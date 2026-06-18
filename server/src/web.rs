@@ -1,4 +1,8 @@
 //! Route handlers, shared state, and embedded static assets.
+//!
+//! Two surfaces share the same logic:
+//! - Human/terminal convenience: `POST /create`, `GET /:name`, `GET /:name+`.
+//! - Canonical REST API under `/api/v1`: versioned, JSON, `201 + Location`.
 
 use std::sync::Arc;
 
@@ -37,7 +41,28 @@ pub async fn resolve(
     State(state): State<AppState>,
     Path(name): Path<String>,
 ) -> Result<Response, AppError> {
-    let link = db::get_link(&state.pool, &name)
+    // A trailing "+" requests the preview/info page instead of redirecting
+    // (the bit.ly convention). A preview is safe: no redirect, no hit counted.
+    if let Some(base) = name.strip_suffix('+') {
+        let d = db::get_link(&state.pool, base)
+            .await
+            .map_err(AppError::internal)?
+            .ok_or(AppError::NotFound)?;
+        let short_url = format!("{}{}", state.base_url, base);
+        let target = (d.kind == "redirect" && !d.encrypted).then_some(d.content.as_str());
+        let kind_label = if d.kind == "paste" { "Paste" } else { "Redirect" };
+        let page = views::preview_page(views::Preview {
+            short_url: &short_url,
+            kind: kind_label,
+            encrypted: d.encrypted,
+            target,
+            hits: d.hits,
+            created_at: &d.created_at,
+        });
+        return Ok(Html(page.into_string()).into_response());
+    }
+
+    let d = db::get_link(&state.pool, &name)
         .await
         .map_err(AppError::internal)?
         .ok_or(AppError::NotFound)?;
@@ -45,12 +70,12 @@ pub async fn resolve(
     // Best-effort; a failed counter must not break the redirect.
     let _ = db::bump_hits(&state.pool, &name).await;
 
-    match link.kind.as_str() {
+    match d.kind.as_str() {
         "redirect" => {
-            if link.encrypted {
-                Ok(Html(views::encrypted_redirect_page(&link.content).into_string()).into_response())
-            } else if validate_redirect(&link.content, DEFAULT_ALLOWED_SCHEMES).is_ok() {
-                Ok(Redirect::to(&link.content).into_response())
+            if d.encrypted {
+                Ok(Html(views::encrypted_redirect_page(&d.content).into_string()).into_response())
+            } else if validate_redirect(&d.content, DEFAULT_ALLOWED_SCHEMES).is_ok() {
+                Ok(Redirect::to(&d.content).into_response())
             } else {
                 // Stored an unexpected scheme somehow — refuse rather than reflect it.
                 Err(AppError::NotFound)
@@ -62,7 +87,7 @@ pub async fn resolve(
 }
 
 // --------------------------------------------------------------------------
-// Terminal-friendly creation
+// Terminal-friendly creation (convenience surface)
 // --------------------------------------------------------------------------
 
 /// `curl yuio.link/create -d url=<url>` -> just the short URL as plain text
@@ -144,7 +169,7 @@ fn normalize_target(s: &str) -> String {
 }
 
 // --------------------------------------------------------------------------
-// JSON API
+// REST API (canonical, versioned, JSON)
 // --------------------------------------------------------------------------
 
 #[derive(Deserialize)]
@@ -163,7 +188,22 @@ pub struct CreateResponse {
     pub url: String,
 }
 
+#[derive(Serialize)]
+pub struct ApiLink {
+    pub name: String,
+    pub kind: String,
+    pub url: String,
+    pub encrypted: bool,
+    /// The destination, only for unencrypted redirects (the server cannot read
+    /// an encrypted target).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+    pub hits: i64,
+    pub created_at: String,
+}
+
 pub enum ApiError {
+    NotFound,
     BadRequest(String),
     Internal,
 }
@@ -171,6 +211,7 @@ pub enum ApiError {
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
+            ApiError::NotFound => (StatusCode::NOT_FOUND, "not found".to_string()),
             ApiError::BadRequest(m) => (StatusCode::BAD_REQUEST, m),
             ApiError::Internal => (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -181,10 +222,12 @@ impl IntoResponse for ApiError {
     }
 }
 
+/// `POST /api/v1/links` — create a link. Returns `201 Created` with a
+/// `Location` header pointing at the new resource.
 pub async fn api_create_link(
     State(state): State<AppState>,
     Json(req): Json<CreateRequest>,
-) -> Result<Json<CreateResponse>, ApiError> {
+) -> Result<impl IntoResponse, ApiError> {
     if req.content.trim().is_empty() {
         return Err(ApiError::BadRequest("content is required".into()));
     }
@@ -215,7 +258,43 @@ pub async fn api_create_link(
         })?;
 
     let url = format!("{}{}", state.base_url, name);
-    Ok(Json(CreateResponse { name, url }))
+    let location = format!("{}api/v1/links/{}", state.base_url, name);
+    Ok((
+        StatusCode::CREATED,
+        [(header::LOCATION, location)],
+        Json(CreateResponse { name, url }),
+    ))
+}
+
+/// `GET /api/v1/links/:name` — read a link (the REST "expand"). Safe and
+/// idempotent. The destination is omitted for encrypted links.
+pub async fn api_get_link(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+) -> Result<Json<ApiLink>, ApiError> {
+    let d = db::get_link(&state.pool, &name)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "failed to read link");
+            ApiError::Internal
+        })?
+        .ok_or(ApiError::NotFound)?;
+
+    let target = if d.kind == "redirect" && !d.encrypted {
+        Some(d.content)
+    } else {
+        None
+    };
+
+    Ok(Json(ApiLink {
+        url: format!("{}{}", state.base_url, d.name),
+        name: d.name,
+        kind: d.kind,
+        encrypted: d.encrypted,
+        target,
+        hits: d.hits,
+        created_at: d.created_at,
+    }))
 }
 
 // --------------------------------------------------------------------------

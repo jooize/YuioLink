@@ -109,3 +109,40 @@ pub fn error_page(code: u16, message: &str) -> Markup {
     };
     document(body, html! {})
 }
+
+pub struct Preview<'a> {
+    pub short_url: &'a str,
+    pub kind: &'a str,
+    pub encrypted: bool,
+    pub target: Option<&'a str>,
+    pub hits: i64,
+    pub created_at: &'a str,
+}
+
+/// The `yuio.link/:name+` preview/info page: where a link goes, hit count,
+/// and whether it is encrypted — without redirecting or counting a hit.
+pub fn preview_page(p: Preview) -> Markup {
+    let body = html! {
+        p.app-subtitle { "Link preview" }
+
+        div.result role="status" {
+            div.result-label { (p.kind) }
+            div.result-row { code { (p.short_url) } }
+        }
+
+        @if let Some(target) = p.target {
+            p.app-subtitle { "Destination" }
+            div.result-row { code { a href=(target) rel="nofollow noopener noreferrer" { (target) } } }
+            a.btn.btn-block href=(p.short_url) { "Continue" }
+        } @else if p.encrypted {
+            p.app-subtitle { "Encrypted — the destination is hidden from the server and opens in your browser with the key from the original link." }
+        } @else {
+            p.app-subtitle { "This is a paste." }
+        }
+
+        p.app-subtitle { (p.hits) " hits · created " (p.created_at) }
+
+        footer.app-footer { a href="/" { "Back to YuioLink" } }
+    };
+    document(body, html! {})
+}

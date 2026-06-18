@@ -45,6 +45,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/static/app.js", get(web::app_js))
         .route("/static/redirect.js", get(web::redirect_js))
         .route("/api/v1/links", post(web::api_create_link))
+        .route("/api/v1/links/:name", get(web::api_get_link))
         .route("/create", post(web::create_plain))
         .route("/:name", get(web::resolve))
         .fallback(fallback)

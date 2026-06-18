@@ -6,13 +6,16 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 use yuiolink_core::{DEFAULT_NAME_LEN, generate_name};
 
 #[derive(sqlx::FromRow)]
-pub struct LinkRow {
+pub struct LinkDetail {
+    pub name: String,
     pub kind: String,
     pub content: String,
     // Read but unused until paste viewing lands.
     #[allow(dead_code)]
     pub content_type: Option<String>,
     pub encrypted: bool,
+    pub hits: i64,
+    pub created_at: String,
 }
 
 pub async fn connect(db_path: &str) -> anyhow::Result<SqlitePool> {
@@ -27,9 +30,9 @@ pub async fn connect(db_path: &str) -> anyhow::Result<SqlitePool> {
     Ok(pool)
 }
 
-pub async fn get_link(pool: &SqlitePool, name: &str) -> Result<Option<LinkRow>, sqlx::Error> {
-    sqlx::query_as::<_, LinkRow>(
-        "SELECT kind, content, content_type, encrypted FROM links WHERE name = ?",
+pub async fn get_link(pool: &SqlitePool, name: &str) -> Result<Option<LinkDetail>, sqlx::Error> {
+    sqlx::query_as::<_, LinkDetail>(
+        "SELECT name, kind, content, content_type, encrypted, hits, created_at FROM links WHERE name = ?",
     )
     .bind(name)
     .fetch_optional(pool)
