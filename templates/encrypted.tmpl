@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src="/js/sjcl.js"></script>
+    </head>
+    <body>
+        <script>
+            var key = window.location.hash;
+{% autoescape off %}
+            var encryptedUri = '{{ uri }}';
+{% endautoescape %}
+            try {
+                var decryptedUri = sjcl.decrypt(key.substr(1), encryptedUri);
+                window.location = decryptedUri;
+            } 
+            catch (ex) {
+                console.log("Could not decrypt URI");
+            }
+        </script>
+    </body>
+</html>

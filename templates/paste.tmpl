@@ -1,0 +1,138 @@
+{% extends "minimal-layout.tmpl" %}
+
+{% block style %}
+.app-window { --window-width: 820px; }
+
+.paste-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.paste-toolbar .switch-row {
+    margin-left: auto;
+    padding: 0;
+}
+
+.paste-toolbar .switch-title {
+    font-size: 14px;
+}
+
+#content_type {
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    background: var(--field-bg);
+    border: 0.5px solid var(--field-border);
+    border-radius: 9px;
+    padding: 7px 30px 7px 12px;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%238e8e93' d='M3 4.5 6 7.5 9 4.5'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    cursor: pointer;
+}
+
+#editor {
+    min-height: 440px;
+    border-radius: 12px;
+    border: 0.5px solid var(--field-border);
+    background: var(--field-bg);
+    overflow: hidden;
+    font-family: var(--font-mono);
+}
+
+#editor .ace_gutter,
+#editor .ace-chrome {
+    background: transparent;
+}
+
+#link-panel { display: none; }
+
+@media (max-width: 600px) {
+    .paste-toolbar { flex-wrap: wrap; }
+    .paste-toolbar .switch-row { margin-left: 0; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="result" id="link-panel" role="status">
+    <div class="result-label">Your link is ready</div>
+    <div class="result-row">
+        <code id="link-element">{{ link }}</code>
+    </div>
+</div>
+
+<form method="POST">
+    <div class="paste-toolbar">
+        <select id="content_type" name="content_type">
+            <option value="csharp">C#</option>
+            <option value="javascript">Javascript</option>
+            <option value="markdown" selected>Markdown</option>
+        </select>
+
+        <label class="switch-row" for="encrypt">
+            <span class="switch-title">Encrypt Paste</span>
+            <span class="switch">
+                <input type="checkbox" name="encrypt" id="encrypt" checked>
+                <span class="switch-track"><span class="switch-thumb"></span></span>
+            </span>
+        </label>
+    </div>
+
+    <div id="editor"></div>
+    <noscript>
+        <textarea class="form-control" name="content" rows="16"></textarea>
+    </noscript>
+
+    <button type="submit" class="btn btn-block" id="submit">Create Paste</button>
+</form>
+{% endblock %}
+
+{% block script %}
+<script src="/js/ace.js" type="text/javascript" charset="utf-8"></script>
+<script>
+    $(function () {
+        var editor = ace.edit("editor");
+        editor.setTheme("ace/theme/chrome");
+        editor.getSession().setMode("ace/mode/markdown");
+        editor.setShowPrintMargin(false);
+        editor.setOption("showGutter", false);
+        editor.setHighlightActiveLine(false);
+        editor.setFontSize(15);
+
+        var contentTypeElement = document.getElementById("content_type");
+        contentTypeElement.onchange = function (event) {
+            var contentType = event.target.value;
+            editor.getSession().setMode("ace/mode/" + contentType);
+        };
+
+        var submit = document.getElementById("submit");
+        submit.onclick = function (event) {
+            var content = editor.getValue();
+            var contentType = $('#content_type').find(":selected").val();
+            var encrypt = document.getElementById("encrypt");
+            if (encrypt.checked) {
+                var key = generateKey(32);
+                content = sjcl.encrypt(key, content, { ks: 256 });
+            }
+
+            $.post("/api/paste", {
+                "content": content,
+                "content_type": contentType,
+                "encrypted": encrypt.checked
+            }, function (data) {
+                var linkElement = document.getElementById("link-element");
+                linkElement.textContent = encrypt.checked ? data + "#" + key : data;
+                $("#link-panel").show();
+            });
+
+            event.returnValue = false;
+            return false;
+        };
+    });
+</script>
+{% endblock %}
