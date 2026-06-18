@@ -1,0 +1,25 @@
+# Rust
+/target/
+
+# macOS / Xcode (future macos/ client)
+*.xcuserstate
+xcuserdata/
+DerivedData/
+*.dSYM
+*.dSYM.zip
+build/
+*.app
+
+# direnv / project-local scratch
+.direnv/
+.tmp/
+
+# Secrets (never commit)
+SECRETS.md
+*.pem
+*.key
+.env
+.env.local
+
+# OS cruft
+.DS_Store
