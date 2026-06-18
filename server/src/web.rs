@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::{Path, State};
-use axum::http::{StatusCode, header};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
@@ -58,6 +58,88 @@ pub async fn resolve(
         }
         // Paste viewing arrives with the paste feature.
         _ => Err(AppError::NotFound),
+    }
+}
+
+// --------------------------------------------------------------------------
+// Terminal-friendly creation
+// --------------------------------------------------------------------------
+
+/// `curl yuio.link/create -d url=<url>` -> just the short URL as plain text
+/// (or JSON when the client sends `Accept: application/json`).
+///
+/// POST, not GET: creating a link changes state, so it must not be a safe
+/// method (RFC 9110); `GET`/`QUERY` are reserved for safe look-ups. Unencrypted
+/// (a shell cannot do client-side crypto — that is the CLI's job); the scheme
+/// allowlist applies; a bare host defaults to `https://`. The body is the URL,
+/// with an optional `url=` prefix so both `-d url=X` and `-d X` work.
+pub async fn create_plain(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: String,
+) -> Response {
+    let trimmed = body.trim();
+    let target = trimmed.strip_prefix("url=").unwrap_or(trimmed).trim();
+
+    if target.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            "usage: curl -d url=<url> https://yuio.link/create\n",
+        )
+            .into_response();
+    }
+
+    let normalized = normalize_target(target);
+    if let Err(e) = validate_redirect(&normalized, DEFAULT_ALLOWED_SCHEMES) {
+        return (StatusCode::BAD_REQUEST, format!("{e}\n")).into_response();
+    }
+
+    let name = match db::insert_unique(&state.pool, "redirect", &normalized, None, false).await {
+        Ok(name) => name,
+        Err(e) => {
+            tracing::error!(error = %e, "failed to insert link (plain)");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "internal error\n").into_response();
+        }
+    };
+
+    let url = format!("{}{}", state.base_url, name);
+
+    let wants_json = headers
+        .get(header::ACCEPT)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|a| a.contains("application/json"));
+
+    if wants_json {
+        Json(CreateResponse { name, url }).into_response()
+    } else {
+        (
+            [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+            format!("{url}\n"),
+        )
+            .into_response()
+    }
+}
+
+/// True if `s` already starts with an explicit `scheme:` (RFC 3986 scheme
+/// characters, with no `/` before the colon so a path colon does not count).
+fn has_scheme(s: &str) -> bool {
+    match s.find(':') {
+        Some(i) if i > 0 => {
+            let scheme = &s[..i];
+            scheme.starts_with(|c: char| c.is_ascii_alphabetic())
+                && scheme
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '-'))
+        }
+        _ => false,
+    }
+}
+
+fn normalize_target(s: &str) -> String {
+    if has_scheme(s) {
+        s.to_string()
+    } else {
+        format!("https://{s}")
     }
 }
 
