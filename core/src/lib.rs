@@ -8,9 +8,12 @@
 pub mod content;
 pub mod crypto;
 pub mod link;
+pub mod words;
 
 pub use content::ContentType;
 pub use crypto::{CryptoError, LinkKey, open, seal, seal_str};
 pub use link::{
-    DEFAULT_ALLOWED_SCHEMES, DEFAULT_NAME_LEN, UriError, generate_name, validate_redirect,
+    DEFAULT_ALLOWED_SCHEMES, Kind, MAX_TTL_SECS, UriError, detect_kind, generate_name, has_scheme,
+    validate_redirect, words_for_ttl,
 };
+pub use words::{WORD_COUNT, words};

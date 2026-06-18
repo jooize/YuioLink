@@ -1,35 +1,149 @@
-//! Link-name generation and redirect-target validation.
+//! Link-name generation, redirect-target validation, and redirect-vs-text
+//! detection.
+
+use std::time::Duration;
 
 use rand::RngCore;
 use rand::rngs::OsRng;
 use url::Url;
 
-/// Unambiguous alphabet for human-friendly link names — excludes the visually
-/// confusable `0/O`, `1/l/I`. 55 symbols.
-const ALPHABET: &[u8] = b"abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+use crate::words::{WORD_COUNT, words};
 
-/// Default link-name length. 55^7 ≈ 1.5e12 — ample, and unguessable because the
-/// bytes come from the OS CSPRNG (unlike the old `math/rand`-seeded scheme).
-pub const DEFAULT_NAME_LEN: usize = 7;
+/// Default max link lifetime used to scale the word count (7 days). The server
+/// enforces its own configurable maximum; this constant only bounds how many
+/// words a name needs, which tops out at two regardless of a larger server max.
+pub const MAX_TTL_SECS: u64 = 7 * 24 * 60 * 60;
 
-/// Generate a random link name using the OS CSPRNG with rejection sampling to
-/// avoid modulo bias.
-pub fn generate_name(len: usize) -> String {
-    let n = ALPHABET.len();
-    // Largest multiple of `n` that fits in a byte; sampled bytes >= this are
-    // rejected so every symbol is equally likely.
-    let max_unbiased = (256 / n * n) as u16;
+/// One full day, in seconds — the boundary below which a one-word name suffices.
+const ONE_DAY_SECS: u64 = 24 * 60 * 60;
 
-    let mut out = String::with_capacity(len);
-    let mut buf = [0u8; 1];
-    while out.len() < len {
-        OsRng.fill_bytes(&mut buf);
-        let b = buf[0] as u16;
-        if b < max_unbiased {
-            out.push(ALPHABET[(b as usize) % n] as char);
+/// What a link carries. Both kinds share one namespace and one storage table;
+/// the kind only changes how the stored `content` is resolved and rendered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Kind {
+    /// `content` is a redirect target (a URL, or sealed ciphertext).
+    Redirect,
+    /// `content` is a body of text (plain, or sealed ciphertext).
+    Text,
+}
+
+impl Kind {
+    /// Stable lowercase identifier used on the wire and in storage.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Kind::Redirect => "redirect",
+            Kind::Text => "text",
+        }
+    }
+}
+
+/// Number of words a name needs for a given lifetime. Shorter-lived links get
+/// shorter, wieldier names because they free their name back into the scarce
+/// short namespace sooner: <=1 day -> one word; up to the 7-day max -> two.
+/// (A one-word name that collides is grown to two at insert time, so a 1-day
+/// link is effectively 1-2 words.)
+pub fn words_for_ttl(ttl: Duration) -> usize {
+    let secs = ttl.as_secs().min(MAX_TTL_SECS);
+    if secs <= ONE_DAY_SECS { 1 } else { 2 }
+}
+
+/// Render words in YuioLink's alternating-case display form: the first word
+/// lowercase, the next UPPERCASE, and so on (`braveOTTER`). The casing is a
+/// readability aid only — lookups and uniqueness are case-insensitive.
+fn alternating_case(parts: &[&str]) -> String {
+    let mut out = String::new();
+    for (i, word) in parts.iter().enumerate() {
+        if i % 2 == 0 {
+            out.push_str(&word.to_lowercase());
+        } else {
+            out.push_str(&word.to_uppercase());
         }
     }
     out
+}
+
+/// Pick a uniformly random word index in `[0, WORD_COUNT)` from the OS CSPRNG,
+/// using rejection sampling to avoid modulo bias.
+fn pick_index() -> usize {
+    // 1296 < 2^16; reject the tail so every index is equally likely.
+    let max_unbiased = (u16::MAX as u32 + 1) / WORD_COUNT as u32 * WORD_COUNT as u32;
+    let mut buf = [0u8; 2];
+    loop {
+        OsRng.fill_bytes(&mut buf);
+        let v = u16::from_le_bytes(buf) as u32;
+        if v < max_unbiased {
+            return (v % WORD_COUNT as u32) as usize;
+        }
+    }
+}
+
+/// Generate a random link name from `words` EFF-short words in alternating-case
+/// display form. The words come from the OS CSPRNG, so names are unguessable.
+pub fn generate_name(words_count: usize) -> String {
+    let list = words();
+    let picked: Vec<&str> = (0..words_count.max(1)).map(|_| list[pick_index()]).collect();
+    alternating_case(&picked)
+}
+
+/// True if `s` already starts with an explicit `scheme:` (RFC 3986 scheme
+/// characters, with no `/` before the colon so a path colon does not count).
+pub fn has_scheme(s: &str) -> bool {
+    match s.find(':') {
+        Some(i) if i > 0 => {
+            let scheme = &s[..i];
+            scheme.starts_with(|c: char| c.is_ascii_alphabetic())
+                && scheme
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '-'))
+        }
+        _ => false,
+    }
+}
+
+/// True if `s` is a single token that looks like a bare domain (`example.com`,
+/// `sub.example.co.uk/path`) — no whitespace, a dotted host, an alphabetic TLD.
+fn looks_like_domain(s: &str) -> bool {
+    if s.chars().any(char::is_whitespace) {
+        return false;
+    }
+    // The host is everything before the first path/query/fragment, minus a port.
+    let host = s.split(['/', '?', '#']).next().unwrap_or(s);
+    let host = host.split(':').next().unwrap_or(host);
+    let labels: Vec<&str> = host.split('.').collect();
+    if labels.len() < 2 {
+        return false;
+    }
+    let tld_ok = labels
+        .last()
+        .is_some_and(|tld| tld.len() >= 2 && tld.chars().all(|c| c.is_ascii_alphabetic()));
+    let labels_ok = labels
+        .iter()
+        .all(|l| !l.is_empty() && l.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'));
+    tld_ok && labels_ok
+}
+
+/// Best-effort guess of whether input is a [`Kind::Redirect`] or [`Kind::Text`].
+///
+/// Multi-line input is Text; a single line that has a scheme or looks like a
+/// bare domain is a Redirect; anything else is Text. The UI always offers a
+/// manual toggle, so this only needs to be right for the common case. Detection
+/// never decides encryption — only redirect-vs-text.
+pub fn detect_kind(s: &str) -> Kind {
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        return Kind::Text;
+    }
+    // A newline that survives trimming means real multi-line content -> Text.
+    // (Trailing blank lines after a single URL are trimmed away, so they stay a
+    // Redirect.)
+    if trimmed.contains('\n') {
+        return Kind::Text;
+    }
+    if has_scheme(trimmed) || looks_like_domain(trimmed) {
+        Kind::Redirect
+    } else {
+        Kind::Text
+    }
 }
 
 /// Default allowlist of URL schemes permitted for unencrypted redirects.
@@ -68,19 +182,70 @@ mod tests {
     use std::collections::HashSet;
 
     #[test]
-    fn name_has_requested_length_and_alphabet() {
-        for _ in 0..100 {
-            let name = generate_name(DEFAULT_NAME_LEN);
-            assert_eq!(name.len(), DEFAULT_NAME_LEN);
-            assert!(name.bytes().all(|b| ALPHABET.contains(&b)));
+    fn one_word_name_is_a_lowercase_list_member() {
+        let list = words();
+        for _ in 0..200 {
+            let name = generate_name(1);
+            assert!(list.contains(&name.as_str()), "{name:?} not in word list");
+        }
+    }
+
+    #[test]
+    fn alternating_case_lowercases_then_uppercases() {
+        assert_eq!(alternating_case(&["brave", "otter"]), "braveOTTER");
+        assert_eq!(alternating_case(&["one", "two", "three"]), "oneTWOthree");
+        assert_eq!(alternating_case(&["solo"]), "solo");
+    }
+
+    #[test]
+    fn two_word_name_has_both_cases() {
+        for _ in 0..50 {
+            let name = generate_name(2);
+            assert!(name.chars().any(|c| c.is_ascii_lowercase()));
+            assert!(name.chars().any(|c| c.is_ascii_uppercase()));
         }
     }
 
     #[test]
     fn names_are_distinct() {
-        let set: HashSet<String> = (0..1000).map(|_| generate_name(DEFAULT_NAME_LEN)).collect();
-        // Collisions at this length/count would be astronomically unlikely.
-        assert_eq!(set.len(), 1000);
+        // Two-word names: 1296^2 ≈ 1.7M, so 1000 draws collide vanishingly rarely.
+        let set: HashSet<String> = (0..1000).map(|_| generate_name(2)).collect();
+        assert!(set.len() > 990);
+    }
+
+    #[test]
+    fn lookup_is_case_insensitive_by_design() {
+        // Display casing is cosmetic; the server compares names with NOCASE.
+        assert!("braveOTTER".eq_ignore_ascii_case("BRAVEotter"));
+        assert!("braveOTTER".eq_ignore_ascii_case("braveotter"));
+    }
+
+    #[test]
+    fn words_for_ttl_boundaries() {
+        assert_eq!(words_for_ttl(Duration::from_secs(15 * 60)), 1); // 15 min
+        assert_eq!(words_for_ttl(Duration::from_secs(ONE_DAY_SECS)), 1); // 1 day (default)
+        assert_eq!(words_for_ttl(Duration::from_secs(ONE_DAY_SECS + 1)), 2); // just over a day
+        assert_eq!(words_for_ttl(Duration::from_secs(MAX_TTL_SECS)), 2); // 7 days (max)
+        assert_eq!(words_for_ttl(Duration::from_secs(MAX_TTL_SECS * 10)), 2); // clamped
+    }
+
+    #[test]
+    fn detect_kind_classifies_common_input() {
+        assert_eq!(detect_kind("https://example.com/watch?v=x"), Kind::Redirect);
+        assert_eq!(detect_kind("mailto:a@b.com"), Kind::Redirect);
+        assert_eq!(detect_kind("example.com"), Kind::Redirect); // bare domain
+        assert_eq!(detect_kind("sub.example.co.uk/path"), Kind::Redirect);
+        assert_eq!(detect_kind("hello"), Kind::Text); // single word
+        assert_eq!(detect_kind("just some prose here"), Kind::Text); // spaces
+        assert_eq!(detect_kind("line one\nline two"), Kind::Text); // multi-line
+        assert_eq!(detect_kind(""), Kind::Text);
+    }
+
+    #[test]
+    fn detect_kind_ignores_trailing_blank_lines() {
+        // A single URL with trailing newlines is still a Redirect.
+        assert_eq!(detect_kind("https://example.com\n\n\n"), Kind::Redirect);
+        assert_eq!(detect_kind("  https://example.com  "), Kind::Redirect);
     }
 
     #[test]
