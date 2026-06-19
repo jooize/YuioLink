@@ -1,0 +1,15 @@
+# Keep the build context small and reproducible: no build output, VCS, scratch,
+# or local databases. Source + manifests only.
+target
+.git
+.tmp
+.trash
+.claude
+.claude-memory
+.claude-lane
+.claude-plans
+.claude-transcripts
+.envrc
+*.db
+*.db-wal
+*.db-shm
