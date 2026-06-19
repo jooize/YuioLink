@@ -34,28 +34,54 @@ fn document(body: Markup, scripts: Markup) -> Markup {
 
 pub fn index_page() -> Markup {
     let body = html! {
-        p.app-subtitle { "Redirect any link, and secure it with client-side encryption." }
+        p.app-subtitle { "Memorable links that always expire — redirect or text, optionally encrypted." }
         noscript { p.app-subtitle { "JavaScript is required to create and decrypt links." } }
 
         div.result #link-panel role="status" hidden {
-            div.result-label { (PreEscaped(ICON_CHECK)) " Your link is ready" }
+            div.result-label { (PreEscaped(ICON_CHECK)) " Your ephemeral link is ready" }
             div.result-row { code #link-element {} }
+            div.result-expiry #link-expiry {}
         }
 
         form #create-form method="post" action="/" {
             div.form-group {
-                input #uri.form-control type="text" name="uri" inputmode="url"
+                textarea #content.form-control name="content" rows="1"
                     autocomplete="off" autocapitalize="off" spellcheck="false"
-                    placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ" autofocus;
+                    placeholder="Paste a link to redirect, or type text to share" autofocus {}
+            }
+
+            // Auto-detected redirect-vs-text, with a one-tap manual override.
+            div.field-label { "Type" }
+            div.segmented #mode-toggle role="group" aria-label="Link type" {
+                button #mode-redirect.seg-btn type="button" data-mode="redirect" { "Redirect" }
+                button #mode-text.seg-btn type="button" data-mode="text" { "Text" }
+            }
+
+            div.field-label { "Expires in" }
+            div.segmented #ttl-toggle role="group" aria-label="Expiry" {
+                button.seg-btn type="button" data-ttl="600" { "10 min" }
+                button.seg-btn type="button" data-ttl="3600" { "1 hour" }
+                button.seg-btn.active type="button" data-ttl="86400" { "1 day" }
+                button.seg-btn type="button" data-ttl="604800" { "7 days" }
+            }
+
+            details.advanced {
+                summary { "Advanced" }
+                label.field-row for="max-uses" {
+                    span.field-row-label { "Burn after" }
+                    input #max-uses type="number" min="1" inputmode="numeric"
+                        placeholder="Unlimited";
+                    span.field-row-suffix { "uses" }
+                }
             }
 
             label.switch-row for="encrypt" {
                 span.switch-label {
-                    span.switch-title { "Encrypt Link" }
+                    span.switch-title { "Encrypt" }
                     span.switch-desc { "End-to-end, in your browser. The key never reaches the server." }
                 }
                 span.switch {
-                    input #encrypt type="checkbox" name="encrypt" checked;
+                    input #encrypt type="checkbox" name="encrypt";
                     span.switch-track { span.switch-thumb {} }
                 }
             }
