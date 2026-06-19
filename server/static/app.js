@@ -1,7 +1,14 @@
-// Landing-page logic: one input that auto-detects redirect vs Text (with a
-// manual override), a TTL picker, optional burn-after-read and encryption, then
-// create the ephemeral link and arm "+ Copy" so the next Enter copies it.
+// Progressive enhancement for the landing + result pages. The create form works
+// without JavaScript (it posts to `POST /` and a result page comes back). When JS
+// is present we intercept the submit for a slicker in-place result, add live type
+// detection, keyboard shortcuts, and copy. Encryption (if the operator enabled it)
+// is the one path that *requires* JS, since the content is sealed in the browser.
 (function () {
+    // Which backend to call; empty meta = same origin. Lets a hosted frontend
+    // point at another backend (e.g. one with encryption enabled).
+    var metaBase = document.querySelector('meta[name="yuiolink-api-base"]');
+    var API_BASE = (metaBase && metaBase.content) ? metaBase.content.replace(/\/+$/, "") : "";
+
     // --- redirect-vs-text detection, mirroring yuiolink_core::detect_kind ---
     function hasScheme(s) {
         var i = s.indexOf(":");
@@ -27,163 +34,140 @@
         return hasScheme(s) ? s : "https://" + s;
     }
 
-    document.addEventListener("DOMContentLoaded", function () {
+    function wireCopy(button, getText) {
+        button.disabled = false;
+        button.addEventListener("click", function () {
+            var text = getText();
+            if (!text || !navigator.clipboard || !navigator.clipboard.writeText) return;
+            navigator.clipboard.writeText(text).then(function () {
+                var original = button.textContent;
+                button.classList.add("copied");
+                button.textContent = "Copied";
+                setTimeout(function () {
+                    button.classList.remove("copied");
+                    button.textContent = original;
+                }, 1500);
+            }, function () {});
+        });
+    }
+
+    function initCreate() {
         var content = document.getElementById("content");
         var form = document.getElementById("create-form");
-        var encrypt = document.getElementById("encrypt");
+        var encrypt = document.getElementById("encrypt"); // null when encryption is off
         var copyBtn = document.getElementById("copy");
         var submitBtn = document.getElementById("submit");
         var linkEl = document.getElementById("link-element");
         var expiryEl = document.getElementById("link-expiry");
         var panel = document.getElementById("link-panel");
         var maxUsesInput = document.getElementById("max-uses");
+        var hint = document.getElementById("detected-hint");
+        var autoRadio = document.getElementById("kind-auto");
 
-        var modeButtons = {
-            redirect: document.getElementById("mode-redirect"),
-            text: document.getElementById("mode-text"),
-        };
-        var ttlButtons = Array.prototype.slice.call(
-            document.querySelectorAll("#ttl-toggle .seg-btn")
-        );
-
-        var autoMode = true; // until the user taps a mode, follow detection
-        var mode = "text";
-        var ttlSeconds = 86400;
-        var ttlLabel = "1 day";
-
-        // --- mode (Redirect | Text) ---
-        function applyMode(next) {
-            mode = next;
-            modeButtons.redirect.classList.toggle("active", mode === "redirect");
-            modeButtons.text.classList.toggle("active", mode === "text");
+        function checkedValue(name, fallback) {
+            var el = document.querySelector('input[name="' + name + '"]:checked');
+            return el ? el.value : fallback;
         }
-        function syncAutoMode() {
-            if (autoMode) applyMode(detectKind(content.value));
+        function effectiveKind() {
+            var v = checkedValue("kind", "auto");
+            return v === "auto" ? detectKind(content.value) : v;
         }
-        Object.keys(modeButtons).forEach(function (key) {
-            modeButtons[key].addEventListener("click", function () {
-                autoMode = false; // manual tap wins
-                applyMode(key);
-                content.focus();
-            });
-        });
+        function ttlLabel() {
+            var el = document.querySelector('input[name="ttl_seconds"]:checked');
+            var label = el && el.nextElementSibling;
+            return label ? label.textContent.trim() : "the chosen time";
+        }
 
-        // --- TTL picker ---
-        ttlButtons.forEach(function (btn) {
-            btn.addEventListener("click", function () {
-                ttlButtons.forEach(function (b) { b.classList.remove("active"); });
-                btn.classList.add("active");
-                ttlSeconds = parseInt(btn.dataset.ttl, 10);
-                ttlLabel = btn.textContent.trim();
-            });
-        });
+        function updateHint() {
+            if (!hint) return;
+            if (autoRadio && autoRadio.checked && content.value.trim() !== "") {
+                hint.textContent = "— looks like " + (detectKind(content.value) === "redirect" ? "a redirect" : "text");
+            } else {
+                hint.textContent = "";
+            }
+        }
 
-        // --- auto-growing textarea ---
         function autosize() {
             content.style.height = "auto";
             content.style.height = content.scrollHeight + "px";
         }
+
         content.addEventListener("input", function () {
             autosize();
-            syncAutoMode();
+            updateHint();
+        });
+        document.querySelectorAll('input[name="kind"]').forEach(function (r) {
+            r.addEventListener("change", updateHint);
         });
 
-        // --- keyboard: Redirect Enter submits; Text Enter = newline, Cmd/Ctrl-Enter submits ---
+        // Redirect: Enter submits. Text: Enter = newline, Cmd/Ctrl-Enter submits.
         content.addEventListener("keydown", function (event) {
             if (event.key !== "Enter") return;
-            if (mode === "redirect") {
-                if (!event.shiftKey) {
-                    event.preventDefault();
-                    form.requestSubmit();
-                }
+            if (effectiveKind() === "redirect") {
+                if (!event.shiftKey) { event.preventDefault(); form.requestSubmit(); }
             } else if (event.metaKey || event.ctrlKey) {
                 event.preventDefault();
                 form.requestSubmit();
             }
         });
 
-        // --- copy ---
-        function hasLink() { return linkEl.textContent.trim() !== ""; }
-        function selectLinkText() {
+        function showReady(url, note) {
+            linkEl.textContent = url;
+            expiryEl.textContent = note;
+            panel.hidden = false;
             var range = document.createRange();
             range.selectNodeContents(linkEl);
             var sel = window.getSelection();
             sel.removeAllRanges();
             sel.addRange(range);
-        }
-        function showReady(url, expiresLabel) {
-            linkEl.textContent = url;
-            expiryEl.textContent = expiresLabel;
-            panel.hidden = false;
-            copyBtn.disabled = false;
-            selectLinkText();
             copyBtn.focus();
         }
-        function doCopy() {
-            if (!hasLink()) return;
-            var text = linkEl.textContent.trim();
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(function () {
-                    copyBtn.classList.add("copied");
-                    copyBtn.textContent = "Copied";
-                    setTimeout(function () {
-                        copyBtn.classList.remove("copied");
-                        copyBtn.textContent = "+ Copy";
-                    }, 1500);
-                }, function () {});
-            }
-        }
-        copyBtn.addEventListener("click", doCopy);
+        wireCopy(copyBtn, function () { return linkEl.textContent.trim(); });
 
-        // --- submit ---
         form.addEventListener("submit", async function (event) {
+            // Intercept for the in-place result; if JS were off, this same form
+            // would post to `POST /` and render a result page instead.
             event.preventDefault();
             var raw = content.value;
-            if (raw.trim() === "") {
-                content.focus();
-                return;
-            }
+            if (raw.trim() === "") { content.focus(); return; }
 
-            // For redirect we normalize a bare host to https://; text is sent as typed.
-            var payload = mode === "redirect" ? normalizeTarget(raw.trim()) : raw;
-
+            var kind = effectiveKind();
+            var payload = kind === "redirect" ? normalizeTarget(raw.trim()) : raw;
             var maxUses = null;
-            if (maxUsesInput.value.trim() !== "") {
+            if (maxUsesInput && maxUsesInput.value.trim() !== "") {
                 var n = parseInt(maxUsesInput.value, 10);
                 if (!isNaN(n) && n > 0) maxUses = n;
             }
+            var ttl = parseInt(checkedValue("ttl_seconds", "86400"), 10);
+            var label = ttlLabel();
 
             submitBtn.disabled = true;
             submitBtn.textContent = "Creating…";
-
             try {
-                var body = payload;
+                var bodyContent = payload;
                 var fragment = "";
-                if (encrypt.checked) {
-                    var rawKey = YuioCrypto.generateKey();
-                    body = await YuioCrypto.seal(payload, rawKey);
-                    fragment = "#" + YuioCrypto.keyToFragment(rawKey);
+                if (encrypt && encrypt.checked) {
+                    var key = YuioCrypto.generateKey();
+                    bodyContent = await YuioCrypto.seal(payload, key);
+                    fragment = "#" + YuioCrypto.keyToFragment(key);
                 }
-
-                var resp = await fetch("/api/v1/links", {
+                var resp = await fetch(API_BASE + "/api/v1/links", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        kind: mode,
-                        content: body,
-                        encrypted: encrypt.checked,
-                        ttl_seconds: ttlSeconds,
+                        kind: kind,
+                        content: bodyContent,
+                        encrypted: !!(encrypt && encrypt.checked),
+                        ttl_seconds: ttl,
                         max_uses: maxUses,
                     }),
                 });
-
                 if (!resp.ok) {
                     var err = await resp.json().catch(function () { return {}; });
                     throw new Error(err.error || "Request failed");
                 }
-
                 var data = await resp.json();
-                var note = "Expires in " + ttlLabel;
+                var note = "Expires in " + label;
                 if (maxUses) note += " · burns after " + maxUses + (maxUses === 1 ? " use" : " uses");
                 showReady(data.url + fragment, note);
             } catch (e) {
@@ -194,9 +178,19 @@
             }
         });
 
-        // initial state
         autosize();
-        syncAutoMode();
+        updateHint();
         content.focus();
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        if (document.getElementById("create-form")) initCreate();
+
+        // Result page (no-JS create landed here): wire its copy button.
+        var resultCopy = document.getElementById("copy-link");
+        var resultLink = document.getElementById("link-element");
+        if (resultCopy && resultLink) {
+            wireCopy(resultCopy, function () { return resultLink.textContent.trim(); });
+        }
     });
 })();

@@ -1,16 +1,17 @@
 //! Route handlers, shared state, and embedded static assets.
 //!
-//! Two surfaces share the same logic:
-//! - Human/terminal convenience: `POST /create`, `GET /:name`, `GET /:name+`.
-//! - Canonical REST API under `/api/v1`: versioned, JSON, `201 + Location`,
-//!   open CORS so a trusted third-party client can run against yuio.link.
+//! Three surfaces share one creation path ([`create_link`]):
+//! - No-JS browser form: `POST /` -> a server-rendered result page.
+//! - Terminal convenience: `POST /create` -> the short URL as text/JSON.
+//! - Canonical REST API under `/api/v1`: versioned JSON, `201 + Location`, open
+//!   CORS so a trusted third-party client can run against any backend.
 
 use std::sync::Arc;
 
-use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Form, Path, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{Html, IntoResponse, Redirect, Response};
+use axum::Json;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
@@ -31,19 +32,143 @@ pub struct AppState {
     pub pool: SqlitePool,
     pub base_url: Arc<str>,
     pub max_ttl_secs: i64,
+    pub encryption_enabled: bool,
+    pub api_base: Arc<str>,
+}
+
+// --------------------------------------------------------------------------
+// Shared creation logic
+// --------------------------------------------------------------------------
+
+/// Why a create attempt failed: a client mistake (400) or our fault (500).
+pub enum CreateError {
+    BadRequest(String),
+    Internal,
+}
+
+/// Validate the inputs and insert a link, shared by every creation surface.
+///
+/// `kind_choice` is the caller's explicit kind (`redirect`/`text`), or `auto`/
+/// `None` to detect it. Trimming follows the rule "trim only a bare URL" — text
+/// is stored verbatim (newlines and all); only a redirect target is trimmed and
+/// normalized.
+async fn create_link(
+    state: &AppState,
+    kind_choice: Option<&str>,
+    raw_content: &str,
+    ttl_seconds: i64,
+    max_uses: Option<i64>,
+    encrypted: bool,
+) -> Result<db::InsertedLink, CreateError> {
+    use CreateError::BadRequest;
+
+    if encrypted && !state.encryption_enabled {
+        return Err(BadRequest("encryption is disabled on this server".into()));
+    }
+    if raw_content.trim().is_empty() {
+        return Err(BadRequest("content is required".into()));
+    }
+
+    let kind = match kind_choice {
+        None | Some("") | Some("auto") => detect_kind(raw_content),
+        Some("redirect") => Kind::Redirect,
+        Some("text") => Kind::Text,
+        Some(_) => return Err(BadRequest("kind must be 'redirect', 'text', or 'auto'".into())),
+    };
+
+    // Redirects are trimmed + normalized + scheme-checked (unless they are opaque
+    // ciphertext); text is kept exactly as typed.
+    let (content, content_type): (String, Option<&str>) = match kind {
+        Kind::Redirect if encrypted => (raw_content.to_string(), None),
+        Kind::Redirect => {
+            let normalized = normalize_target(raw_content.trim());
+            validate_redirect(&normalized, DEFAULT_ALLOWED_SCHEMES)
+                .map_err(|e| BadRequest(e.to_string()))?;
+            (normalized, None)
+        }
+        Kind::Text => (raw_content.to_string(), Some(ContentType::PlainText.as_str())),
+    };
+
+    if content.len() > MAX_CONTENT_BYTES {
+        return Err(BadRequest("content too large".into()));
+    }
+    check_ttl(ttl_seconds, state.max_ttl_secs).map_err(BadRequest)?;
+    if let Some(n) = max_uses
+        && n <= 0
+    {
+        return Err(BadRequest("max_uses must be a positive integer".into()));
+    }
+
+    db::insert_link(
+        &state.pool,
+        NewLink {
+            kind: kind.as_str(),
+            content: &content,
+            content_type,
+            encrypted,
+            ttl_seconds,
+            max_uses,
+        },
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!(error = %e, "failed to insert link");
+        CreateError::Internal
+    })
 }
 
 // --------------------------------------------------------------------------
 // Pages
 // --------------------------------------------------------------------------
 
-pub async fn index() -> Html<String> {
-    Html(views::index_page().into_string())
+pub async fn index(State(state): State<AppState>) -> Html<String> {
+    Html(views::index_page(state.encryption_enabled, &state.api_base).into_string())
 }
 
-/// POST `/` only happens without JavaScript — link creation needs the browser.
-pub async fn js_required() -> Html<String> {
-    Html(views::js_required_page().into_string())
+/// `POST /` — the no-JavaScript create path. A plain HTML form submits here and
+/// gets a server-rendered result page. (With JS, `app.js` instead intercepts the
+/// submit and uses the JSON API for an in-place result.) Always unencrypted: the
+/// browser cannot seal without JS.
+pub async fn form_create(State(state): State<AppState>, Form(form): Form<FormCreate>) -> Response {
+    let max_uses = match form.max_uses.as_deref().map(str::trim) {
+        Some(s) if !s.is_empty() => match s.parse::<i64>() {
+            Ok(n) => Some(n),
+            Err(_) => return form_error("uses must be a whole number"),
+        },
+        _ => None,
+    };
+    let ttl_seconds = form.ttl_seconds.unwrap_or(DEFAULT_TTL_SECS);
+
+    match create_link(
+        &state,
+        form.kind.as_deref(),
+        &form.content,
+        ttl_seconds,
+        max_uses,
+        false,
+    )
+    .await
+    {
+        Ok(inserted) => {
+            let url = format!("{}{}", state.base_url, inserted.name);
+            Html(views::result_page(&url, &inserted.expires_at, max_uses).into_string())
+                .into_response()
+        }
+        Err(CreateError::BadRequest(msg)) => form_error(&msg),
+        Err(CreateError::Internal) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Html(views::error_page(500, "Something went wrong.").into_string()),
+        )
+            .into_response(),
+    }
+}
+
+fn form_error(msg: &str) -> Response {
+    (
+        StatusCode::BAD_REQUEST,
+        Html(views::error_page(400, msg).into_string()),
+    )
+        .into_response()
 }
 
 pub async fn resolve(
@@ -115,7 +240,7 @@ pub async fn resolve(
 /// method (RFC 9110). Unencrypted (a shell cannot do client-side crypto — that
 /// is the CLI's job). Optional trailing `ttl=`/`uses=` params tune the lifetime
 /// and burn-after-read count; the rest of the body is the content, whose kind is
-/// auto-detected (so `--data-binary @file` becomes a Text link).
+/// auto-detected (so `--data-binary @file` becomes a Text link, verbatim).
 pub async fn create_plain(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -123,7 +248,7 @@ pub async fn create_plain(
 ) -> Response {
     let parsed = parse_plain_body(&body);
 
-    if parsed.content.is_empty() {
+    if parsed.content.trim().is_empty() {
         return (
             StatusCode::BAD_REQUEST,
             "usage: curl -d url=<url> [-d ttl=1d] [-d uses=1] https://yuio.link/create\n",
@@ -140,55 +265,26 @@ pub async fn create_plain(
         },
         None => DEFAULT_TTL_SECS,
     };
-    if let Err(msg) = check_ttl(ttl_seconds, state.max_ttl_secs) {
-        return (StatusCode::BAD_REQUEST, format!("{msg}\n")).into_response();
-    }
 
     let max_uses = match parsed.uses {
         Some(s) => match s.trim().parse::<i64>() {
-            Ok(n) if n > 0 => Some(n),
-            _ => return (StatusCode::BAD_REQUEST, "uses must be a positive integer\n").into_response(),
+            Ok(n) => Some(n),
+            Err(_) => {
+                return (StatusCode::BAD_REQUEST, "uses must be a positive integer\n")
+                    .into_response();
+            }
         },
         None => None,
     };
 
-    // Build the row from the detected kind. Redirects are normalized + scheme-checked.
-    let (kind, content, content_type): (Kind, String, Option<&str>) = match detect_kind(parsed.content)
-    {
-        Kind::Redirect => {
-            let normalized = normalize_target(parsed.content);
-            if let Err(e) = validate_redirect(&normalized, DEFAULT_ALLOWED_SCHEMES) {
-                return (StatusCode::BAD_REQUEST, format!("{e}\n")).into_response();
-            }
-            (Kind::Redirect, normalized, None)
-        }
-        Kind::Text => (
-            Kind::Text,
-            parsed.content.to_string(),
-            Some(ContentType::PlainText.as_str()),
-        ),
-    };
-
-    if content.len() > MAX_CONTENT_BYTES {
-        return (StatusCode::BAD_REQUEST, "content too large\n").into_response();
-    }
-
-    let inserted = match db::insert_link(
-        &state.pool,
-        NewLink {
-            kind: kind.as_str(),
-            content: &content,
-            content_type,
-            encrypted: false,
-            ttl_seconds,
-            max_uses,
-        },
-    )
-    .await
+    // Auto-detect kind (None); never encrypted.
+    let inserted = match create_link(&state, None, parsed.content, ttl_seconds, max_uses, false).await
     {
         Ok(inserted) => inserted,
-        Err(e) => {
-            tracing::error!(error = %e, "failed to insert link (plain)");
+        Err(CreateError::BadRequest(msg)) => {
+            return (StatusCode::BAD_REQUEST, format!("{msg}\n")).into_response();
+        }
+        Err(CreateError::Internal) => {
             return (StatusCode::INTERNAL_SERVER_ERROR, "internal error\n").into_response();
         }
     };
@@ -224,31 +320,33 @@ struct PlainBody<'a> {
 
 /// Pull optional trailing `&ttl=…` / `&uses=…` params off a `curl -d` body, then
 /// strip a leading `url=`/`text=`/`content=` field name. Only *trailing* option
-/// pairs are consumed, so a redirect URL keeps its own `?a=1&b=2` query string
-/// as long as `ttl`/`uses` come last (as `-d` appends them).
+/// pairs are consumed, so a redirect URL keeps its own `?a=1&b=2` query string as
+/// long as `ttl`/`uses` come last (as `-d` appends them). The content body is not
+/// trimmed here — text is kept verbatim; the redirect path trims it later.
 fn parse_plain_body(body: &str) -> PlainBody<'_> {
-    let mut rest = body.trim();
+    let mut rest = body;
     let mut ttl = None;
     let mut uses = None;
 
-    while let Some(amp) = rest.rfind('&') {
-        let last = &rest[amp + 1..];
+    loop {
+        let trimmed = rest.trim_end();
+        let Some(amp) = trimmed.rfind('&') else { break };
+        let last = &trimmed[amp + 1..];
         if let Some(v) = last.strip_prefix("ttl=") {
-            ttl = Some(v);
+            ttl = Some(v.trim());
         } else if let Some(v) = last.strip_prefix("uses=") {
-            uses = Some(v);
+            uses = Some(v.trim());
         } else {
             break;
         }
-        rest = rest[..amp].trim_end();
+        rest = &trimmed[..amp];
     }
 
     let content = rest
         .strip_prefix("url=")
         .or_else(|| rest.strip_prefix("text="))
         .or_else(|| rest.strip_prefix("content="))
-        .unwrap_or(rest)
-        .trim();
+        .unwrap_or(rest);
 
     PlainBody { content, ttl, uses }
 }
@@ -264,7 +362,11 @@ fn parse_duration(s: &str) -> Option<i64> {
         c if c.is_ascii_digit() => (s, 1),
         _ => return None,
     };
-    num.trim().parse::<i64>().ok().filter(|&n| n >= 0).map(|n| n * mult)
+    num.trim()
+        .parse::<i64>()
+        .ok()
+        .filter(|&n| n >= 0)
+        .map(|n| n * mult)
 }
 
 /// Reject a TTL outside `[MIN_TTL_SECS, max_ttl]`.
@@ -287,15 +389,26 @@ fn normalize_target(s: &str) -> String {
 }
 
 // --------------------------------------------------------------------------
-// REST API (canonical, versioned, JSON)
+// Form / REST request + response types
 // --------------------------------------------------------------------------
+
+/// The no-JS HTML form (`application/x-www-form-urlencoded`).
+#[derive(Deserialize)]
+pub struct FormCreate {
+    pub content: String,
+    #[serde(default)]
+    pub kind: Option<String>,
+    #[serde(default)]
+    pub ttl_seconds: Option<i64>,
+    /// A number input; empty string when left blank.
+    #[serde(default)]
+    pub max_uses: Option<String>,
+}
 
 #[derive(Deserialize)]
 pub struct CreateRequest {
     pub kind: String,
     pub content: String,
-    #[serde(default)]
-    pub content_type: Option<String>,
     #[serde(default)]
     pub encrypted: bool,
     /// Lifetime in seconds; omitted -> [`DEFAULT_TTL_SECS`].
@@ -305,6 +418,9 @@ pub struct CreateRequest {
     #[serde(default)]
     pub max_uses: Option<i64>,
 }
+// Note: `content_type` is intentionally absent — minimal Text renders plaintext
+// only. Rich Text (a later step, on a sandboxed origin) will reintroduce it with
+// real handling. Unknown JSON fields are ignored, so older clients still work.
 
 #[derive(Serialize)]
 pub struct CreateResponse {
@@ -340,6 +456,15 @@ pub enum ApiError {
     Internal,
 }
 
+impl From<CreateError> for ApiError {
+    fn from(e: CreateError) -> Self {
+        match e {
+            CreateError::BadRequest(m) => ApiError::BadRequest(m),
+            CreateError::Internal => ApiError::Internal,
+        }
+    }
+}
+
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
@@ -355,63 +480,26 @@ impl IntoResponse for ApiError {
 }
 
 /// `POST /api/v1/links` — create a link. Returns `201 Created` with a
-/// `Location` header pointing at the new resource.
+/// `Location` header pointing at the new resource. This is the surface JS uses
+/// for an in-place result (and the one a third-party client targets).
 pub async fn api_create_link(
     State(state): State<AppState>,
     Json(req): Json<CreateRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
-    if req.content.trim().is_empty() {
-        return Err(ApiError::BadRequest("content is required".into()));
-    }
     if req.content.len() > MAX_CONTENT_BYTES {
         return Err(ApiError::BadRequest("content too large".into()));
     }
 
-    let kind = match req.kind.as_str() {
-        "redirect" => Kind::Redirect,
-        "text" => Kind::Text,
-        _ => return Err(ApiError::BadRequest("kind must be 'redirect' or 'text'".into())),
-    };
-
-    // Plaintext redirects must use an allowlisted scheme (blocks javascript:, data:, ...).
-    if kind == Kind::Redirect && !req.encrypted {
-        validate_redirect(&req.content, DEFAULT_ALLOWED_SCHEMES)
-            .map_err(|e| ApiError::BadRequest(e.to_string()))?;
-    }
-
     let ttl_seconds = req.ttl_seconds.unwrap_or(DEFAULT_TTL_SECS);
-    check_ttl(ttl_seconds, state.max_ttl_secs).map_err(ApiError::BadRequest)?;
-
-    if let Some(n) = req.max_uses
-        && n <= 0
-    {
-        return Err(ApiError::BadRequest("max_uses must be a positive integer".into()));
-    }
-
-    let content_type = match kind {
-        // Stored for forward-compatibility; minimal Text only renders plaintext.
-        Kind::Text => {
-            Some(ContentType::parse_or_default(req.content_type.as_deref().unwrap_or("")).as_str())
-        }
-        Kind::Redirect => None,
-    };
-
-    let inserted = db::insert_link(
-        &state.pool,
-        NewLink {
-            kind: kind.as_str(),
-            content: &req.content,
-            content_type,
-            encrypted: req.encrypted,
-            ttl_seconds,
-            max_uses: req.max_uses,
-        },
+    let inserted = create_link(
+        &state,
+        Some(req.kind.as_str()),
+        &req.content,
+        ttl_seconds,
+        req.max_uses,
+        req.encrypted,
     )
-    .await
-    .map_err(|e| {
-        tracing::error!(error = %e, "failed to insert link");
-        ApiError::Internal
-    })?;
+    .await?;
 
     let url = format!("{}{}", state.base_url, inserted.name);
     let location = format!("{}api/v1/links/{}", state.base_url, inserted.name);
@@ -508,9 +596,10 @@ mod tests {
     }
 
     #[test]
-    fn parse_plain_body_treats_file_dump_as_content() {
-        let p = parse_plain_body("just some\nnotes from a file&ttl=1d");
-        assert_eq!(p.content, "just some\nnotes from a file");
+    fn parse_plain_body_keeps_text_verbatim() {
+        // A file dump keeps its internal newlines; only the trailing ttl is peeled.
+        let p = parse_plain_body("just some\nnotes from a file\n&ttl=1d");
+        assert_eq!(p.content, "just some\nnotes from a file\n");
         assert_eq!(p.ttl, Some("1d"));
     }
 

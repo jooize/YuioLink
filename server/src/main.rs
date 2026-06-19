@@ -34,6 +34,7 @@ async fn main() -> anyhow::Result<()> {
         db = %config.db_path,
         max_ttl_secs = config.max_ttl_secs,
         reap_interval_secs = config.reap_interval_secs,
+        encryption_enabled = config.encryption_enabled,
         "starting YuioLink server"
     );
 
@@ -43,12 +44,14 @@ async fn main() -> anyhow::Result<()> {
         pool: pool.clone(),
         base_url: Arc::from(config.base_url.as_str()),
         max_ttl_secs: config.max_ttl_secs,
+        encryption_enabled: config.encryption_enabled,
+        api_base: Arc::from(config.api_base.as_str()),
     };
 
     spawn_reaper(pool, config.reap_interval_secs);
 
     let app = Router::new()
-        .route("/", get(web::index).post(web::js_required))
+        .route("/", get(web::index).post(web::form_create))
         .route("/static/app.css", get(web::app_css))
         .route("/static/crypto.js", get(web::crypto_js))
         .route("/static/app.js", get(web::app_js))

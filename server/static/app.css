@@ -110,7 +110,7 @@ body {
     }
 }
 
-.app-head {
+main > header {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -136,14 +136,15 @@ body {
     height: 32px;
 }
 
-.app-title {
+header h1 {
     margin: 0;
     font-size: clamp(25px, 6vw, 29px);
     font-weight: 600;
     letter-spacing: -0.022em;
 }
 
-.app-subtitle {
+/* Default paragraph: centered secondary text (tagline, status, info lines). */
+main p {
     margin: 14px auto 0;
     max-width: 32ch;
     text-align: center;
@@ -152,12 +153,12 @@ body {
     color: var(--text-secondary);
 }
 
-form {
-    margin: 24px 0 0;
+main p.meta {
+    font-size: 12.5px;
 }
 
-.form-group {
-    margin: 0 0 14px;
+form {
+    margin: 24px 0 0;
 }
 
 .form-control {
@@ -185,26 +186,45 @@ form {
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
-/* Auto-growing textarea (JS sets the height; CSS bounds it). */
+/* Auto-growing textarea: wrap long lines instead of scrolling sideways, and keep
+   pasted newlines. JS sets the height; CSS bounds it. */
 textarea.form-control {
     display: block;
     resize: none;
-    overflow-y: auto;
     min-height: 46px;
     max-height: 40vh;
     line-height: 1.45;
+    white-space: pre-wrap;
     overflow-wrap: anywhere;
+    word-break: break-word;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
-/* Small caption above a control group. */
-.field-label {
-    margin: 16px 0 7px;
+/* Radio-group wrapper: strip the native fieldset chrome; the legend is the caption. */
+.picker {
+    margin: 16px 0 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+.picker > legend {
+    padding: 0;
+    margin: 0 0 7px;
     font-size: 12.5px;
     font-weight: 600;
     color: var(--text-secondary);
 }
 
-/* iOS-style segmented control (Type, Expires in). */
+.hint {
+    margin-left: 6px;
+    font-weight: 400;
+    color: var(--text-tertiary);
+}
+
+/* iOS-style segmented control (Type, Expires in), built from native radios so it
+   works without JavaScript. The radio is visually hidden; its label is the chip. */
 .segmented {
     display: flex;
     gap: 2px;
@@ -213,37 +233,39 @@ textarea.form-control {
     border-radius: var(--radius-control);
 }
 
-.seg-btn {
+.seg-radio {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.seg-label {
     flex: 1;
     min-width: 0;
+    text-align: center;
     padding: 8px 6px;
-    font-family: inherit;
     font-size: 13.5px;
     font-weight: 500;
     color: var(--text);
-    background: transparent;
-    border: none;
     border-radius: calc(var(--radius-control) - 3px);
     cursor: pointer;
+    user-select: none;
     transition: background 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
-    -webkit-appearance: none;
-    appearance: none;
 }
 
-.seg-btn.active {
+.seg-radio:checked + .seg-label {
     background: var(--card-highlight);
-    color: var(--text);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 @media (prefers-color-scheme: dark) {
-    .seg-btn.active {
+    .seg-radio:checked + .seg-label {
         background: rgba(120, 120, 128, 0.55);
     }
 }
 
-.seg-btn:focus-visible {
-    outline: none;
+.seg-radio:focus-visible + .seg-label {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
@@ -253,25 +275,12 @@ textarea.form-control {
 }
 
 .advanced > summary {
-    list-style: none;
     cursor: pointer;
     font-size: 13px;
     font-weight: 600;
     color: var(--accent);
     padding: 4px 0;
     user-select: none;
-}
-
-.advanced > summary::-webkit-details-marker {
-    display: none;
-}
-
-.advanced > summary::after {
-    content: " ›";
-}
-
-.advanced[open] > summary::after {
-    content: " ⌄";
 }
 
 .field-row {
@@ -281,10 +290,6 @@ textarea.form-control {
     padding: 10px 4px 2px;
     font-size: 14px;
     color: var(--text);
-}
-
-.field-row-suffix {
-    color: var(--text-secondary);
 }
 
 .field-row input[type="number"] {
@@ -321,13 +326,13 @@ textarea.form-control {
     min-width: 0;
 }
 
-.switch-title {
+.switch-label strong {
     display: block;
     font-size: 15px;
     font-weight: 500;
 }
 
-.switch-desc {
+.switch-label small {
     display: block;
     margin-top: 2px;
     font-size: 12.5px;
@@ -456,8 +461,9 @@ textarea.form-control {
     background: var(--switch-on);
 }
 
-/* Result panel */
+/* Result panel — a semantic <output> holding the created/previewed link. */
 .result {
+    display: block;
     margin: 20px 0 0;
     padding: 14px;
     border-radius: 16px;
@@ -475,15 +481,8 @@ textarea.form-control {
     margin-bottom: 9px;
 }
 
-.result-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.result-row code {
-    flex: 1;
-    min-width: 0;
+.result > code {
+    display: block;
     font-family: var(--font-mono);
     font-size: 13px;
     word-break: break-all;
@@ -492,6 +491,7 @@ textarea.form-control {
 }
 
 .result-expiry {
+    display: block;
     margin-top: 9px;
     font-size: 12.5px;
     color: var(--text-secondary);
@@ -514,7 +514,7 @@ textarea.form-control {
     border-radius: var(--radius-control);
 }
 
-.app-footer {
+main > footer {
     margin: 22px 0 0;
     padding-top: 18px;
     border-top: 0.5px solid var(--separator);
