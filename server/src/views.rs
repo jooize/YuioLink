@@ -101,6 +101,39 @@ pub fn encrypted_redirect_page(sealed: &str) -> Markup {
     document(body, scripts)
 }
 
+/// A plaintext Text link. The body is rendered as an escaped `<pre>` — maud
+/// escapes it, so a `<script>` in the content shows as text and never executes.
+/// We never emit it as live HTML (that would be stored XSS on our own origin).
+pub fn text_view_page(text: &str) -> Markup {
+    let body = html! {
+        p.app-subtitle { "Text" }
+        pre.text-body #text-body { (text) }
+        button.btn.btn-block #copy-text type="button" { "Copy" }
+        footer.app-footer { a href="/" { "Back to YuioLink" } }
+    };
+    // text.js only wires the Copy button here (no payload to decrypt).
+    let scripts = html! { script src="/static/text.js" {} };
+    document(body, scripts)
+}
+
+/// An encrypted Text link. The ciphertext rides in a data attribute; `text.js`
+/// decrypts it with the key from the URL fragment and fills the `<pre>` via
+/// `textContent` (never `innerHTML`), so decrypted content is also inert.
+pub fn encrypted_text_page(sealed: &str) -> Markup {
+    let body = html! {
+        p.app-subtitle #status { "Decrypting…" }
+        noscript { p.app-subtitle { "JavaScript is required to decrypt this text." } }
+        pre.text-body #text-body hidden {}
+        button.btn.btn-block #copy-text type="button" hidden { "Copy" }
+        div #payload data-sealed=(sealed) hidden {}
+    };
+    let scripts = html! {
+        script src="/static/crypto.js" {}
+        script src="/static/text.js" {}
+    };
+    document(body, scripts)
+}
+
 pub fn error_page(code: u16, message: &str) -> Markup {
     let body = html! {
         p.error-code { (code) }
@@ -117,10 +150,12 @@ pub struct Preview<'a> {
     pub target: Option<&'a str>,
     pub hits: i64,
     pub created_at: &'a str,
+    pub expires_at: &'a str,
+    pub max_uses: Option<i64>,
 }
 
-/// The `yuio.link/:name+` preview/info page: where a link goes, hit count,
-/// and whether it is encrypted — without redirecting or counting a hit.
+/// The `yuio.link/:name+` preview/info page: where a link goes, its kind, hit
+/// count, expiry, and remaining uses — without redirecting or counting a hit.
 pub fn preview_page(p: Preview) -> Markup {
     let body = html! {
         p.app-subtitle { "Link preview" }
@@ -135,12 +170,18 @@ pub fn preview_page(p: Preview) -> Markup {
             div.result-row { code { a href=(target) rel="nofollow noopener noreferrer" { (target) } } }
             a.btn.btn-block href=(p.short_url) { "Continue" }
         } @else if p.encrypted {
-            p.app-subtitle { "Encrypted — the destination is hidden from the server and opens in your browser with the key from the original link." }
+            p.app-subtitle { "Encrypted — the content is hidden from the server and opens in your browser with the key from the original link." }
         } @else {
-            p.app-subtitle { "This is a paste." }
+            p.app-subtitle { "This is a Text link — open it to read." }
+            a.btn.btn-block href=(p.short_url) { "Open" }
         }
 
-        p.app-subtitle { (p.hits) " hits · created " (p.created_at) }
+        p.app-subtitle {
+            "created " (p.created_at) " · " (p.hits) " hits · expires " (p.expires_at) " UTC"
+            @if let Some(max) = p.max_uses {
+                " · " ((max - p.hits).max(0)) " of " (max) " uses left"
+            }
+        }
 
         footer.app-footer { a href="/" { "Back to YuioLink" } }
     };

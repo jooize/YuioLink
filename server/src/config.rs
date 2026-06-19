@@ -2,6 +2,15 @@
 
 use std::env;
 
+/// Smallest accepted link lifetime (1 minute).
+pub const MIN_TTL_SECS: i64 = 60;
+/// Lifetime used when a request omits one (1 day).
+pub const DEFAULT_TTL_SECS: i64 = 24 * 60 * 60;
+/// Default ceiling on link lifetime (7 days); overridable via the environment.
+pub const DEFAULT_MAX_TTL_SECS: i64 = 7 * 24 * 60 * 60;
+/// Default interval between reaper sweeps (seconds).
+pub const DEFAULT_REAP_SECS: u64 = 60;
+
 #[derive(Clone, Debug)]
 pub struct Config {
     /// Address to bind, e.g. `127.0.0.1:8080`.
@@ -10,6 +19,10 @@ pub struct Config {
     pub base_url: String,
     /// SQLite database file path.
     pub db_path: String,
+    /// Maximum link lifetime in seconds (requests above this are rejected).
+    pub max_ttl_secs: i64,
+    /// How often the reaper deletes expired rows, in seconds.
+    pub reap_interval_secs: u64,
 }
 
 impl Config {
@@ -24,10 +37,24 @@ impl Config {
 
         let db_path = env::var("YUIOLINK_DB").unwrap_or_else(|_| "yuiolink.db".to_string());
 
+        let max_ttl_secs = env::var("YUIOLINK_MAX_TTL_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .filter(|&v| v >= MIN_TTL_SECS)
+            .unwrap_or(DEFAULT_MAX_TTL_SECS);
+
+        let reap_interval_secs = env::var("YUIOLINK_REAP_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .filter(|&v| v > 0)
+            .unwrap_or(DEFAULT_REAP_SECS);
+
         Self {
             bind,
             base_url,
             db_path,
+            max_ttl_secs,
+            reap_interval_secs,
         }
     }
 }
