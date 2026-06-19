@@ -231,8 +231,7 @@ fn parse_plain_body(body: &str) -> PlainBody<'_> {
     let mut ttl = None;
     let mut uses = None;
 
-    loop {
-        let Some(amp) = rest.rfind('&') else { break };
+    while let Some(amp) = rest.rfind('&') {
         let last = &rest[amp + 1..];
         if let Some(v) = last.strip_prefix("ttl=") {
             ttl = Some(v);
@@ -383,10 +382,10 @@ pub async fn api_create_link(
     let ttl_seconds = req.ttl_seconds.unwrap_or(DEFAULT_TTL_SECS);
     check_ttl(ttl_seconds, state.max_ttl_secs).map_err(ApiError::BadRequest)?;
 
-    if let Some(n) = req.max_uses {
-        if n <= 0 {
-            return Err(ApiError::BadRequest("max_uses must be a positive integer".into()));
-        }
+    if let Some(n) = req.max_uses
+        && n <= 0
+    {
+        return Err(ApiError::BadRequest("max_uses must be a positive integer".into()));
     }
 
     let content_type = match kind {

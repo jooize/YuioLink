@@ -125,7 +125,7 @@ pub async fn insert_link(pool: &SqlitePool, link: NewLink<'_>) -> Result<Inserte
             Ok(expires_at) => return Ok(InsertedLink { name, expires_at }),
             Err(sqlx::Error::Database(db)) if db.is_unique_violation() => {
                 collisions += 1;
-                if collisions % COLLISION_GROW_AT == 0 {
+                if collisions.is_multiple_of(COLLISION_GROW_AT) {
                     words += 1;
                 }
             }
