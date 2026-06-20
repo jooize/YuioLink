@@ -7,6 +7,8 @@
     --switch-on: #34c759;
     --switch-off: rgba(120, 120, 128, 0.32);
     --result: #10b981;
+    --warn: #c77a00;
+    --danger: #d70015;
 
     --bg-1: #e7e8ec;
     --bg-2: #f6f7f9;
@@ -40,6 +42,8 @@
         --accent-press: #0a6fd6;
         --switch-off: rgba(120, 120, 128, 0.5);
         --result: #34d399;
+        --warn: #ffd60a;
+        --danger: #ff453a;
 
         --bg-1: #121214;
         --bg-2: #202024;
@@ -457,24 +461,19 @@ textarea.form-control {
     border-radius: var(--radius-control) 0 0 var(--radius-control);
 }
 
-.split-copy {
+/* "Clear" sits where Copy was — caution colour, since it discards the input. */
+.split-clear {
     flex: none;
-    /* Fixed width so toggling "+ Copy" / "Copy" / "Copied" never resizes the button. */
-    min-width: 6em;
-    padding: 0 16px;
+    padding: 0 18px;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     border-radius: 0 var(--radius-control) var(--radius-control) 0;
-    background: var(--accent-press);
+    background: linear-gradient(180deg, #ff9f0a, #ff9500);
+    color: #fff;
 }
 
-.split-copy:disabled {
-    opacity: 0.4;
-    cursor: default;
-}
-
-.split-copy.copied {
-    background: var(--switch-on);
+.split-clear:hover {
+    filter: brightness(1.05);
 }
 
 /* Result panel — a semantic <output> holding the created/previewed link. */
@@ -518,14 +517,14 @@ textarea.form-control {
     user-select: all;
 }
 
-/* Foot row inside the bubble: kind · expiry · limit on the left, copy shortcut right. */
+/* Foot row inside the bubble: kind · expiry · limit on the left, Copy + ⌘C right. */
 .result-foot {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 10px 12px;
     flex-wrap: wrap;
-    margin-top: 11px;
+    margin-top: 12px;
 }
 
 .result-meta {
@@ -533,8 +532,49 @@ textarea.form-control {
     color: var(--text-secondary);
 }
 
-.result-hint {
-    font-size: 12px;
+/* Live "expires in" colouring as the deadline nears. */
+.countdown.expiring-soon {
+    color: var(--warn);
+    font-weight: 600;
+}
+
+.countdown.expiring-now {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.result-actions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex: none;
+}
+
+.result-copy {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border: none;
+    border-radius: 8px;
+    padding: 6px 13px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.result-copy:hover {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.result-copy.copied {
+    color: var(--switch-on);
+    background: color-mix(in srgb, var(--switch-on) 18%, transparent);
+}
+
+.result-kbd {
+    font-family: var(--font);
+    font-size: 11.5px;
     color: var(--text-tertiary);
     white-space: nowrap;
 }
@@ -556,16 +596,15 @@ textarea.form-control {
     border-radius: var(--radius-control);
 }
 
-/* Compact storage status near the top; links down to the full history. An accent
-   pill. Its space is always reserved (visibility, not display) so revealing it never
-   shifts the layout — the slot looks the same whether or not the pill shows. */
+/* Compact storage status near the top: an accent pill, always shown. Links to the
+   full history when there are links, otherwise toggles local persistence. */
 .storage-indicator {
     display: flex;
     align-items: center;
     justify-content: center;
     width: fit-content;
     min-height: 28px;
-    margin: 14px auto 0;
+    margin: 16px auto 0;
     padding: 5px 13px;
     font-size: 12.5px;
     font-weight: 500;
@@ -573,12 +612,8 @@ textarea.form-control {
     background: color-mix(in srgb, var(--accent) 12%, transparent);
     border-radius: 999px;
     text-decoration: none;
-    visibility: hidden;
+    cursor: pointer;
     transition: background 0.15s ease;
-}
-
-.storage-indicator.shown {
-    visibility: visible;
 }
 
 .storage-indicator:hover {

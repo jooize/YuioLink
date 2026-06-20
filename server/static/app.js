@@ -2,7 +2,8 @@
 //
 // The create form works WITHOUT JavaScript (it posts to `POST /` and a result page
 // comes back). This script is the enhancement layer: an in-place result, the kind
-// named on the button, keyboard shortcuts, copy, and a created-link history.
+// named on the button, keyboard shortcuts, copy, a live expiry countdown, and a
+// created-link history.
 //
 // It targets modern browsers deliberately. Anything too old to run this is served
 // the no-JS path instead — that is the universal fallback, so there is no ES5 /
@@ -11,8 +12,6 @@
 (() => {
     "use strict";
 
-    // Which backend to call; empty meta = same origin. Lets a hosted frontend point
-    // at another backend (e.g. one with encryption enabled).
     const metaBase = document.querySelector('meta[name="yuiolink-api-base"]');
     const API_BASE = metaBase?.content ? metaBase.content.replace(/\/+$/, "") : "";
 
@@ -43,51 +42,28 @@
 
     // Platform copy shortcut shown beside a freshly created (and selected) link.
     const isMac = /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent || "");
-    const COPY_HINT = `${isMac ? "⌘" : "Ctrl+"}C to copy`;
+    const KBD = isMac ? "⌘C" : "Ctrl+C";
 
-    // Flash "Copied" on a button; `restore` re-derives its label afterwards (the
-    // create-page Copy button toggles between "+ Copy" and "Copy").
-    const flashCopied = (button, restore) => {
-        const prev = button.textContent;
+    // --- clipboard ---
+    const flashCopied = (button) => {
         button.classList.add("copied");
         button.textContent = "Copied";
         setTimeout(() => {
             button.classList.remove("copied");
-            if (restore) restore(); else button.textContent = prev;
+            button.textContent = "Copy";
         }, 1500);
     };
-    const copyToClipboard = async (text, button, restore) => {
+    const copyToClipboard = async (text, button) => {
         if (!text) return;
         try {
             await navigator.clipboard.writeText(text);
-            flashCopied(button, restore);
+            flashCopied(button);
         } catch {
             // Clipboard unavailable (insecure context) or permission denied.
         }
     };
-    // Simple copy wiring for the result/text pages (the label never changes).
-    const wireCopy = (button, getText) => {
-        button.disabled = false;
-        button.addEventListener("click", () => copyToClipboard(getText(), button));
-    };
 
-    // --- created-link history ---
-    // Kept in memory for the session by default. Persisted to localStorage ONLY when
-    // the user explicitly opts in via "Save on this device"; opting back out deletes
-    // the stored copy.
-    const HISTORY_KEY = "yuiolink:history";
-    const PERSIST_KEY = "yuiolink:history:persist";
-    const HISTORY_MAX = 20;
-    let memHistory = [];
-    let persistEnabled = false;
-    // The link currently shown in the result panel; excluded from the history list
-    // below so it is not displayed twice.
-    let currentResultUrl = null;
-
-    const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
-    const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* full or blocked */ } };
-    const lsDel = (k) => { try { localStorage.removeItem(k); } catch { /* blocked */ } };
-
+    // --- expiry countdown (live; shared by the result and the history list) ---
     const usesSuffix = (uses) => {
         if (uses === 1) return " · one-time";
         if (uses) return ` · max ${uses} uses`;
@@ -95,22 +71,76 @@
     };
     // SQLite "YYYY-MM-DD HH:MM:SS" is UTC; make it explicit so Date parses correctly.
     const parseUtc = (s) => (s ? new Date(`${s.replace(" ", "T")}Z`) : null);
-    const humanizeUntil = (iso) => {
-        const d = parseUtc(iso);
-        if (!d || Number.isNaN(d.getTime())) return "";
-        const ms = d.getTime() - Date.now();
-        if (ms <= 0) return "expired";
-        const mins = Math.round(ms / 60000);
-        if (mins < 60) return `expires in ${mins} min`;
-        const hrs = Math.round(mins / 60);
-        if (hrs < 48) return `expires in ${hrs} h`;
-        return `expires in ${Math.round(hrs / 24)} d`;
+
+    // Remaining time as { text, level }. Shows hours/minutes, switches to seconds in
+    // the last minute, and flags "soon" (≤5 min) then "now" (≤1 min) for colouring.
+    const formatCountdown = (expiresIso) => {
+        const d = parseUtc(expiresIso);
+        if (!d || Number.isNaN(d.getTime())) return { text: "", level: "" };
+        const s = Math.round((d.getTime() - Date.now()) / 1000);
+        if (s <= 0) return { text: "expired", level: "now" };
+        let text;
+        if (s < 60) text = `${s}s`;
+        else if (s < 3600) text = `${Math.round(s / 60)} min`;
+        else if (s < 86400) { const h = Math.round(s / 3600); text = `${h} hour${h === 1 ? "" : "s"}`; }
+        else { const days = Math.round(s / 86400); text = `${days} day${days === 1 ? "" : "s"}`; }
+        const level = s <= 60 ? "now" : s <= 300 ? "soon" : "";
+        return { text, level };
     };
+    const updateCountdown = (span) => {
+        const { text, level } = formatCountdown(span.dataset.expires);
+        span.textContent = text;
+        span.classList.toggle("expiring-soon", level === "soon");
+        span.classList.toggle("expiring-now", level === "now");
+    };
+    // Build "<kind> · expires in <live countdown><uses>" into `metaEl` (no innerHTML).
+    const buildMeta = (metaEl, kind, expiresIso, uses) => {
+        metaEl.replaceChildren();
+        metaEl.append(`${kindLabel(kind)} · expires in `);
+        const span = document.createElement("span");
+        span.className = "countdown";
+        span.dataset.expires = expiresIso ?? "";
+        updateCountdown(span);
+        metaEl.append(span);
+        const suffix = usesSuffix(uses);
+        if (suffix) metaEl.append(suffix);
+    };
+    const tickCountdowns = () => {
+        for (const span of document.querySelectorAll(".countdown")) updateCountdown(span);
+    };
+
+    // Reveal and wire the result's Copy button + ⌘C hint (the link already exists,
+    // so this copy is a plain synchronous writeText that works on the first click).
+    const setupResultCopy = (linkEl) => {
+        const kbd = document.getElementById("result-kbd");
+        if (kbd) { kbd.textContent = KBD; kbd.hidden = false; }
+        const btn = document.getElementById("copy-result");
+        if (btn) {
+            btn.hidden = false;
+            btn.addEventListener("click", () => copyToClipboard(linkEl.textContent.trim(), btn));
+        }
+    };
+
+    // --- created-link history ---
+    // Kept in memory for the session by default. Persisted to localStorage ONLY when
+    // the user explicitly opts in ("Enable local history"); opting back out deletes
+    // the stored copy.
+    const HISTORY_KEY = "yuiolink:history";
+    const PERSIST_KEY = "yuiolink:history:persist";
+    const HISTORY_MAX = 20;
+    let memHistory = [];
+    let persistEnabled = false;
+    // The link currently shown in the result panel; excluded from the history list.
+    let currentResultUrl = null;
+
+    const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+    const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* full or blocked */ } };
+    const lsDel = (k) => { try { localStorage.removeItem(k); } catch { /* blocked */ } };
+
     const pruneHistory = (list) => list.filter((it) => {
         const d = parseUtc(it.expires);
         return !d || Number.isNaN(d.getTime()) || d.getTime() > Date.now();
     });
-
     const loadPersisted = () => {
         persistEnabled = lsGet(PERSIST_KEY) === "1";
         if (persistEnabled) {
@@ -134,20 +164,25 @@
     const renderHistory = () => {
         memHistory = pruneHistory(memHistory);
         persistNow();
-        // The link in the result panel is shown there, not repeated in the list.
         const shown = currentResultUrl
             ? memHistory.filter((it) => it.url !== currentResultUrl)
             : [...memHistory];
         const n = shown.length;
 
+        // The pill is always visible: a link to the list when there is history, or a
+        // toggle for local persistence when there is not.
         const indicator = document.getElementById("storage-indicator");
         if (indicator) {
-            indicator.classList.toggle("shown", n > 0);
             if (n > 0) {
-                const where = persistEnabled ? "saved on this device" : "lost when this tab closes";
+                const where = persistEnabled ? "saved on this device" : "lost when page closed";
                 indicator.textContent = `History · ${n} ${n === 1 ? "link" : "links"} (${where}) ›`;
+                indicator.dataset.mode = "list";
+            } else if (persistEnabled) {
+                indicator.textContent = "No links yet · Local history on";
+                indicator.dataset.mode = "disable";
             } else {
-                indicator.textContent = "";
+                indicator.textContent = "No links yet · Enable local history";
+                indicator.dataset.mode = "enable";
             }
         }
 
@@ -163,7 +198,6 @@
         for (const it of shown) {
             const li = document.createElement("li");
             li.className = "history-item";
-
             const text = document.createElement("div");
             text.className = "history-text";
             const url = document.createElement("code");
@@ -171,15 +205,13 @@
             url.textContent = it.url;
             const meta = document.createElement("small");
             meta.className = "history-meta";
-            meta.textContent = `${kindLabel(it.kind)} · ${humanizeUntil(it.expires)}${usesSuffix(it.uses)}`;
+            buildMeta(meta, it.kind, it.expires, it.uses);
             text.append(url, meta);
-
             const copy = document.createElement("button");
             copy.className = "history-copy";
             copy.type = "button";
             copy.textContent = "Copy";
             copy.addEventListener("click", () => copyToClipboard(it.url, copy));
-
             li.append(text, copy);
             listEl.append(li);
         }
@@ -189,8 +221,8 @@
         const content = document.getElementById("content");
         const form = document.getElementById("create-form");
         const encrypt = document.getElementById("encrypt"); // null when encryption is off
-        const copyBtn = document.getElementById("copy");
         const submitBtn = document.getElementById("submit");
+        const clearBtn = document.getElementById("clear");
         const linkEl = document.getElementById("link-element");
         const metaEl = document.getElementById("link-expiry");
         const panel = document.getElementById("link-panel");
@@ -199,28 +231,19 @@
         const limitCustomValue = document.getElementById("limit-custom-value");
 
         const UNIT_SECS = { m: 60, h: 3600, d: 86400 };
-        const UNIT_NAME = { m: "minute", h: "hour", d: "day" };
 
         const checkedValue = (name, fallback) =>
             document.querySelector(`input[name="${name}"]:checked`)?.value ?? fallback;
 
-        // Expiry as { secs, label }, honoring the Custom field.
-        const ttlInfo = () => {
+        const ttlSeconds = () => {
             const v = checkedValue("ttl_seconds", "3600");
             if (v === "custom") {
                 let n = Number.parseInt(ttlCustomValue.value, 10);
                 if (Number.isNaN(n) || n < 0) n = 0;
-                const u = ttlCustomUnit.value;
-                return {
-                    secs: n * (UNIT_SECS[u] ?? 60),
-                    label: `${n} ${UNIT_NAME[u]}${n === 1 ? "" : "s"}`,
-                };
+                return n * (UNIT_SECS[ttlCustomUnit.value] ?? 60);
             }
-            const radio = document.querySelector('input[name="ttl_seconds"]:checked');
-            return { secs: Number.parseInt(v, 10), label: radio?.nextElementSibling?.textContent.trim() ?? "1 hour" };
+            return Number.parseInt(v, 10);
         };
-
-        // Use limit: 1, a custom positive count, or null (unlimited).
         const maxUses = () => {
             const v = checkedValue("limit", "unlimited");
             if (v === "1") return 1;
@@ -231,9 +254,6 @@
             return null;
         };
 
-        const metaNote = (kind, ttl, uses) =>
-            `${kindLabel(kind)} · expires in ${ttl.label}${usesSuffix(uses)}`;
-
         // The primary button names what it will create.
         const updateSubmitLabel = () => {
             submitBtn.textContent = content.value.trim() === ""
@@ -241,47 +261,22 @@
                 : `Create ${kindLabel(detectKind(content.value))} Link`;
         };
 
-        // "+ Copy" creates first, then copies. Once the current input (content +
-        // settings) already has a link, it drops the "+" and just copies.
-        let lastSig = null;
-        let lastUrl = null;
-        const currentSig = () => JSON.stringify({
-            c: content.value,
-            t: ttlInfo().secs,
-            m: maxUses(),
-            e: !!encrypt?.checked,
-        });
-        const isCreated = () => lastUrl !== null && lastSig === currentSig();
-        const refreshCopyLabel = () => { copyBtn.textContent = isCreated() ? "Copy" : "+ Copy"; };
-
         const autosize = () => {
             content.style.height = "auto";
             const h = content.scrollHeight;
             content.style.height = `${h}px`;
-            // Only allow scrolling once the content actually exceeds the max height;
-            // otherwise a single line (or fully-shown text) never scrolls.
+            // Only scroll once the content exceeds max-height; a single line never does.
             const maxPx = Number.parseFloat(getComputedStyle(content).maxHeight);
             content.style.overflowY = !Number.isNaN(maxPx) && h > maxPx ? "auto" : "hidden";
         };
 
-        content.addEventListener("input", () => {
-            autosize();
-            updateSubmitLabel();
-            refreshCopyLabel();
-        });
-        // Any settings change invalidates the "already created" state.
-        form.addEventListener("change", refreshCopyLabel);
-        form.addEventListener("input", refreshCopyLabel);
+        content.addEventListener("input", () => { autosize(); updateSubmitLabel(); });
 
         // Focus the Custom field as soon as its segment is picked.
         const ttlCustomRadio = document.getElementById("ttl-custom");
-        ttlCustomRadio?.addEventListener("change", () => {
-            if (ttlCustomRadio.checked) ttlCustomValue.focus();
-        });
+        ttlCustomRadio?.addEventListener("change", () => { if (ttlCustomRadio.checked) ttlCustomValue.focus(); });
         const limitCustomRadio = document.getElementById("limit-custom");
-        limitCustomRadio?.addEventListener("change", () => {
-            if (limitCustomRadio.checked) limitCustomValue.focus();
-        });
+        limitCustomRadio?.addEventListener("change", () => { if (limitCustomRadio.checked) limitCustomValue.focus(); });
 
         // Redirect: Enter submits. Text: Enter = newline, Cmd/Ctrl-Enter submits.
         content.addEventListener("keydown", (event) => {
@@ -300,9 +295,9 @@
             content.setSelectionRange(n, n);
         });
 
-        const showReady = (url, note) => {
+        const showReady = (url, kind, expiresIso, uses) => {
             linkEl.textContent = url;
-            metaEl.textContent = note;
+            buildMeta(metaEl, kind, expiresIso, uses);
             panel.hidden = false;
             const range = document.createRange();
             range.selectNodeContents(linkEl);
@@ -314,20 +309,16 @@
             panel.focus({ preventScroll: true });
         };
 
-        // Create the link via the JSON API and show it in place. Returns the final
-        // URL (with any encryption key fragment), or null on empty/failed input.
         const createLink = async () => {
             const raw = content.value;
-            if (raw.trim() === "") { content.focus(); return null; }
-
+            if (raw.trim() === "") { content.focus(); return; }
             const kind = detectKind(raw);
             const payload = kind === "redirect" ? normalizeTarget(raw.trim()) : raw;
-            const ttl = ttlInfo();
+            const ttl = ttlSeconds();
             const uses = maxUses();
 
-            const restoreLabel = submitBtn.textContent;
+            const restore = submitBtn.textContent;
             submitBtn.disabled = true;
-            copyBtn.disabled = true;
             submitBtn.textContent = "Creating…";
             try {
                 let bodyContent = payload;
@@ -344,7 +335,7 @@
                         kind,
                         content: bodyContent,
                         encrypted: !!encrypt?.checked,
-                        ttl_seconds: ttl.secs,
+                        ttl_seconds: ttl,
                         max_uses: uses,
                     }),
                 });
@@ -354,21 +345,15 @@
                 }
                 const data = await resp.json();
                 const url = data.url + fragment;
-                showReady(url, metaNote(kind, ttl, uses));
-                lastSig = currentSig();
-                lastUrl = url;
                 currentResultUrl = url;
+                showReady(url, kind, data.expires_at, uses);
                 addHistory({ url, kind, uses, expires: data.expires_at });
                 renderHistory();
-                return url;
             } catch (e) {
                 alert(e.message || "Could not create the link.");
-                return null;
             } finally {
                 submitBtn.disabled = false;
-                copyBtn.disabled = false;
-                submitBtn.textContent = restoreLabel;
-                refreshCopyLabel();
+                submitBtn.textContent = restore;
             }
         };
 
@@ -379,50 +364,34 @@
             createLink();
         });
 
-        // NB: not an async handler — the clipboard call must run synchronously inside
-        // the click so it keeps the user activation it requires.
-        copyBtn.addEventListener("click", () => {
-            if (isCreated() && lastUrl) {
-                copyToClipboard(lastUrl, copyBtn, refreshCopyLabel);
-                return;
-            }
-            // First click has to create the link first; a clipboard write *after* the
-            // network await loses the activation it needs (the "first click does
-            // nothing" bug). Hand the clipboard a Promise of the text up front so the
-            // write stays bound to this click. createLink is called exactly once.
-            const urlPromise = createLink();
-            const fallback = () =>
-                urlPromise.then((url) => { if (url) copyToClipboard(url, copyBtn, refreshCopyLabel); });
-            if (typeof ClipboardItem !== "undefined") {
-                navigator.clipboard.write([
-                    new ClipboardItem({
-                        "text/plain": urlPromise.then((url) => {
-                            if (!url) throw new Error("no url");
-                            return new Blob([url], { type: "text/plain" });
-                        }),
-                    }),
-                ]).then(() => flashCopied(copyBtn, refreshCopyLabel), fallback);
-            } else {
-                fallback();
-            }
+        clearBtn?.addEventListener("click", () => {
+            content.value = "";
+            autosize();
+            updateSubmitLabel();
+            content.focus();
         });
-        copyBtn.disabled = false;
 
-        const resultHint = document.getElementById("result-hint");
-        if (resultHint) resultHint.textContent = COPY_HINT;
+        setupResultCopy(linkEl);
 
-        // Jump to the history without leaving "#history" in the address bar.
-        document.getElementById("storage-indicator")?.addEventListener("click", (event) => {
+        // The always-visible storage pill: jump to the list, or toggle persistence.
+        const indicator = document.getElementById("storage-indicator");
+        indicator?.addEventListener("click", (event) => {
             event.preventDefault();
-            document.getElementById("history")?.scrollIntoView({ behavior: "smooth", block: "start" });
-            history.replaceState(null, "", location.pathname + location.search);
+            const mode = indicator.dataset.mode;
+            if (mode === "list") {
+                document.getElementById("history")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                history.replaceState(null, "", location.pathname + location.search);
+            } else if (mode === "enable") {
+                setPersist(true);
+                renderHistory();
+            } else {
+                setPersist(false);
+                renderHistory();
+            }
         });
 
         const persistBox = document.getElementById("history-persist");
-        persistBox?.addEventListener("change", () => {
-            setPersist(persistBox.checked);
-            renderHistory();
-        });
+        persistBox?.addEventListener("change", () => { setPersist(persistBox.checked); renderHistory(); });
         document.getElementById("history-clear")?.addEventListener("click", () => {
             memHistory = [];
             lsDel(HISTORY_KEY);
@@ -431,45 +400,49 @@
 
         autosize();
         updateSubmitLabel();
-        refreshCopyLabel();
         renderHistory();
         content.focus();
     };
 
-    // The no-JS result page: record the just-created link so it shows in history
-    // when the user returns to the landing page (persisted only if opted in).
+    // The no-JS result page: record the just-created link and return its fields.
     const recordResultPage = (linkEl) => {
         const url = linkEl.textContent.trim();
-        if (!url) return;
+        if (!url) return null;
         const metaText = document.getElementById("link-expiry")?.textContent ?? "";
         const when = metaText.match(/expires (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) UTC/);
         const usesMatch = metaText.match(/max (\d+) uses/);
-        addHistory({
+        const entry = {
             url,
             kind: /^Text/.test(metaText) ? "text" : "redirect",
             uses: /one-time/.test(metaText) ? 1 : (usesMatch ? Number.parseInt(usesMatch[1], 10) : null),
             expires: when ? when[1] : null,
-        });
+        };
+        addHistory(entry);
+        return entry;
     };
 
     document.addEventListener("DOMContentLoaded", () => {
         loadPersisted();
-        if (document.getElementById("create-form")) initCreate();
-
-        // Result page (no-JS create landed here): wire its copy button and record it.
-        const resultCopy = document.getElementById("copy-link");
-        const resultLink = document.getElementById("link-element");
-        if (resultCopy && resultLink) {
-            wireCopy(resultCopy, () => resultLink.textContent.trim());
-            recordResultPage(resultLink);
-            // Select the link and show the copy shortcut, matching the in-place result.
-            const range = document.createRange();
-            range.selectNodeContents(resultLink);
-            const sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(range);
-            const hint = document.getElementById("result-hint");
-            if (hint) hint.textContent = COPY_HINT;
+        if (document.getElementById("create-form")) {
+            initCreate();
+        } else {
+            // Result page: turn the server-rendered meta into a live countdown, wire
+            // copy + ⌘C, and select the link.
+            const resultLink = document.getElementById("link-element");
+            if (resultLink) {
+                const entry = recordResultPage(resultLink);
+                if (entry) {
+                    const metaEl = document.getElementById("link-expiry");
+                    if (metaEl) buildMeta(metaEl, entry.kind, entry.expires, entry.uses);
+                    setupResultCopy(resultLink);
+                    const range = document.createRange();
+                    range.selectNodeContents(resultLink);
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+            }
         }
+        setInterval(tickCountdowns, 1000);
     });
 })();

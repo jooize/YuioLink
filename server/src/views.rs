@@ -51,8 +51,12 @@ fn result_output(url: Option<&str>, meta: Markup) -> Markup {
             code.result-url #link-element { @if let Some(u) = url { (u) } }
             div.result-foot {
                 small.result-meta #link-expiry { (meta) }
-                // app.js fills this with the platform copy shortcut (⌘C / Ctrl+C).
-                small.result-hint #result-hint {}
+                div.result-actions {
+                    // Both revealed by app.js (copy needs JS). The link already exists
+                    // here, so this copy is synchronous and reliable.
+                    button.result-copy #copy-result type="button" hidden { "Copy" }
+                    kbd.result-kbd #result-kbd hidden {}
+                }
             }
         }
     }
@@ -95,7 +99,7 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
             // a link).
             div.split-btn {
                 button #submit.btn.split-primary type="submit" { "Create Link" }
-                button #copy.btn.split-copy type="button" disabled { "+ Copy" }
+                button #clear.btn.split-clear type="button" { "Clear" }
             }
 
             // Native radios so the pickers work without JS. "Custom" reveals an extra
@@ -194,10 +198,7 @@ pub fn result_page(url: &str, kind_label: &str, expires_at: &str, max_uses: Opti
     };
     let body = html! {
         (result_output(Some(url), meta))
-        div.split-btn {
-            a.btn.split-primary href=(url) { "Open link" }
-            button #copy-link.btn.split-copy type="button" { "Copy" }
-        }
+        a.btn.btn-block href=(url) { "Open link" }
         p {
             a href={ (url) "+" } { "Preview" } " · " a href="/" { "Create another" }
         }
