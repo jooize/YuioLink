@@ -76,10 +76,12 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
             noscript { p { "Creating links works without JavaScript; encryption needs it." } }
         }
 
-        // Compact storage status (top) linking down to the full history. Its space
-        // is reserved (CSS `visibility`) so it never moves the layout; app.js adds
-        // `.shown` once there is history.
-        a.storage-indicator #storage-indicator href="#history" {}
+        // Split storage pill (top): left shows the status (and links to the list),
+        // right is the local-persistence toggle in its own colour. app.js fills both.
+        div.storage-pill {
+            a.storage-status #storage-status href="#history" {}
+            button.storage-toggle #storage-toggle type="button" {}
+        }
 
         // The created link (latest), shown above the input. app.js fills it in place;
         // the no-JS path reloads to a result page.
@@ -165,8 +167,6 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
             h2.history-title { "History on device" }
             ul.history-list #history-list {}
             div.history-actions {
-                // Distinct colour; app.js sets the label and toggles persistence.
-                button.history-persist #history-persist type="button" {}
                 button.history-clear #history-clear type="button" { "Clear" }
             }
         }

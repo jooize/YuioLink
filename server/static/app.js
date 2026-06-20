@@ -79,7 +79,7 @@
         if (s <= 0) return { text: "expired", level: "now" };
         let text;
         if (s < 60) text = `${s}s`;                            // last minute: seconds
-        else if (s < 3540) text = `${Math.floor(s / 60)} min`; // 1..58 min
+        else if (s < 3540) { const m = Math.floor(s / 60); text = `${m} minute${m === 1 ? "" : "s"}`; }
         else if (s < 82800) { const h = Math.round(s / 3600); text = `${h} hour${h === 1 ? "" : "s"}`; }
         else { const days = Math.round(s / 86400); text = `${days} day${days === 1 ? "" : "s"}`; }
         const level = s < 60 ? "now" : s <= 300 ? "soon" : "";
@@ -187,31 +187,21 @@
             : [...memHistory];
         const n = shown.length;
 
-        // The pill is always visible: a link to the list when there is history, or a
-        // toggle for local persistence when there is not.
-        const indicator = document.getElementById("storage-indicator");
-        if (indicator) {
-            if (n > 0) {
-                const where = persistEnabled ? "saved on this device" : "clears on close";
-                indicator.textContent = `History · ${n} ${n === 1 ? "link" : "links"} (${where}) ›`;
-                indicator.dataset.mode = "list";
-            } else if (persistEnabled) {
-                indicator.textContent = "No links yet · Local history on";
-                indicator.dataset.mode = "disable";
-            } else {
-                indicator.textContent = "No links yet · Enable local history";
-                indicator.dataset.mode = "enable";
-            }
+        // Split pill: left = status (and a link to the list), right = persistence toggle.
+        const status = document.getElementById("storage-status");
+        if (status) {
+            status.textContent = n > 0 ? `History · ${n} ${n === 1 ? "link" : "links"} ›` : "No links yet";
+            status.dataset.has = n > 0 ? "1" : "";
+        }
+        const toggle = document.getElementById("storage-toggle");
+        if (toggle) {
+            toggle.textContent = persistEnabled ? "Local history on" : "Enable local history";
+            toggle.classList.toggle("on", persistEnabled);
         }
 
         const section = document.getElementById("history");
         const listEl = document.getElementById("history-list");
         if (!section || !listEl) return;
-        const persistBtn = document.getElementById("history-persist");
-        if (persistBtn) {
-            persistBtn.textContent = persistEnabled ? "Local history on" : "Enable local history";
-            persistBtn.classList.toggle("on", persistEnabled);
-        }
 
         listEl.replaceChildren();
         if (n === 0) { section.hidden = true; return; }
@@ -408,25 +398,20 @@
 
         setupResultCopy(linkEl);
 
-        // The always-visible storage pill: jump to the list, or toggle persistence.
-        const indicator = document.getElementById("storage-indicator");
-        indicator?.addEventListener("click", (event) => {
+        // Split pill: left status jumps to the list (without leaving #history in the
+        // address bar); right toggle flips local persistence.
+        const status = document.getElementById("storage-status");
+        status?.addEventListener("click", (event) => {
             event.preventDefault();
-            const mode = indicator.dataset.mode;
-            if (mode === "list") {
-                document.getElementById("history")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                history.replaceState(null, "", location.pathname + location.search);
-            } else if (mode === "enable") {
-                setPersist(true);
-                renderHistory();
-            } else {
-                setPersist(false);
-                renderHistory();
-            }
+            if (!status.dataset.has) return;
+            document.getElementById("history")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            history.replaceState(null, "", location.pathname + location.search);
+        });
+        document.getElementById("storage-toggle")?.addEventListener("click", () => {
+            setPersist(!persistEnabled);
+            renderHistory();
         });
 
-        const persistBtn = document.getElementById("history-persist");
-        persistBtn?.addEventListener("click", () => { setPersist(!persistEnabled); renderHistory(); });
         document.getElementById("history-clear")?.addEventListener("click", () => {
             memHistory = [];
             lsDel(HISTORY_KEY);

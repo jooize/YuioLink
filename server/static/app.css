@@ -467,7 +467,7 @@ textarea.form-control {
 .result {
     display: block;
     margin: 18px 0 0;
-    padding: 14px 16px 13px;
+    padding: 15px 16px 8px;
     border-radius: 14px;
     background: color-mix(in srgb, var(--result) 13%, var(--field-bg));
     border: 0.5px solid color-mix(in srgb, var(--result) 38%, transparent);
@@ -582,29 +582,55 @@ textarea.form-control {
     border-radius: var(--radius-control);
 }
 
-/* Compact storage status near the top: an accent pill, always shown. Links to the
-   full history when there are links, otherwise toggles local persistence. */
-.storage-indicator {
+/* Split storage pill near the top, always shown. Two butted segments clipped to a
+   pill: left = status (links to the list), right = local-persistence toggle in its
+   own colour, for a clean colour cut between them. */
+.storage-pill {
+    display: flex;
+    width: fit-content;
+    max-width: 100%;
+    margin: 16px auto 0;
+    border-radius: 999px;
+    overflow: hidden;
+    font-size: 12.5px;
+}
+
+.storage-status {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: fit-content;
-    min-height: 28px;
-    margin: 16px auto 0;
-    padding: 5px 13px;
-    font-size: 12.5px;
+    padding: 6px 13px;
     font-weight: 500;
     color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
     text-decoration: none;
-    cursor: pointer;
+    white-space: nowrap;
     transition: background 0.15s ease;
 }
 
-.storage-indicator:hover {
-    background: color-mix(in srgb, var(--accent) 18%, transparent);
+.storage-status:hover {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
     text-decoration: none;
+}
+
+.storage-toggle {
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 6px 13px;
+    border: none;
+    color: #fff;
+    background: #8b5cf6;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: filter 0.15s ease, background 0.15s ease;
+}
+
+.storage-toggle:hover {
+    filter: brightness(1.07);
+}
+
+.storage-toggle.on {
+    background: var(--switch-on);
 }
 
 /* Created-link history (bottom). In memory for the session unless persisted. */
@@ -688,30 +714,8 @@ textarea.form-control {
 .history-actions {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     margin-top: 12px;
-}
-
-/* Persistence toggle: a distinct-colour button (violet off, green when on). */
-.history-persist {
-    font-family: inherit;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: #fff;
-    background: #8b5cf6;
-    border: none;
-    border-radius: 8px;
-    padding: 7px 13px;
-    cursor: pointer;
-    transition: filter 0.15s ease, background 0.15s ease;
-}
-
-.history-persist:hover {
-    filter: brightness(1.06);
-}
-
-.history-persist.on {
-    background: var(--switch-on);
 }
 
 .history-clear {
