@@ -633,6 +633,15 @@ textarea.form-control {
     background: var(--switch-on);
 }
 
+/* Caution line under the pill when history was turned off with links still present. */
+.storage-warning {
+    margin: 9px auto 0;
+    max-width: 34ch;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--warn);
+}
+
 /* Created-link history (bottom). In memory for the session unless persisted. */
 .history {
     margin: 22px 0 0;

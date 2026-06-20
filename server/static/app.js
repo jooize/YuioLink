@@ -151,6 +151,8 @@
     // The URL currently shown in the result panel — a flag for the "input out of sync"
     // dimming. (The link itself still counts in the history list.)
     let currentResultUrl = null;
+    // Set when the user turns persistence off while links exist, to show the warning.
+    let warnArmed = false;
 
     const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
     const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* full or blocked */ } };
@@ -197,6 +199,8 @@
             toggle.textContent = persistEnabled ? "Local History On" : "Enable Local History";
             toggle.classList.toggle("on", persistEnabled);
         }
+        const warn = document.getElementById("storage-warning");
+        if (warn) warn.hidden = !(warnArmed && !persistEnabled && n > 0);
 
         const section = document.getElementById("history");
         const listEl = document.getElementById("history-list");
@@ -407,7 +411,9 @@
             history.replaceState(null, "", location.pathname + location.search);
         });
         document.getElementById("storage-toggle")?.addEventListener("click", () => {
+            const turningOff = persistEnabled;
             setPersist(!persistEnabled);
+            warnArmed = turningOff; // only warn when actively switching saving off
             renderHistory();
         });
 

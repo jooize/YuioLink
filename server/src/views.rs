@@ -79,6 +79,10 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
             a.storage-status #storage-status href="#history" {}
             button.storage-toggle #storage-toggle type="button" {}
         }
+        // Shown by app.js when the user turns local history off while links exist.
+        p.storage-warning #storage-warning hidden {
+            "Local history is off — these links will be gone when you close this page."
+        }
 
         // The created link (latest), shown above the input. app.js fills it in place;
         // the no-JS path reloads to a result page.
