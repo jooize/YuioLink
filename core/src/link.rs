@@ -113,12 +113,15 @@ fn looks_like_domain(s: &str) -> bool {
     if labels.len() < 2 {
         return false;
     }
+    // Unicode-aware so internationalized domains (e.g. `åäö.se`, `münchen.de`)
+    // are recognized, not just ASCII ones. The browser / `url` crate handle the
+    // IDNA punycode conversion when the link is opened.
     let tld_ok = labels
         .last()
-        .is_some_and(|tld| tld.len() >= 2 && tld.chars().all(|c| c.is_ascii_alphabetic()));
+        .is_some_and(|tld| tld.chars().count() >= 2 && tld.chars().all(char::is_alphabetic));
     let labels_ok = labels
         .iter()
-        .all(|l| !l.is_empty() && l.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'));
+        .all(|l| !l.is_empty() && l.chars().all(|c| c.is_alphanumeric() || c == '-'));
     tld_ok && labels_ok
 }
 
@@ -163,14 +166,17 @@ pub enum UriError {
     SchemeNotAllowed(String),
 }
 
-/// Validate a redirect target: it must parse as a URL whose scheme is on the
-/// allowlist. Applied to *unencrypted* redirects only — encrypted targets are
-/// opaque to the server and only ever decrypted client-side by the key holder.
-pub fn validate_redirect(uri: &str, allowed_schemes: &[&str]) -> Result<(), UriError> {
+/// Validate a redirect target and return its canonical serialization: it must
+/// parse as a URL whose scheme is on the allowlist. The returned string is the
+/// `url` crate's normalized form — crucially ASCII (an internationalized host is
+/// IDNA/punycode-encoded), so it is safe to put in a `Location` header. Applied
+/// to *unencrypted* redirects only — encrypted targets are opaque to the server
+/// and only ever decrypted client-side by the key holder.
+pub fn validate_redirect(uri: &str, allowed_schemes: &[&str]) -> Result<String, UriError> {
     let parsed = Url::parse(uri).map_err(|_| UriError::Invalid)?;
     let scheme = parsed.scheme();
     if allowed_schemes.iter().any(|s| s.eq_ignore_ascii_case(scheme)) {
-        Ok(())
+        Ok(parsed.into())
     } else {
         Err(UriError::SchemeNotAllowed(scheme.to_string()))
     }
@@ -235,6 +241,8 @@ mod tests {
         assert_eq!(detect_kind("mailto:a@b.com"), Kind::Redirect);
         assert_eq!(detect_kind("example.com"), Kind::Redirect); // bare domain
         assert_eq!(detect_kind("sub.example.co.uk/path"), Kind::Redirect);
+        assert_eq!(detect_kind("åäö.se"), Kind::Redirect); // IDN bare domain
+        assert_eq!(detect_kind("münchen.de/weg"), Kind::Redirect); // IDN + path
         assert_eq!(detect_kind("hello"), Kind::Text); // single word
         assert_eq!(detect_kind("just some prose here"), Kind::Text); // spaces
         assert_eq!(detect_kind("line one\nline two"), Kind::Text); // multi-line
@@ -273,5 +281,14 @@ mod tests {
             validate_redirect("not a url", DEFAULT_ALLOWED_SCHEMES),
             Err(UriError::Invalid)
         );
+    }
+
+    #[test]
+    fn idn_redirect_canonicalizes_to_ascii() {
+        // An internationalized host must come back ASCII (punycode) so it is a
+        // valid Location header value and never panics the redirect handler.
+        let canonical = validate_redirect("https://åäö.se", DEFAULT_ALLOWED_SCHEMES).unwrap();
+        assert!(canonical.is_ascii(), "must be ASCII: {canonical:?}");
+        assert!(canonical.contains("xn--"), "host should be punycode: {canonical:?}");
     }
 }

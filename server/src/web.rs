@@ -82,9 +82,11 @@ async fn create_link(
         Kind::Redirect if encrypted => (raw_content.to_string(), None),
         Kind::Redirect => {
             let normalized = normalize_target(raw_content.trim());
-            validate_redirect(&normalized, DEFAULT_ALLOWED_SCHEMES)
+            // Store the canonical (ASCII / IDNA-encoded) form so it is a valid
+            // `Location` header value when the link resolves.
+            let canonical = validate_redirect(&normalized, DEFAULT_ALLOWED_SCHEMES)
                 .map_err(|e| BadRequest(e.to_string()))?;
-            (normalized, None)
+            (canonical, None)
         }
         Kind::Text => (raw_content.to_string(), Some(ContentType::PlainText.as_str())),
     };
@@ -130,29 +132,42 @@ pub async fn index(State(state): State<AppState>) -> Html<String> {
 /// submit and uses the JSON API for an in-place result.) Always unencrypted: the
 /// browser cannot seal without JS.
 pub async fn form_create(State(state): State<AppState>, Form(form): Form<FormCreate>) -> Response {
-    let max_uses = match form.max_uses.as_deref().map(str::trim) {
-        Some(s) if !s.is_empty() => match s.parse::<i64>() {
-            Ok(n) => Some(n),
-            Err(_) => return form_error("uses must be a whole number"),
+    // Expiry: a preset ("600"/"3600"/"604800") or "custom" (a number + unit).
+    let ttl_seconds = match form.ttl_seconds.as_deref() {
+        Some("custom") => match parse_custom_ttl(form.ttl_custom.as_deref(), form.ttl_unit.as_deref())
+        {
+            Ok(secs) => secs,
+            Err(msg) => return form_error(msg),
+        },
+        Some(s) => s.parse::<i64>().unwrap_or(DEFAULT_TTL_SECS),
+        None => DEFAULT_TTL_SECS,
+    };
+
+    // Limit: unlimited (default), exactly 1, or a custom positive count.
+    let max_uses = match form.limit.as_deref() {
+        Some("1") => Some(1),
+        Some("custom") => match form.limit_custom.as_deref().map(str::trim) {
+            Some(s) if !s.is_empty() => match s.parse::<i64>() {
+                Ok(n) => Some(n),
+                Err(_) => return form_error("limit must be a whole number"),
+            },
+            _ => None,
         },
         _ => None,
     };
-    let ttl_seconds = form.ttl_seconds.unwrap_or(DEFAULT_TTL_SECS);
 
-    match create_link(
-        &state,
-        form.kind.as_deref(),
-        &form.content,
-        ttl_seconds,
-        max_uses,
-        false,
-    )
-    .await
-    {
+    // No kind field: the server detects it (a URL is a redirect, else text).
+    match create_link(&state, None, &form.content, ttl_seconds, max_uses, false).await {
         Ok(inserted) => {
             let url = format!("{}{}", state.base_url, inserted.name);
-            Html(views::result_page(&url, &inserted.expires_at, max_uses).into_string())
-                .into_response()
+            let kind_label = match detect_kind(&form.content) {
+                Kind::Redirect => "Redirect",
+                Kind::Text => "Text",
+            };
+            Html(
+                views::result_page(&url, kind_label, &inserted.expires_at, max_uses).into_string(),
+            )
+            .into_response()
         }
         Err(CreateError::BadRequest(msg)) => form_error(&msg),
         Err(CreateError::Internal) => (
@@ -161,6 +176,23 @@ pub async fn form_create(State(state): State<AppState>, Form(form): Form<FormCre
         )
             .into_response(),
     }
+}
+
+/// Parse the no-JS "Custom" expiry (a number plus a minutes/hours/days unit) into
+/// seconds. The accepted range is enforced afterward by [`check_ttl`].
+fn parse_custom_ttl(value: Option<&str>, unit: Option<&str>) -> Result<i64, &'static str> {
+    let n: i64 = value
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or("enter a custom expiry")?
+        .parse()
+        .map_err(|_| "expiry must be a whole number")?;
+    let mult = match unit {
+        Some("h") => 3600,
+        Some("d") => 86400,
+        _ => 60, // minutes (default)
+    };
+    Ok(n.saturating_mul(mult))
 }
 
 fn form_error(msg: &str) -> Response {
@@ -392,17 +424,26 @@ fn normalize_target(s: &str) -> String {
 // Form / REST request + response types
 // --------------------------------------------------------------------------
 
-/// The no-JS HTML form (`application/x-www-form-urlencoded`).
+/// The no-JS HTML form (`application/x-www-form-urlencoded`). The kind is detected
+/// server-side, so there is no `kind` field.
 #[derive(Deserialize)]
 pub struct FormCreate {
     pub content: String,
+    /// Expiry preset (`600`/`3600`/`604800`) or the sentinel `custom`.
     #[serde(default)]
-    pub kind: Option<String>,
+    pub ttl_seconds: Option<String>,
+    /// Custom-expiry amount (with [`Self::ttl_unit`]), used when `ttl_seconds` is `custom`.
     #[serde(default)]
-    pub ttl_seconds: Option<i64>,
-    /// A number input; empty string when left blank.
+    pub ttl_custom: Option<String>,
+    /// Custom-expiry unit: `m`, `h`, or `d`.
     #[serde(default)]
-    pub max_uses: Option<String>,
+    pub ttl_unit: Option<String>,
+    /// Use limit: `unlimited`, `1`, or `custom`.
+    #[serde(default)]
+    pub limit: Option<String>,
+    /// Custom use limit, used when `limit` is `custom`.
+    #[serde(default)]
+    pub limit_custom: Option<String>,
 }
 
 #[derive(Deserialize)]
