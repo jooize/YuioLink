@@ -4,9 +4,7 @@
 //! `legend` for the radio groups, `output` for created links, `code`/`pre` for
 //! machine text — and reserves classes for genuinely styled components.
 
-use maud::{DOCTYPE, Markup, PreEscaped, html};
-
-const ICON_CHAIN: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>"#;
+use maud::{DOCTYPE, Markup, html};
 
 /// The shared page shell: head, the glass "app window", and the masthead.
 fn document(body: Markup, scripts: Markup) -> Markup {
@@ -22,6 +20,9 @@ fn document_full(head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover";
                 meta name="color-scheme" content="light dark";
+                // Tint the Safari/browser UI to match the page background.
+                meta name="theme-color" media="(prefers-color-scheme: light)" content="#e7e8ec";
+                meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121214";
                 title { "YuioLink" }
                 link rel="stylesheet" href="/static/app.css";
                 (head_extra)
@@ -29,7 +30,6 @@ fn document_full(head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
             body {
                 main.app-window {
                     header {
-                        span.app-icon aria-hidden="true" { (PreEscaped(ICON_CHAIN)) }
                         h1 { "YuioLink" }
                     }
                     (body)
@@ -52,10 +52,9 @@ fn result_output(url: Option<&str>, meta: Markup) -> Markup {
             div.result-foot {
                 small.result-meta #link-expiry { (meta) }
                 div.result-actions {
-                    // Both revealed by app.js (copy needs JS). The link already exists
-                    // here, so this copy is synchronous and reliable.
+                    // Revealed by app.js (copy needs JS). The link already exists here,
+                    // so this copy is synchronous and reliable.
                     button.result-copy #copy-result type="button" hidden { "Copy" }
-                    kbd.result-kbd #result-kbd hidden {}
                 }
             }
         }
@@ -163,13 +162,11 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
         // user ticks "Save on this device", which opts into localStorage. app.js
         // fills the list and toggles persistence.
         section.history #history hidden {
-            h2.history-title { "Recent links" }
+            h2.history-title { "History on device" }
             ul.history-list #history-list {}
             div.history-actions {
-                label.history-persist for="history-persist" {
-                    input #history-persist type="checkbox";
-                    span { "Save on this device" }
-                }
+                // Distinct colour; app.js sets the label and toggles persistence.
+                button.history-persist #history-persist type="button" {}
                 button.history-clear #history-clear type="button" { "Clear" }
             }
         }

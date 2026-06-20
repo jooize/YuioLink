@@ -72,6 +72,15 @@
 html {
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
+    /* Paint the background on the root so it extends under the Safari toolbars and
+       into the overscroll/safe-area, instead of leaving those areas blank. */
+    min-height: 100%;
+    background-color: var(--bg-1);
+    background-image:
+        radial-gradient(1100px 760px at 12% 6%, var(--glow-1), transparent 60%),
+        radial-gradient(1000px 720px at 88% 96%, var(--glow-2), transparent 58%),
+        linear-gradient(155deg, var(--bg-2), var(--bg-1));
+    background-attachment: fixed;
 }
 
 /* The `hidden` attribute must win over the component `display` rules below
@@ -93,11 +102,6 @@ body {
     padding: calc(44px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
     font-family: var(--font);
     color: var(--text);
-    background:
-        radial-gradient(1100px 760px at 12% 6%, var(--glow-1), transparent 60%),
-        radial-gradient(1000px 720px at 88% 96%, var(--glow-2), transparent 58%),
-        linear-gradient(155deg, var(--bg-2), var(--bg-1));
-    background-attachment: fixed;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
 }
@@ -128,29 +132,7 @@ body {
 }
 
 main > header {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     text-align: center;
-    gap: 14px;
-}
-
-.app-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 15px;
-    display: grid;
-    place-items: center;
-    color: #fff;
-    background: linear-gradient(160deg, #4aa3ff 0%, var(--accent) 55%, var(--accent-press) 100%);
-    box-shadow:
-        inset 0 1px 1px rgba(255, 255, 255, 0.55),
-        inset 0 -2px 6px rgba(0, 0, 0, 0.18);
-}
-
-.app-icon svg {
-    width: 32px;
-    height: 32px;
 }
 
 header h1 {
@@ -188,7 +170,7 @@ form {
     border: 0.5px solid var(--field-border);
     border-radius: var(--radius-control);
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
-    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
     -webkit-appearance: none;
     appearance: none;
 }
@@ -201,6 +183,11 @@ form {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* Greyed after a successful submit; focusing or editing the field restores it. */
+.form-control.submitted {
+    opacity: 0.55;
 }
 
 /* Auto-growing textarea: wrap long lines instead of scrolling sideways, and keep
@@ -479,11 +466,17 @@ textarea.form-control {
 /* Result panel — a semantic <output> holding the created/previewed link. */
 .result {
     display: block;
-    margin: 20px 0 0;
-    padding: 16px;
-    border-radius: 16px;
+    margin: 18px 0 0;
+    padding: 14px 16px 13px;
+    border-radius: 14px;
     background: color-mix(in srgb, var(--result) 13%, var(--field-bg));
     border: 0.5px solid color-mix(in srgb, var(--result) 38%, transparent);
+    transition: opacity 0.18s ease;
+}
+
+/* Dim the result when the input no longer matches the link it produced. */
+.result.stale {
+    opacity: 0.5;
 }
 
 .result-label {
@@ -570,13 +563,6 @@ textarea.form-control {
 .result-copy.copied {
     color: var(--switch-on);
     background: color-mix(in srgb, var(--switch-on) 18%, transparent);
-}
-
-.result-kbd {
-    font-family: var(--font);
-    font-size: 11.5px;
-    color: var(--text-tertiary);
-    white-space: nowrap;
 }
 
 /* Text-link viewer body. */
@@ -706,21 +692,26 @@ textarea.form-control {
     margin-top: 12px;
 }
 
+/* Persistence toggle: a distinct-colour button (violet off, green when on). */
 .history-persist {
-    display: flex;
-    align-items: center;
-    gap: 7px;
+    font-family: inherit;
     font-size: 12.5px;
-    color: var(--text-secondary);
+    font-weight: 600;
+    color: #fff;
+    background: #8b5cf6;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 13px;
     cursor: pointer;
-    user-select: none;
+    transition: filter 0.15s ease, background 0.15s ease;
 }
 
-.history-persist input {
-    width: 15px;
-    height: 15px;
-    margin: 0;
-    accent-color: var(--accent);
+.history-persist:hover {
+    filter: brightness(1.06);
+}
+
+.history-persist.on {
+    background: var(--switch-on);
 }
 
 .history-clear {

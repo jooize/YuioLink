@@ -40,10 +40,6 @@
     const kindLabel = (k) => (k === "redirect" ? "Redirect" : "Text");
     const normalizeTarget = (s) => (hasScheme(s) ? s : `https://${s}`);
 
-    // Platform copy shortcut shown beside a freshly created (and selected) link.
-    const isMac = /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent || "");
-    const KBD = isMac ? "⌘C" : "Ctrl+C";
-
     // --- clipboard ---
     const flashCopied = (button) => {
         button.classList.add("copied");
@@ -72,19 +68,21 @@
     // SQLite "YYYY-MM-DD HH:MM:SS" is UTC; make it explicit so Date parses correctly.
     const parseUtc = (s) => (s ? new Date(`${s.replace(" ", "T")}Z`) : null);
 
-    // Remaining time as { text, level }. Shows hours/minutes, switches to seconds in
-    // the last minute, and flags "soon" (≤5 min) then "now" (≤1 min) for colouring.
+    // Remaining time as { text, level }. floor minutes (so "1 min" holds for the whole
+    // last minute, then seconds tick to "1s" — never a jump to 0), and the hour band
+    // starts at 59 min so a 1-hour link reads "1 hour" for its first minute, then
+    // "58 min". Flags "soon" (≤5 min, yellow) then "now" (last minute, red).
     const formatCountdown = (expiresIso) => {
         const d = parseUtc(expiresIso);
         if (!d || Number.isNaN(d.getTime())) return { text: "", level: "" };
         const s = Math.round((d.getTime() - Date.now()) / 1000);
         if (s <= 0) return { text: "expired", level: "now" };
         let text;
-        if (s < 60) text = `${s}s`;
-        else if (s < 3600) text = `${Math.round(s / 60)} min`;
-        else if (s < 86400) { const h = Math.round(s / 3600); text = `${h} hour${h === 1 ? "" : "s"}`; }
+        if (s < 60) text = `${s}s`;                            // last minute: seconds
+        else if (s < 3540) text = `${Math.floor(s / 60)} min`; // 1..58 min
+        else if (s < 82800) { const h = Math.round(s / 3600); text = `${h} hour${h === 1 ? "" : "s"}`; }
         else { const days = Math.round(s / 86400); text = `${days} day${days === 1 ? "" : "s"}`; }
-        const level = s <= 60 ? "now" : s <= 300 ? "soon" : "";
+        const level = s < 60 ? "now" : s <= 300 ? "soon" : "";
         return { text, level };
     };
     const updateCountdown = (span) => {
@@ -108,12 +106,32 @@
     const tickCountdowns = () => {
         for (const span of document.querySelectorAll(".countdown")) updateCountdown(span);
     };
+    // Re-tick only as often as the display actually changes: every second in the last
+    // minute, otherwise at the next minute/hour/day boundary — so a long-lived link
+    // does not wake the CPU every second. Self-reschedules; call to (re)start it.
+    let tickTimer = null;
+    const scheduleTick = () => {
+        if (tickTimer) clearTimeout(tickTimer);
+        tickCountdowns();
+        let delay = 60000;
+        for (const span of document.querySelectorAll(".countdown")) {
+            const d = parseUtc(span.dataset.expires);
+            if (!d || Number.isNaN(d.getTime())) continue;
+            const s = Math.round((d.getTime() - Date.now()) / 1000);
+            let dd;
+            if (s <= 0) dd = 60000;
+            else if (s < 60) dd = 1000;
+            else if (s < 3540) dd = (s % 60 + 1) * 1000;
+            else if (s < 82800) dd = (s % 3600 + 1) * 1000;
+            else dd = (s % 86400 + 1) * 1000;
+            if (dd < delay) delay = dd;
+        }
+        tickTimer = setTimeout(scheduleTick, Math.max(1000, Math.min(delay, 60000)));
+    };
 
-    // Reveal and wire the result's Copy button + ⌘C hint (the link already exists,
-    // so this copy is a plain synchronous writeText that works on the first click).
+    // Reveal and wire the result's Copy button (the link already exists, so this copy
+    // is a plain synchronous writeText that works on the first click, incl. Safari).
     const setupResultCopy = (linkEl) => {
-        const kbd = document.getElementById("result-kbd");
-        if (kbd) { kbd.textContent = KBD; kbd.hidden = false; }
         const btn = document.getElementById("copy-result");
         if (btn) {
             btn.hidden = false;
@@ -174,7 +192,7 @@
         const indicator = document.getElementById("storage-indicator");
         if (indicator) {
             if (n > 0) {
-                const where = persistEnabled ? "saved on this device" : "lost when page closed";
+                const where = persistEnabled ? "saved on this device" : "clears on close";
                 indicator.textContent = `History · ${n} ${n === 1 ? "link" : "links"} (${where}) ›`;
                 indicator.dataset.mode = "list";
             } else if (persistEnabled) {
@@ -189,8 +207,11 @@
         const section = document.getElementById("history");
         const listEl = document.getElementById("history-list");
         if (!section || !listEl) return;
-        const persistBox = document.getElementById("history-persist");
-        if (persistBox) persistBox.checked = persistEnabled;
+        const persistBtn = document.getElementById("history-persist");
+        if (persistBtn) {
+            persistBtn.textContent = persistEnabled ? "Local history on" : "Enable local history";
+            persistBtn.classList.toggle("on", persistEnabled);
+        }
 
         listEl.replaceChildren();
         if (n === 0) { section.hidden = true; return; }
@@ -231,6 +252,9 @@
         const limitCustomValue = document.getElementById("limit-custom-value");
 
         const UNIT_SECS = { m: 60, h: 3600, d: 86400 };
+        // The input value that produced the current result; the result dims when the
+        // input drifts away from it.
+        let resultSourceValue = null;
 
         const checkedValue = (name, fallback) =>
             document.querySelector(`input[name="${name}"]:checked`)?.value ?? fallback;
@@ -270,7 +294,12 @@
             content.style.overflowY = !Number.isNaN(maxPx) && h > maxPx ? "auto" : "hidden";
         };
 
-        content.addEventListener("input", () => { autosize(); updateSubmitLabel(); });
+        content.addEventListener("input", () => {
+            autosize();
+            updateSubmitLabel();
+            content.classList.remove("submitted"); // editing re-activates the field
+            if (currentResultUrl) panel.classList.toggle("stale", content.value !== resultSourceValue);
+        });
 
         // Focus the Custom field as soon as its segment is picked.
         const ttlCustomRadio = document.getElementById("ttl-custom");
@@ -289,8 +318,9 @@
             }
         });
 
-        // Focusing the field places the caret at the end (clicking still positions it).
+        // Focusing the field un-greys it and places the caret at the end.
         content.addEventListener("focus", () => {
+            content.classList.remove("submitted");
             const n = content.value.length;
             content.setSelectionRange(n, n);
         });
@@ -349,6 +379,11 @@
                 showReady(url, kind, data.expires_at, uses);
                 addHistory({ url, kind, uses, expires: data.expires_at });
                 renderHistory();
+                // The input greys (still clickable); the result is in sync with it.
+                resultSourceValue = raw;
+                content.classList.add("submitted");
+                panel.classList.remove("stale");
+                scheduleTick();
             } catch (e) {
                 alert(e.message || "Could not create the link.");
             } finally {
@@ -390,8 +425,8 @@
             }
         });
 
-        const persistBox = document.getElementById("history-persist");
-        persistBox?.addEventListener("change", () => { setPersist(persistBox.checked); renderHistory(); });
+        const persistBtn = document.getElementById("history-persist");
+        persistBtn?.addEventListener("click", () => { setPersist(!persistEnabled); renderHistory(); });
         document.getElementById("history-clear")?.addEventListener("click", () => {
             memHistory = [];
             lsDel(HISTORY_KEY);
@@ -443,6 +478,6 @@
                 }
             }
         }
-        setInterval(tickCountdowns, 1000);
+        scheduleTick();
     });
 })();
