@@ -124,7 +124,7 @@ async fn create_link(
 // --------------------------------------------------------------------------
 
 pub async fn index(State(state): State<AppState>) -> Html<String> {
-    Html(views::index_page(state.encryption_enabled, &state.api_base).into_string())
+    Html(views::index_page(state.encryption_enabled, &state.api_base, state.max_ttl_secs).into_string())
 }
 
 /// `POST /` — the no-JavaScript create path. A plain HTML form submits here and

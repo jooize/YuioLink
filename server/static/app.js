@@ -77,13 +77,13 @@
         if (!d || Number.isNaN(d.getTime())) return { text: "", level: "" };
         const s = Math.round((d.getTime() - Date.now()) / 1000);
         if (s <= 0) return { text: "expired", level: "now" };
-        let text;
-        if (s < 180) text = `${s} second${s === 1 ? "" : "s"}`; // last 3 minutes: seconds
-        else if (s < 3540) { const m = Math.floor(s / 60); text = `${m} minute${m === 1 ? "" : "s"}`; }
-        else if (s < 82800) { const h = Math.round(s / 3600); text = `${h} hour${h === 1 ? "" : "s"}`; }
-        else { const days = Math.round(s / 86400); text = `${days} day${days === 1 ? "" : "s"}`; }
+        let unit;
+        if (s < 180) unit = `${s} second${s === 1 ? "" : "s"}`; // last 3 minutes: seconds
+        else if (s < 3540) { const m = Math.floor(s / 60); unit = `${m} minute${m === 1 ? "" : "s"}`; }
+        else if (s < 82800) { const h = Math.round(s / 3600); unit = `${h} hour${h === 1 ? "" : "s"}`; }
+        else { const days = Math.round(s / 86400); unit = `${days} day${days === 1 ? "" : "s"}`; }
         const level = s < 60 ? "now" : s <= 300 ? "soon" : "";
-        return { text, level };
+        return { text: `expires in ${unit}`, level };
     };
     const updateCountdown = (span) => {
         const { text, level } = formatCountdown(span.dataset.expires);
@@ -94,7 +94,7 @@
     // Build "<kind> · expires in <live countdown><uses>" into `metaEl` (no innerHTML).
     const buildMeta = (metaEl, kind, expiresIso, uses) => {
         metaEl.replaceChildren();
-        metaEl.append(`${kindLabel(kind)} · expires in `);
+        metaEl.append(`${kindLabel(kind)} · `);
         const span = document.createElement("span");
         span.className = "countdown";
         span.dataset.expires = expiresIso ?? "";
@@ -113,6 +113,9 @@
     const scheduleTick = () => {
         if (tickTimer) clearTimeout(tickTimer);
         tickCountdowns();
+        // Reflect a link that just expired: dim it and reveal "Clear Expired".
+        const expiredBtn = document.getElementById("history-clear-expired");
+        if (expiredBtn && expiredBtn.hidden && memHistory.some(isExpired)) renderHistory();
         let delay = 60000;
         for (const span of document.querySelectorAll(".countdown")) {
             const d = parseUtc(span.dataset.expires);
@@ -158,14 +161,14 @@
     const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* full or blocked */ } };
     const lsDel = (k) => { try { localStorage.removeItem(k); } catch { /* blocked */ } };
 
-    const pruneHistory = (list) => list.filter((it) => {
+    const isExpired = (it) => {
         const d = parseUtc(it.expires);
-        return !d || Number.isNaN(d.getTime()) || d.getTime() > Date.now();
-    });
+        return !!d && !Number.isNaN(d.getTime()) && d.getTime() <= Date.now();
+    };
     const loadPersisted = () => {
         persistEnabled = lsGet(PERSIST_KEY) === "1";
         if (persistEnabled) {
-            try { memHistory = pruneHistory(JSON.parse(lsGet(HISTORY_KEY)) ?? []); }
+            try { memHistory = JSON.parse(lsGet(HISTORY_KEY)) ?? []; }
             catch { memHistory = []; }
         }
     };
@@ -176,14 +179,13 @@
         else { lsDel(PERSIST_KEY); lsDel(HISTORY_KEY); } // forget what was stored
     };
     const addHistory = (entry) => {
-        memHistory = pruneHistory(memHistory).filter((it) => it.url !== entry.url);
+        memHistory = memHistory.filter((it) => it.url !== entry.url);
         memHistory.unshift(entry);
         if (memHistory.length > HISTORY_MAX) memHistory.length = HISTORY_MAX;
         persistNow();
     };
 
     const renderHistory = () => {
-        memHistory = pruneHistory(memHistory);
         persistNow();
         const shown = [...memHistory];
         const n = shown.length;
@@ -214,6 +216,7 @@
         for (const it of shown) {
             const li = document.createElement("li");
             li.className = "history-item";
+            if (isExpired(it)) li.classList.add("expired");
             const text = document.createElement("div");
             text.className = "history-text";
             const url = document.createElement("code");
@@ -231,6 +234,8 @@
             li.append(text, copy);
             listEl.append(li);
         }
+        const clearExpired = document.getElementById("history-clear-expired");
+        if (clearExpired) clearExpired.hidden = !memHistory.some(isExpired);
     };
 
     const initCreate = () => {
@@ -425,6 +430,11 @@
         });
         document.getElementById("history-toggle")?.addEventListener("click", () => {
             document.getElementById("history")?.classList.toggle("collapsed");
+        });
+        document.getElementById("history-clear-expired")?.addEventListener("click", () => {
+            memHistory = memHistory.filter((it) => !isExpired(it));
+            persistNow();
+            renderHistory();
         });
 
         autosize();

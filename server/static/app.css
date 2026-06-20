@@ -325,7 +325,15 @@ textarea.form-control {
 }
 
 #limit-custom-value {
-    flex: 0 0 7em;
+    flex: 0 0 33.333%;
+}
+
+/* "Up to N days" hint under the Specify-expiry field. */
+.custom-hint {
+    flex: 0 0 100%;
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--text-secondary);
 }
 
 /* macOS-style switch row */
@@ -693,7 +701,7 @@ textarea.form-control {
     transform: rotate(0deg);
 }
 
-.history.collapsed .history-list {
+.history.collapsed .history-body {
     display: none;
 }
 
@@ -720,6 +728,26 @@ textarea.form-control {
     background: var(--field-bg);
     border: 0.5px solid var(--field-border);
     border-radius: 10px;
+}
+
+/* Expired links stay in the list (dimmed) until cleared via "Clear Expired". */
+.history-item.expired {
+    opacity: 0.5;
+}
+
+.history-clear-expired {
+    margin-top: 8px;
+    font-family: inherit;
+    font-size: 12px;
+    color: #ff9500;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+
+.history-clear-expired:hover {
+    text-decoration: underline;
 }
 
 .history-text {

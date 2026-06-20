@@ -62,7 +62,19 @@ fn result_output(url: Option<&str>, meta: Markup) -> Markup {
 /// result page comes back); `app.js` progressively enhances it with live type
 /// detection, keyboard shortcuts, an in-place result, and copy. Encryption is
 /// only offered when the operator enabled it (`encryption_enabled`).
-pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
+/// Humanize a TTL ceiling for display, e.g. 604800 -> "7 days".
+fn humanize_duration(secs: i64) -> String {
+    let (n, unit) = if secs % 86400 == 0 {
+        (secs / 86400, "day")
+    } else if secs % 3600 == 0 {
+        (secs / 3600, "hour")
+    } else {
+        (secs / 60, "minute")
+    };
+    format!("{n} {unit}{}", if n == 1 { "" } else { "s" })
+}
+
+pub fn index_page(encryption_enabled: bool, api_base: &str, max_ttl_secs: i64) -> Markup {
     let head_extra = html! {
         // app.js reads this to decide which backend to call; empty = same origin.
         meta name="yuiolink-api-base" content=(api_base);
@@ -129,6 +141,7 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
                         input.seg-radio #ttl-unit-d type="radio" name="ttl_unit" value="d";
                         label.seg-label for="ttl-unit-d" { "days" }
                     }
+                    small.custom-hint { "Up to " (humanize_duration(max_ttl_secs)) }
                 }
             }
 
@@ -167,7 +180,7 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
         // Created-link history (bottom). Kept in memory for the session unless the
         // user ticks "Save on this device", which opts into localStorage. app.js
         // fills the list and toggles persistence.
-        section.history #history hidden {
+        section.history.collapsed #history hidden {
             div.history-head {
                 button.history-toggle #history-toggle type="button" {
                     span.history-chevron aria-hidden="true" { "›" }
@@ -175,7 +188,10 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
                 }
                 button.history-clear #history-clear type="button" { "Clear" }
             }
-            ul.history-list #history-list {}
+            div.history-body {
+                ul.history-list #history-list {}
+                button.history-clear-expired #history-clear-expired type="button" hidden { "Clear Expired" }
+            }
         }
 
         footer {
