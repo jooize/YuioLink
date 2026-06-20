@@ -148,7 +148,8 @@
     const HISTORY_MAX = 20;
     let memHistory = [];
     let persistEnabled = false;
-    // The link currently shown in the result panel; excluded from the history list.
+    // The URL currently shown in the result panel — a flag for the "input out of sync"
+    // dimming. (The link itself still counts in the history list.)
     let currentResultUrl = null;
 
     const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -182,20 +183,18 @@
     const renderHistory = () => {
         memHistory = pruneHistory(memHistory);
         persistNow();
-        const shown = currentResultUrl
-            ? memHistory.filter((it) => it.url !== currentResultUrl)
-            : [...memHistory];
+        const shown = [...memHistory];
         const n = shown.length;
 
         // Split pill: left = status (and a link to the list), right = persistence toggle.
         const status = document.getElementById("storage-status");
         if (status) {
-            status.textContent = n > 0 ? `History · ${n} ${n === 1 ? "link" : "links"} ›` : "No links yet";
+            status.textContent = n > 0 ? `History · ${n} ${n === 1 ? "Link" : "Links"} ›` : "No Links Yet";
             status.dataset.has = n > 0 ? "1" : "";
         }
         const toggle = document.getElementById("storage-toggle");
         if (toggle) {
-            toggle.textContent = persistEnabled ? "Local history on" : "Enable local history";
+            toggle.textContent = persistEnabled ? "Local History On" : "Enable Local History";
             toggle.classList.toggle("on", persistEnabled);
         }
 

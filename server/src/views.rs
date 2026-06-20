@@ -20,9 +20,6 @@ fn document_full(head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover";
                 meta name="color-scheme" content="light dark";
-                // Tint the Safari/browser UI to match the page background.
-                meta name="theme-color" media="(prefers-color-scheme: light)" content="#e7e8ec";
-                meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121214";
                 title { "YuioLink" }
                 link rel="stylesheet" href="/static/app.css";
                 (head_extra)
@@ -164,7 +161,7 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
         // user ticks "Save on this device", which opts into localStorage. app.js
         // fills the list and toggles persistence.
         section.history #history hidden {
-            h2.history-title { "History on device" }
+            h2.history-title { "History on Device" }
             ul.history-list #history-list {}
             div.history-actions {
                 button.history-clear #history-clear type="button" { "Clear" }
