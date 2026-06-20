@@ -8,8 +8,6 @@ use maud::{DOCTYPE, Markup, PreEscaped, html};
 
 const ICON_CHAIN: &str = r#"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>"#;
 
-const ICON_CHECK: &str = r#"<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9.55 17.6 4.4 12.45l1.4-1.4 3.75 3.75 8.85-8.85 1.4 1.4z"/></svg>"#;
-
 /// The shared page shell: head, the glass "app window", and the masthead.
 fn document(body: Markup, scripts: Markup) -> Markup {
     document_full(html! {}, body, scripts)
@@ -43,13 +41,19 @@ fn document_full(head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
 }
 
 /// The result `<output>` shown after a link is created (server-rendered on the
-/// no-JS path, populated in place by `app.js` otherwise).
-fn result_output(url: Option<&str>, expiry_line: Markup) -> Markup {
+/// no-JS path, populated in place by `app.js` otherwise). The URL is the focus;
+/// a single meta line carries kind, expiry, and any use limit.
+fn result_output(url: Option<&str>, meta: Markup) -> Markup {
     html! {
-        output.result #link-panel hidden[url.is_none()] {
-            strong.result-label { (PreEscaped(ICON_CHECK)) " Your ephemeral link is ready" }
-            code #link-element { @if let Some(u) = url { (u) } }
-            small.result-expiry #link-expiry { (expiry_line) }
+        // tabindex=-1: focused after creation so the link selection survives for ⌘C
+        // and the next Tab lands on the input (the panel precedes the form in the DOM).
+        output.result #link-panel tabindex="-1" hidden[url.is_none()] {
+            code.result-url #link-element { @if let Some(u) = url { (u) } }
+            div.result-foot {
+                small.result-meta #link-expiry { (meta) }
+                // app.js fills this with the platform copy shortcut (⌘C / Ctrl+C).
+                small.result-hint #result-hint {}
+            }
         }
     }
 }
@@ -64,12 +68,18 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
         meta name="yuiolink-api-base" content=(api_base);
     };
     let body = html! {
-        p { "Memorable links that always expire — redirect or text." }
+        p { "Wieldy Ephemeral Link" }
         @if encryption_enabled {
             noscript { p { "Creating links works without JavaScript; encryption needs it." } }
         }
 
-        // Filled in place by app.js; the no-JS path reloads to a result page.
+        // Compact storage status (top) linking down to the full history. Its space
+        // is reserved (CSS `visibility`) so it never moves the layout; app.js adds
+        // `.shown` once there is history.
+        a.storage-indicator #storage-indicator href="#history" {}
+
+        // The created link (latest), shown above the input. app.js fills it in place;
+        // the no-JS path reloads to a result page.
         (result_output(None, html! {}))
 
         form #create-form method="post" action="/" {
@@ -77,41 +87,57 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
                 autocomplete="off" autocapitalize="off" spellcheck="false"
                 placeholder="Paste a link to redirect, or type text to share" autofocus {}
 
-            // Native radios so the picker works without JS; "Auto" lets the server
-            // detect. app.js shows a live hint and resolves "Auto" before the API call.
-            fieldset.picker {
-                legend { "Type" small.hint #detected-hint {} }
-                div.segmented {
-                    input.seg-radio #kind-auto type="radio" name="kind" value="auto" checked;
-                    label.seg-label for="kind-auto" { "Auto" }
-                    input.seg-radio #kind-redirect type="radio" name="kind" value="redirect";
-                    label.seg-label for="kind-redirect" { "Redirect" }
-                    input.seg-radio #kind-text type="radio" name="kind" value="text";
-                    label.seg-label for="kind-text" { "Text" }
-                }
+            // No Type picker: a URL is always a redirect, anything else is text, so
+            // the kind is detected and named on the button itself. app.js updates the
+            // label live ("Create Redirect Link" / "Create Text Link"); without JS the
+            // server detects on submit and this generic label is fine. The Copy button
+            // creates first, then copies (it drops the "+" once the current input has
+            // a link).
+            div.split-btn {
+                button #submit.btn.split-primary type="submit" { "Create Link" }
+                button #copy.btn.split-copy type="button" disabled { "+ Copy" }
             }
 
+            // Native radios so the pickers work without JS. "Custom" reveals an extra
+            // field (CSS `:has()` on the no-JS path; app.js also focuses it).
             fieldset.picker {
                 legend { "Expires in" }
                 div.segmented {
                     input.seg-radio #ttl-600 type="radio" name="ttl_seconds" value="600";
-                    label.seg-label for="ttl-600" { "10 min" }
-                    input.seg-radio #ttl-3600 type="radio" name="ttl_seconds" value="3600";
+                    label.seg-label for="ttl-600" { "10 minutes" }
+                    input.seg-radio #ttl-3600 type="radio" name="ttl_seconds" value="3600" checked;
                     label.seg-label for="ttl-3600" { "1 hour" }
-                    input.seg-radio #ttl-86400 type="radio" name="ttl_seconds" value="86400" checked;
-                    label.seg-label for="ttl-86400" { "1 day" }
                     input.seg-radio #ttl-604800 type="radio" name="ttl_seconds" value="604800";
                     label.seg-label for="ttl-604800" { "7 days" }
+                    input.seg-radio #ttl-custom type="radio" name="ttl_seconds" value="custom";
+                    label.seg-label for="ttl-custom" { "Custom" }
+                }
+                div.custom-field #ttl-custom-field {
+                    input #ttl-custom-value.custom-num name="ttl_custom" type="number"
+                        min="1" inputmode="numeric" placeholder="30";
+                    select #ttl-custom-unit.custom-unit name="ttl_unit" {
+                        option value="m" selected { "minutes" }
+                        option value="h" { "hours" }
+                        option value="d" { "days" }
+                    }
                 }
             }
 
-            details.advanced {
-                summary { "Advanced" }
-                label.field-row for="max-uses" {
-                    "Burn after"
-                    input #max-uses name="max_uses" type="number" min="1" inputmode="numeric"
-                        placeholder="Unlimited";
-                    "uses"
+            fieldset.picker {
+                legend { "Limit" }
+                div.segmented {
+                    input.seg-radio #limit-unlimited type="radio" name="limit" value="unlimited" checked;
+                    label.seg-label for="limit-unlimited" {
+                        span.infinity aria-label="Unlimited" { "∞" }
+                    }
+                    input.seg-radio #limit-1 type="radio" name="limit" value="1";
+                    label.seg-label for="limit-1" { "1" }
+                    input.seg-radio #limit-custom type="radio" name="limit" value="custom";
+                    label.seg-label for="limit-custom" { "Custom" }
+                }
+                div.custom-field #limit-custom-field {
+                    input #limit-custom-value.custom-num name="limit_custom" type="number"
+                        min="1" inputmode="numeric" placeholder="Number of uses";
                 }
             }
 
@@ -127,10 +153,20 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
                     }
                 }
             }
+        }
 
-            div.split-btn {
-                button #submit.btn.split-primary type="submit" { "Create Link" }
-                button #copy.btn.split-copy type="button" disabled { "+ Copy" }
+        // Created-link history (bottom). Kept in memory for the session unless the
+        // user ticks "Save on this device", which opts into localStorage. app.js
+        // fills the list and toggles persistence.
+        section.history #history hidden {
+            h2.history-title { "Recent links" }
+            ul.history-list #history-list {}
+            div.history-actions {
+                label.history-persist for="history-persist" {
+                    input #history-persist type="checkbox";
+                    span { "Save on this device" }
+                }
+                button.history-clear #history-clear type="button" { "Clear" }
             }
         }
 
@@ -147,18 +183,20 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
 }
 
 /// The no-JS result page shown after `POST /` creates a link.
-pub fn result_page(url: &str, expires_at: &str, max_uses: Option<i64>) -> Markup {
-    let expiry = html! {
-        "Expires " (expires_at) " UTC"
-        @if let Some(max) = max_uses {
-            " · burns after " (max) (if max == 1 { " use" } else { " uses" })
+pub fn result_page(url: &str, kind_label: &str, expires_at: &str, max_uses: Option<i64>) -> Markup {
+    let meta = html! {
+        (kind_label) " · expires " (expires_at) " UTC"
+        @match max_uses {
+            Some(1) => { " · one-time" }
+            Some(max) => { " · max " (max) " uses" }
+            None => {}
         }
     };
     let body = html! {
-        (result_output(Some(url), expiry))
+        (result_output(Some(url), meta))
         div.split-btn {
             a.btn.split-primary href=(url) { "Open link" }
-            button #copy-link.btn.split-copy type="button" { "+ Copy" }
+            button #copy-link.btn.split-copy type="button" { "Copy" }
         }
         p {
             a href={ (url) "+" } { "Preview" } " · " a href="/" { "Create another" }

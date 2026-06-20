@@ -2,54 +2,45 @@
 // `yuiolink-core` crate: AES-256-GCM, 96-bit nonce, sealed string
 // `yl1.<b64url(nonce)>.<b64url(ciphertext||tag)>`, key carried in the URL
 // fragment as base64url. The key never leaves the browser.
-window.YuioCrypto = (function () {
-    function b64urlEncode(bytes) {
-        var bin = "";
-        for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+window.YuioCrypto = (() => {
+    "use strict";
+
+    const b64urlEncode = (bytes) => {
+        let bin = "";
+        for (const b of bytes) bin += String.fromCharCode(b);
         return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-    }
+    };
 
-    function b64urlDecode(str) {
-        str = str.replace(/-/g, "+").replace(/_/g, "/");
-        while (str.length % 4) str += "=";
-        var bin = atob(str);
-        var out = new Uint8Array(bin.length);
-        for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-        return out;
-    }
+    const b64urlDecode = (str) => {
+        const b64 = str.replace(/-/g, "+").replace(/_/g, "/");
+        const padded = b64.padEnd(Math.ceil(b64.length / 4) * 4, "=");
+        return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+    };
 
-    function generateKey() {
-        return crypto.getRandomValues(new Uint8Array(32));
-    }
+    const generateKey = () => crypto.getRandomValues(new Uint8Array(32));
 
-    async function seal(plaintext, rawKey) {
-        var key = await crypto.subtle.importKey("raw", rawKey, "AES-GCM", false, ["encrypt"]);
-        var iv = crypto.getRandomValues(new Uint8Array(12));
-        var ct = await crypto.subtle.encrypt(
-            { name: "AES-GCM", iv: iv },
+    const seal = async (plaintext, rawKey) => {
+        const key = await crypto.subtle.importKey("raw", rawKey, "AES-GCM", false, ["encrypt"]);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const ct = await crypto.subtle.encrypt(
+            { name: "AES-GCM", iv },
             key,
-            new TextEncoder().encode(plaintext)
+            new TextEncoder().encode(plaintext),
         );
-        return "yl1." + b64urlEncode(iv) + "." + b64urlEncode(new Uint8Array(ct));
-    }
+        return `yl1.${b64urlEncode(iv)}.${b64urlEncode(new Uint8Array(ct))}`;
+    };
 
-    async function open(sealed, rawKey) {
-        var parts = sealed.split(".");
+    const open = async (sealed, rawKey) => {
+        const parts = sealed.split(".");
         if (parts.length !== 3 || parts[0] !== "yl1") {
             throw new Error("unsupported sealed format");
         }
-        var iv = b64urlDecode(parts[1]);
-        var ct = b64urlDecode(parts[2]);
-        var key = await crypto.subtle.importKey("raw", rawKey, "AES-GCM", false, ["decrypt"]);
-        var pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, ct);
+        const iv = b64urlDecode(parts[1]);
+        const ct = b64urlDecode(parts[2]);
+        const key = await crypto.subtle.importKey("raw", rawKey, "AES-GCM", false, ["decrypt"]);
+        const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
         return new TextDecoder().decode(pt);
-    }
-
-    return {
-        generateKey: generateKey,
-        seal: seal,
-        open: open,
-        keyToFragment: b64urlEncode,
-        fragmentToKey: b64urlDecode,
     };
+
+    return { generateKey, seal, open, keyToFragment: b64urlEncode, fragmentToKey: b64urlDecode };
 })();

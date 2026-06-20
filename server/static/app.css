@@ -6,6 +6,7 @@
     --accent-press: #0066d6;
     --switch-on: #34c759;
     --switch-off: rgba(120, 120, 128, 0.32);
+    --result: #10b981;
 
     --bg-1: #e7e8ec;
     --bg-2: #f6f7f9;
@@ -38,6 +39,7 @@
         --accent-hover: #3d9bff;
         --accent-press: #0a6fd6;
         --switch-off: rgba(120, 120, 128, 0.5);
+        --result: #34d399;
 
         --bg-1: #121214;
         --bg-2: #202024;
@@ -65,6 +67,13 @@
 
 html {
     -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+}
+
+/* The `hidden` attribute must win over the component `display` rules below
+   (a class selector would otherwise override the UA `[hidden]` style). */
+[hidden] {
+    display: none !important;
 }
 
 body {
@@ -74,8 +83,10 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: calc(24px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
+    /* Top-anchored, not vertically centered: as the result/history grow the window
+       stays put at the top instead of re-centering (which read as a scroll jump). */
+    justify-content: flex-start;
+    padding: calc(44px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
     font-family: var(--font);
     color: var(--text);
     background:
@@ -95,7 +106,9 @@ body {
     border: 0.5px solid var(--card-border);
     border-radius: var(--radius-window);
     box-shadow: var(--card-shadow), inset 0 1px 0 var(--card-highlight);
-    padding: clamp(22px, 5vw, 34px);
+    /* More room above the logo, balancing the reserved storage-pill slot below the
+       tagline so the top reads the same with or without the pill showing. */
+    padding: clamp(34px, 6vw, 48px) clamp(22px, 5vw, 34px) clamp(22px, 5vw, 34px);
 }
 
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
@@ -198,7 +211,9 @@ textarea.form-control {
     overflow-wrap: anywhere;
     word-break: break-word;
     overflow-x: hidden;
-    overflow-y: auto;
+    /* No scrollbar while the content fits; app.js flips this to `auto` only once
+       the text exceeds max-height. */
+    overflow-y: hidden;
 }
 
 /* Radio-group wrapper: strip the native fieldset chrome; the legend is the caption. */
@@ -214,16 +229,10 @@ textarea.form-control {
     margin: 0 0 7px;
     font-size: 12.5px;
     font-weight: 600;
-    color: var(--text-secondary);
+    color: var(--accent);
 }
 
-.hint {
-    margin-left: 6px;
-    font-weight: 400;
-    color: var(--text-tertiary);
-}
-
-/* iOS-style segmented control (Type, Expires in), built from native radios so it
+/* iOS-style segmented control (Expires in, Limit), built from native radios so it
    works without JavaScript. The radio is visually hidden; its label is the chip. */
 .segmented {
     display: flex;
@@ -269,32 +278,36 @@ textarea.form-control {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
-/* Advanced disclosure. */
-.advanced {
-    margin-top: 16px;
+/* The infinity chip (Limit: unlimited) reads a touch larger than the digits. */
+.infinity {
+    font-size: 17px;
+    line-height: 1;
 }
 
-.advanced > summary {
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--accent);
-    padding: 4px 0;
-    user-select: none;
+/* "Custom" reveal: hidden until its segment is picked. CSS `:has()` drives the
+   no-JS path; app.js also focuses the field when Custom is chosen. */
+.custom-field {
+    display: none;
+    gap: 8px;
+    margin-top: 8px;
 }
 
-.field-row {
+.picker:has(.seg-radio[value="custom"]:checked) .custom-field {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 4px 2px;
-    font-size: 14px;
-    color: var(--text);
 }
 
-.field-row input[type="number"] {
-    width: 6.5em;
-    padding: 8px 10px;
+.custom-num {
+    flex: 1;
+    min-width: 0;
+}
+
+.custom-unit {
+    flex: none;
+}
+
+.custom-num,
+.custom-unit {
+    padding: 9px 11px;
     font-family: inherit;
     font-size: 15px;
     color: var(--text);
@@ -305,7 +318,8 @@ textarea.form-control {
     appearance: none;
 }
 
-.field-row input[type="number"]:focus {
+.custom-num:focus,
+.custom-unit:focus {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
@@ -445,6 +459,8 @@ textarea.form-control {
 
 .split-copy {
     flex: none;
+    /* Fixed width so toggling "+ Copy" / "Copy" / "Copied" never resizes the button. */
+    min-width: 6em;
     padding: 0 16px;
     font-size: 14px;
     font-weight: 500;
@@ -465,10 +481,10 @@ textarea.form-control {
 .result {
     display: block;
     margin: 20px 0 0;
-    padding: 14px;
+    padding: 16px;
     border-radius: 16px;
-    background: color-mix(in srgb, var(--switch-on) 14%, var(--field-bg));
-    border: 0.5px solid color-mix(in srgb, var(--switch-on) 35%, transparent);
+    background: color-mix(in srgb, var(--result) 13%, var(--field-bg));
+    border: 0.5px solid color-mix(in srgb, var(--result) 38%, transparent);
 }
 
 .result-label {
@@ -477,11 +493,23 @@ textarea.form-control {
     gap: 6px;
     font-size: 12.5px;
     font-weight: 600;
-    color: color-mix(in srgb, var(--switch-on) 65%, var(--text));
-    margin-bottom: 9px;
+    color: color-mix(in srgb, var(--switch-on) 60%, var(--text));
+    margin-bottom: 11px;
 }
 
-.result > code {
+/* The created link — the focus of the single bubble: prominent, fully selectable. */
+.result-url {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    line-height: 1.4;
+    word-break: break-all;
+    color: var(--text);
+    user-select: all;
+}
+
+/* The preview page uses a plainer inline code (no box). */
+.result > code:not(.result-url) {
     display: block;
     font-family: var(--font-mono);
     font-size: 13px;
@@ -490,11 +518,25 @@ textarea.form-control {
     user-select: all;
 }
 
-.result-expiry {
-    display: block;
-    margin-top: 9px;
+/* Foot row inside the bubble: kind · expiry · limit on the left, copy shortcut right. */
+.result-foot {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 11px;
+}
+
+.result-meta {
     font-size: 12.5px;
     color: var(--text-secondary);
+}
+
+.result-hint {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
 }
 
 /* Text-link viewer body. */
@@ -512,6 +554,152 @@ textarea.form-control {
     background: var(--field-bg);
     border: 0.5px solid var(--field-border);
     border-radius: var(--radius-control);
+}
+
+/* Compact storage status near the top; links down to the full history. An accent
+   pill. Its space is always reserved (visibility, not display) so revealing it never
+   shifts the layout — the slot looks the same whether or not the pill shows. */
+.storage-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    min-height: 28px;
+    margin: 14px auto 0;
+    padding: 5px 13px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border-radius: 999px;
+    text-decoration: none;
+    visibility: hidden;
+    transition: background 0.15s ease;
+}
+
+.storage-indicator.shown {
+    visibility: visible;
+}
+
+.storage-indicator:hover {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    text-decoration: none;
+}
+
+/* Created-link history (bottom). In memory for the session unless persisted. */
+.history {
+    margin: 22px 0 0;
+    padding-top: 18px;
+    border-top: 0.5px solid var(--separator);
+    scroll-margin-top: 18px;
+}
+
+.history-title {
+    margin: 0 0 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--field-bg);
+    border: 0.5px solid var(--field-border);
+    border-radius: 10px;
+}
+
+.history-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.history-url {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: all;
+}
+
+.history-meta {
+    display: block;
+    margin-top: 2px;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+}
+
+.history-copy {
+    flex: none;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    background: none;
+    border: 0;
+    padding: 6px 2px;
+    cursor: pointer;
+}
+
+.history-copy:hover {
+    text-decoration: underline;
+}
+
+.history-copy.copied {
+    color: var(--switch-on);
+    text-decoration: none;
+}
+
+.history-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+}
+
+.history-persist {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.history-persist input {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+.history-clear {
+    font-family: inherit;
+    font-size: 12.5px;
+    color: var(--accent);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+
+.history-clear:hover {
+    text-decoration: underline;
 }
 
 main > footer {
@@ -549,13 +737,3 @@ code {
     }
 }
 
-@media (max-width: 480px) {
-    body {
-        justify-content: flex-start;
-    }
-
-    .app-window {
-        margin-top: auto;
-        margin-bottom: auto;
-    }
-}
