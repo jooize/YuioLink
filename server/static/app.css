@@ -281,6 +281,8 @@ textarea.form-control {
     display: none;
     gap: 8px;
     margin-top: 8px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .picker:has(.seg-radio[value="custom"]:checked) .custom-field {
@@ -290,14 +292,6 @@ textarea.form-control {
 .custom-num {
     flex: 1;
     min-width: 0;
-}
-
-.custom-unit {
-    flex: none;
-}
-
-.custom-num,
-.custom-unit {
     padding: 9px 11px;
     font-family: inherit;
     font-size: 15px;
@@ -309,11 +303,20 @@ textarea.form-control {
     appearance: none;
 }
 
-.custom-num:focus,
-.custom-unit:focus {
+.custom-num:focus {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* Specify-expiry unit chips: keep the number field compact, chips take the rest. */
+#ttl-custom-value {
+    flex: 0 0 5em;
+}
+
+.unit-segmented {
+    flex: 1;
+    min-width: 13em;
 }
 
 /* macOS-style switch row */

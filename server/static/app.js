@@ -78,7 +78,7 @@
         const s = Math.round((d.getTime() - Date.now()) / 1000);
         if (s <= 0) return { text: "expired", level: "now" };
         let text;
-        if (s < 60) text = `${s}s`;                            // last minute: seconds
+        if (s < 180) text = `${s} second${s === 1 ? "" : "s"}`; // last 3 minutes: seconds
         else if (s < 3540) { const m = Math.floor(s / 60); text = `${m} minute${m === 1 ? "" : "s"}`; }
         else if (s < 82800) { const h = Math.round(s / 3600); text = `${h} hour${h === 1 ? "" : "s"}`; }
         else { const days = Math.round(s / 86400); text = `${days} day${days === 1 ? "" : "s"}`; }
@@ -120,7 +120,7 @@
             const s = Math.round((d.getTime() - Date.now()) / 1000);
             let dd;
             if (s <= 0) dd = 60000;
-            else if (s < 60) dd = 1000;
+            else if (s < 180) dd = 1000;
             else if (s < 3540) dd = (s % 60 + 1) * 1000;
             else if (s < 82800) dd = (s % 3600 + 1) * 1000;
             else dd = (s % 86400 + 1) * 1000;
@@ -241,7 +241,6 @@
         const metaEl = document.getElementById("link-expiry");
         const panel = document.getElementById("link-panel");
         const ttlCustomValue = document.getElementById("ttl-custom-value");
-        const ttlCustomUnit = document.getElementById("ttl-custom-unit");
         const limitCustomValue = document.getElementById("limit-custom-value");
 
         const UNIT_SECS = { m: 60, h: 3600, d: 86400 };
@@ -257,7 +256,7 @@
             if (v === "custom") {
                 let n = Number.parseInt(ttlCustomValue.value, 10);
                 if (Number.isNaN(n) || n < 0) n = 0;
-                return n * (UNIT_SECS[ttlCustomUnit.value] ?? 60);
+                return n * (UNIT_SECS[checkedValue("ttl_unit", "m")] ?? 60);
             }
             return Number.parseInt(v, 10);
         };

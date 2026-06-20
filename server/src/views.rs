@@ -116,15 +116,18 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
                     input.seg-radio #ttl-604800 type="radio" name="ttl_seconds" value="604800";
                     label.seg-label for="ttl-604800" { "7 days" }
                     input.seg-radio #ttl-custom type="radio" name="ttl_seconds" value="custom";
-                    label.seg-label for="ttl-custom" { "Custom" }
+                    label.seg-label for="ttl-custom" { "Specify" }
                 }
                 div.custom-field #ttl-custom-field {
                     input #ttl-custom-value.custom-num name="ttl_custom" type="number"
                         min="1" inputmode="numeric" placeholder="30";
-                    select #ttl-custom-unit.custom-unit name="ttl_unit" {
-                        option value="m" selected { "minutes" }
-                        option value="h" { "hours" }
-                        option value="d" { "days" }
+                    div.segmented.unit-segmented {
+                        input.seg-radio #ttl-unit-m type="radio" name="ttl_unit" value="m" checked;
+                        label.seg-label for="ttl-unit-m" { "minutes" }
+                        input.seg-radio #ttl-unit-h type="radio" name="ttl_unit" value="h";
+                        label.seg-label for="ttl-unit-h" { "hours" }
+                        input.seg-radio #ttl-unit-d type="radio" name="ttl_unit" value="d";
+                        label.seg-label for="ttl-unit-d" { "days" }
                     }
                 }
             }
@@ -137,9 +140,9 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
                         span.infinity aria-label="Unlimited" { "∞" }
                     }
                     input.seg-radio #limit-1 type="radio" name="limit" value="1";
-                    label.seg-label for="limit-1" { "1" }
+                    label.seg-label for="limit-1" { "Once" }
                     input.seg-radio #limit-custom type="radio" name="limit" value="custom";
-                    label.seg-label for="limit-custom" { "Custom" }
+                    label.seg-label for="limit-custom" { "Specify" }
                 }
                 div.custom-field #limit-custom-field {
                     input #limit-custom-value.custom-num name="limit_custom" type="number"
