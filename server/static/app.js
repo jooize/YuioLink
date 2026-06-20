@@ -205,6 +205,8 @@
         const section = document.getElementById("history");
         const listEl = document.getElementById("history-list");
         if (!section || !listEl) return;
+        const title = document.querySelector(".history-title");
+        if (title) title.textContent = persistEnabled ? "Local History (On-Device)" : "Local History (Not Saved)";
 
         listEl.replaceChildren();
         if (n === 0) { section.hidden = true; return; }
@@ -420,6 +422,9 @@
             memHistory = [];
             lsDel(HISTORY_KEY);
             renderHistory();
+        });
+        document.getElementById("history-toggle")?.addEventListener("click", () => {
+            document.getElementById("history")?.classList.toggle("collapsed");
         });
 
         autosize();

@@ -146,7 +146,7 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
                 }
                 div.custom-field #limit-custom-field {
                     input #limit-custom-value.custom-num name="limit_custom" type="number"
-                        min="1" inputmode="numeric" placeholder="Number of uses";
+                        min="1" inputmode="numeric" placeholder="Uses";
                 }
             }
 
@@ -168,11 +168,14 @@ pub fn index_page(encryption_enabled: bool, api_base: &str) -> Markup {
         // user ticks "Save on this device", which opts into localStorage. app.js
         // fills the list and toggles persistence.
         section.history #history hidden {
-            h2.history-title { "History on Device" }
-            ul.history-list #history-list {}
-            div.history-actions {
+            div.history-head {
+                button.history-toggle #history-toggle type="button" {
+                    span.history-chevron aria-hidden="true" { "›" }
+                    span.history-title { "Local History" }
+                }
                 button.history-clear #history-clear type="button" { "Clear" }
             }
+            ul.history-list #history-list {}
         }
 
         footer {

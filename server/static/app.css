@@ -319,6 +319,15 @@ textarea.form-control {
     min-width: 13em;
 }
 
+/* The Specify-limit number stays compact and sits under the Specify chip. */
+#limit-custom-field {
+    justify-content: flex-end;
+}
+
+#limit-custom-value {
+    flex: 0 0 7em;
+}
+
 /* macOS-style switch row */
 .switch-row {
     display: flex;
@@ -653,8 +662,42 @@ textarea.form-control {
     scroll-margin-top: 18px;
 }
 
+.history-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+/* Collapse toggle: chevron + title; rotates and hides the list when collapsed. */
+.history-toggle {
+    display: inline-flex;
+    align-items: center;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.history-chevron {
+    display: inline-block;
+    margin-right: 6px;
+    color: var(--text-tertiary);
+    transition: transform 0.15s ease;
+    transform: rotate(90deg);
+}
+
+.history.collapsed .history-chevron {
+    transform: rotate(0deg);
+}
+
+.history.collapsed .history-list {
+    display: none;
+}
+
 .history-title {
-    margin: 0 0 10px;
     font-size: 12.5px;
     font-weight: 600;
     color: var(--accent);
@@ -723,17 +766,10 @@ textarea.form-control {
     text-decoration: none;
 }
 
-.history-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    margin-top: 12px;
-}
-
 .history-clear {
     font-family: inherit;
     font-size: 12.5px;
-    color: var(--accent);
+    color: #ff9500;
     background: none;
     border: 0;
     padding: 0;
