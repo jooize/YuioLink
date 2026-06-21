@@ -1101,20 +1101,20 @@ textarea.form-control {
     to { transform: rotate(360deg); }
 }
 
-/* Tombstone left after a link is broken or forgotten: details are purged; only a
-   dim, dashed marker remains, with its own Clear. */
+/* Tombstone marking where a removed entry was: a faded, recessed slot rather than the
+   old dashed border (which vanished on the last row and read as noise). The muted fill
+   reads as "emptied" in any position; it keeps the list's solid hairline separators. */
 .history-tomb {
     justify-content: space-between;
-    border-style: dashed;
-    background: color-mix(in srgb, var(--field-bg) 55%, transparent);
+    background: color-mix(in srgb, var(--text) 6%, transparent);
 }
 
 .history-tomb-msg {
     flex: 1;
     min-width: 0;
-    font-size: 12.5px;
+    font-size: 12px;
     font-style: italic;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
 }
 
 .history-tomb-clear {

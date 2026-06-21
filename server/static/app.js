@@ -168,11 +168,16 @@
         for (const span of document.querySelectorAll(".countdown")) updateCountdown(span);
     };
     // Re-tick only as often as the display actually changes: every second in the last
-    // minute, otherwise at the next minute/hour/day boundary — so a long-lived link
-    // does not wake the CPU every second. Self-reschedules; call to (re)start it.
+    // minute, otherwise at the next minute/hour/day boundary — so a long-lived link does
+    // not wake the CPU every second. It also stops entirely once nothing is left to count,
+    // and pauses while the tab is hidden — so an idle or backgrounded page draws no power.
+    // Self-reschedules; call to (re)start it.
     let tickTimer = null;
     const scheduleTick = () => {
-        if (tickTimer) clearTimeout(tickTimer);
+        if (tickTimer) { clearTimeout(tickTimer); tickTimer = null; }
+        // Paused while the tab is hidden: nothing visible to update, so no battery spent.
+        // visibilitychange (below) resumes and catches up the instant it is shown again.
+        if (document.hidden) return;
         tickCountdowns();
         // Reflect any link that just expired: dim its row and reveal "Clear Expired".
         // Re-render whenever the live expired count diverges from what is shown dimmed —
@@ -181,25 +186,33 @@
         const expiredNow = memHistory.filter(isExpired).length;
         const expiredShown = document.querySelectorAll(".history-item.expired").length;
         if (expiredNow !== expiredShown) renderHistory();
-        let delay = 60000;
+        let delay = Infinity;
         for (const span of document.querySelectorAll(".countdown")) {
             const d = parseUtc(span.dataset.expires);
             if (!d || Number.isNaN(d.getTime())) continue;
             const ms = d.getTime() - Date.now();
+            if (ms <= 0) continue;         // expired: its text is final — nothing more to update
             const s = Math.floor(ms / 1000);
             let dd;
-            if (ms <= 0) dd = 60000;       // already expired: idle
-            else if (ms < 1000) dd = ms;   // final partial second: wake right at the deadline so "expired" lands on time
+            if (ms < 1000) dd = ms;        // final partial second: wake right at the deadline so "expired" lands on time
             else if (s < 120) dd = 1000;   // tick every second once seconds are shown
             else if (s < 3540) dd = (s % 60 + 1) * 1000;
             else if (s < 82800) dd = (s % 3600 + 1) * 1000;
             else dd = (s % 86400 + 1) * 1000;
             if (dd < delay) delay = dd;
         }
-        // Floor 50ms (not 1000) so the sub-second final tick above is honoured; only the
-        // last partial second ever asks for under a second, so this is not a busy-wait.
-        tickTimer = setTimeout(scheduleTick, Math.max(50, Math.min(delay, 60000)));
+        // Re-arm only while a live countdown still needs updating; once everything is
+        // expired (or there are none) the timer stops — zero wakeups until something
+        // changes. Floor 50ms honours the sub-second final tick (only the last partial
+        // second ever asks for under a second, so it is not a busy-wait).
+        if (delay !== Infinity) tickTimer = setTimeout(scheduleTick, Math.max(50, Math.min(delay, 60000)));
     };
+    // Stop ticking while hidden; resume (and catch up — a link may have expired off-screen)
+    // the moment the tab is shown again.
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) { if (tickTimer) { clearTimeout(tickTimer); tickTimer = null; } }
+        else scheduleTick();
+    });
 
     // Reveal and wire the result's Copy button (the link already exists, so this copy
     // is a plain synchronous writeText that works on the first click, incl. Safari).
