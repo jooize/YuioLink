@@ -558,7 +558,9 @@ textarea.form-control {
 /* The link name as the giant hero (direction R4): the memorable word, big and in
    the accent colour, centred and selectable. */
 .result-word {
-    display: block;
+    display: inline-block;
+    position: relative;
+    max-width: 100%;
     font-family: var(--font-mono);
     /* The mockup's "arson" is a fixed 30px; clamp only shrinks it on narrow phones. */
     font-size: clamp(24px, 7vw, 30px);
@@ -569,6 +571,27 @@ textarea.form-control {
     margin-bottom: 4px;
     color: var(--accent);
     user-select: all;
+}
+
+/* Copy confirmation: a green check appears just right of the hero word on copy (⌘C or
+   the Copy button) and clears after the same 1.5s as the button's "Copied". It is
+   absolutely positioned so the centred hero never shifts. */
+.result-word::after {
+    content: "\2713";
+    position: absolute;
+    left: calc(100% + 0.35em);
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.62em;
+    font-weight: 700;
+    color: var(--switch-on);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+    pointer-events: none;
+}
+
+.result-word.copied::after {
+    opacity: 1;
 }
 
 /* The full URL beneath the hero word: small and quiet — dim scheme, standout host

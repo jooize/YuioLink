@@ -58,11 +58,17 @@
             button.textContent = "Copy";
         }, 1500);
     };
-    const copyToClipboard = async (text, button) => {
+    // `heroEl` (the result word), when given, gets a transient green check on success,
+    // cleared after the same 1.5s as the button's "Copied".
+    const copyToClipboard = async (text, button, heroEl) => {
         if (!text) return;
         try {
             await navigator.clipboard.writeText(text);
             flashCopied(button);
+            if (heroEl) {
+                heroEl.classList.add("copied");
+                setTimeout(() => heroEl.classList.remove("copied"), 1500);
+            }
         } catch {
             // Clipboard unavailable (insecure context) or permission denied.
         }
@@ -179,7 +185,8 @@
         const btn = document.getElementById("copy-result");
         if (btn) {
             btn.hidden = false;
-            btn.addEventListener("click", () => copyToClipboard(linkEl.textContent.trim(), btn));
+            const hero = document.getElementById("link-word");
+            btn.addEventListener("click", () => copyToClipboard(linkEl.textContent.trim(), btn, hero));
         }
     };
 
@@ -196,7 +203,7 @@
             const url = linkEl.textContent.trim();
             if (!url) return;
             event.preventDefault();
-            copyToClipboard(url, document.getElementById("copy-result"));
+            copyToClipboard(url, document.getElementById("copy-result"), document.getElementById("link-word"));
         });
     };
 
