@@ -113,14 +113,15 @@
     // SQLite "YYYY-MM-DD HH:MM:SS" is UTC; make it explicit so Date parses correctly.
     const parseUtc = (s) => (s ? new Date(`${s.replace(" ", "T")}Z`) : null);
 
-    // Remaining time as { text, compact, level }. Floor the seconds and round the bigger
-    // units UP so a freshly made link opens on the value it then holds for a full interval
-    // — a 2-minute link starts at "1 minute 59 seconds" (compact "1m59s"), a 1-minute link
-    // at "59 seconds", a 5-minute link at "5 minutes" — instead of flashing the round
-    // boundary for a second and reflowing into the seconds display. Whole minutes from
-    // 2 min up; the last two minutes count seconds; under a minute is bare seconds. The
-    // hour band starts at 59 min so a 1-hour link reads "1 hour" for its first minute.
-    // Flags "soon" (≤5 min, yellow) then "now" (last minute, red).
+    // Remaining time as { text, compact, level }. Floor the seconds; round the bigger units
+    // UP off the real remaining ms — so a fresh link opens on the value it then holds for a
+    // full interval AND each step flips exactly on its boundary (a 5-minute link shows
+    // "5 minutes" until precisely 4:00, then "4 minutes"). A 2-minute link starts at
+    // "1 minute 59 seconds" (compact "1m59s"), a 1-minute link at "59 seconds" — no round
+    // boundary flashed for a second then reflowed. Whole minutes from 2 min up; the last two
+    // minutes count seconds; under a minute is bare seconds. The hour band starts at 59 min
+    // so a 1-hour link reads "1 hour" for its first minute. Flags "soon" (≤5 min, yellow)
+    // then "now" (last minute, red).
     const formatCountdown = (expiresIso) => {
         const d = parseUtc(expiresIso);
         if (!d || Number.isNaN(d.getTime())) return { text: "", compact: "", level: "" };
@@ -134,9 +135,9 @@
         if (s < 60) { const sec = s || 1; unit = `${sec} second${sec === 1 ? "" : "s"}`; short = `${sec}s`; } // under a minute: bare seconds (floor can hit 0 in the last partial second; show 1)
         // 1:59 -> 1:00 reads "1 minute 59 seconds" so the tail never shows "90 seconds".
         else if (s < 120) { const sec = s - 60; unit = sec ? `1 minute ${sec} second${sec === 1 ? "" : "s"}` : "1 minute"; short = sec ? `1m${sec}s` : "1m"; }
-        else if (s < 3540) { const m = Math.ceil(s / 60); unit = `${m} minute${m === 1 ? "" : "s"}`; short = `${m}m`; }
-        else if (s < 82800) { const h = Math.ceil(s / 3600); unit = `${h} hour${h === 1 ? "" : "s"}`; short = `${h}h`; }
-        else { const days = Math.ceil(s / 86400); unit = `${days} day${days === 1 ? "" : "s"}`; short = `${days}d`; }
+        else if (s < 3540) { const m = Math.ceil(ms / 60000); unit = `${m} minute${m === 1 ? "" : "s"}`; short = `${m}m`; }
+        else if (s < 82800) { const h = Math.ceil(ms / 3600000); unit = `${h} hour${h === 1 ? "" : "s"}`; short = `${h}h`; }
+        else { const days = Math.ceil(ms / 86400000); unit = `${days} day${days === 1 ? "" : "s"}`; short = `${days}d`; }
         const level = s < 60 ? "now" : s <= 300 ? "soon" : "";
         return { text: `${unit} left`, compact: short, level };
     };
@@ -192,13 +193,11 @@
             if (!d || Number.isNaN(d.getTime())) continue;
             const ms = d.getTime() - Date.now();
             if (ms <= 0) continue;         // expired: its text is final — nothing more to update
-            const s = Math.floor(ms / 1000);
-            let dd;
-            if (ms < 1000) dd = ms;        // final partial second: wake right at the deadline so "expired" lands on time
-            else if (s < 120) dd = 1000;   // tick every second once seconds are shown
-            else if (s < 3540) dd = (s % 60 + 1) * 1000;
-            else if (s < 82800) dd = (s % 3600 + 1) * 1000;
-            else dd = (s % 86400 + 1) * 1000;
+            // Wake on the exact next boundary: each second while seconds show (≤2 min),
+            // otherwise each minute mark — so the minute/hour/day label flips precisely on
+            // its boundary ("5 minutes" -> "4 minutes" exactly at 4:00), not a second early.
+            // This also lands the final tick right at the deadline.
+            const dd = ms <= 120000 ? ((ms - 1) % 1000) + 1 : ((ms - 1) % 60000) + 1;
             if (dd < delay) delay = dd;
         }
         // Re-arm only while a live countdown still needs updating; once everything is
