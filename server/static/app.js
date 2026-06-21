@@ -113,23 +113,26 @@
     // SQLite "YYYY-MM-DD HH:MM:SS" is UTC; make it explicit so Date parses correctly.
     const parseUtc = (s) => (s ? new Date(`${s.replace(" ", "T")}Z`) : null);
 
-    // Remaining time as { text, compact, level }: whole minutes from 2 min up, then the
-    // 1:59 -> 1:00 stretch reads "1 minute 59 seconds" (compact "1m59s") rather than a
-    // big "90 seconds", and under a minute it counts down bare seconds. The hour band
-    // starts at 59 min so a 1-hour link reads "1 hour" for its first minute, then
-    // "58 min". Flags "soon" (≤5 min, yellow) then "now" (last minute, red).
+    // Remaining time as { text, compact, level }. Floor the seconds and round the bigger
+    // units UP so a freshly made link opens on the value it then holds for a full interval
+    // — a 2-minute link starts at "1 minute 59 seconds" (compact "1m59s"), a 1-minute link
+    // at "59 seconds", a 5-minute link at "5 minutes" — instead of flashing the round
+    // boundary for a second and reflowing into the seconds display. Whole minutes from
+    // 2 min up; the last two minutes count seconds; under a minute is bare seconds. The
+    // hour band starts at 59 min so a 1-hour link reads "1 hour" for its first minute.
+    // Flags "soon" (≤5 min, yellow) then "now" (last minute, red).
     const formatCountdown = (expiresIso) => {
         const d = parseUtc(expiresIso);
         if (!d || Number.isNaN(d.getTime())) return { text: "", compact: "", level: "" };
-        const s = Math.round((d.getTime() - Date.now()) / 1000);
+        const s = Math.floor((d.getTime() - Date.now()) / 1000);
         if (s <= 0) return { text: "expired", compact: "expired", level: "now" };
         let unit, short;
         if (s < 60) { unit = `${s} second${s === 1 ? "" : "s"}`; short = `${s}s`; } // under a minute: bare seconds
         // 1:59 -> 1:00 reads "1 minute 59 seconds" so the tail never shows "90 seconds".
         else if (s < 120) { const sec = s - 60; unit = sec ? `1 minute ${sec} second${sec === 1 ? "" : "s"}` : "1 minute"; short = sec ? `1m${sec}s` : "1m"; }
-        else if (s < 3540) { const m = Math.floor(s / 60); unit = `${m} minute${m === 1 ? "" : "s"}`; short = `${m}m`; }
-        else if (s < 82800) { const h = Math.round(s / 3600); unit = `${h} hour${h === 1 ? "" : "s"}`; short = `${h}h`; }
-        else { const days = Math.round(s / 86400); unit = `${days} day${days === 1 ? "" : "s"}`; short = `${days}d`; }
+        else if (s < 3540) { const m = Math.ceil(s / 60); unit = `${m} minute${m === 1 ? "" : "s"}`; short = `${m}m`; }
+        else if (s < 82800) { const h = Math.ceil(s / 3600); unit = `${h} hour${h === 1 ? "" : "s"}`; short = `${h}h`; }
+        else { const days = Math.ceil(s / 86400); unit = `${days} day${days === 1 ? "" : "s"}`; short = `${days}d`; }
         const level = s < 60 ? "now" : s <= 300 ? "soon" : "";
         return { text: `${unit} left`, compact: short, level };
     };
@@ -178,7 +181,7 @@
         for (const span of document.querySelectorAll(".countdown")) {
             const d = parseUtc(span.dataset.expires);
             if (!d || Number.isNaN(d.getTime())) continue;
-            const s = Math.round((d.getTime() - Date.now()) / 1000);
+            const s = Math.floor((d.getTime() - Date.now()) / 1000);
             let dd;
             if (s <= 0) dd = 60000;
             else if (s < 120) dd = 1000; // tick every second once seconds are shown
@@ -455,13 +458,17 @@
         label.textContent = "Remove this link?";
         const actions = document.createElement("div");
         actions.className = "history-confirm-actions";
+        // An expired link is already gone server-side, which changes both buttons below.
+        const expired = isExpired(it);
 
         // Forget first; Delete Link (destructive) second.
         const forget = document.createElement("button");
         forget.type = "button";
         forget.className = "history-confirm-forget";
         forget.textContent = "Forget Link";
-        forget.title = "Removes it from this device only — the link keeps working.";
+        forget.title = expired
+            ? "Removes the record from this device — the link has already expired."
+            : "Removes it from this device only — the link keeps working.";
         forget.addEventListener("click", () => forgetLink(it));
         actions.append(forget);
         // Server break needs the creation token; offer it only when we have one.
@@ -470,7 +477,7 @@
             server.type = "button";
             server.className = "history-confirm-server";
             server.textContent = "Delete Link";
-            if (isExpired(it)) {
+            if (expired) {
                 // An expired link is already erased from the server — nothing to delete,
                 // so only forgetting the local record remains.
                 server.disabled = true;
