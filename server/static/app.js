@@ -291,6 +291,28 @@
     const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* full or blocked */ } };
     const lsDel = (k) => { try { localStorage.removeItem(k); } catch { /* blocked */ } };
 
+    // --- cross-tab history: each entry carries a stable id so tabs can merge rather than
+    // clobber each other's saved list (localStorage is the shared store). ---
+    const newId = () => (self.crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const withIds = (list) => (Array.isArray(list) ? list.map((e) => (e && e.id ? e : { ...e, id: newId() })) : []);
+    const readStored = () => { try { return withIds(JSON.parse(lsGet(HISTORY_KEY))); } catch { return []; } };
+    // Merge two lists (this tab + storage/another tab): keyed by id, a removal (tombstone)
+    // wins over a live copy of the same entry, links de-dupe by url, newest (created) first.
+    const mergeHistories = (a, b) => {
+        const byId = new Map();
+        for (const e of [...a, ...b]) {
+            if (!e || !e.id) continue;
+            const prev = byId.get(e.id);
+            if (!prev || (e.tombstone && !prev.tombstone)) byId.set(e.id, e);
+        }
+        const seenUrl = new Set();
+        const out = [...byId.values()]
+            .sort((x, y) => (y.created ?? 0) - (x.created ?? 0))
+            .filter((e) => !e.url || (!seenUrl.has(e.url) && seenUrl.add(e.url)));
+        if (out.length > HISTORY_MAX) out.length = HISTORY_MAX;
+        return out;
+    };
+
     const isExpired = (it) => {
         const d = parseUtc(it.expires);
         return !!d && !Number.isNaN(d.getTime()) && d.getTime() <= Date.now();
@@ -298,14 +320,19 @@
     const loadPersisted = () => {
         persistEnabled = lsGet(PERSIST_KEY) === "1";
         if (persistEnabled) {
-            try { memHistory = JSON.parse(lsGet(HISTORY_KEY)) ?? []; }
-            catch { memHistory = []; }
+            memHistory = readStored();
             historyOpen = lsGet(OPEN_KEY) !== "0"; // restore the open/closed choice (default open)
         } else {
             lsDel(OPEN_KEY); // history off: forget any saved openness
         }
     };
-    const persistNow = () => { if (persistEnabled) lsSet(HISTORY_KEY, JSON.stringify(memHistory)); };
+    // Write only when the value actually changed — so a tab adopting another tab's update
+    // (via the storage event -> render -> persistNow) does not echo a write back and ping-pong.
+    const persistNow = () => {
+        if (!persistEnabled) return;
+        const json = JSON.stringify(memHistory);
+        if (json !== lsGet(HISTORY_KEY)) lsSet(HISTORY_KEY, json);
+    };
     // Remember the open/closed choice only while persistence is on.
     const persistOpen = () => { if (persistEnabled) lsSet(OPEN_KEY, historyOpen ? "1" : "0"); };
     const applyHistoryOpen = () => {
@@ -314,12 +341,14 @@
     const setHistoryOpen = (open) => { historyOpen = open; applyHistoryOpen(); persistOpen(); };
     const setPersist = (on) => {
         persistEnabled = on;
-        // Turning on (re)saves the list AND the current openness — so flipping it off then
-        // back on restores the panel state; turning off forgets both.
-        if (on) { lsSet(PERSIST_KEY, "1"); persistNow(); persistOpen(); }
+        // Turning on merges this tab's session links with whatever is already saved (and
+        // other tabs') AND saves the current openness; turning off forgets both.
+        if (on) { memHistory = mergeHistories(memHistory, readStored()); lsSet(PERSIST_KEY, "1"); persistNow(); persistOpen(); }
         else { lsDel(PERSIST_KEY); lsDel(HISTORY_KEY); lsDel(OPEN_KEY); }
     };
     const addHistory = (entry) => {
+        entry.id = newId();
+        if (persistEnabled) memHistory = mergeHistories(memHistory, readStored()); // pick up other tabs first
         memHistory = memHistory.filter((it) => it.url !== entry.url);
         memHistory.unshift(entry);
         if (memHistory.length > HISTORY_MAX) memHistory.length = HISTORY_MAX;
@@ -473,18 +502,25 @@
     };
     // Label for a grace-window Delete button: the action plus the seconds left to use it.
     const graceLabel = (until) => `Delete · ${Math.max(1, Math.ceil((until - Date.now()) / 1000))}s`;
-    // Replace the entry in place with a tombstone, fully purging its url / name / token
-    // from memory and storage. The tombstone holds no link details and can itself be
-    // cleared.
+    // Pull in other tabs' changes, then locate an entry by its stable id (the passed `it`
+    // may be a stale reference from a previous render). Returns the index, or -1.
+    const findEntry = (it) => {
+        if (persistEnabled) memHistory = mergeHistories(memHistory, readStored());
+        return memHistory.findIndex((e) => e.id === it.id);
+    };
+    // Replace the entry in place with a tombstone, purging its url / name / token but keeping
+    // the id (so the removal merges across tabs) and created (for ordering).
     const tombstone = (it, kind) => {
-        const i = memHistory.indexOf(it);
+        const i = findEntry(it);
         if (i === -1) return;
-        memHistory[i] = { tombstone: kind };
+        memHistory[i] = { id: memHistory[i].id, created: memHistory[i].created, tombstone: kind };
         persistNow();
         renderHistory();
     };
     const clearTombstone = (it) => {
-        memHistory = memHistory.filter((h) => h !== it);
+        const i = findEntry(it);
+        if (i === -1) return;
+        memHistory = memHistory.filter((e) => e.id !== it.id);
         persistNow();
         renderHistory();
     };
@@ -493,15 +529,16 @@
     // server, then purge them; an already-expired link has nothing on the server to keep.
     const FORGET_GRACE_MS = 15000;
     const forgetLink = (it) => {
-        const i = memHistory.indexOf(it);
+        const i = findEntry(it);
         if (i === -1) return;
-        if (isExpired(it)) {
-            memHistory[i] = { tombstone: "gone" };
-        } else if (it.token && it.name) {
-            memHistory[i] = { tombstone: "forgotten", name: it.name, token: it.token, until: Date.now() + FORGET_GRACE_MS };
+        const cur = memHistory[i];
+        if (isExpired(cur)) {
+            memHistory[i] = { id: cur.id, created: cur.created, tombstone: "gone" };
+        } else if (cur.token && cur.name) {
+            memHistory[i] = { id: cur.id, created: cur.created, tombstone: "forgotten", name: cur.name, token: cur.token, until: Date.now() + FORGET_GRACE_MS };
             tickForgetGrace();
         } else {
-            memHistory[i] = { tombstone: "forgotten" };
+            memHistory[i] = { id: cur.id, created: cur.created, tombstone: "forgotten" };
         }
         persistNow();
         renderHistory();
@@ -935,6 +972,23 @@
         addHistory(entry);
         return entry;
     };
+
+    // Another tab changed the shared store: adopt its history (merge, so neither tab's links
+    // are lost) or reflect a persistence on/off flip. The merged render re-persists only if
+    // this tab still has something extra (persistNow's no-op guard prevents a ping-pong).
+    window.addEventListener("storage", (event) => {
+        if (event.key === HISTORY_KEY) {
+            if (!persistEnabled) return;
+            memHistory = mergeHistories(memHistory, readStored());
+            renderHistory();
+            tickForgetGrace();
+            scheduleTick();
+        } else if (event.key === PERSIST_KEY) {
+            persistEnabled = lsGet(PERSIST_KEY) === "1";
+            if (persistEnabled) memHistory = mergeHistories(memHistory, readStored());
+            renderHistory();
+        }
+    });
 
     document.addEventListener("DOMContentLoaded", () => {
         loadPersisted();
