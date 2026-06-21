@@ -9,6 +9,7 @@
     --result: #10b981;
     --warn: #c77a00;
     --danger: #d70015;
+    --text-kind: #8b5cf6;
 
     --bg-1: #e7e8ec;
     --bg-2: #f6f7f9;
@@ -44,6 +45,7 @@
         --result: #34d399;
         --warn: #ffd60a;
         --danger: #ff453a;
+        --text-kind: #b794ff;
 
         --bg-1: #121214;
         --bg-2: #202024;
@@ -336,22 +338,6 @@ textarea.form-control {
     color: var(--text-secondary);
 }
 
-/* Inline validation under a Specify field — a simple, clear message that lights up
-   the section in place of a browser alert. */
-.custom-error {
-    flex: 0 0 100%;
-    margin-top: 4px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--warn);
-}
-
-/* The number field lights up to match while its message is showing. */
-.custom-num.invalid {
-    border-color: var(--warn);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 28%, transparent);
-}
-
 /* Whole-form error under the action — on-page, never an alert. Danger colour since
    it means the link was not created. */
 .form-error {
@@ -531,27 +517,21 @@ textarea.form-control {
    box; direction C presents the URL in a read-only-style field with Copy docked
    on the right, the meta and any note beneath. (The preview page keeps the plain
    .result box above.) */
+/* The created-link result drops the green box: the URL is the hero (coloured),
+   centred, with its meta and a Copy pill beneath and an optional note last. The
+   preview page keeps the plain .result box above. */
 #link-panel {
     margin: 24px 0 4px;
     padding: 0;
     background: none;
     border: 0;
-}
-
-.result-field {
-    display: flex;
-    align-items: stretch;
-    border-radius: var(--radius-control);
-    overflow: hidden;
-    background: var(--field-bg);
-    border: 0.5px solid var(--field-border);
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+    text-align: center;
 }
 
 /* Optional note under the result, e.g. when a blank limit defaulted to Once. */
 .result-note {
     display: block;
-    margin: 6px 0 0 3px;
+    margin-top: 12px;
     font-size: 12px;
     line-height: 1.4;
     color: var(--text-secondary);
@@ -567,20 +547,16 @@ textarea.form-control {
     margin-bottom: 11px;
 }
 
-/* The created link, filling the field; truncates with an ellipsis but stays fully
-   selectable (⌘C) and the Copy button copies the whole thing. */
+/* The created link — the hero of the result: prominent, centred, coloured, and
+   fully selectable. Wraps rather than truncating so the whole link is visible. */
 .result-url {
-    flex: 1;
-    min-width: 0;
     display: block;
-    padding: 11px 13px;
     font-family: var(--font-mono);
-    font-size: 14px;
+    font-size: 16.5px;
     line-height: 1.45;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    letter-spacing: -0.01em;
+    word-break: break-all;
+    color: var(--accent);
     user-select: all;
 }
 
@@ -594,19 +570,18 @@ textarea.form-control {
     user-select: all;
 }
 
-/* Meta line (kind · expiry · limit) below the field. */
-.result-meta {
-    display: block;
-    margin: 8px 0 0 3px;
-    font-size: 12.5px;
-    color: var(--text-secondary);
+/* Foot beneath the hero URL: the meta line, then the Copy pill, centred. */
+.result-foot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 13px;
 }
 
-/* The kind word ("Redirect"/"Text"). In the history list it gets a fixed width
-   matching the wider word so the "· expires in …" after it lines up on every row. */
-.history-meta .kind-label {
-    display: inline-block;
-    min-width: 4.5em;
+.result-meta {
+    font-size: 12.5px;
+    color: var(--text-secondary);
 }
 
 /* Live "expires in" colouring as the deadline nears. */
@@ -620,30 +595,35 @@ textarea.form-control {
     font-weight: 600;
 }
 
-/* Copy docked on the field's right edge, divided by a hairline. */
-.result-copy {
-    flex: none;
+.result-actions {
     display: flex;
     align-items: center;
-    border: 0;
-    border-left: 0.5px solid var(--field-border);
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-    color: var(--accent);
+    gap: 9px;
+}
+
+/* Copy pill beneath the URL. */
+.result-copy {
     font-family: inherit;
-    font-size: 13px;
+    font-size: 13.5px;
     font-weight: 600;
-    padding: 0 18px;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 0.5px solid color-mix(in srgb, var(--accent) 22%, transparent);
+    border-radius: 999px;
+    padding: 7px 22px;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .result-copy:hover {
     background: color-mix(in srgb, var(--accent) 20%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 .result-copy.copied {
     color: var(--switch-on);
     background: color-mix(in srgb, var(--switch-on) 18%, transparent);
+    border-color: color-mix(in srgb, var(--switch-on) 30%, transparent);
 }
 
 /* Text-link viewer body. */
@@ -731,28 +711,18 @@ textarea.form-control {
     scroll-margin-top: 18px;
 }
 
-/* When the History pill jumps you to the list, draw the eye to the "Local History"
-   title with a brief, tasteful glow — not the section's separator line. */
-@keyframes history-title-glow {
-    0%   { text-shadow: 0 0 9px color-mix(in srgb, var(--accent) 65%, transparent); }
-    100% { text-shadow: 0 0 0 transparent; }
+/* When the History pill jumps you to the list, light the whole section up briefly:
+   a soft accent wash that fades out. `background-clip: padding-box` keeps the wash
+   inside the border, so the separator line itself never glows. Runs regardless of
+   the reduced-motion setting — it is a gentle, brief, non-essential cue. */
+@keyframes history-attention {
+    0%   { background-color: color-mix(in srgb, var(--accent) 14%, transparent); }
+    100% { background-color: transparent; }
 }
 
-@keyframes history-title-blink {
-    0%, 49%   { opacity: 1; }
-    50%, 99%  { opacity: 0.25; }
-    100%      { opacity: 1; }
-}
-
-.history.attention .history-title {
-    animation: history-title-glow 1.4s ease-out;
-}
-
-/* Reduced motion: a couple of gentle blinks of the title instead of a glow. */
-@media (prefers-reduced-motion: reduce) {
-    .history.attention .history-title {
-        animation: history-title-blink 0.85s 2;
-    }
+.history.attention {
+    background-clip: padding-box;
+    animation: history-attention 1.4s ease-out;
 }
 
 .history-head {
@@ -806,6 +776,7 @@ textarea.form-control {
 }
 
 .history-item {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -836,13 +807,33 @@ textarea.form-control {
     text-decoration: underline;
 }
 
-.history-text {
-    flex: 1;
-    min-width: 0;
+/* Kind pill — colour-coded so Redirect/Text scan apart, fixed width so the URLs
+   that follow line up across every row. */
+.history-kind {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    padding: 2px 0;
+    font-size: 10.5px;
+    font-weight: 600;
+    border-radius: 6px;
+}
+
+.history-kind.redirect {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+}
+
+.history-kind.text {
+    color: var(--text-kind);
+    background: color-mix(in srgb, var(--text-kind) 16%, transparent);
 }
 
 .history-url {
-    display: block;
+    flex: 1;
+    min-width: 0;
     font-family: var(--font-mono);
     font-size: 13px;
     color: var(--text);
@@ -852,11 +843,11 @@ textarea.form-control {
     user-select: all;
 }
 
-.history-meta {
-    display: block;
-    margin-top: 2px;
+.history-when {
+    flex: none;
     font-size: 11.5px;
     color: var(--text-secondary);
+    white-space: nowrap;
 }
 
 .history-copy {
@@ -878,6 +869,95 @@ textarea.form-control {
 .history-copy.copied {
     color: var(--switch-on);
     text-decoration: none;
+}
+
+/* Per-item delete: a quiet × that opens the confirm overlay. */
+.history-delete {
+    flex: none;
+    font-family: inherit;
+    font-size: 17px;
+    line-height: 1;
+    color: var(--text-tertiary);
+    background: none;
+    border: 0;
+    padding: 2px 5px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.history-delete:hover {
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+/* Confirmation drawn over the row: a short prompt and the two ways to remove. */
+.history-confirm {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px 0 12px;
+    background: var(--field-bg);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border-radius: 10px;
+}
+
+.history-confirm-label {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-confirm-label.error {
+    color: var(--danger);
+}
+
+.history-confirm-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+}
+
+.history-confirm-server,
+.history-confirm-forget {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 999px;
+    border: 0.5px solid transparent;
+    padding: 5px 11px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.history-confirm-server {
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 13%, transparent);
+    border-color: color-mix(in srgb, var(--danger) 24%, transparent);
+}
+
+.history-confirm-forget {
+    color: var(--text);
+    background: color-mix(in srgb, var(--text) 9%, transparent);
+}
+
+.history-confirm-cancel {
+    flex: none;
+    font-family: inherit;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--text-tertiary);
+    background: none;
+    border: 0;
+    padding: 2px 4px;
+    cursor: pointer;
 }
 
 .history-clear {

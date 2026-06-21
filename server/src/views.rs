@@ -45,14 +45,17 @@ fn result_output(url: Option<&str>, meta: Markup) -> Markup {
         // tabindex=-1: focused after creation so the link selection survives for ⌘C
         // and the next Tab lands on the input (the panel precedes the form in the DOM).
         output.result #link-panel tabindex="-1" hidden[url.is_none()] {
-            // Copy-field (direction C): the URL sits in a read-only-style field with
-            // Copy docked on the right (revealed by app.js). The meta and any note sit
-            // beneath it.
-            div.result-field {
-                code.result-url #link-element { @if let Some(u) = url { (u) } }
-                button.result-copy #copy-result type="button" hidden { "Copy" }
+            // URL as the hero (coloured, centred); the meta line and a Copy pill sit
+            // beneath, with an optional note last (e.g. when a blank limit defaulted).
+            code.result-url #link-element { @if let Some(u) = url { (u) } }
+            div.result-foot {
+                small.result-meta #link-expiry { (meta) }
+                div.result-actions {
+                    // Revealed by app.js (copy needs JS). The link already exists here,
+                    // so this copy is synchronous and reliable.
+                    button.result-copy #copy-result type="button" hidden { "Copy" }
+                }
             }
-            small.result-meta #link-expiry { (meta) }
             small.result-note #result-note hidden {}
         }
     }
@@ -135,9 +138,10 @@ pub fn index_page(encryption_enabled: bool, api_base: &str, max_ttl_secs: i64) -
                 }
                 div.custom-field #ttl-custom-field {
                     // No real value — the greyed placeholder shows the default (5) that
-                    // app.js applies when the box is left blank.
+                    // app.js applies when the box is left blank. min/step give the
+                    // browser native validation of anything typed.
                     input #ttl-custom-value.custom-num name="ttl_custom" type="number"
-                        min="1" inputmode="numeric" placeholder="5";
+                        min="1" step="1" inputmode="numeric" placeholder="5";
                     div.segmented.unit-segmented {
                         input.seg-radio #ttl-unit-m type="radio" name="ttl_unit" value="m" checked;
                         label.seg-label for="ttl-unit-m" { "minutes" }
@@ -147,8 +151,6 @@ pub fn index_page(encryption_enabled: bool, api_base: &str, max_ttl_secs: i64) -
                         label.seg-label for="ttl-unit-d" { "days" }
                     }
                     small.custom-hint { "Up to " (humanize_duration(max_ttl_secs)) }
-                    // app.js reveals this (and reds the field) instead of alerting.
-                    small.custom-error #ttl-error role="alert" hidden { "Links last at least 1 minute." }
                 }
             }
 
@@ -165,10 +167,10 @@ pub fn index_page(encryption_enabled: bool, api_base: &str, max_ttl_secs: i64) -
                     label.seg-label for="limit-custom" { "Specify" }
                 }
                 div.custom-field #limit-custom-field {
+                    // Blank defaults to Once (app.js); native min/step validate a typed
+                    // value, and app.js offers "A billion" once 9 digits are reached.
                     input #limit-custom-value.custom-num name="limit_custom" type="number"
                         min="1" step="1" inputmode="numeric" placeholder="Uses";
-                    // Blank defaults to Once (app.js); a typed value must be a whole number.
-                    small.custom-error #limit-error role="alert" hidden { "Uses must be a whole number, 1 or more." }
                 }
             }
 

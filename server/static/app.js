@@ -70,7 +70,15 @@
     // --- expiry countdown (live; shared by the result and the history list) ---
     const usesSuffix = (uses) => {
         if (uses === 1) return " · one-time";
-        if (uses) return ` · max ${uses} uses`;
+        if (uses === 1000000000) return " · a billion uses";
+        if (uses) return ` · max ${uses.toLocaleString()} uses`;
+        return "";
+    };
+    // Compact form for the tight history rows.
+    const usesSuffixShort = (uses) => {
+        if (uses === 1) return " · once";
+        if (uses === 1000000000) return " · 1B";
+        if (uses) return ` · ${uses}×`;
         return "";
     };
     // SQLite "YYYY-MM-DD HH:MM:SS" is UTC; make it explicit so Date parses correctly.
@@ -82,20 +90,21 @@
     // "58 min". Flags "soon" (≤5 min, yellow) then "now" (last minute, red).
     const formatCountdown = (expiresIso) => {
         const d = parseUtc(expiresIso);
-        if (!d || Number.isNaN(d.getTime())) return { text: "", level: "" };
+        if (!d || Number.isNaN(d.getTime())) return { text: "", compact: "", level: "" };
         const s = Math.round((d.getTime() - Date.now()) / 1000);
-        if (s <= 0) return { text: "expired", level: "now" };
-        let unit;
-        if (s < 180) unit = `${s} second${s === 1 ? "" : "s"}`; // last 3 minutes: seconds
-        else if (s < 3540) { const m = Math.floor(s / 60); unit = `${m} minute${m === 1 ? "" : "s"}`; }
-        else if (s < 82800) { const h = Math.round(s / 3600); unit = `${h} hour${h === 1 ? "" : "s"}`; }
-        else { const days = Math.round(s / 86400); unit = `${days} day${days === 1 ? "" : "s"}`; }
+        if (s <= 0) return { text: "expired", compact: "expired", level: "now" };
+        let unit, short;
+        if (s < 180) { unit = `${s} second${s === 1 ? "" : "s"}`; short = `${s}s`; } // last 3 minutes: seconds
+        else if (s < 3540) { const m = Math.floor(s / 60); unit = `${m} minute${m === 1 ? "" : "s"}`; short = `${m}m`; }
+        else if (s < 82800) { const h = Math.round(s / 3600); unit = `${h} hour${h === 1 ? "" : "s"}`; short = `${h}h`; }
+        else { const days = Math.round(s / 86400); unit = `${days} day${days === 1 ? "" : "s"}`; short = `${days}d`; }
         const level = s < 60 ? "now" : s <= 300 ? "soon" : "";
-        return { text: `expires in ${unit}`, level };
+        return { text: `expires in ${unit}`, compact: short, level };
     };
+    // Result spans show the full phrase; history spans set data-compact for "1h"/"4m".
     const updateCountdown = (span) => {
-        const { text, level } = formatCountdown(span.dataset.expires);
-        span.textContent = text;
+        const { text, compact, level } = formatCountdown(span.dataset.expires);
+        span.textContent = span.dataset.compact ? compact : text;
         span.classList.toggle("expiring-soon", level === "soon");
         span.classList.toggle("expiring-now", level === "now");
     };
@@ -225,25 +234,107 @@
             const li = document.createElement("li");
             li.className = "history-item";
             if (isExpired(it)) li.classList.add("expired");
-            const text = document.createElement("div");
-            text.className = "history-text";
+
+            // Colour-coded kind pill (fixed width) so the URLs line up across rows.
+            const kind = document.createElement("span");
+            kind.className = `history-kind ${it.kind === "redirect" ? "redirect" : "text"}`;
+            kind.textContent = kindLabel(it.kind);
+
             const url = document.createElement("code");
             url.className = "history-url";
             url.textContent = it.url;
-            const meta = document.createElement("small");
-            meta.className = "history-meta";
-            buildMeta(meta, it.kind, it.expires, it.uses);
-            text.append(url, meta);
+
+            const when = document.createElement("small");
+            when.className = "history-when";
+            const span = document.createElement("span");
+            span.className = "countdown";
+            span.dataset.expires = it.expires ?? "";
+            span.dataset.compact = "1";
+            updateCountdown(span);
+            when.append(span);
+            const suffix = usesSuffixShort(it.uses);
+            if (suffix) when.append(suffix);
+
             const copy = document.createElement("button");
             copy.className = "history-copy";
             copy.type = "button";
             copy.textContent = "Copy";
             copy.addEventListener("click", () => copyToClipboard(it.url, copy));
-            li.append(text, copy);
+
+            const del = document.createElement("button");
+            del.className = "history-delete";
+            del.type = "button";
+            del.setAttribute("aria-label", "Remove");
+            del.textContent = "×"; // ×
+            del.addEventListener("click", () => openConfirm(li, it));
+
+            li.append(kind, url, when, copy, del);
             listEl.append(li);
         }
         const clearExpired = document.getElementById("history-clear-expired");
         if (clearExpired) clearExpired.hidden = !memHistory.some(isExpired);
+    };
+
+    // --- per-item removal: confirm over the row, then delete-from-server or forget ---
+    const closeConfirm = (li) => {
+        li.classList.remove("confirming");
+        li.querySelector(".history-confirm")?.remove();
+    };
+    const forgetLink = (it) => {
+        memHistory = memHistory.filter((h) => h.url !== it.url);
+        persistNow();
+        renderHistory();
+    };
+    const deleteFromServer = async (it, li) => {
+        if (!it.token || !it.name) { forgetLink(it); return; }
+        try {
+            const resp = await fetch(`${API_BASE}/api/v1/links/${encodeURIComponent(it.name)}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${it.token}` },
+            });
+            // 204 = deleted; 404 = already gone (expired/reaped) — either way drop it.
+            if (resp.ok || resp.status === 404) { forgetLink(it); return; }
+            throw new Error("delete failed");
+        } catch {
+            const label = li.querySelector(".history-confirm-label");
+            if (label) { label.textContent = "Couldn't delete — try again."; label.classList.add("error"); }
+        }
+    };
+    const openConfirm = (li, it) => {
+        for (const el of document.querySelectorAll(".history-item.confirming")) closeConfirm(el);
+        li.classList.add("confirming");
+
+        const overlay = document.createElement("div");
+        overlay.className = "history-confirm";
+        const label = document.createElement("span");
+        label.className = "history-confirm-label";
+        label.textContent = "Remove this link?";
+        const actions = document.createElement("div");
+        actions.className = "history-confirm-actions";
+        // Server delete needs the creation token; offer it only when we have one.
+        if (it.token && it.name) {
+            const server = document.createElement("button");
+            server.type = "button";
+            server.className = "history-confirm-server";
+            server.textContent = "Delete from server";
+            server.addEventListener("click", () => deleteFromServer(it, li));
+            actions.append(server);
+        }
+        const forget = document.createElement("button");
+        forget.type = "button";
+        forget.className = "history-confirm-forget";
+        forget.textContent = "Forget on device";
+        forget.addEventListener("click", () => forgetLink(it));
+        actions.append(forget);
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "history-confirm-cancel";
+        cancel.setAttribute("aria-label", "Cancel");
+        cancel.textContent = "×"; // ×
+        cancel.addEventListener("click", () => closeConfirm(li));
+
+        overlay.append(label, actions, cancel);
+        li.append(overlay);
     };
 
     const initCreate = () => {
@@ -257,14 +348,15 @@
         const panel = document.getElementById("link-panel");
         const ttlCustomValue = document.getElementById("ttl-custom-value");
         const limitCustomValue = document.getElementById("limit-custom-value");
-        const ttlError = document.getElementById("ttl-error");
-        const limitError = document.getElementById("limit-error");
 
-        // Inline validation feedback (no browser alert): light up a Specify field and
-        // reveal its message.
-        const setFieldError = (input, errorEl, show) => {
-            if (errorEl) errorEl.hidden = !show;
-            input?.classList.toggle("invalid", show);
+        // Field-level problems (not a number, below 1, not whole) are left to the
+        // number inputs' native validation — no hand-rolled checks. A Specify box is
+        // only meaningful while its segment is selected, so disable the inactive ones:
+        // a disabled control is skipped by native validation and not submitted, which
+        // keeps a stale hidden value from silently blocking the form.
+        const syncCustomEnabled = () => {
+            ttlCustomValue.disabled = checkedValue("ttl_seconds", "3600") !== "custom";
+            limitCustomValue.disabled = checkedValue("limit", "unlimited") !== "custom";
         };
 
         // Whole-form errors (a failed request, a server rejection) shown on the page
@@ -289,17 +381,17 @@
             const v = checkedValue("ttl_seconds", "3600");
             if (v === "custom") {
                 // An empty Specify box accepts the default (5); a typed value is used
-                // as-is, so a too-short one (e.g. 0) is caught by validation on submit.
+                // as-is (the input's native min/step already barred 0 and fractions).
                 const raw = ttlCustomValue.value.trim();
-                let n = raw === "" ? 5 : Number.parseInt(raw, 10);
-                if (Number.isNaN(n) || n < 0) n = 0;
-                return n * (UNIT_SECS[checkedValue("ttl_unit", "m")] ?? 60);
+                const n = raw === "" ? 5 : Number.parseInt(raw, 10);
+                return (Number.isNaN(n) ? 5 : n) * (UNIT_SECS[checkedValue("ttl_unit", "m")] ?? 60);
             }
             return Number.parseInt(v, 10);
         };
         const maxUses = () => {
             const v = checkedValue("limit", "unlimited");
             if (v === "1") return 1;
+            if (v === "billion") return 1000000000;
             if (v === "custom") {
                 const n = Number.parseInt(limitCustomValue.value, 10);
                 return !Number.isNaN(n) && n > 0 ? n : null;
@@ -331,26 +423,49 @@
             if (currentResultUrl) panel.classList.toggle("stale", content.value !== resultSourceValue);
         });
 
-        // Focus the Custom field as soon as its segment is picked.
-        const ttlCustomRadio = document.getElementById("ttl-custom");
-        ttlCustomRadio?.addEventListener("change", () => { if (ttlCustomRadio.checked) ttlCustomValue.focus(); });
-        const limitCustomRadio = document.getElementById("limit-custom");
-        limitCustomRadio?.addEventListener("change", () => { if (limitCustomRadio.checked) limitCustomValue.focus(); });
+        // Inject the "A billion" segment (once) between Once and Specify, then pick it.
+        const selectBillion = () => {
+            let radio = document.getElementById("limit-billion");
+            if (!radio) {
+                const specify = document.getElementById("limit-custom");
+                radio = document.createElement("input");
+                radio.className = "seg-radio";
+                radio.id = "limit-billion";
+                radio.type = "radio";
+                radio.name = "limit";
+                radio.value = "billion";
+                const label = document.createElement("label");
+                label.className = "seg-label";
+                label.htmlFor = "limit-billion";
+                label.textContent = "A billion";
+                specify.before(radio, label);
+                radio.addEventListener("change", syncCustomEnabled);
+            }
+            radio.checked = true;
+            syncCustomEnabled();
+        };
 
-        // Clear an inline error as soon as the user edits the field or switches segment.
-        ttlCustomValue.addEventListener("input", () => setFieldError(ttlCustomValue, ttlError, false));
-        limitCustomValue.addEventListener("input", () => {
-            // Keep Uses to a whole number — strip anything but digits (no sign, decimal,
-            // or exponent), and cap the length so it stays within what the server takes
-            // and can never overflow into a failed request.
-            const cleaned = limitCustomValue.value.replace(/\D+/g, "").slice(0, 15);
-            if (cleaned !== limitCustomValue.value) limitCustomValue.value = cleaned;
-            setFieldError(limitCustomValue, limitError, false);
-        });
-        for (const r of document.querySelectorAll('input[name="ttl_seconds"], input[name="ttl_unit"]'))
-            r.addEventListener("change", () => setFieldError(ttlCustomValue, ttlError, false));
+        // Switching segments toggles which Specify box native validation sees, and
+        // picking "Specify" focuses its field.
+        for (const r of document.querySelectorAll('input[name="ttl_seconds"]'))
+            r.addEventListener("change", () => {
+                syncCustomEnabled();
+                if (document.getElementById("ttl-custom")?.checked) ttlCustomValue.focus();
+            });
         for (const r of document.querySelectorAll('input[name="limit"]'))
-            r.addEventListener("change", () => setFieldError(limitCustomValue, limitError, false));
+            r.addEventListener("change", () => {
+                syncCustomEnabled();
+                if (document.getElementById("limit-custom")?.checked) limitCustomValue.focus();
+            });
+
+        // Keep Uses to a whole number — digits only, capped at 9. Reaching that cap is
+        // taken as "I want a huge number", so the "A billion" preset appears and is
+        // selected rather than letting an unwieldy count through.
+        limitCustomValue.addEventListener("input", () => {
+            const cleaned = limitCustomValue.value.replace(/\D+/g, "").slice(0, 9);
+            if (cleaned !== limitCustomValue.value) limitCustomValue.value = cleaned;
+            if (cleaned.length === 9) selectBillion();
+        });
 
         // Redirect: Enter submits. Text: Enter = newline, Cmd/Ctrl-Enter submits.
         content.addEventListener("keydown", (event) => {
@@ -394,36 +509,16 @@
             clearFormError();
             if (raw.trim() === "") { content.focus(); return; }
 
-            // Validate inline, before any request — no browser alerts.
-            // Expiry: a too-short value lights up the Specify field.
+            // The number inputs' native validation has already run (a submit only
+            // reaches here once it passes), so this only fills the gaps it can't: an
+            // empty Specify-limit takes the default of Once, noted on the result.
             const ttl = ttlSeconds();
-            setFieldError(ttlCustomValue, ttlError, ttl < 60);
-            if (ttl < 60) { ttlCustomValue.focus(); return; }
-
-            // Limit (Specify): a blank box accepts the default (Once, noted on the
-            // result); a typed value must be a whole number of 1 or more, else the
-            // field lights up.
             let uses = maxUses();
             let defaultedOnce = false;
-            if (checkedValue("limit", "unlimited") === "custom") {
-                const usesRaw = limitCustomValue.value.trim();
-                if (usesRaw === "") {
-                    uses = 1;
-                    defaultedOnce = true;
-                } else {
-                    // isSafeInteger also rejects values too large to send exactly (and
-                    // beyond what the server's i64 takes), so they error here, on the
-                    // page, instead of bubbling up as a failed request.
-                    const n = Number(usesRaw);
-                    if (!Number.isSafeInteger(n) || n < 1) {
-                        setFieldError(limitCustomValue, limitError, true);
-                        limitCustomValue.focus();
-                        return;
-                    }
-                    uses = n;
-                }
+            if (checkedValue("limit", "unlimited") === "custom" && limitCustomValue.value.trim() === "") {
+                uses = 1;
+                defaultedOnce = true;
             }
-            setFieldError(limitCustomValue, limitError, false);
 
             const kind = detectKind(raw);
             const payload = kind === "redirect" ? normalizeTarget(raw.trim()) : raw;
@@ -458,7 +553,9 @@
                 const url = data.url + fragment;
                 currentResultUrl = url;
                 showReady(url, kind, data.expires_at, uses, defaultedOnce);
-                addHistory({ url, kind, uses, expires: data.expires_at });
+                // Keep the name + delete token so the history row can offer a real
+                // server delete (token is undefined if the backend didn't send one).
+                addHistory({ url, name: data.name, kind, uses, expires: data.expires_at, token: data.delete_token });
                 renderHistory();
                 // The input greys (still clickable); the result is in sync with it.
                 resultSourceValue = raw;
@@ -529,6 +626,7 @@
 
         autosize();
         updateSubmitLabel();
+        syncCustomEnabled();
         renderHistory();
         content.focus();
     };
@@ -542,9 +640,13 @@
         const usesMatch = metaText.match(/max (\d+) uses/);
         const entry = {
             url,
+            // The name is the last path segment (minus any #fragment). No token on the
+            // no-JS path, so this row can only be forgotten on device, not server-deleted.
+            name: url.split("#")[0].split("/").pop(),
             kind: /^Text/.test(metaText) ? "text" : "redirect",
             uses: /one-time/.test(metaText) ? 1 : (usesMatch ? Number.parseInt(usesMatch[1], 10) : null),
             expires: when ? when[1] : null,
+            token: null,
         };
         addHistory(entry);
         return entry;
