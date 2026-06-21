@@ -160,9 +160,13 @@
     const scheduleTick = () => {
         if (tickTimer) clearTimeout(tickTimer);
         tickCountdowns();
-        // Reflect a link that just expired: dim it and reveal "Clear Expired".
-        const expiredBtn = document.getElementById("history-clear-expired");
-        if (expiredBtn && expiredBtn.hidden && memHistory.some(isExpired)) renderHistory();
+        // Reflect any link that just expired: dim its row and reveal "Clear Expired".
+        // Re-render whenever the live expired count diverges from what is shown dimmed —
+        // not just the first time (the old `.hidden` guard fired once, so links expiring
+        // after the button appeared showed "expired" text but never got greyed).
+        const expiredNow = memHistory.filter(isExpired).length;
+        const expiredShown = document.querySelectorAll(".history-item.expired").length;
+        if (expiredNow !== expiredShown) renderHistory();
         let delay = 60000;
         for (const span of document.querySelectorAll(".countdown")) {
             const d = parseUtc(span.dataset.expires);

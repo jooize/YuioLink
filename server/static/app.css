@@ -849,6 +849,12 @@ textarea.form-control {
     opacity: 0.5;
 }
 
+/* A dead row is done, not urgent — mute its countdown to grey. Otherwise the red
+   "expired" warning keeps shouting from a row that is only waiting to be cleared. */
+.history-item.expired .countdown {
+    color: var(--text-secondary);
+}
+
 .history-clear-expired {
     display: block;
     margin: 12px auto 0;
