@@ -113,15 +113,16 @@
     // SQLite "YYYY-MM-DD HH:MM:SS" is UTC; make it explicit so Date parses correctly.
     const parseUtc = (s) => (s ? new Date(`${s.replace(" ", "T")}Z`) : null);
 
-    // Minutes show the SET value for a 30s grace, then count down by whole minutes.
+    // Minutes/hours/days show the SET value for a 30s grace, then count down by floor.
     const SET_GRACE_MS = 30000;
-    // Remaining time as { text, compact, level }. Minutes read the set value (rounded up) for
-    // a 30s grace, then floor: a 5-minute link shows "5 minutes" for 30s, "4 minutes" for the
-    // next 30s, then "3 minutes" from ~4:00 down, etc. Seconds are floored and per-second; the
-    // last two minutes count seconds ("1m59s"); under a minute is bare seconds. Hours/days
-    // round up (the hour band starts at 59 min). "expired" keys off the real deadline (never
-    // early; last partial second reads "1 second"). Flags "soon" (≤5 min, yellow) then "now"
-    // (last minute, red).
+    const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    // Remaining time as { text, compact, level }. Minutes/hours/days read the SET value for a
+    // 30s grace (e.g. "1 hour"), then count down by FLOOR in the largest whole unit — truthful
+    // and skip-free: "1 hour" -> "59 minutes" -> "58 minutes" ..., "1 day" -> "23 hours". A
+    // 5-minute link reads "5 minutes" for 30s, "4 minutes" for the next 30s, then "3 minutes"
+    // from ~4:00. Seconds are floored & per-second; the last two minutes count seconds
+    // ("1m59s"); under a minute is bare seconds. "expired" keys off the real deadline (never
+    // early; last partial second reads "1 second"). Flags "soon" (≤5 min, yellow) then "now".
     const formatCountdown = (expiresIso, createdMs) => {
         const d = parseUtc(expiresIso);
         if (!d || Number.isNaN(d.getTime())) return { text: "", compact: "", level: "" };
@@ -131,19 +132,22 @@
         // "1 second", matching the greying/Delete-disable which also use the true deadline.
         if (ms <= 0) return { text: "expired", compact: "expired", level: "now" };
         const s = Math.floor(ms / 1000);
+        const created = Number(createdMs);
+        const fresh = created && Date.now() - created < SET_GRACE_MS && ms >= 120000;
         let unit, short;
-        if (s < 60) { const sec = s || 1; unit = `${sec} second${sec === 1 ? "" : "s"}`; short = `${sec}s`; } // under a minute: bare seconds (floor can hit 0 in the last partial second; show 1)
+        if (fresh) {
+            // The set value (what was chosen), held for the 30s grace. Round the TTL to its
+            // natural unit via minutes first, so a 60-minute TTL reads "1 hour", not "60 min".
+            const mins = Math.round((d.getTime() - created) / 60000);
+            if (mins >= 1440) { const n = Math.round(mins / 1440); unit = plural(n, "day"); short = `${n}d`; }
+            else if (mins >= 60) { const n = Math.round(mins / 60); unit = plural(n, "hour"); short = `${n}h`; }
+            else { unit = plural(mins, "minute"); short = `${mins}m`; }
+        } else if (s < 60) { const sec = s || 1; unit = plural(sec, "second"); short = `${sec}s`; } // floor can hit 0 in the last partial second; show 1
         // 1:59 -> 1:00 reads "1 minute 59 seconds" so the tail never shows "90 seconds".
-        else if (s < 120) { const sec = s - 60; unit = sec ? `1 minute ${sec} second${sec === 1 ? "" : "s"}` : "1 minute"; short = sec ? `1m${sec}s` : "1m"; }
-        else if (s < 3540) {
-            // The set value (round up) for the first 30s, then floor — counts down truthfully.
-            const created = Number(createdMs);
-            const fresh = created && Date.now() - created < SET_GRACE_MS;
-            const m = fresh ? Math.ceil(ms / 60000) : Math.floor(ms / 60000);
-            unit = `${m} minute${m === 1 ? "" : "s"}`; short = `${m}m`;
-        }
-        else if (s < 82800) { const h = Math.ceil(ms / 3600000); unit = `${h} hour${h === 1 ? "" : "s"}`; short = `${h}h`; }
-        else { const days = Math.ceil(ms / 86400000); unit = `${days} day${days === 1 ? "" : "s"}`; short = `${days}d`; }
+        else if (s < 120) { const sec = s - 60; unit = sec ? `1 minute ${plural(sec, "second")}` : "1 minute"; short = sec ? `1m${sec}s` : "1m"; }
+        else if (ms < 3600000) { const m = Math.floor(ms / 60000); unit = plural(m, "minute"); short = `${m}m`; }
+        else if (ms < 86400000) { const h = Math.floor(ms / 3600000); unit = plural(h, "hour"); short = `${h}h`; }
+        else { const days = Math.floor(ms / 86400000); unit = plural(days, "day"); short = `${days}d`; }
         const level = s < 60 ? "now" : s <= 300 ? "soon" : "";
         return { text: `${unit} left`, compact: short, level };
     };
@@ -207,9 +211,12 @@
             // lands on the deadline.
             const created = Number(span.dataset.created);
             const graceLeft = created ? created + SET_GRACE_MS - Date.now() : 0;
-            const dd = (graceLeft > 0 && ms >= 120000 && ms < 3540000)
-                ? graceLeft
-                : (ms <= 120000 ? (ms % 1000) + 1 : (ms % 60000) + 1);
+            let dd;
+            if (graceLeft > 0 && ms >= 120000) dd = graceLeft;     // hold the set value
+            else if (ms <= 120000) dd = (ms % 1000) + 1;           // per-second
+            else if (ms < 3600000) dd = (ms % 60000) + 1;          // per-minute
+            else if (ms < 86400000) dd = (ms % 3600000) + 1;       // per-hour
+            else dd = (ms % 86400000) + 1;                          // per-day
             if (dd < delay) delay = dd;
         }
         // Re-arm only while a live countdown still needs updating; once everything is
