@@ -113,16 +113,16 @@
     // SQLite "YYYY-MM-DD HH:MM:SS" is UTC; make it explicit so Date parses correctly.
     const parseUtc = (s) => (s ? new Date(`${s.replace(" ", "T")}Z`) : null);
 
-    // Remaining time as { text, compact, level }. Floor the seconds; round the bigger units
-    // UP off the real remaining ms — so a fresh link opens on the value it then holds for a
-    // full interval AND each step flips exactly on its boundary (a 5-minute link shows
-    // "5 minutes" until precisely 4:00, then "4 minutes"). A 2-minute link starts at
-    // "1 minute 59 seconds" (compact "1m59s"), a 1-minute link at "59 seconds" — no round
-    // boundary flashed for a second then reflowed. Whole minutes from 2 min up; the last two
-    // minutes count seconds; under a minute is bare seconds. The hour band starts at 59 min
-    // so a 1-hour link reads "1 hour" for its first minute. Flags "soon" (≤5 min, yellow)
-    // then "now" (last minute, red).
-    const formatCountdown = (expiresIso) => {
+    // Minutes show the SET value for a 30s grace, then count down by whole minutes.
+    const SET_GRACE_MS = 30000;
+    // Remaining time as { text, compact, level }. Minutes read the set value (rounded up) for
+    // a 30s grace, then floor: a 5-minute link shows "5 minutes" for 30s, "4 minutes" for the
+    // next 30s, then "3 minutes" from ~4:00 down, etc. Seconds are floored and per-second; the
+    // last two minutes count seconds ("1m59s"); under a minute is bare seconds. Hours/days
+    // round up (the hour band starts at 59 min). "expired" keys off the real deadline (never
+    // early; last partial second reads "1 second"). Flags "soon" (≤5 min, yellow) then "now"
+    // (last minute, red).
+    const formatCountdown = (expiresIso, createdMs) => {
         const d = parseUtc(expiresIso);
         if (!d || Number.isNaN(d.getTime())) return { text: "", compact: "", level: "" };
         const ms = d.getTime() - Date.now();
@@ -135,7 +135,13 @@
         if (s < 60) { const sec = s || 1; unit = `${sec} second${sec === 1 ? "" : "s"}`; short = `${sec}s`; } // under a minute: bare seconds (floor can hit 0 in the last partial second; show 1)
         // 1:59 -> 1:00 reads "1 minute 59 seconds" so the tail never shows "90 seconds".
         else if (s < 120) { const sec = s - 60; unit = sec ? `1 minute ${sec} second${sec === 1 ? "" : "s"}` : "1 minute"; short = sec ? `1m${sec}s` : "1m"; }
-        else if (s < 3540) { const m = Math.ceil(ms / 60000); unit = `${m} minute${m === 1 ? "" : "s"}`; short = `${m}m`; }
+        else if (s < 3540) {
+            // The set value (round up) for the first 30s, then floor — counts down truthfully.
+            const created = Number(createdMs);
+            const fresh = created && Date.now() - created < SET_GRACE_MS;
+            const m = fresh ? Math.ceil(ms / 60000) : Math.floor(ms / 60000);
+            unit = `${m} minute${m === 1 ? "" : "s"}`; short = `${m}m`;
+        }
         else if (s < 82800) { const h = Math.ceil(ms / 3600000); unit = `${h} hour${h === 1 ? "" : "s"}`; short = `${h}h`; }
         else { const days = Math.ceil(ms / 86400000); unit = `${days} day${days === 1 ? "" : "s"}`; short = `${days}d`; }
         const level = s < 60 ? "now" : s <= 300 ? "soon" : "";
@@ -143,7 +149,7 @@
     };
     // Result spans show the full phrase; history spans set data-compact for "1h"/"4m".
     const updateCountdown = (span) => {
-        const { text, compact, level } = formatCountdown(span.dataset.expires);
+        const { text, compact, level } = formatCountdown(span.dataset.expires, span.dataset.created);
         span.textContent = span.dataset.compact ? compact : text;
         span.classList.toggle("expiring-soon", level === "soon");
         span.classList.toggle("expiring-now", level === "now");
@@ -160,6 +166,7 @@
         const span = document.createElement("span");
         span.className = "countdown";
         span.dataset.expires = expiresIso ?? "";
+        span.dataset.created = String(Date.now()); // the result is shown at creation; grace runs from now
         updateCountdown(span);
         metaEl.append(span);
         const suffix = usesSuffix(uses);
@@ -193,11 +200,16 @@
             if (!d || Number.isNaN(d.getTime())) continue;
             const ms = d.getTime() - Date.now();
             if (ms <= 0) continue;         // expired: its text is final — nothing more to update
-            // Wake on the exact next boundary: each second while seconds show (≤2 min),
-            // otherwise each minute mark — so the minute/hour/day label flips precisely on
-            // its boundary ("5 minutes" -> "4 minutes" exactly at 4:00), not a second early.
-            // This also lands the final tick right at the deadline.
-            const dd = ms <= 120000 ? ((ms - 1) % 1000) + 1 : ((ms - 1) % 60000) + 1;
+            // Wake on the next change: a minute-band link still in its 30s set-value grace
+            // wakes when the grace ends (to switch to the floor countdown); otherwise on the
+            // next second (≤2 min) or the next minute mark. The +1 lands just past the
+            // boundary so the floored label shows its new (lower) value, and the final tick
+            // lands on the deadline.
+            const created = Number(span.dataset.created);
+            const graceLeft = created ? created + SET_GRACE_MS - Date.now() : 0;
+            const dd = (graceLeft > 0 && ms >= 120000 && ms < 3540000)
+                ? graceLeft
+                : (ms <= 120000 ? (ms % 1000) + 1 : (ms % 60000) + 1);
             if (dd < delay) delay = dd;
         }
         // Re-arm only while a live countdown still needs updating; once everything is
@@ -384,6 +396,7 @@
             const span = document.createElement("span");
             span.className = "countdown";
             span.dataset.expires = it.expires ?? "";
+            if (it.created) span.dataset.created = String(it.created);
             updateCountdown(span);
             meta.append(span);
             const suffix = usesSuffixShort(it.uses);
@@ -800,7 +813,7 @@
                 showReady(url, kind, data.expires_at, uses, defaultedOnce);
                 // Keep the name + delete token so the history row can offer a real
                 // server delete (token is undefined if the backend didn't send one).
-                addHistory({ url, name: data.name, kind, uses, expires: data.expires_at, token: data.delete_token });
+                addHistory({ url, name: data.name, kind, uses, expires: data.expires_at, token: data.delete_token, created: Date.now() });
                 renderHistory();
                 // The input greys (still clickable); the result is in sync with it.
                 resultSourceValue = raw;
@@ -889,6 +902,7 @@
             uses: /one-time/.test(metaText) ? 1 : (usesMatch ? Number.parseInt(usesMatch[1], 10) : null),
             expires: when ? when[1] : null,
             token: null,
+            created: Date.now(), // the result page loads at ~creation; grace runs from now
         };
         addHistory(entry);
         return entry;
