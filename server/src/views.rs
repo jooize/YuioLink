@@ -45,15 +45,15 @@ fn result_output(url: Option<&str>, meta: Markup) -> Markup {
         // tabindex=-1: focused after creation so the link selection survives for ⌘C
         // and the next Tab lands on the input (the panel precedes the form in the DOM).
         output.result #link-panel tabindex="-1" hidden[url.is_none()] {
-            code.result-url #link-element { @if let Some(u) = url { (u) } }
-            div.result-foot {
-                small.result-meta #link-expiry { (meta) }
-                div.result-actions {
-                    // Revealed by app.js (copy needs JS). The link already exists here,
-                    // so this copy is synchronous and reliable.
-                    button.result-copy #copy-result type="button" hidden { "Copy" }
-                }
+            // Copy-field (direction C): the URL sits in a read-only-style field with
+            // Copy docked on the right (revealed by app.js). The meta and any note sit
+            // beneath it.
+            div.result-field {
+                code.result-url #link-element { @if let Some(u) = url { (u) } }
+                button.result-copy #copy-result type="button" hidden { "Copy" }
             }
+            small.result-meta #link-expiry { (meta) }
+            small.result-note #result-note hidden {}
         }
     }
 }
@@ -115,6 +115,9 @@ pub fn index_page(encryption_enabled: bool, api_base: &str, max_ttl_secs: i64) -
                 button #submit.btn.split-primary type="submit" { "Create Link" }
                 button #clear.btn.split-clear type="button" { "Clear" }
             }
+            // Whole-form errors (failed request, server rejection) appear here, on the
+            // page — app.js fills and reveals it instead of alerting.
+            p.form-error #form-error role="alert" hidden {}
 
             // Native radios so the pickers work without JS. "Custom" reveals an extra
             // field (CSS `:has()` on the no-JS path; app.js also focuses it).
@@ -131,8 +134,10 @@ pub fn index_page(encryption_enabled: bool, api_base: &str, max_ttl_secs: i64) -
                     label.seg-label for="ttl-custom" { "Specify" }
                 }
                 div.custom-field #ttl-custom-field {
+                    // No real value — the greyed placeholder shows the default (5) that
+                    // app.js applies when the box is left blank.
                     input #ttl-custom-value.custom-num name="ttl_custom" type="number"
-                        min="1" inputmode="numeric" placeholder="30";
+                        min="1" inputmode="numeric" placeholder="5";
                     div.segmented.unit-segmented {
                         input.seg-radio #ttl-unit-m type="radio" name="ttl_unit" value="m" checked;
                         label.seg-label for="ttl-unit-m" { "minutes" }
@@ -142,6 +147,8 @@ pub fn index_page(encryption_enabled: bool, api_base: &str, max_ttl_secs: i64) -
                         label.seg-label for="ttl-unit-d" { "days" }
                     }
                     small.custom-hint { "Up to " (humanize_duration(max_ttl_secs)) }
+                    // app.js reveals this (and reds the field) instead of alerting.
+                    small.custom-error #ttl-error role="alert" hidden { "Links last at least 1 minute." }
                 }
             }
 
@@ -159,7 +166,9 @@ pub fn index_page(encryption_enabled: bool, api_base: &str, max_ttl_secs: i64) -
                 }
                 div.custom-field #limit-custom-field {
                     input #limit-custom-value.custom-num name="limit_custom" type="number"
-                        min="1" inputmode="numeric" placeholder="Uses";
+                        min="1" step="1" inputmode="numeric" placeholder="Uses";
+                    // Blank defaults to Once (app.js); a typed value must be a whole number.
+                    small.custom-error #limit-error role="alert" hidden { "Uses must be a whole number, 1 or more." }
                 }
             }
 

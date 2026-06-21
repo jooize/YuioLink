@@ -38,6 +38,14 @@
         return hasScheme(t) || looksLikeDomain(t) ? "redirect" : "text";
     };
     const kindLabel = (k) => (k === "redirect" ? "Redirect" : "Text");
+    // The kind word in a fixed-width box so the "· expires in …" that follows lines
+    // up across history rows regardless of "Text" vs the wider "Redirect".
+    const kindLabelEl = (k) => {
+        const el = document.createElement("span");
+        el.className = "kind-label";
+        el.textContent = kindLabel(k);
+        return el;
+    };
     const normalizeTarget = (s) => (hasScheme(s) ? s : `https://${s}`);
 
     // --- clipboard ---
@@ -94,7 +102,7 @@
     // Build "<kind> · expires in <live countdown><uses>" into `metaEl` (no innerHTML).
     const buildMeta = (metaEl, kind, expiresIso, uses) => {
         metaEl.replaceChildren();
-        metaEl.append(`${kindLabel(kind)} · `);
+        metaEl.append(kindLabelEl(kind), " · ");
         const span = document.createElement("span");
         span.className = "countdown";
         span.dataset.expires = expiresIso ?? "";
@@ -249,6 +257,25 @@
         const panel = document.getElementById("link-panel");
         const ttlCustomValue = document.getElementById("ttl-custom-value");
         const limitCustomValue = document.getElementById("limit-custom-value");
+        const ttlError = document.getElementById("ttl-error");
+        const limitError = document.getElementById("limit-error");
+
+        // Inline validation feedback (no browser alert): light up a Specify field and
+        // reveal its message.
+        const setFieldError = (input, errorEl, show) => {
+            if (errorEl) errorEl.hidden = !show;
+            input?.classList.toggle("invalid", show);
+        };
+
+        // Whole-form errors (a failed request, a server rejection) shown on the page
+        // under the action — never an alert popup.
+        const formError = document.getElementById("form-error");
+        const showFormError = (msg) => {
+            if (!formError) return;
+            formError.textContent = msg;
+            formError.hidden = false;
+        };
+        const clearFormError = () => { if (formError) formError.hidden = true; };
 
         const UNIT_SECS = { m: 60, h: 3600, d: 86400 };
         // The input value that produced the current result; the result dims when the
@@ -261,7 +288,10 @@
         const ttlSeconds = () => {
             const v = checkedValue("ttl_seconds", "3600");
             if (v === "custom") {
-                let n = Number.parseInt(ttlCustomValue.value, 10);
+                // An empty Specify box accepts the default (5); a typed value is used
+                // as-is, so a too-short one (e.g. 0) is caught by validation on submit.
+                const raw = ttlCustomValue.value.trim();
+                let n = raw === "" ? 5 : Number.parseInt(raw, 10);
                 if (Number.isNaN(n) || n < 0) n = 0;
                 return n * (UNIT_SECS[checkedValue("ttl_unit", "m")] ?? 60);
             }
@@ -296,6 +326,7 @@
         content.addEventListener("input", () => {
             autosize();
             updateSubmitLabel();
+            clearFormError();
             content.classList.remove("submitted"); // editing re-activates the field
             if (currentResultUrl) panel.classList.toggle("stale", content.value !== resultSourceValue);
         });
@@ -305,6 +336,21 @@
         ttlCustomRadio?.addEventListener("change", () => { if (ttlCustomRadio.checked) ttlCustomValue.focus(); });
         const limitCustomRadio = document.getElementById("limit-custom");
         limitCustomRadio?.addEventListener("change", () => { if (limitCustomRadio.checked) limitCustomValue.focus(); });
+
+        // Clear an inline error as soon as the user edits the field or switches segment.
+        ttlCustomValue.addEventListener("input", () => setFieldError(ttlCustomValue, ttlError, false));
+        limitCustomValue.addEventListener("input", () => {
+            // Keep Uses to a whole number — strip anything but digits (no sign, decimal,
+            // or exponent), and cap the length so it stays within what the server takes
+            // and can never overflow into a failed request.
+            const cleaned = limitCustomValue.value.replace(/\D+/g, "").slice(0, 15);
+            if (cleaned !== limitCustomValue.value) limitCustomValue.value = cleaned;
+            setFieldError(limitCustomValue, limitError, false);
+        });
+        for (const r of document.querySelectorAll('input[name="ttl_seconds"], input[name="ttl_unit"]'))
+            r.addEventListener("change", () => setFieldError(ttlCustomValue, ttlError, false));
+        for (const r of document.querySelectorAll('input[name="limit"]'))
+            r.addEventListener("change", () => setFieldError(limitCustomValue, limitError, false));
 
         // Redirect: Enter submits. Text: Enter = newline, Cmd/Ctrl-Enter submits.
         content.addEventListener("keydown", (event) => {
@@ -324,9 +370,14 @@
             content.setSelectionRange(n, n);
         });
 
-        const showReady = (url, kind, expiresIso, uses) => {
+        const showReady = (url, kind, expiresIso, uses, defaultedOnce) => {
             linkEl.textContent = url;
             buildMeta(metaEl, kind, expiresIso, uses);
+            const note = document.getElementById("result-note");
+            if (note) {
+                note.hidden = !defaultedOnce;
+                if (defaultedOnce) note.textContent = "Limit not specified, so this link opens once.";
+            }
             panel.hidden = false;
             const range = document.createRange();
             range.selectNodeContents(linkEl);
@@ -340,11 +391,42 @@
 
         const createLink = async () => {
             const raw = content.value;
+            clearFormError();
             if (raw.trim() === "") { content.focus(); return; }
+
+            // Validate inline, before any request — no browser alerts.
+            // Expiry: a too-short value lights up the Specify field.
+            const ttl = ttlSeconds();
+            setFieldError(ttlCustomValue, ttlError, ttl < 60);
+            if (ttl < 60) { ttlCustomValue.focus(); return; }
+
+            // Limit (Specify): a blank box accepts the default (Once, noted on the
+            // result); a typed value must be a whole number of 1 or more, else the
+            // field lights up.
+            let uses = maxUses();
+            let defaultedOnce = false;
+            if (checkedValue("limit", "unlimited") === "custom") {
+                const usesRaw = limitCustomValue.value.trim();
+                if (usesRaw === "") {
+                    uses = 1;
+                    defaultedOnce = true;
+                } else {
+                    // isSafeInteger also rejects values too large to send exactly (and
+                    // beyond what the server's i64 takes), so they error here, on the
+                    // page, instead of bubbling up as a failed request.
+                    const n = Number(usesRaw);
+                    if (!Number.isSafeInteger(n) || n < 1) {
+                        setFieldError(limitCustomValue, limitError, true);
+                        limitCustomValue.focus();
+                        return;
+                    }
+                    uses = n;
+                }
+            }
+            setFieldError(limitCustomValue, limitError, false);
+
             const kind = detectKind(raw);
             const payload = kind === "redirect" ? normalizeTarget(raw.trim()) : raw;
-            const ttl = ttlSeconds();
-            const uses = maxUses();
 
             const restore = submitBtn.textContent;
             submitBtn.disabled = true;
@@ -375,7 +457,7 @@
                 const data = await resp.json();
                 const url = data.url + fragment;
                 currentResultUrl = url;
-                showReady(url, kind, data.expires_at, uses);
+                showReady(url, kind, data.expires_at, uses, defaultedOnce);
                 addHistory({ url, kind, uses, expires: data.expires_at });
                 renderHistory();
                 // The input greys (still clickable); the result is in sync with it.
@@ -384,7 +466,7 @@
                 panel.classList.remove("stale");
                 scheduleTick();
             } catch (e) {
-                alert(e.message || "Could not create the link.");
+                showFormError(e.message || "Could not create the link.");
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = restore;
@@ -413,7 +495,15 @@
         status?.addEventListener("click", (event) => {
             event.preventDefault();
             if (!status.dataset.has) return;
-            document.getElementById("history")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            const section = document.getElementById("history");
+            if (!section) return;
+            section.classList.remove("collapsed"); // expand it, don't just jump to a collapsed box
+            section.scrollIntoView({ behavior: "smooth", block: "start" });
+            // A brief, tasteful glow to draw the eye to the freshly expanded list.
+            section.classList.remove("attention");
+            void section.offsetWidth; // reflow so the animation restarts on repeat clicks
+            section.classList.add("attention");
+            section.addEventListener("animationend", () => section.classList.remove("attention"), { once: true });
             history.replaceState(null, "", location.pathname + location.search);
         });
         document.getElementById("storage-toggle")?.addEventListener("click", () => {

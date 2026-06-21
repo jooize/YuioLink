@@ -143,7 +143,8 @@ pub async fn form_create(State(state): State<AppState>, Form(form): Form<FormCre
         None => DEFAULT_TTL_SECS,
     };
 
-    // Limit: unlimited (default), exactly 1, or a custom positive count.
+    // Limit: unlimited (default), exactly 1, or a custom positive count. A "Specify"
+    // left blank defaults to Once, matching the JS path.
     let max_uses = match form.limit.as_deref() {
         Some("1") => Some(1),
         Some("custom") => match form.limit_custom.as_deref().map(str::trim) {
@@ -151,7 +152,7 @@ pub async fn form_create(State(state): State<AppState>, Form(form): Form<FormCre
                 Ok(n) => Some(n),
                 Err(_) => return form_error("limit must be a whole number"),
             },
-            _ => None,
+            _ => Some(1),
         },
         _ => None,
     };

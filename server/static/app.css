@@ -336,6 +336,34 @@ textarea.form-control {
     color: var(--text-secondary);
 }
 
+/* Inline validation under a Specify field — a simple, clear message that lights up
+   the section in place of a browser alert. */
+.custom-error {
+    flex: 0 0 100%;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--warn);
+}
+
+/* The number field lights up to match while its message is showing. */
+.custom-num.invalid {
+    border-color: var(--warn);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 28%, transparent);
+}
+
+/* Whole-form error under the action — on-page, never an alert. Danger colour since
+   it means the link was not created. */
+.form-error {
+    margin: 12px auto 0;
+    max-width: 36ch;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--danger);
+}
+
 /* macOS-style switch row */
 .switch-row {
     display: flex;
@@ -499,6 +527,36 @@ textarea.form-control {
     opacity: 0.5;
 }
 
+/* The created-link result (the landing/result page #link-panel) drops the green
+   box; direction C presents the URL in a read-only-style field with Copy docked
+   on the right, the meta and any note beneath. (The preview page keeps the plain
+   .result box above.) */
+#link-panel {
+    margin: 24px 0 4px;
+    padding: 0;
+    background: none;
+    border: 0;
+}
+
+.result-field {
+    display: flex;
+    align-items: stretch;
+    border-radius: var(--radius-control);
+    overflow: hidden;
+    background: var(--field-bg);
+    border: 0.5px solid var(--field-border);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* Optional note under the result, e.g. when a blank limit defaulted to Once. */
+.result-note {
+    display: block;
+    margin: 6px 0 0 3px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+}
+
 .result-label {
     display: flex;
     align-items: center;
@@ -509,14 +567,20 @@ textarea.form-control {
     margin-bottom: 11px;
 }
 
-/* The created link — the focus of the single bubble: prominent, fully selectable. */
+/* The created link, filling the field; truncates with an ellipsis but stays fully
+   selectable (⌘C) and the Copy button copies the whole thing. */
 .result-url {
+    flex: 1;
+    min-width: 0;
     display: block;
+    padding: 11px 13px;
     font-family: var(--font-mono);
-    font-size: 15px;
-    line-height: 1.4;
-    word-break: break-all;
+    font-size: 14px;
+    line-height: 1.45;
     color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     user-select: all;
 }
 
@@ -530,19 +594,19 @@ textarea.form-control {
     user-select: all;
 }
 
-/* Foot row inside the bubble: kind · expiry · limit on the left, Copy + ⌘C right. */
-.result-foot {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px 12px;
-    flex-wrap: wrap;
-    margin-top: 12px;
-}
-
+/* Meta line (kind · expiry · limit) below the field. */
 .result-meta {
+    display: block;
+    margin: 8px 0 0 3px;
     font-size: 12.5px;
     color: var(--text-secondary);
+}
+
+/* The kind word ("Redirect"/"Text"). In the history list it gets a fixed width
+   matching the wider word so the "· expires in …" after it lines up on every row. */
+.history-meta .kind-label {
+    display: inline-block;
+    min-width: 4.5em;
 }
 
 /* Live "expires in" colouring as the deadline nears. */
@@ -556,28 +620,25 @@ textarea.form-control {
     font-weight: 600;
 }
 
-.result-actions {
+/* Copy docked on the field's right edge, divided by a hairline. */
+.result-copy {
+    flex: none;
     display: flex;
     align-items: center;
-    gap: 9px;
-    flex: none;
-}
-
-.result-copy {
+    border: 0;
+    border-left: 0.5px solid var(--field-border);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent);
     font-family: inherit;
     font-size: 13px;
     font-weight: 600;
-    color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 14%, transparent);
-    border: none;
-    border-radius: 8px;
-    padding: 6px 13px;
+    padding: 0 18px;
     cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease;
 }
 
 .result-copy:hover {
-    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .result-copy.copied {
@@ -670,6 +731,30 @@ textarea.form-control {
     scroll-margin-top: 18px;
 }
 
+/* When the History pill jumps you to the list, draw the eye to the "Local History"
+   title with a brief, tasteful glow — not the section's separator line. */
+@keyframes history-title-glow {
+    0%   { text-shadow: 0 0 9px color-mix(in srgb, var(--accent) 65%, transparent); }
+    100% { text-shadow: 0 0 0 transparent; }
+}
+
+@keyframes history-title-blink {
+    0%, 49%   { opacity: 1; }
+    50%, 99%  { opacity: 0.25; }
+    100%      { opacity: 1; }
+}
+
+.history.attention .history-title {
+    animation: history-title-glow 1.4s ease-out;
+}
+
+/* Reduced motion: a couple of gentle blinks of the title instead of a glow. */
+@media (prefers-reduced-motion: reduce) {
+    .history.attention .history-title {
+        animation: history-title-blink 0.85s 2;
+    }
+}
+
 .history-head {
     display: flex;
     align-items: center;
@@ -736,7 +821,8 @@ textarea.form-control {
 }
 
 .history-clear-expired {
-    margin-top: 8px;
+    display: block;
+    margin: 12px auto 0;
     font-family: inherit;
     font-size: 12px;
     color: #ff9500;
