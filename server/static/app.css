@@ -9,8 +9,8 @@
     --result: #10b981;
     --warn: #c77a00;
     --danger: #d70015;
-    /* "Text" kind — a muted notepad-yellow chip (used as the history pill background). */
-    --text-kind: #e9c44e;
+    /* "Text" kind — amber ink for the tinted Text chip (matches the history-list mockup). */
+    --text-kind: #b07c00;
 
     --bg-1: #e7e8ec;
     --bg-2: #f6f7f9;
@@ -46,7 +46,7 @@
         --result: #34d399;
         --warn: #ffd60a;
         --danger: #ff453a;
-        --text-kind: #d4bb55;
+        --text-kind: #ffd60a;
 
         --bg-1: #121214;
         --bg-2: #202024;
@@ -560,11 +560,13 @@ textarea.form-control {
 .result-word {
     display: block;
     font-family: var(--font-mono);
-    font-size: clamp(22px, 6vw, 30px);
+    /* The mockup's "arson" is a fixed 30px; clamp only shrinks it on narrow phones. */
+    font-size: clamp(24px, 7vw, 30px);
     font-weight: 700;
     line-height: 1.1;
     letter-spacing: -0.01em;
     word-break: break-all;
+    margin-bottom: 4px;
     color: var(--accent);
     user-select: all;
 }
@@ -573,7 +575,7 @@ textarea.form-control {
    — rendered in parts by app.js. Wraps so the whole link stays visible/copyable. */
 .result-url {
     display: block;
-    margin-top: 5px;
+    margin-top: 0;
     font-family: var(--font-mono);
     font-size: 15px;
     line-height: 1.4;
@@ -809,20 +811,21 @@ textarea.form-control {
     list-style: none;
     margin: 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
 }
 
+/* List-y rows (mockup B in history-list.html): bare rows divided by a hairline, no
+   per-row box — lighter inside the glass card than stacked cards. */
 .history-item {
     position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 12px;
-    background: var(--field-bg);
-    border: 0.5px solid var(--field-border);
-    border-radius: 10px;
+    padding: 11px 4px;
+    border-bottom: 0.5px solid var(--separator);
+}
+
+.history-item:last-child {
+    border-bottom: 0;
 }
 
 /* Expired links stay in the list (dimmed) until cleared via "Clear Expired". */
@@ -847,17 +850,17 @@ textarea.form-control {
 }
 
 /* Colour-coded kind pill, used in the history rows (the result names the kind in
-   plain text instead). Redirect is a tinted-blue chip; Text is a muted notepad-yellow
-   chip with dark ink (so it reads as a note and stays legible in both themes). */
+   plain text instead). Both are tinted chips of equal weight — Redirect blue, Text
+   amber — matching the history-list mockup. */
 .kind-pill {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex: none;
-    padding: 2px 8px;
-    font-size: 10.5px;
+    padding: 1px 7px;
+    font-size: 10px;
     font-weight: 600;
-    border-radius: 6px;
+    border-radius: 5px;
 }
 
 .kind-pill.redirect {
@@ -866,8 +869,8 @@ textarea.form-control {
 }
 
 .kind-pill.text {
-    color: #5a4600;
-    background: var(--text-kind);
+    color: var(--text-kind);
+    background: color-mix(in srgb, var(--text-kind) 16%, transparent);
 }
 
 /* Two-line history entry (mockup B, word-forward): the link name leads on top, the
@@ -885,7 +888,7 @@ textarea.form-control {
 .history-url {
     display: block;
     font-family: var(--font-mono);
-    font-size: 14.5px;
+    font-size: 14px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -903,20 +906,15 @@ textarea.form-control {
     font-weight: 600;
 }
 
-/* Line 2 (kind + expiry) in mono, echoing B's techy second line; the pill keeps the
-   UI font so it stays a crisp chip. */
+/* Line 2 (kind + expiry) in mono, matching B's techy second line in the mockup. */
 .history-meta {
     display: flex;
     align-items: center;
     gap: 7px;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 11.5px;
     color: var(--text-secondary);
     white-space: nowrap;
-}
-
-.history-meta .kind-pill {
-    font-family: var(--font);
 }
 
 .history-copy {
