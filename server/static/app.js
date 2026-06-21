@@ -422,7 +422,7 @@
     };
     const deleteFromServer = async (it, li) => {
         if (!it.token || !it.name) { tombstone(it, "broken"); return; }
-        showConfirmBusy(li, "Breaking link…");
+        showConfirmBusy(li, "Deleting link…");
         try {
             const resp = await fetch(`${API_BASE}/api/v1/links/${encodeURIComponent(it.name)}`, {
                 method: "DELETE",
@@ -447,11 +447,11 @@
         const actions = document.createElement("div");
         actions.className = "history-confirm-actions";
 
-        // Forget first; Break Link (destructive) second.
+        // Forget first; Delete Link (destructive) second.
         const forget = document.createElement("button");
         forget.type = "button";
         forget.className = "history-confirm-forget";
-        forget.textContent = "Forget On Device";
+        forget.textContent = "Forget Link";
         forget.title = "Removes it from this device only — the link keeps working.";
         forget.addEventListener("click", () => forgetLink(it));
         actions.append(forget);
@@ -460,7 +460,7 @@
             const server = document.createElement("button");
             server.type = "button";
             server.className = "history-confirm-server";
-            server.textContent = "Break Link";
+            server.textContent = "Delete Link";
             server.title = "Deletes it from the server — the link stops working for everyone.";
             server.addEventListener("click", () => deleteFromServer(it, li));
             actions.append(server);
