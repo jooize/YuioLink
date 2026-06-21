@@ -340,8 +340,20 @@
         }
         const toggle = document.getElementById("storage-toggle");
         if (toggle) {
-            toggle.textContent = persistEnabled ? "Local History On" : "Enable Local History";
+            // HIG switch: the label names what it controls ("Local History"); the switch
+            // shows on/off by colour + knob position, not by words. role/aria for a11y.
+            if (!toggle.querySelector(".storage-switch")) {
+                const label = document.createElement("span");
+                label.className = "storage-toggle-label";
+                label.textContent = "Local History";
+                const sw = document.createElement("span");
+                sw.className = "storage-switch";
+                sw.setAttribute("aria-hidden", "true");
+                toggle.replaceChildren(label, sw);
+                toggle.setAttribute("role", "switch");
+            }
             toggle.classList.toggle("on", persistEnabled);
+            toggle.setAttribute("aria-checked", persistEnabled ? "true" : "false");
         }
         const warn = document.getElementById("storage-warning");
         if (warn) warn.hidden = !(warnArmed && !persistEnabled && n > 0);
