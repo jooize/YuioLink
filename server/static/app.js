@@ -58,17 +58,20 @@
             button.textContent = "Copy";
         }, 1500);
     };
-    // `heroEl` (the result word), when given, gets a transient green check on success,
-    // cleared after the same 1.5s as the button's "Copied".
-    const copyToClipboard = async (text, button, heroEl) => {
+    // Add `cls` to `el` for the same 1.5s as the button's "Copied" flash — used for the
+    // green copy check that trails the result URL and the history rows.
+    const flashClass = (el, cls) => {
+        if (!el) return;
+        el.classList.add(cls);
+        setTimeout(() => el.classList.remove(cls), 1500);
+    };
+    // `onCopied`, when given, runs on a successful copy (e.g. to flash a green check).
+    const copyToClipboard = async (text, button, onCopied) => {
         if (!text) return;
         try {
             await navigator.clipboard.writeText(text);
             flashCopied(button);
-            if (heroEl) {
-                heroEl.classList.add("copied");
-                setTimeout(() => heroEl.classList.remove("copied"), 1500);
-            }
+            onCopied?.();
         } catch {
             // Clipboard unavailable (insecure context) or permission denied.
         }
@@ -184,8 +187,7 @@
         const btn = document.getElementById("copy-result");
         if (btn) {
             btn.hidden = false;
-            const hero = document.getElementById("link-word");
-            btn.addEventListener("click", () => copyToClipboard(linkEl.textContent.trim(), btn, hero));
+            btn.addEventListener("click", () => copyToClipboard(linkEl.textContent.trim(), btn, () => flashClass(linkEl, "copied")));
         }
     };
 
@@ -202,7 +204,7 @@
             const url = linkEl.textContent.trim();
             if (!url) return;
             event.preventDefault();
-            copyToClipboard(url, document.getElementById("copy-result"), document.getElementById("link-word"));
+            copyToClipboard(url, document.getElementById("copy-result"), () => flashClass(linkEl, "copied"));
         });
     };
 
@@ -212,9 +214,13 @@
     // the stored copy.
     const HISTORY_KEY = "yuiolink:history";
     const PERSIST_KEY = "yuiolink:history:persist";
+    const OPEN_KEY = "yuiolink:history:open";
     const HISTORY_MAX = 20;
     let memHistory = [];
     let persistEnabled = false;
+    // The history panel is open by default each visit; the open/closed choice is only
+    // remembered across visits while Local History is on (persistOpen / setPersist).
+    let historyOpen = true;
     // The URL currently shown in the result panel — a flag for the "input out of sync"
     // dimming. (The link itself still counts in the history list.)
     let currentResultUrl = null;
@@ -234,13 +240,24 @@
         if (persistEnabled) {
             try { memHistory = JSON.parse(lsGet(HISTORY_KEY)) ?? []; }
             catch { memHistory = []; }
+            historyOpen = lsGet(OPEN_KEY) !== "0"; // restore the open/closed choice (default open)
+        } else {
+            lsDel(OPEN_KEY); // history off: forget any saved openness
         }
     };
     const persistNow = () => { if (persistEnabled) lsSet(HISTORY_KEY, JSON.stringify(memHistory)); };
+    // Remember the open/closed choice only while persistence is on.
+    const persistOpen = () => { if (persistEnabled) lsSet(OPEN_KEY, historyOpen ? "1" : "0"); };
+    const applyHistoryOpen = () => {
+        document.getElementById("history")?.classList.toggle("collapsed", !historyOpen);
+    };
+    const setHistoryOpen = (open) => { historyOpen = open; applyHistoryOpen(); persistOpen(); };
     const setPersist = (on) => {
         persistEnabled = on;
-        if (on) { lsSet(PERSIST_KEY, "1"); persistNow(); }
-        else { lsDel(PERSIST_KEY); lsDel(HISTORY_KEY); } // forget what was stored
+        // Turning on (re)saves the list AND the current openness — so flipping it off then
+        // back on restores the panel state; turning off forgets both.
+        if (on) { lsSet(PERSIST_KEY, "1"); persistNow(); persistOpen(); }
+        else { lsDel(PERSIST_KEY); lsDel(HISTORY_KEY); lsDel(OPEN_KEY); }
     };
     const addHistory = (entry) => {
         memHistory = memHistory.filter((it) => it.url !== entry.url);
@@ -306,9 +323,15 @@
             const txt = document.createElement("div");
             txt.className = "history-text";
 
+            const l1 = document.createElement("div");
+            l1.className = "history-l1";
             const url = document.createElement("code");
             url.className = "history-url";
             renderUrlInto(url, it.url);
+            const check = document.createElement("span");
+            check.className = "history-check";
+            check.setAttribute("aria-hidden", "true");
+            l1.append(url, check);
 
             const meta = document.createElement("small");
             meta.className = "history-meta";
@@ -321,13 +344,13 @@
             const suffix = usesSuffixShort(it.uses);
             if (suffix) meta.append(suffix);
 
-            txt.append(url, meta);
+            txt.append(l1, meta);
 
             const copy = document.createElement("button");
             copy.className = "history-copy";
             copy.type = "button";
             copy.textContent = "Copy";
-            copy.addEventListener("click", () => copyToClipboard(it.url, copy));
+            copy.addEventListener("click", () => copyToClipboard(it.url, copy, () => flashClass(check, "show")));
 
             const del = document.createElement("button");
             del.className = "history-delete";
@@ -723,13 +746,8 @@
             if (!status.dataset.has) return;
             const section = document.getElementById("history");
             if (!section) return;
-            section.classList.remove("collapsed"); // expand it, don't just jump to a collapsed box
+            setHistoryOpen(true); // expand (and persist the openness if Local History is on)
             section.scrollIntoView({ behavior: "smooth", block: "start" });
-            // A brief, tasteful glow to draw the eye to the freshly expanded list.
-            section.classList.remove("attention");
-            void section.offsetWidth; // reflow so the animation restarts on repeat clicks
-            section.classList.add("attention");
-            section.addEventListener("animationend", () => section.classList.remove("attention"), { once: true });
             history.replaceState(null, "", location.pathname + location.search);
         });
         document.getElementById("storage-toggle")?.addEventListener("click", () => {
@@ -745,7 +763,7 @@
             renderHistory();
         });
         document.getElementById("history-toggle")?.addEventListener("click", () => {
-            document.getElementById("history")?.classList.toggle("collapsed");
+            setHistoryOpen(!historyOpen);
         });
         document.getElementById("history-clear-expired")?.addEventListener("click", () => {
             memHistory = memHistory.filter((it) => !isExpired(it));
@@ -757,6 +775,7 @@
         updateSubmitLabel();
         syncCustomEnabled();
         renderHistory();
+        applyHistoryOpen(); // open by default on load (or the remembered state)
         content.focus();
     };
 

@@ -9,8 +9,8 @@
     --result: #10b981;
     --warn: #c77a00;
     --danger: #d70015;
-    /* "Text" kind word — a golden yellow (legible on the light glass). */
-    --text-kind: #b8910a;
+    /* "Text" kind word — a bright golden yellow. */
+    --text-kind: #eec100;
     /* Vibrant purple — the standout border on the create input. */
     --purple: #af52de;
 
@@ -562,9 +562,7 @@ textarea.form-control {
 /* The link name as the giant hero (direction R4): the memorable word, big and in
    the accent colour, centred and selectable. */
 .result-word {
-    display: inline-block;
-    position: relative;
-    max-width: 100%;
+    display: block;
     font-family: var(--font-mono);
     /* The mockup's "arson" is a fixed 30px; clamp only shrinks it on narrow phones. */
     font-size: clamp(24px, 7vw, 30px);
@@ -575,27 +573,6 @@ textarea.form-control {
     margin-bottom: 4px;
     color: var(--accent);
     user-select: all;
-}
-
-/* Copy confirmation: a green check appears just right of the hero word on copy (⌘C or
-   the Copy button) and clears after the same 1.5s as the button's "Copied". It is
-   absolutely positioned so the centred hero never shifts. */
-.result-word::after {
-    content: "\2713";
-    position: absolute;
-    left: calc(100% + 0.35em);
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.62em;
-    font-weight: 700;
-    color: var(--switch-on);
-    opacity: 0;
-    transition: opacity 0.18s ease;
-    pointer-events: none;
-}
-
-.result-word.copied::after {
-    opacity: 1;
 }
 
 /* The full URL beneath the hero word: small and quiet — dim scheme, standout host
@@ -609,6 +586,22 @@ textarea.form-control {
     word-break: break-all;
     color: var(--text-tertiary);
     user-select: all;
+}
+
+/* Copy confirmation: a green check trails the URL on copy (the Copy button or ⌘C),
+   showing exactly what was copied — the whole link — and clears with the button's
+   "Copied" after 1.5s. Opacity-toggled (space reserved) so the line never reflows. */
+.result-url::after {
+    content: "\2713";
+    margin-left: 0.4em;
+    font-weight: 700;
+    color: var(--switch-on);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+.result-url.copied::after {
+    opacity: 1;
 }
 
 .result-url .u-scheme,
@@ -786,20 +779,6 @@ textarea.form-control {
     scroll-margin-top: 18px;
 }
 
-/* When the History pill jumps you to the list, light the whole section up briefly:
-   a soft accent wash that fades out. `background-clip: padding-box` keeps the wash
-   inside the border, so the separator line itself never glows. Runs regardless of
-   the reduced-motion setting — it is a gentle, brief, non-essential cue. */
-@keyframes history-attention {
-    0%   { background-color: color-mix(in srgb, var(--accent) 14%, transparent); }
-    100% { background-color: transparent; }
-}
-
-.history.attention {
-    background-clip: padding-box;
-    animation: history-attention 1.4s ease-out;
-}
-
 .history-head {
     display: flex;
     align-items: center;
@@ -912,16 +891,43 @@ textarea.form-control {
     gap: 3px;
 }
 
-/* Line 1: the full tri-colour URL (mockup A) — dim scheme, standout host, the link
-   name highlighted in accent. */
+/* Line 1: the tri-colour URL plus a trailing green copy-check, on one row. */
+.history-l1 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+/* The full tri-colour URL (mockup A) — dim scheme, standout host, accent name. */
 .history-url {
-    display: block;
+    flex: 1;
+    min-width: 0;
     font-family: var(--font-mono);
     font-size: 13px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     user-select: all;
+}
+
+/* Green check trailing the URL on copy (matches the result); opacity-toggled so the
+   row never reflows. */
+.history-check {
+    flex: none;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--switch-on);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+.history-check::before {
+    content: "\2713";
+}
+
+.history-check.show {
+    opacity: 1;
 }
 
 .history-url .u-scheme,
