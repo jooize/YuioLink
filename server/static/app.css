@@ -277,10 +277,10 @@ textarea.form-control {
     line-height: 1;
 }
 
-/* The injected "A billion" chip (app.js) stands out in the accent colour rather
-   than the neutral chip text, marking it as the special preset. */
+/* The injected "A billion" chip (app.js) stands out in purple — matching the
+   Enable Local History pill — marking it as the special preset. */
 .seg-label.seg-billion {
-    color: var(--accent);
+    color: var(--text-kind);
     font-weight: 600;
 }
 
@@ -975,6 +975,52 @@ textarea.form-control {
 .history-confirm-forget {
     color: var(--text);
     background: color-mix(in srgb, var(--text) 9%, transparent);
+}
+
+/* Spinner shown in the confirm overlay while the server is contacted. */
+.history-spinner {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    border: 2px solid color-mix(in srgb, var(--text) 18%, transparent);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: history-spin 0.7s linear infinite;
+}
+
+@keyframes history-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Tombstone left after a link is broken or forgotten: details are purged; only a
+   dim, dashed marker remains, with its own Clear. */
+.history-tomb {
+    justify-content: space-between;
+    border-style: dashed;
+    background: color-mix(in srgb, var(--field-bg) 55%, transparent);
+}
+
+.history-tomb-msg {
+    flex: 1;
+    min-width: 0;
+    font-size: 12.5px;
+    font-style: italic;
+    color: var(--text-tertiary);
+}
+
+.history-tomb-clear {
+    flex: none;
+    font-family: inherit;
+    font-size: 12px;
+    color: #ff9500;
+    background: none;
+    border: 0;
+    padding: 4px 2px;
+    cursor: pointer;
+}
+
+.history-tomb-clear:hover {
+    text-decoration: underline;
 }
 
 .history-clear {

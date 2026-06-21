@@ -227,11 +227,12 @@
         persistNow();
         const shown = [...memHistory];
         const n = shown.length;
+        const linkCount = shown.filter((it) => !it.tombstone).length; // tombstones are not links
 
         // Split pill: left = status (and a link to the list), right = persistence toggle.
         const status = document.getElementById("storage-status");
         if (status) {
-            status.textContent = n > 0 ? `History · ${n} ${n === 1 ? "Link" : "Links"} ›` : "No Links Yet";
+            status.textContent = linkCount > 0 ? `History · ${linkCount} ${linkCount === 1 ? "Link" : "Links"} ›` : "No Links Yet";
             status.dataset.has = n > 0 ? "1" : "";
         }
         const toggle = document.getElementById("storage-toggle");
@@ -246,12 +247,29 @@
         const listEl = document.getElementById("history-list");
         if (!section || !listEl) return;
         const title = document.querySelector(".history-title");
-        if (title) title.textContent = persistEnabled ? "Local History (On-Device)" : "Local History (Not Saved)";
+        if (title) title.textContent = persistEnabled ? "Local History" : "Local History (Not Saved)";
 
         listEl.replaceChildren();
         if (n === 0) { section.hidden = true; return; }
         section.hidden = false;
         for (const it of shown) {
+            if (it.tombstone) {
+                // A marker where a removed entry was; no link details remain.
+                const li = document.createElement("li");
+                li.className = "history-item history-tomb";
+                const msg = document.createElement("span");
+                msg.className = "history-tomb-msg";
+                msg.textContent = it.tombstone === "broken" ? "Link broken" : "Removed from this device";
+                const clear = document.createElement("button");
+                clear.className = "history-tomb-clear";
+                clear.type = "button";
+                clear.textContent = "Clear";
+                clear.addEventListener("click", () => clearTombstone(it));
+                li.append(msg, clear);
+                listEl.append(li);
+                continue;
+            }
+
             const li = document.createElement("li");
             li.className = "history-item";
             if (isExpired(it)) li.classList.add("expired");
@@ -300,29 +318,69 @@
         if (clearExpired) clearExpired.hidden = !memHistory.some(isExpired);
     };
 
-    // --- per-item removal: confirm over the row, then delete-from-server or forget ---
+    // --- per-item removal: confirm over the row, then break-on-server or forget ---
     const closeConfirm = (li) => {
         li.classList.remove("confirming");
         li.querySelector(".history-confirm")?.remove();
     };
-    const forgetLink = (it) => {
-        memHistory = memHistory.filter((h) => h.url !== it.url);
+    // Replace the entry in place with a tombstone, fully purging its url / name /
+    // token from memory and storage. The tombstone holds no link details and can
+    // itself be cleared.
+    const tombstone = (it, kind) => {
+        const i = memHistory.indexOf(it);
+        if (i === -1) return;
+        memHistory[i] = { tombstone: kind };
         persistNow();
         renderHistory();
     };
+    const clearTombstone = (it) => {
+        memHistory = memHistory.filter((h) => h !== it);
+        persistNow();
+        renderHistory();
+    };
+    const forgetLink = (it) => tombstone(it, "forgotten");
+
+    // While the server is contacted, swap the overlay to a spinner; on failure offer
+    // a retry (the entry is left intact so the token survives for another try).
+    const showConfirmBusy = (li, msg) => {
+        const overlay = li.querySelector(".history-confirm");
+        if (!overlay) return;
+        const spin = document.createElement("span");
+        spin.className = "history-spinner";
+        const label = document.createElement("span");
+        label.className = "history-confirm-label";
+        label.textContent = msg;
+        overlay.replaceChildren(spin, label);
+    };
+    const showConfirmError = (li, it) => {
+        const overlay = li.querySelector(".history-confirm");
+        if (!overlay) return;
+        const label = document.createElement("span");
+        label.className = "history-confirm-label error";
+        label.textContent = "Server didn't respond.";
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.className = "history-confirm-server";
+        retry.textContent = "Try Again";
+        retry.addEventListener("click", () => deleteFromServer(it, li));
+        const actions = document.createElement("div");
+        actions.className = "history-confirm-actions";
+        actions.append(retry);
+        overlay.replaceChildren(label, actions);
+    };
     const deleteFromServer = async (it, li) => {
-        if (!it.token || !it.name) { forgetLink(it); return; }
+        if (!it.token || !it.name) { tombstone(it, "broken"); return; }
+        showConfirmBusy(li, "Breaking link…");
         try {
             const resp = await fetch(`${API_BASE}/api/v1/links/${encodeURIComponent(it.name)}`, {
                 method: "DELETE",
                 headers: { Authorization: `Bearer ${it.token}` },
             });
-            // 204 = deleted; 404 = already gone (expired/reaped) — either way drop it.
-            if (resp.ok || resp.status === 404) { forgetLink(it); return; }
+            // 204 = deleted; 404 = already gone (expired/reaped) — either way it is gone.
+            if (resp.ok || resp.status === 404) { tombstone(it, "broken"); return; }
             throw new Error("delete failed");
         } catch {
-            const label = li.querySelector(".history-confirm-label");
-            if (label) { label.textContent = "Couldn't delete — try again."; label.classList.add("error"); }
+            showConfirmError(li, it);
         }
     };
     const openConfirm = (li, it) => {
@@ -336,7 +394,16 @@
         label.textContent = "Remove this link?";
         const actions = document.createElement("div");
         actions.className = "history-confirm-actions";
-        // Server delete needs the creation token; offer it only when we have one.
+
+        // Forget first; Break Link (destructive) second.
+        const forget = document.createElement("button");
+        forget.type = "button";
+        forget.className = "history-confirm-forget";
+        forget.textContent = "Forget On Device";
+        forget.title = "Removes it from this device only — the link keeps working.";
+        forget.addEventListener("click", () => forgetLink(it));
+        actions.append(forget);
+        // Server break needs the creation token; offer it only when we have one.
         if (it.token && it.name) {
             const server = document.createElement("button");
             server.type = "button";
@@ -346,13 +413,6 @@
             server.addEventListener("click", () => deleteFromServer(it, li));
             actions.append(server);
         }
-        const forget = document.createElement("button");
-        forget.type = "button";
-        forget.className = "history-confirm-forget";
-        forget.textContent = "Forget On Device";
-        forget.title = "Removes it from this device only — the link keeps working.";
-        forget.addEventListener("click", () => forgetLink(it));
-        actions.append(forget);
 
         // No cancel button — the row's × toggles the prompt shut, so it never moves.
         overlay.append(label, actions);
