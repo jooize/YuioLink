@@ -603,6 +603,13 @@ textarea.form-control {
     opacity: 1;
 }
 
+/* A dead result strikes through both the hero name word and the URL — the link no
+   longer resolves, so its whole identity reads as crossed out. */
+.result.expired .result-word,
+.result.expired .result-url {
+    text-decoration: line-through;
+}
+
 .result-url .u-scheme,
 .result-url .u-sep,
 .result-url .u-frag {

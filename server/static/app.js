@@ -136,6 +136,10 @@
         span.textContent = span.dataset.compact ? compact : text;
         span.classList.toggle("expiring-soon", level === "soon");
         span.classList.toggle("expiring-now", level === "now");
+        // A dead result strikes through its name word and URL (the history list dims
+        // its rows instead). History countdowns sit outside .result, so this no-ops
+        // for them. Live, since this runs every tick via tickCountdowns().
+        span.closest(".result")?.classList.toggle("expired", text === "expired");
     };
     // Build "<Kind> · <green time left><uses>" into `metaEl` (no innerHTML): the kind
     // as a coloured word, then the green countdown, then any use limit.
