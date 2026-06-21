@@ -1,5 +1,5 @@
 :root {
-    --window-width: 440px;
+    --window-width: 480px;
 
     --accent: #007aff;
     --accent-hover: #2b90ff;
@@ -277,6 +277,13 @@ textarea.form-control {
     line-height: 1;
 }
 
+/* The injected "A billion" chip (app.js) stands out in the accent colour rather
+   than the neutral chip text, marking it as the special preset. */
+.seg-label.seg-billion {
+    color: var(--accent);
+    font-weight: 600;
+}
+
 /* "Custom" reveal: hidden until its segment is picked. CSS `:has()` drives the
    no-JS path; app.js also focuses the field when Custom is chosen. */
 .custom-field {
@@ -547,8 +554,10 @@ textarea.form-control {
     margin-bottom: 11px;
 }
 
-/* The created link — the hero of the result: prominent, centred, coloured, and
-   fully selectable. Wraps rather than truncating so the whole link is visible. */
+/* The created link — the hero of the result: prominent, centred, and fully
+   selectable. Wraps rather than truncating so the whole link is visible. The URL
+   is rendered in parts (app.js): a dim scheme, a standout host, and the memorable
+   word most highlighted. */
 .result-url {
     display: block;
     font-family: var(--font-mono);
@@ -556,8 +565,23 @@ textarea.form-control {
     line-height: 1.45;
     letter-spacing: -0.01em;
     word-break: break-all;
-    color: var(--accent);
+    color: var(--text);
     user-select: all;
+}
+
+.result-url .u-scheme,
+.result-url .u-sep,
+.result-url .u-frag {
+    color: var(--text-tertiary);
+}
+
+.result-url .u-host {
+    color: var(--text);
+}
+
+.result-url .u-name {
+    color: var(--accent);
+    font-weight: 600;
 }
 
 /* The preview page uses a plainer inline code (no box). */
@@ -871,8 +895,11 @@ textarea.form-control {
     text-decoration: none;
 }
 
-/* Per-item delete: a quiet × that opens the confirm overlay. */
+/* Per-item delete: a quiet × that toggles the confirm overlay. It sits above the
+   overlay (z-index) and keeps its place, so opening the prompt never moves it. */
 .history-delete {
+    position: relative;
+    z-index: 2;
     flex: none;
     font-family: inherit;
     font-size: 17px;
@@ -894,10 +921,12 @@ textarea.form-control {
 .history-confirm {
     position: absolute;
     inset: 0;
+    z-index: 1;
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 0 8px 0 12px;
+    /* Extra right padding clears the × column so the actions never slide under it. */
+    padding: 0 38px 0 12px;
     background: var(--field-bg);
     -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
@@ -946,18 +975,6 @@ textarea.form-control {
 .history-confirm-forget {
     color: var(--text);
     background: color-mix(in srgb, var(--text) 9%, transparent);
-}
-
-.history-confirm-cancel {
-    flex: none;
-    font-family: inherit;
-    font-size: 16px;
-    line-height: 1;
-    color: var(--text-tertiary);
-    background: none;
-    border: 0;
-    padding: 2px 4px;
-    cursor: pointer;
 }
 
 .history-clear {

@@ -67,6 +67,27 @@
         }
     };
 
+    // Render a URL into `el` as styled parts: a dim scheme, a standout host, and the
+    // memorable word (the link name) most highlighted; any #fragment stays dim.
+    // textContent still returns the whole URL, so copy and ⌘C are unaffected.
+    const renderUrlInto = (el, url) => {
+        el.replaceChildren();
+        const m = url.match(/^([a-z][a-z0-9+.-]*:\/\/)([^/]+)(\/[^#]*)?(#.*)?$/i);
+        if (!m) { el.textContent = url; return; }
+        const [, scheme, host, path, frag] = m;
+        const add = (cls, text) => {
+            if (!text) return;
+            const s = document.createElement("span");
+            s.className = cls;
+            s.textContent = text;
+            el.append(s);
+        };
+        add("u-scheme", scheme);
+        add("u-host", host);
+        if (path) { add("u-sep", "/"); add("u-name", path.slice(1)); }
+        add("u-frag", frag);
+    };
+
     // --- expiry countdown (live; shared by the result and the history list) ---
     const usesSuffix = (uses) => {
         if (uses === 1) return " · one-time";
@@ -266,7 +287,11 @@
             del.type = "button";
             del.setAttribute("aria-label", "Remove");
             del.textContent = "×"; // ×
-            del.addEventListener("click", () => openConfirm(li, it));
+            // The same × toggles the prompt — it stays put (sits above the overlay).
+            del.addEventListener("click", () => {
+                if (li.classList.contains("confirming")) closeConfirm(li);
+                else openConfirm(li, it);
+            });
 
             li.append(kind, url, when, copy, del);
             listEl.append(li);
@@ -316,24 +341,21 @@
             const server = document.createElement("button");
             server.type = "button";
             server.className = "history-confirm-server";
-            server.textContent = "Delete from server";
+            server.textContent = "Break Link";
+            server.title = "Deletes it from the server — the link stops working for everyone.";
             server.addEventListener("click", () => deleteFromServer(it, li));
             actions.append(server);
         }
         const forget = document.createElement("button");
         forget.type = "button";
         forget.className = "history-confirm-forget";
-        forget.textContent = "Forget on device";
+        forget.textContent = "Forget On Device";
+        forget.title = "Removes it from this device only — the link keeps working.";
         forget.addEventListener("click", () => forgetLink(it));
         actions.append(forget);
-        const cancel = document.createElement("button");
-        cancel.type = "button";
-        cancel.className = "history-confirm-cancel";
-        cancel.setAttribute("aria-label", "Cancel");
-        cancel.textContent = "×"; // ×
-        cancel.addEventListener("click", () => closeConfirm(li));
 
-        overlay.append(label, actions, cancel);
+        // No cancel button — the row's × toggles the prompt shut, so it never moves.
+        overlay.append(label, actions);
         li.append(overlay);
     };
 
@@ -435,7 +457,7 @@
                 radio.name = "limit";
                 radio.value = "billion";
                 const label = document.createElement("label");
-                label.className = "seg-label";
+                label.className = "seg-label seg-billion"; // standout colour for the playful preset
                 label.htmlFor = "limit-billion";
                 label.textContent = "A billion";
                 specify.before(radio, label);
@@ -462,7 +484,9 @@
         // taken as "I want a huge number", so the "A billion" preset appears and is
         // selected rather than letting an unwieldy count through.
         limitCustomValue.addEventListener("input", () => {
-            const cleaned = limitCustomValue.value.replace(/\D+/g, "").slice(0, 9);
+            // Digits only, no leading zeros (so "0000000000" is 0, not a billion), then
+            // capped at 9. Reaching 9 real digits offers the "A billion" preset.
+            const cleaned = limitCustomValue.value.replace(/\D+/g, "").replace(/^0+(?=\d)/, "").slice(0, 9);
             if (cleaned !== limitCustomValue.value) limitCustomValue.value = cleaned;
             if (cleaned.length === 9) selectBillion();
         });
@@ -486,7 +510,7 @@
         });
 
         const showReady = (url, kind, expiresIso, uses, defaultedOnce) => {
-            linkEl.textContent = url;
+            renderUrlInto(linkEl, url);
             buildMeta(metaEl, kind, expiresIso, uses);
             const note = document.getElementById("result-note");
             if (note) {
@@ -663,6 +687,7 @@
             if (resultLink) {
                 const entry = recordResultPage(resultLink);
                 if (entry) {
+                    renderUrlInto(resultLink, entry.url); // re-style after reading its text
                     const metaEl = document.getElementById("link-expiry");
                     if (metaEl) buildMeta(metaEl, entry.kind, entry.expires, entry.uses);
                     setupResultCopy(resultLink);
