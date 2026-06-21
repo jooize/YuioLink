@@ -101,14 +101,12 @@
     // --- expiry countdown (live; shared by the result and the history list) ---
     const usesSuffix = (uses) => {
         if (uses === 1) return " · one-time";
-        if (uses === 1000000000) return " · a billion uses";
         if (uses) return ` · max ${uses.toLocaleString()} uses`;
         return "";
     };
     // Compact form for the tight history rows.
     const usesSuffixShort = (uses) => {
         if (uses === 1) return " · once";
-        if (uses === 1000000000) return " · 1B";
         if (uses) return ` · ${uses}×`;
         return "";
     };
@@ -501,6 +499,8 @@
             if (!formError) return;
             formError.textContent = msg;
             formError.hidden = false;
+            // Bring it on screen in case the user had scrolled to the expiry/limit pickers.
+            formError.scrollIntoView({ behavior: "smooth", block: "nearest" });
         };
         const clearFormError = () => { if (formError) formError.hidden = true; };
 
@@ -526,7 +526,6 @@
         const maxUses = () => {
             const v = checkedValue("limit", "unlimited");
             if (v === "1") return 1;
-            if (v === "billion") return 1000000000;
             if (v === "custom") {
                 const n = Number.parseInt(limitCustomValue.value, 10);
                 return !Number.isNaN(n) && n > 0 ? n : null;
@@ -571,28 +570,6 @@
             if (currentResultUrl) panel.classList.toggle("stale", content.value !== resultSourceValue);
         });
 
-        // Inject the "A billion" segment (once) between Once and Specify, then pick it.
-        const selectBillion = () => {
-            let radio = document.getElementById("limit-billion");
-            if (!radio) {
-                const specify = document.getElementById("limit-custom");
-                radio = document.createElement("input");
-                radio.className = "seg-radio";
-                radio.id = "limit-billion";
-                radio.type = "radio";
-                radio.name = "limit";
-                radio.value = "billion";
-                const label = document.createElement("label");
-                label.className = "seg-label seg-billion"; // standout colour for the playful preset
-                label.htmlFor = "limit-billion";
-                label.textContent = "A billion";
-                specify.before(radio, label);
-                radio.addEventListener("change", syncCustomEnabled);
-            }
-            radio.checked = true;
-            syncCustomEnabled();
-        };
-
         // Switching segments toggles which Specify box native validation sees, and
         // picking "Specify" focuses its field.
         for (const r of document.querySelectorAll('input[name="ttl_seconds"]'))
@@ -606,15 +583,10 @@
                 if (document.getElementById("limit-custom")?.checked) limitCustomValue.focus();
             });
 
-        // Keep Uses to a whole number — digits only, capped at 9. Reaching that cap is
-        // taken as "I want a huge number", so the "A billion" preset appears and is
-        // selected rather than letting an unwieldy count through.
+        // Keep the view limit to a whole number: digits only, no leading zeros.
         limitCustomValue.addEventListener("input", () => {
-            // Digits only, no leading zeros (so "0000000000" is 0, not a billion), then
-            // capped at 9. Reaching 9 real digits offers the "A billion" preset.
-            const cleaned = limitCustomValue.value.replace(/\D+/g, "").replace(/^0+(?=\d)/, "").slice(0, 9);
+            const cleaned = limitCustomValue.value.replace(/\D+/g, "").replace(/^0+(?=\d)/, "");
             if (cleaned !== limitCustomValue.value) limitCustomValue.value = cleaned;
-            if (cleaned.length === 9) selectBillion();
         });
 
         // Redirect: Enter submits (Shift-Enter inserts a newline). Text: Enter = newline,

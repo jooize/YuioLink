@@ -64,17 +64,17 @@ async fn create_link(
     use CreateError::BadRequest;
 
     if encrypted && !state.encryption_enabled {
-        return Err(BadRequest("encryption is disabled on this server".into()));
+        return Err(BadRequest("Encryption is turned off on this server.".into()));
     }
     if raw_content.trim().is_empty() {
-        return Err(BadRequest("content is required".into()));
+        return Err(BadRequest("Enter a link to redirect, or some text to share.".into()));
     }
 
     let kind = match kind_choice {
         None | Some("") | Some("auto") => detect_kind(raw_content),
         Some("redirect") => Kind::Redirect,
         Some("text") => Kind::Text,
-        Some(_) => return Err(BadRequest("kind must be 'redirect', 'text', or 'auto'".into())),
+        Some(_) => return Err(BadRequest("That is not a link type we recognize.".into())),
     };
 
     // Redirects are trimmed + normalized + scheme-checked (unless they are opaque
@@ -93,13 +93,13 @@ async fn create_link(
     };
 
     if content.len() > MAX_CONTENT_BYTES {
-        return Err(BadRequest("content too large".into()));
+        return Err(BadRequest("That is too large to share (the limit is 64 KB).".into()));
     }
     check_ttl(ttl_seconds, state.max_ttl_secs).map_err(BadRequest)?;
     if let Some(n) = max_uses
         && n <= 0
     {
-        return Err(BadRequest("max_uses must be a positive integer".into()));
+        return Err(BadRequest("Enter a view limit of one or more.".into()));
     }
 
     db::insert_link(
@@ -152,7 +152,7 @@ pub async fn form_create(State(state): State<AppState>, Form(form): Form<FormCre
         Some("custom") => match form.limit_custom.as_deref().map(str::trim) {
             Some(s) if !s.is_empty() => match s.parse::<i64>() {
                 Ok(n) => Some(n),
-                Err(_) => return form_error("limit must be a whole number"),
+                Err(_) => return form_error("Enter the view limit as a whole number."),
             },
             _ => Some(1),
         },
@@ -189,9 +189,9 @@ fn parse_custom_ttl(value: Option<&str>, unit: Option<&str>) -> Result<i64, &'st
     let n: i64 = value
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .ok_or("enter a custom expiry")?
+        .ok_or("Enter a custom expiry.")?
         .parse()
-        .map_err(|_| "expiry must be a whole number")?;
+        .map_err(|_| "Enter the expiry as a whole number.")?;
     let mult = match unit {
         Some("h") => 3600,
         Some("d") => 86400,
@@ -297,7 +297,7 @@ pub async fn create_plain(
         Some(s) => match parse_duration(s) {
             Some(secs) => secs,
             None => {
-                return (StatusCode::BAD_REQUEST, "invalid ttl (try 10m, 2h, 3d)\n").into_response();
+                return (StatusCode::BAD_REQUEST, "That expiry is not valid. Try a value like 10m, 2h, or 3d.\n").into_response();
             }
         },
         None => DEFAULT_TTL_SECS,
@@ -307,7 +307,7 @@ pub async fn create_plain(
         Some(s) => match s.trim().parse::<i64>() {
             Ok(n) => Some(n),
             Err(_) => {
-                return (StatusCode::BAD_REQUEST, "uses must be a positive integer\n")
+                return (StatusCode::BAD_REQUEST, "The view limit must be a whole number above zero.\n")
                     .into_response();
             }
         },
@@ -407,12 +407,12 @@ fn parse_duration(s: &str) -> Option<i64> {
         .map(|n| n * mult)
 }
 
-/// Reject a TTL outside `[MIN_TTL_SECS, max_ttl]`.
+/// Reject a TTL outside `[MIN_TTL_SECS, max_ttl]`, phrased for humans in days/hours.
 fn check_ttl(ttl_seconds: i64, max_ttl: i64) -> Result<(), String> {
     if ttl_seconds < MIN_TTL_SECS {
-        Err(format!("ttl must be at least {MIN_TTL_SECS} seconds"))
+        Err(format!("Links must last at least {}.", views::humanize_duration(MIN_TTL_SECS)))
     } else if ttl_seconds > max_ttl {
-        Err(format!("ttl must be at most {max_ttl} seconds"))
+        Err(format!("Links can last at most {}.", views::humanize_duration(max_ttl)))
     } else {
         Ok(())
     }
@@ -540,7 +540,7 @@ pub async fn api_create_link(
     Json(req): Json<CreateRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     if req.content.len() > MAX_CONTENT_BYTES {
-        return Err(ApiError::BadRequest("content too large".into()));
+        return Err(ApiError::BadRequest("That is too large to share (the limit is 64 KB).".into()));
     }
 
     let ttl_seconds = req.ttl_seconds.unwrap_or(DEFAULT_TTL_SECS);

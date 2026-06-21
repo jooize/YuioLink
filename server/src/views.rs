@@ -73,8 +73,9 @@ fn result_output(url: Option<&str>, meta: Markup) -> Markup {
 /// result page comes back); `app.js` progressively enhances it with live type
 /// detection, keyboard shortcuts, an in-place result, and copy. Encryption is
 /// only offered when the operator enabled it (`encryption_enabled`).
-/// Humanize a TTL ceiling for display, e.g. 604800 -> "7 days".
-fn humanize_duration(secs: i64) -> String {
+/// Humanize a TTL ceiling for display, e.g. 604800 -> "7 days". Also used by
+/// `web::check_ttl` to phrase the out-of-range error in days/hours, not seconds.
+pub fn humanize_duration(secs: i64) -> String {
     let (n, unit) = if secs % 86400 == 0 {
         (secs / 86400, "day")
     } else if secs % 3600 == 0 {
@@ -163,7 +164,7 @@ pub fn index_page(encryption_enabled: bool, api_base: &str, max_ttl_secs: i64) -
             }
 
             fieldset.picker {
-                legend { "Limit" }
+                legend { "Limit views to" }
                 div.segmented {
                     input.seg-radio #limit-unlimited type="radio" name="limit" value="unlimited" checked;
                     label.seg-label for="limit-unlimited" {
@@ -175,10 +176,9 @@ pub fn index_page(encryption_enabled: bool, api_base: &str, max_ttl_secs: i64) -
                     label.seg-label for="limit-custom" { "Specify" }
                 }
                 div.custom-field #limit-custom-field {
-                    // Blank defaults to Once (app.js); native min/step validate a typed
-                    // value, and app.js offers "A billion" once 9 digits are reached.
+                    // Blank defaults to Once (app.js); native min/step validate a typed value.
                     input #limit-custom-value.custom-num name="limit_custom" type="number"
-                        min="1" step="1" inputmode="numeric" placeholder="Uses";
+                        min="1" step="1" inputmode="numeric" placeholder="Times";
                 }
             }
 

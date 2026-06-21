@@ -282,13 +282,6 @@ textarea.form-control {
     line-height: 1;
 }
 
-/* The injected "A billion" chip (app.js) stands out in the accent colour,
-   marking it as the special preset. */
-.seg-label.seg-billion {
-    color: var(--accent);
-    font-weight: 600;
-}
-
 /* "Custom" reveal: hidden until its segment is picked. CSS `:has()` drives the
    no-JS path; app.js also focuses the field when Custom is chosen. */
 .custom-field {
@@ -323,9 +316,9 @@ textarea.form-control {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
-/* Specify-expiry unit chips: keep the number field compact, chips take the rest. */
+/* Specify-expiry unit chips: keep the number field fairly compact, chips take the rest. */
 #ttl-custom-value {
-    flex: 0 0 5em;
+    flex: 0 0 6.5em;
 }
 
 .unit-segmented {
@@ -333,13 +326,14 @@ textarea.form-control {
     min-width: 13em;
 }
 
-/* The Specify-limit number stays compact and sits under the Specify chip. */
+/* The Specify-limit number sits under the Specify chip; a bit wider since it now takes
+   any amount (the "A billion" preset is gone). */
 #limit-custom-field {
     justify-content: flex-end;
 }
 
 #limit-custom-value {
-    flex: 0 0 33.333%;
+    flex: 0 0 50%;
 }
 
 /* "Up to N days" hint under the Specify-expiry field. */
