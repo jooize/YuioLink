@@ -755,8 +755,8 @@ textarea.form-control {
     text-decoration: none;
 }
 
-/* HIG-style switch: a "Local History" label and a toggle that shows state by colour +
-   knob position (green/right = on), not by words. */
+/* HIG-style switch on the old purple (mockup C): a "Local History" label and a toggle
+   that shows state by colour + knob position (green/right = on), not by words. */
 .storage-toggle {
     display: flex;
     align-items: center;
@@ -766,25 +766,25 @@ textarea.form-control {
     font-weight: 500;
     padding: 6px 12px;
     border: none;
-    color: var(--text);
-    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: #fff;
+    background: #8b5cf6;
     cursor: pointer;
     white-space: nowrap;
-    transition: background 0.15s ease;
+    transition: filter 0.15s ease;
 }
 
 .storage-toggle:hover {
-    background: color-mix(in srgb, var(--text) 13%, transparent);
+    filter: brightness(1.07);
 }
 
-/* The switch track + sliding knob. */
+/* The switch track + sliding knob — white-translucent on the purple, green when on. */
 .storage-switch {
     position: relative;
     flex: none;
     width: 30px;
     height: 18px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--text) 22%, transparent);
+    background: rgba(255, 255, 255, 0.3);
     transition: background 0.2s ease;
 }
 
