@@ -601,8 +601,10 @@ textarea.form-control {
     font-weight: 400;
 }
 
-/* The preview page uses a plainer inline code (no box). */
-.result > code:not(.result-url) {
+/* The preview page uses a plainer inline code (no box). Must exclude the result
+   hero word — this selector (0,2,1) otherwise outweighs `.result-word` (0,1,0) and
+   would shrink the hero to 13px in `var(--text)` instead of the 30px accent. */
+.result > code:not(.result-url):not(.result-word) {
     display: block;
     font-family: var(--font-mono);
     font-size: 13px;
