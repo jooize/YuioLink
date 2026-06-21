@@ -317,18 +317,30 @@
         section.hidden = false;
         for (const it of shown) {
             if (it.tombstone) {
-                // A marker where a removed entry was; no link details remain.
+                // A marker where a removed entry was. A just-forgotten live link keeps its
+                // name + token for a short grace window so it can still be Deleted from the
+                // server (an out for a mis-click); after that the purge strips them.
                 const li = document.createElement("li");
                 li.className = "history-item history-tomb";
                 const msg = document.createElement("span");
                 msg.className = "history-tomb-msg";
-                msg.textContent = it.tombstone === "broken" ? "Link broken" : "Removed from this device";
+                msg.textContent = tombMessage(it);
+                li.append(msg);
+                if (it.tombstone === "forgotten" && it.name && it.token) {
+                    const del = document.createElement("button");
+                    del.className = "history-tomb-delete";
+                    del.type = "button";
+                    del.textContent = "Delete";
+                    del.title = "Also delete it from the server — the link stops working for everyone.";
+                    del.addEventListener("click", () => deleteForgotten(it, li));
+                    li.append(del);
+                }
                 const clear = document.createElement("button");
                 clear.className = "history-tomb-clear";
                 clear.type = "button";
                 clear.textContent = "Clear";
                 clear.addEventListener("click", () => clearTombstone(it));
-                li.append(msg, clear);
+                li.append(clear);
                 listEl.append(li);
                 continue;
             }
@@ -395,9 +407,19 @@
         li.classList.remove("confirming");
         li.querySelector(".history-confirm")?.remove();
     };
-    // Replace the entry in place with a tombstone, fully purging its url / name /
-    // token from memory and storage. The tombstone holds no link details and can
-    // itself be cleared.
+    // The message under a tombstone, by kind — it also tells the user where the link now
+    // stands on the server.
+    const tombMessage = (it) => {
+        switch (it.tombstone) {
+            case "deleted": return "Removed from this device and the server";
+            case "gone": return "Removed — the link had already expired";
+            case "forgotten": return "Removed from this device — still on the server";
+            default: return "Removed from this device";
+        }
+    };
+    // Replace the entry in place with a tombstone, fully purging its url / name / token
+    // from memory and storage. The tombstone holds no link details and can itself be
+    // cleared.
     const tombstone = (it, kind) => {
         const i = memHistory.indexOf(it);
         if (i === -1) return;
@@ -410,7 +432,40 @@
         persistNow();
         renderHistory();
     };
-    const forgetLink = (it) => tombstone(it, "forgotten");
+    // Forgetting removes the entry from this device at once. If the link is still live we
+    // keep its name + token for FORGET_GRACE_MS so a mis-click can still Delete it from the
+    // server, then purge them; an already-expired link has nothing on the server to keep.
+    const FORGET_GRACE_MS = 15000;
+    const forgetLink = (it) => {
+        const i = memHistory.indexOf(it);
+        if (i === -1) return;
+        if (isExpired(it)) {
+            memHistory[i] = { tombstone: "gone" };
+        } else if (it.token && it.name) {
+            memHistory[i] = { tombstone: "forgotten", name: it.name, token: it.token, until: Date.now() + FORGET_GRACE_MS };
+            scheduleForgetPurge();
+        } else {
+            memHistory[i] = { tombstone: "forgotten" };
+        }
+        persistNow();
+        renderHistory();
+    };
+    // Strip the retained name/token from forgotten tombstones past their grace window, then
+    // re-arm for the next one due (also covers graces restored from localStorage).
+    let forgetPurgeTimer = null;
+    const scheduleForgetPurge = () => {
+        if (forgetPurgeTimer) { clearTimeout(forgetPurgeTimer); forgetPurgeTimer = null; }
+        const now = Date.now();
+        let changed = false;
+        let next = Infinity;
+        for (const it of memHistory) {
+            if (!it.until) continue;
+            if (it.until <= now) { delete it.name; delete it.token; delete it.until; changed = true; }
+            else next = Math.min(next, it.until);
+        }
+        if (changed) { persistNow(); renderHistory(); }
+        if (next !== Infinity) forgetPurgeTimer = setTimeout(scheduleForgetPurge, Math.max(50, next - now));
+    };
 
     // While the server is contacted, swap the overlay to a spinner; on failure offer
     // a retry (the entry is left intact so the token survives for another try).
@@ -440,20 +495,33 @@
         actions.append(retry);
         overlay.replaceChildren(label, actions);
     };
+    // Best-effort DELETE on the server; true if the link is gone (204) or already gone
+    // (404, expired/reaped). Shared by the confirm-menu Delete and the tombstone out.
+    const serverDelete = async (name, token) => {
+        try {
+            const resp = await fetch(`${API_BASE}/api/v1/links/${encodeURIComponent(name)}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            return resp.ok || resp.status === 404;
+        } catch {
+            return false;
+        }
+    };
     const deleteFromServer = async (it, li) => {
         if (!it.token || !it.name) { tombstone(it, "broken"); return; }
         showConfirmBusy(li, "Deleting link…");
-        try {
-            const resp = await fetch(`${API_BASE}/api/v1/links/${encodeURIComponent(it.name)}`, {
-                method: "DELETE",
-                headers: { Authorization: `Bearer ${it.token}` },
-            });
-            // 204 = deleted; 404 = already gone (expired/reaped) — either way it is gone.
-            if (resp.ok || resp.status === 404) { tombstone(it, "broken"); return; }
-            throw new Error("delete failed");
-        } catch {
-            showConfirmError(li, it);
-        }
+        if (await serverDelete(it.name, it.token)) tombstone(it, "deleted");
+        else showConfirmError(li, it);
+    };
+    // The grace-window out: delete a just-forgotten (still-live) link from the server.
+    const deleteForgotten = async (it, li) => {
+        if (!it.token || !it.name) return;
+        const msgEl = li.querySelector(".history-tomb-msg");
+        if (msgEl) msgEl.textContent = "Deleting from the server…";
+        li.querySelector(".history-tomb-delete")?.remove();
+        if (await serverDelete(it.name, it.token)) tombstone(it, "deleted");
+        else renderHistory(); // restore the row; Delete reappears if still within grace
     };
     const openConfirm = (li, it) => {
         for (const el of document.querySelectorAll(".history-item.confirming")) closeConfirm(el);
@@ -831,6 +899,7 @@
                 }
             }
         }
+        scheduleForgetPurge(); // clear/arm any grace windows restored from localStorage
         scheduleTick();
     });
 })();
