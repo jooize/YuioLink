@@ -851,8 +851,10 @@ textarea.form-control {
     border-bottom: 0;
 }
 
-/* Expired links stay in the list (dimmed) until cleared via "Clear Expired". */
-.history-item.expired {
+/* Expired links stay in the list until cleared via "Clear Expired". Only the dead
+   link's text fades — the × and its remove menu stay fully lit so it is easy to clear
+   (dimming the whole row would dim the confirm overlay drawn over it too). */
+.history-item.expired .history-text {
     opacity: 0.5;
 }
 
@@ -1067,6 +1069,15 @@ textarea.form-control {
     color: var(--danger);
     background: color-mix(in srgb, var(--danger) 13%, transparent);
     border-color: color-mix(in srgb, var(--danger) 24%, transparent);
+}
+
+/* An expired link is already erased server-side, so there is nothing to delete: the
+   button goes inert and neutral (no red alarm), leaving only Forget. */
+.history-confirm-server:disabled {
+    color: var(--text-tertiary);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    border-color: var(--separator);
+    cursor: not-allowed;
 }
 
 .history-confirm-forget {

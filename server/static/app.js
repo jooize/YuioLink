@@ -113,8 +113,9 @@
     // SQLite "YYYY-MM-DD HH:MM:SS" is UTC; make it explicit so Date parses correctly.
     const parseUtc = (s) => (s ? new Date(`${s.replace(" ", "T")}Z`) : null);
 
-    // Remaining time as { text, level }. floor minutes (so "1 min" holds for the whole
-    // last minute, then seconds tick to "1s" — never a jump to 0), and the hour band
+    // Remaining time as { text, compact, level }: whole minutes from 2 min up, then the
+    // 1:59 -> 1:00 stretch reads "1 minute 59 seconds" (compact "1m59s") rather than a
+    // big "90 seconds", and under a minute it counts down bare seconds. The hour band
     // starts at 59 min so a 1-hour link reads "1 hour" for its first minute, then
     // "58 min". Flags "soon" (≤5 min, yellow) then "now" (last minute, red).
     const formatCountdown = (expiresIso) => {
@@ -123,7 +124,9 @@
         const s = Math.round((d.getTime() - Date.now()) / 1000);
         if (s <= 0) return { text: "expired", compact: "expired", level: "now" };
         let unit, short;
-        if (s < 180) { unit = `${s} second${s === 1 ? "" : "s"}`; short = `${s}s`; } // last 3 minutes: seconds
+        if (s < 60) { unit = `${s} second${s === 1 ? "" : "s"}`; short = `${s}s`; } // under a minute: bare seconds
+        // 1:59 -> 1:00 reads "1 minute 59 seconds" so the tail never shows "90 seconds".
+        else if (s < 120) { const sec = s - 60; unit = sec ? `1 minute ${sec} second${sec === 1 ? "" : "s"}` : "1 minute"; short = sec ? `1m${sec}s` : "1m"; }
         else if (s < 3540) { const m = Math.floor(s / 60); unit = `${m} minute${m === 1 ? "" : "s"}`; short = `${m}m`; }
         else if (s < 82800) { const h = Math.round(s / 3600); unit = `${h} hour${h === 1 ? "" : "s"}`; short = `${h}h`; }
         else { const days = Math.round(s / 86400); unit = `${days} day${days === 1 ? "" : "s"}`; short = `${days}d`; }
@@ -178,7 +181,7 @@
             const s = Math.round((d.getTime() - Date.now()) / 1000);
             let dd;
             if (s <= 0) dd = 60000;
-            else if (s < 180) dd = 1000;
+            else if (s < 120) dd = 1000; // tick every second once seconds are shown
             else if (s < 3540) dd = (s % 60 + 1) * 1000;
             else if (s < 82800) dd = (s % 3600 + 1) * 1000;
             else dd = (s % 86400 + 1) * 1000;
@@ -467,8 +470,15 @@
             server.type = "button";
             server.className = "history-confirm-server";
             server.textContent = "Delete Link";
-            server.title = "Deletes it from the server — the link stops working for everyone.";
-            server.addEventListener("click", () => deleteFromServer(it, li));
+            if (isExpired(it)) {
+                // An expired link is already erased from the server — nothing to delete,
+                // so only forgetting the local record remains.
+                server.disabled = true;
+                server.title = "Already gone — an expired link is erased from the server.";
+            } else {
+                server.title = "Deletes it from the server — the link stops working for everyone.";
+                server.addEventListener("click", () => deleteFromServer(it, li));
+            }
             actions.append(server);
         }
 
