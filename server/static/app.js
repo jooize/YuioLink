@@ -38,11 +38,11 @@
         return hasScheme(t) || looksLikeDomain(t) ? "redirect" : "text";
     };
     const kindLabel = (k) => (k === "redirect" ? "Redirect" : "Text");
-    // The kind word in a fixed-width box so the "· expires in …" that follows lines
-    // up across history rows regardless of "Text" vs the wider "Redirect".
-    const kindLabelEl = (k) => {
+    // The colour-coded kind pill (Redirect blue, Text post-it yellow), shared by the
+    // history rows and the result meta.
+    const kindPill = (k) => {
         const el = document.createElement("span");
-        el.className = "kind-label";
+        el.className = `kind-pill ${k === "redirect" ? "redirect" : "text"}`;
         el.textContent = kindLabel(k);
         return el;
     };
@@ -129,10 +129,10 @@
         span.classList.toggle("expiring-soon", level === "soon");
         span.classList.toggle("expiring-now", level === "now");
     };
-    // Build "<kind> · expires in <live countdown><uses>" into `metaEl` (no innerHTML).
+    // Build "<kind pill> expires in <live countdown><uses>" into `metaEl` (no innerHTML).
     const buildMeta = (metaEl, kind, expiresIso, uses) => {
         metaEl.replaceChildren();
-        metaEl.append(kindLabelEl(kind), " · ");
+        metaEl.append(kindPill(kind), " ");
         const span = document.createElement("span");
         span.className = "countdown";
         span.dataset.expires = expiresIso ?? "";
@@ -274,25 +274,27 @@
             li.className = "history-item";
             if (isExpired(it)) li.classList.add("expired");
 
-            // Colour-coded kind pill (fixed width) so the URLs line up across rows.
-            const kind = document.createElement("span");
-            kind.className = `history-kind ${it.kind === "redirect" ? "redirect" : "text"}`;
-            kind.textContent = kindLabel(it.kind);
+            // Two-line entry (mockup A): line 1 the tri-colour URL, line 2 the kind
+            // pill + expiry. Copy and × stay vertically centred beside the text block.
+            const txt = document.createElement("div");
+            txt.className = "history-text";
 
             const url = document.createElement("code");
             url.className = "history-url";
-            url.textContent = it.url;
+            renderUrlInto(url, it.url);
 
-            const when = document.createElement("small");
-            when.className = "history-when";
+            const meta = document.createElement("small");
+            meta.className = "history-meta";
+            meta.append(kindPill(it.kind), " ");
             const span = document.createElement("span");
             span.className = "countdown";
             span.dataset.expires = it.expires ?? "";
-            span.dataset.compact = "1";
             updateCountdown(span);
-            when.append(span);
+            meta.append(span);
             const suffix = usesSuffixShort(it.uses);
-            if (suffix) when.append(suffix);
+            if (suffix) meta.append(suffix);
+
+            txt.append(url, meta);
 
             const copy = document.createElement("button");
             copy.className = "history-copy";
@@ -311,7 +313,7 @@
                 else openConfirm(li, it);
             });
 
-            li.append(kind, url, when, copy, del);
+            li.append(txt, copy, del);
             listEl.append(li);
         }
         const clearExpired = document.getElementById("history-clear-expired");
