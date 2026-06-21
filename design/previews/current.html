@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>YuioLink — current-state preview</title>
+<!--
+  A populated, resting-state preview of the live app, built from the post-JS DOM.
+  It links the REAL stylesheet (../../server/static/app.css) so it always reflects
+  the current design. Open it directly in a browser (file://). To preview a copy
+  confirmation, add class "copied" to the .result-url / .result-word, or "show" to a
+  .history-check. Not served by the app -- a design reference only.
+-->
+<link rel="stylesheet" href="../../server/static/app.css">
+</head>
+<body>
+<main class="app-window">
+    <header><h1>YuioLink</h1></header>
+    <p>Wieldy Ephemeral Link</p>
+
+    <!-- RESULT (R4): hero word, quiet full URL, coloured kind word + green time. -->
+    <output class="result" id="link-panel" tabindex="-1">
+        <code class="result-word" id="link-word">arson</code>
+        <code class="result-url" id="link-element"><span class="u-scheme">https://</span><span class="u-host">yuio.link</span><span class="u-sep">/</span><span class="u-name">arson</span></code>
+        <div class="result-foot">
+            <small class="result-meta"><span class="kind-word redirect">Redirect</span> &middot; <span class="countdown">1 hour left</span></small>
+            <div class="result-actions"><button class="result-copy" type="button">Copy</button></div>
+        </div>
+    </output>
+
+    <!-- CREATE INPUT: thin vibrant purple border. -->
+    <form>
+        <textarea class="form-control" rows="1" placeholder="Paste a link to redirect, or type text to share"></textarea>
+        <div class="split-btn">
+            <button class="btn split-primary" type="button">Create Redirect Link</button>
+            <button class="btn split-clear" type="button">Clear</button>
+        </div>
+    </form>
+
+    <!-- HISTORY (A grouped inset): tri-colour URL, coloured kind word + green time. -->
+    <section class="history" id="history">
+        <div class="history-head">
+            <button class="history-toggle" type="button"><span class="history-chevron" aria-hidden="true">&rsaquo;</span><span class="history-title">Local History</span></button>
+            <button class="history-clear" type="button">Clear</button>
+        </div>
+        <div class="history-body">
+            <ul class="history-list">
+                <li class="history-item">
+                    <div class="history-text">
+                        <div class="history-l1"><code class="history-url"><span class="u-scheme">https://</span><span class="u-host">yuio.link</span><span class="u-sep">/</span><span class="u-name">arson</span></code><span class="history-check" aria-hidden="true"></span></div>
+                        <small class="history-meta"><span class="kind-word redirect">Redirect</span> &middot; <span class="countdown">1 hour left</span></small>
+                    </div>
+                    <button class="history-copy" type="button">Copy</button>
+                    <button class="history-delete" type="button" aria-label="Remove">&times;</button>
+                </li>
+                <li class="history-item">
+                    <div class="history-text">
+                        <div class="history-l1"><code class="history-url"><span class="u-scheme">https://</span><span class="u-host">yuio.link</span><span class="u-sep">/</span><span class="u-name">BrAvEqUiT</span></code><span class="history-check" aria-hidden="true"></span></div>
+                        <small class="history-meta"><span class="kind-word text">Text</span> &middot; <span class="countdown">3 hours left</span> &middot; once</small>
+                    </div>
+                    <button class="history-copy" type="button">Copy</button>
+                    <button class="history-delete" type="button" aria-label="Remove">&times;</button>
+                </li>
+                <li class="history-item expired">
+                    <div class="history-text">
+                        <div class="history-l1"><code class="history-url"><span class="u-scheme">https://</span><span class="u-host">yuio.link</span><span class="u-sep">/</span><span class="u-name">ZeStYfRog</span></code><span class="history-check" aria-hidden="true"></span></div>
+                        <small class="history-meta"><span class="kind-word redirect">Redirect</span> &middot; <span class="countdown expiring-now">expired</span></small>
+                    </div>
+                    <button class="history-copy" type="button">Copy</button>
+                    <button class="history-delete" type="button" aria-label="Remove">&times;</button>
+                </li>
+            </ul>
+        </div>
+    </section>
+</main>
+</body>
+</html>
