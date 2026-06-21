@@ -124,10 +124,14 @@
     const formatCountdown = (expiresIso) => {
         const d = parseUtc(expiresIso);
         if (!d || Number.isNaN(d.getTime())) return { text: "", compact: "", level: "" };
-        const s = Math.floor((d.getTime() - Date.now()) / 1000);
-        if (s <= 0) return { text: "expired", compact: "expired", level: "now" };
+        const ms = d.getTime() - Date.now();
+        // "expired" keys off the real deadline (not the floored seconds) so the label never
+        // flips before the link is actually gone — the last partial second still reads
+        // "1 second", matching the greying/Delete-disable which also use the true deadline.
+        if (ms <= 0) return { text: "expired", compact: "expired", level: "now" };
+        const s = Math.floor(ms / 1000);
         let unit, short;
-        if (s < 60) { unit = `${s} second${s === 1 ? "" : "s"}`; short = `${s}s`; } // under a minute: bare seconds
+        if (s < 60) { const sec = s || 1; unit = `${sec} second${sec === 1 ? "" : "s"}`; short = `${sec}s`; } // under a minute: bare seconds (floor can hit 0 in the last partial second; show 1)
         // 1:59 -> 1:00 reads "1 minute 59 seconds" so the tail never shows "90 seconds".
         else if (s < 120) { const sec = s - 60; unit = sec ? `1 minute ${sec} second${sec === 1 ? "" : "s"}` : "1 minute"; short = sec ? `1m${sec}s` : "1m"; }
         else if (s < 3540) { const m = Math.ceil(s / 60); unit = `${m} minute${m === 1 ? "" : "s"}`; short = `${m}m`; }
@@ -181,16 +185,20 @@
         for (const span of document.querySelectorAll(".countdown")) {
             const d = parseUtc(span.dataset.expires);
             if (!d || Number.isNaN(d.getTime())) continue;
-            const s = Math.floor((d.getTime() - Date.now()) / 1000);
+            const ms = d.getTime() - Date.now();
+            const s = Math.floor(ms / 1000);
             let dd;
-            if (s <= 0) dd = 60000;
-            else if (s < 120) dd = 1000; // tick every second once seconds are shown
+            if (ms <= 0) dd = 60000;       // already expired: idle
+            else if (ms < 1000) dd = ms;   // final partial second: wake right at the deadline so "expired" lands on time
+            else if (s < 120) dd = 1000;   // tick every second once seconds are shown
             else if (s < 3540) dd = (s % 60 + 1) * 1000;
             else if (s < 82800) dd = (s % 3600 + 1) * 1000;
             else dd = (s % 86400 + 1) * 1000;
             if (dd < delay) delay = dd;
         }
-        tickTimer = setTimeout(scheduleTick, Math.max(1000, Math.min(delay, 60000)));
+        // Floor 50ms (not 1000) so the sub-second final tick above is honoured; only the
+        // last partial second ever asks for under a second, so this is not a busy-wait.
+        tickTimer = setTimeout(scheduleTick, Math.max(50, Math.min(delay, 60000)));
     };
 
     // Reveal and wire the result's Copy button (the link already exists, so this copy
