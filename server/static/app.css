@@ -143,7 +143,7 @@ main > header {
 
 header h1 {
     margin: 0;
-    font-size: clamp(25px, 6vw, 29px);
+    font-size: clamp(28px, 8vw, 38px);
     font-weight: 600;
     letter-spacing: -0.022em;
 }
@@ -1118,6 +1118,8 @@ textarea.form-control {
     background: none;
     border: 0;
     padding: 0;
+    /* Nudge it in from the window edge so it does not sit flush against the corner. */
+    margin-right: 6px;
     cursor: pointer;
 }
 
