@@ -85,6 +85,15 @@ impl Drop for LinkKey {
     }
 }
 
+/// A random capability token (256-bit, base64url) — used as a per-link delete
+/// secret. It is returned once at creation and stored by the server so only its
+/// holder can delete the link; it is not a cryptographic key for the content.
+pub fn generate_token() -> String {
+    let mut bytes = [0u8; KEY_LEN];
+    OsRng.fill_bytes(&mut bytes);
+    B64.encode(bytes)
+}
+
 /// Encrypt `plaintext` under `key`, returning the sealed string.
 pub fn seal(key: &LinkKey, plaintext: &[u8]) -> Result<String, CryptoError> {
     let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key.0));

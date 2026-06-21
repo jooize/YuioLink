@@ -75,12 +75,12 @@ async fn main() -> anyhow::Result<()> {
 fn api_routes() -> Router<AppState> {
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_methods([Method::GET, Method::POST])
-        .allow_headers([header::CONTENT_TYPE]);
+        .allow_methods([Method::GET, Method::POST, Method::DELETE])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
 
     Router::new()
         .route("/links", post(web::api_create_link))
-        .route("/links/:name", get(web::api_get_link))
+        .route("/links/:name", get(web::api_get_link).delete(web::api_delete_link))
         .layer(cors)
 }
 

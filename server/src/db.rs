@@ -39,6 +39,9 @@ pub struct NewLink<'a> {
     pub encrypted: bool,
     pub ttl_seconds: i64,
     pub max_uses: Option<i64>,
+    /// Secret that authorizes deleting this link later; `None` means the link
+    /// cannot be deleted via the API (no holder).
+    pub delete_token: Option<&'a str>,
 }
 
 /// The result of creating a link: its generated name and computed expiry.
@@ -107,8 +110,8 @@ pub async fn insert_link(pool: &SqlitePool, link: NewLink<'_>) -> Result<Inserte
     loop {
         let name = generate_name(words);
         let result: Result<String, sqlx::Error> = sqlx::query_scalar(
-            "INSERT INTO links (name, kind, content, content_type, encrypted, expires_at, max_uses) \
-             VALUES (?, ?, ?, ?, ?, datetime('now', '+' || ? || ' seconds'), ?) \
+            "INSERT INTO links (name, kind, content, content_type, encrypted, expires_at, max_uses, delete_token) \
+             VALUES (?, ?, ?, ?, ?, datetime('now', '+' || ? || ' seconds'), ?, ?) \
              RETURNING expires_at",
         )
         .bind(&name)
@@ -118,6 +121,7 @@ pub async fn insert_link(pool: &SqlitePool, link: NewLink<'_>) -> Result<Inserte
         .bind(link.encrypted)
         .bind(link.ttl_seconds)
         .bind(link.max_uses)
+        .bind(link.delete_token)
         .fetch_one(pool)
         .await;
 
@@ -132,6 +136,20 @@ pub async fn insert_link(pool: &SqlitePool, link: NewLink<'_>) -> Result<Inserte
             Err(e) => return Err(e),
         }
     }
+}
+
+/// Delete a link by name, but only when `token` matches the secret stored at
+/// creation. Returns whether a row was removed. A NULL stored token never
+/// matches (`NULL = ?` is never true), so a tokenless link cannot be deleted —
+/// fail closed. `name` matches case-insensitively (the column is NOCASE); the
+/// token compares with the default binary collation (exact).
+pub async fn delete_link(pool: &SqlitePool, name: &str, token: &str) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query("DELETE FROM links WHERE name = ? AND delete_token = ?")
+        .bind(name)
+        .bind(token)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() > 0)
 }
 
 /// Delete every expired row, freeing those names for reuse. Returns the count.

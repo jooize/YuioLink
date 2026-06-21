@@ -59,6 +59,7 @@ async fn create_link(
     ttl_seconds: i64,
     max_uses: Option<i64>,
     encrypted: bool,
+    delete_token: Option<&str>,
 ) -> Result<db::InsertedLink, CreateError> {
     use CreateError::BadRequest;
 
@@ -110,6 +111,7 @@ async fn create_link(
             encrypted,
             ttl_seconds,
             max_uses,
+            delete_token,
         },
     )
     .await
@@ -158,7 +160,9 @@ pub async fn form_create(State(state): State<AppState>, Form(form): Form<FormCre
     };
 
     // No kind field: the server detects it (a URL is a redirect, else text).
-    match create_link(&state, None, &form.content, ttl_seconds, max_uses, false).await {
+    // No-JS form: no token issued (nowhere to keep it), so these links are not
+    // API-deletable — fail closed.
+    match create_link(&state, None, &form.content, ttl_seconds, max_uses, false, None).await {
         Ok(inserted) => {
             let url = format!("{}{}", state.base_url, inserted.name);
             let kind_label = match detect_kind(&form.content) {
@@ -311,7 +315,7 @@ pub async fn create_plain(
     };
 
     // Auto-detect kind (None); never encrypted.
-    let inserted = match create_link(&state, None, parsed.content, ttl_seconds, max_uses, false).await
+    let inserted = match create_link(&state, None, parsed.content, ttl_seconds, max_uses, false, None).await
     {
         Ok(inserted) => inserted,
         Err(CreateError::BadRequest(msg)) => {
@@ -334,6 +338,7 @@ pub async fn create_plain(
             name: inserted.name,
             url,
             expires_at: inserted.expires_at,
+            delete_token: None,
         })
         .into_response()
     } else {
@@ -469,6 +474,12 @@ pub struct CreateResponse {
     pub name: String,
     pub url: String,
     pub expires_at: String,
+    /// One-time secret that authorizes deleting this link (DELETE with
+    /// `Authorization: Bearer <token>`). Returned only here; never stored
+    /// anywhere the client doesn't put it. Absent when the link was made
+    /// without a token (the `/create` convenience path).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delete_token: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -533,6 +544,7 @@ pub async fn api_create_link(
     }
 
     let ttl_seconds = req.ttl_seconds.unwrap_or(DEFAULT_TTL_SECS);
+    let delete_token = yuiolink_core::generate_token();
     let inserted = create_link(
         &state,
         Some(req.kind.as_str()),
@@ -540,6 +552,7 @@ pub async fn api_create_link(
         ttl_seconds,
         req.max_uses,
         req.encrypted,
+        Some(&delete_token),
     )
     .await?;
 
@@ -552,8 +565,39 @@ pub async fn api_create_link(
             name: inserted.name,
             url,
             expires_at: inserted.expires_at,
+            delete_token: Some(delete_token),
         }),
     ))
+}
+
+/// Pull a bearer token out of the `Authorization` header, if present.
+fn bearer_token(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(header::AUTHORIZATION)?
+        .to_str()
+        .ok()?
+        .strip_prefix("Bearer ")
+}
+
+/// `DELETE /api/v1/links/:name` — delete a link, authorized by the per-link
+/// secret from creation sent as `Authorization: Bearer <token>`. Returns
+/// `204 No Content` on success. A missing/wrong token or unknown name both
+/// return `404` so the endpoint reveals nothing about which links exist.
+pub async fn api_delete_link(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+) -> Result<StatusCode, ApiError> {
+    let token = bearer_token(&headers).ok_or(ApiError::NotFound)?;
+    let deleted = db::delete_link(&state.pool, &name, token).await.map_err(|e| {
+        tracing::error!(error = %e, "failed to delete link");
+        ApiError::Internal
+    })?;
+    if deleted {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(ApiError::NotFound)
+    }
 }
 
 /// `GET /api/v1/links/:name` — read a link (the REST "expand"). Safe and
