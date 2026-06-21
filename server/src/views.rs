@@ -178,7 +178,7 @@ pub fn index_page(encryption_enabled: bool, api_base: &str, max_ttl_secs: i64) -
                 div.custom-field #limit-custom-field {
                     // Blank defaults to Once (app.js); native min/step validate a typed value.
                     input #limit-custom-value.custom-num name="limit_custom" type="number"
-                        min="1" step="1" inputmode="numeric" placeholder="Times";
+                        min="1" max="1000000000" step="1" inputmode="numeric" placeholder="Times";
                 }
             }
 

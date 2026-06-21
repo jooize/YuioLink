@@ -583,9 +583,11 @@
                 if (document.getElementById("limit-custom")?.checked) limitCustomValue.focus();
             });
 
-        // Keep the view limit to a whole number: digits only, no leading zeros.
+        // Keep the view limit a whole number, digits only (no leading zeros), capped at
+        // one billion.
         limitCustomValue.addEventListener("input", () => {
-            const cleaned = limitCustomValue.value.replace(/\D+/g, "").replace(/^0+(?=\d)/, "");
+            let cleaned = limitCustomValue.value.replace(/\D+/g, "").replace(/^0+(?=\d)/, "");
+            if (cleaned !== "" && Number(cleaned) > 1000000000) cleaned = "1000000000";
             if (cleaned !== limitCustomValue.value) limitCustomValue.value = cleaned;
         });
 

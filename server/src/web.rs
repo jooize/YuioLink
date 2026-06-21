@@ -26,6 +26,9 @@ use crate::{error::AppError, views};
 /// Cap on stored content (~64 KB) — enough for a long URL or a Text snippet,
 /// small enough to keep a single ephemeral row cheap.
 const MAX_CONTENT_BYTES: usize = 64 * 1024;
+/// Cap on a link's view limit (one billion) — effectively unlimited, but bounded so a
+/// request cannot ask for an absurd count. Mirrors the input's `max` on the page.
+const MAX_USES: i64 = 1_000_000_000;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -96,10 +99,13 @@ async fn create_link(
         return Err(BadRequest("That is too large to share (the limit is 64 KB).".into()));
     }
     check_ttl(ttl_seconds, state.max_ttl_secs).map_err(BadRequest)?;
-    if let Some(n) = max_uses
-        && n <= 0
-    {
-        return Err(BadRequest("Enter a view limit of one or more.".into()));
+    if let Some(n) = max_uses {
+        if n <= 0 {
+            return Err(BadRequest("Enter a view limit of one or more.".into()));
+        }
+        if n > MAX_USES {
+            return Err(BadRequest("The view limit can be at most 1,000,000,000.".into()));
+        }
     }
 
     db::insert_link(
