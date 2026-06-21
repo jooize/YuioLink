@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YuioLink — Local History toggle mockups</title>
+<style>
+  :root {
+    --accent: #007aff;
+    --switch-on: #34c759;
+    --purple: #8b5cf6;            /* the old toggle's violet */
+    --bg: #e7e8ec;
+    --panel: #f6f7f9;
+    --text: #1d1d1f;
+    --text-2: rgba(60,60,67,0.6);
+    --sep: rgba(0,0,0,0.08);
+  }
+  .dark {
+    --accent: #0a84ff;
+    --switch-on: #30d158;
+    --purple: #9d72f0;
+    --bg: #121214;
+    --panel: #202024;
+    --text: #f5f5f7;
+    --text-2: rgba(235,235,245,0.6);
+    --sep: rgba(255,255,255,0.1);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, system-ui, sans-serif; }
+  .scheme { background: var(--bg); color: var(--text); padding: 28px 22px 36px; }
+  h1 { font-size: 15px; font-weight: 700; margin: 0 0 4px; letter-spacing: .02em; text-transform: uppercase; color: var(--text-2); }
+  h2 { font-size: 13px; font-weight: 600; margin: 26px 0 10px; }
+  .note { font-size: 12px; color: var(--text-2); margin: 0 0 14px; max-width: 46ch; }
+  .row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 8px 0; }
+  .cap { font-size: 11px; color: var(--text-2); width: 64px; flex: none; }
+
+  /* shared pill shell */
+  .pill { display: flex; width: fit-content; border-radius: 999px; overflow: hidden; font-size: 12.5px; }
+  .status { display: flex; align-items: center; padding: 6px 13px; font-weight: 500;
+            color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); white-space: nowrap; }
+
+  /* ---- A. OLD WAY (purple / green, state shown in words) ---- */
+  .old { font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 13px; border: 0;
+         color: #fff; background: var(--purple); cursor: pointer; white-space: nowrap; }
+  .old.on { background: var(--switch-on); }
+
+  /* ---- HIG switch (label + track/knob) ---- */
+  .hig { display: flex; align-items: center; gap: 8px; font: inherit; font-size: 12.5px; font-weight: 500;
+         padding: 6px 12px; border: 0; cursor: pointer; white-space: nowrap; }
+  .sw { position: relative; flex: none; width: 30px; height: 18px; border-radius: 999px; transition: background .2s; }
+  .sw::before { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%;
+                background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.25); transition: transform .2s; }
+  .hig.on .sw::before { transform: translateX(12px); }
+
+  /* B. current HIG — neutral grey */
+  .hig.grey { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
+  .hig.grey .sw { background: color-mix(in srgb, var(--text) 22%, transparent); }
+  .hig.grey.on .sw { background: var(--switch-on); }
+
+  /* C. purple background, green switch */
+  .hig.purple { color: #fff; background: var(--purple); }
+  .hig.purple .sw { background: rgba(255,255,255,0.3); }
+  .hig.purple.on .sw { background: var(--switch-on); }
+
+  /* D. purple background, switch fills white (knob purple) */
+  .hig.purpleWhite { color: #fff; background: var(--purple); }
+  .hig.purpleWhite .sw { background: rgba(255,255,255,0.28); }
+  .hig.purpleWhite.on .sw { background: #fff; }
+  .hig.purpleWhite.on .sw::before { background: var(--purple); box-shadow: none; }
+
+  /* E. purple-when-on: grey base, switch + a faint purple wash when on */
+  .hig.purpleOn { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); transition: background .2s; }
+  .hig.purpleOn .sw { background: color-mix(in srgb, var(--text) 22%, transparent); }
+  .hig.purpleOn.on { color: #fff; background: var(--purple); }
+  .hig.purpleOn.on .sw { background: rgba(255,255,255,0.85); }
+  .hig.purpleOn.on .sw::before { background: var(--purple); box-shadow: none; }
+</style>
+</head>
+<body>
+<template id="block">
+  <h1>placeholder</h1>
+
+  <h2>A — Old way (saved for reference / revert)</h2>
+  <p class="note">Purple pill, state shown in words; turns green when on. This is what was live before the HIG switch.</p>
+  <div class="row"><span class="cap">off</span>
+    <span class="pill"><span class="status">No Links Yet</span><button class="old">Enable Local History</button></span></div>
+  <div class="row"><span class="cap">on</span>
+    <span class="pill"><span class="status">History · 3 Links ›</span><button class="old on">Local History On</button></span></div>
+
+  <h2>B — Current HIG switch (neutral grey)</h2>
+  <p class="note">Label names what it controls; the switch shows state. What's live now.</p>
+  <div class="row"><span class="cap">off</span>
+    <span class="pill"><span class="status">No Links Yet</span><button class="hig grey"><span>Local History</span><span class="sw"></span></button></span></div>
+  <div class="row"><span class="cap">on</span>
+    <span class="pill"><span class="status">History · 3 Links ›</span><button class="hig grey on"><span>Local History</span><span class="sw"></span></button></span></div>
+
+  <h2>C — HIG switch on the OLD PURPLE, green switch</h2>
+  <p class="note">Keeps the purple you miss; switch turns green when on.</p>
+  <div class="row"><span class="cap">off</span>
+    <span class="pill"><span class="status">No Links Yet</span><button class="hig purple"><span>Local History</span><span class="sw"></span></button></span></div>
+  <div class="row"><span class="cap">on</span>
+    <span class="pill"><span class="status">History · 3 Links ›</span><button class="hig purple on"><span>Local History</span><span class="sw"></span></button></span></div>
+
+  <h2>D — Purple background, switch fills white (purple knob)</h2>
+  <p class="note">Monochrome with the purple; the white-filled track reads clearly "on".</p>
+  <div class="row"><span class="cap">off</span>
+    <span class="pill"><span class="status">No Links Yet</span><button class="hig purpleWhite"><span>Local History</span><span class="sw"></span></button></span></div>
+  <div class="row"><span class="cap">on</span>
+    <span class="pill"><span class="status">History · 3 Links ›</span><button class="hig purpleWhite on"><span>Local History</span><span class="sw"></span></button></span></div>
+
+  <h2>E — Grey when off, turns purple when on</h2>
+  <p class="note">Quiet until enabled, then the whole control goes purple (state via colour + switch).</p>
+  <div class="row"><span class="cap">off</span>
+    <span class="pill"><span class="status">No Links Yet</span><button class="hig purpleOn"><span>Local History</span><span class="sw"></span></button></span></div>
+  <div class="row"><span class="cap">on</span>
+    <span class="pill"><span class="status">History · 3 Links ›</span><button class="hig purpleOn on"><span>Local History</span><span class="sw"></span></button></span></div>
+</template>
+
+<section class="scheme" id="light"></section>
+<section class="scheme dark" id="dark"></section>
+<script>
+  for (const id of ["light", "dark"]) {
+    const sec = document.getElementById(id);
+    sec.appendChild(document.getElementById("block").content.cloneNode(true));
+    sec.querySelector("h1").textContent = id === "light" ? "Light mode" : "Dark mode";
+  }
+</script>
+</body>
+</html>
