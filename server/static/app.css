@@ -537,6 +537,9 @@ textarea.form-control {
     padding: 0;
     background: none;
     border: 0;
+    /* Focused programmatically (for ⌘C) — suppress the browser focus ring, which
+       inherits .result's 14px radius and renders a notched outline around the hero. */
+    outline: none;
     text-align: center;
 }
 
@@ -563,7 +566,6 @@ textarea.form-control {
    the accent colour, centred and selectable. */
 .result-word {
     display: block;
-    position: relative;
     font-family: var(--font-mono);
     /* The mockup's "arson" is a fixed 30px; clamp only shrinks it on narrow phones. */
     font-size: clamp(24px, 7vw, 30px);
@@ -574,30 +576,6 @@ textarea.form-control {
     margin-bottom: 4px;
     color: var(--accent);
     user-select: all;
-    transition: color 0.12s ease;
-}
-
-/* On copy (Copy button or ⌘C), the hero word is replaced in place by a big green
-   check for 1.5s — a bold confirmation. Result only; history uses a trailing check. */
-.result-word::after {
-    content: "\2713";
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--switch-on);
-    opacity: 0;
-    transition: opacity 0.18s ease;
-    pointer-events: none;
-}
-
-.result-word.copied {
-    color: transparent;
-}
-
-.result-word.copied::after {
-    opacity: 1;
 }
 
 /* The full URL beneath the hero word: small and quiet — dim scheme, standout host
@@ -611,6 +589,22 @@ textarea.form-control {
     word-break: break-all;
     color: var(--text-tertiary);
     user-select: all;
+}
+
+/* Copy confirmation: a green check trails the URL on copy (the Copy button or ⌘C),
+   showing the whole link was copied; clears with the button's "Copied" after 1.5s.
+   Opacity-toggled (space reserved) so the centred line never reflows. */
+.result-url::after {
+    content: "\2713";
+    margin-left: 0.4em;
+    font-weight: 700;
+    color: var(--switch-on);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+.result-url.copied::after {
+    opacity: 1;
 }
 
 .result-url .u-scheme,

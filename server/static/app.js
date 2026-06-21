@@ -187,8 +187,7 @@
         const btn = document.getElementById("copy-result");
         if (btn) {
             btn.hidden = false;
-            const wordEl = document.getElementById("link-word");
-            btn.addEventListener("click", () => copyToClipboard(linkEl.textContent.trim(), btn, () => flashClass(wordEl, "copied")));
+            btn.addEventListener("click", () => copyToClipboard(linkEl.textContent.trim(), btn, () => flashClass(linkEl, "copied")));
         }
     };
 
@@ -205,7 +204,7 @@
             const url = linkEl.textContent.trim();
             if (!url) return;
             event.preventDefault();
-            copyToClipboard(url, document.getElementById("copy-result"), () => flashClass(document.getElementById("link-word"), "copied"));
+            copyToClipboard(url, document.getElementById("copy-result"), () => flashClass(linkEl, "copied"));
         });
     };
 
