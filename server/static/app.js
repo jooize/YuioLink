@@ -89,26 +89,6 @@
         add("u-frag", frag);
     };
 
-    // History variant (mockup B, "word-forward"): drop the scheme and dim the host so
-    // the link name leads. textContent is still the wieldy "host/name" — the row's Copy
-    // button copies the full URL (with scheme), so this only affects the visible text.
-    const renderUrlWordForward = (el, url) => {
-        el.replaceChildren();
-        const m = url.match(/^([a-z][a-z0-9+.-]*:\/\/)([^/]+)(\/[^#]*)?(#.*)?$/i);
-        if (!m) { el.textContent = url; return; }
-        const [, , host, path, frag] = m;
-        const add = (cls, text) => {
-            if (!text) return;
-            const s = document.createElement("span");
-            s.className = cls;
-            s.textContent = text;
-            el.append(s);
-        };
-        add("u-host", host);
-        if (path) { add("u-sep", "/"); add("u-name", path.slice(1)); }
-        add("u-frag", frag);
-    };
-
     // --- expiry countdown (live; shared by the result and the history list) ---
     const usesSuffix = (uses) => {
         if (uses === 1) return " · one-time";
@@ -314,15 +294,15 @@
             li.className = "history-item";
             if (isExpired(it)) li.classList.add("expired");
 
-            // Two-line entry (mockup B, word-forward): line 1 leads with the link name
-            // (dim host, scheme dropped), line 2 the kind pill + expiry. Copy and × stay
-            // vertically centred beside the text block.
+            // Two-line entry (mockup A): line 1 the full tri-colour URL (dim scheme,
+            // standout host, accent name), line 2 the kind pill + expiry. Copy and ×
+            // stay vertically centred beside the text block.
             const txt = document.createElement("div");
             txt.className = "history-text";
 
             const url = document.createElement("code");
             url.className = "history-url";
-            renderUrlWordForward(url, it.url);
+            renderUrlInto(url, it.url);
 
             const meta = document.createElement("small");
             meta.className = "history-meta";

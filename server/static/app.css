@@ -809,20 +809,24 @@ textarea.form-control {
     color: var(--accent);
 }
 
+/* Grouped inset (mockup "A · grouped inset"): one rounded panel holding the rows,
+   with hairline dividers between them (iOS-settings feel). */
 .history-list {
     list-style: none;
     margin: 0;
     padding: 0;
+    background: var(--field-bg);
+    border: 0.5px solid var(--field-border);
+    border-radius: 12px;
+    overflow: hidden;
 }
 
-/* List-y rows (mockup B in history-list.html): bare rows divided by a hairline, no
-   per-row box — lighter inside the glass card than stacked cards. */
 .history-item {
     position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 11px 4px;
+    padding: 11px 13px;
     border-bottom: 0.5px solid var(--separator);
 }
 
@@ -875,8 +879,8 @@ textarea.form-control {
     background: color-mix(in srgb, var(--text-kind) 16%, transparent);
 }
 
-/* Two-line history entry (mockup B, word-forward): the link name leads on top, the
-   kind pill + expiry beneath, with Copy and × vertically centred beside the block. */
+/* Two-line history entry (mockup A): the full URL on top, the kind pill + expiry
+   beneath, with Copy and × vertically centred beside the block. */
 .history-text {
     flex: 1;
     min-width: 0;
@@ -885,22 +889,26 @@ textarea.form-control {
     gap: 3px;
 }
 
-/* Line 1 leads with the memorable word: the scheme is dropped and the host dimmed,
-   so the link name (accent) is what the eye lands on. */
+/* Line 1: the full tri-colour URL (mockup A) — dim scheme, standout host, the link
+   name highlighted in accent. */
 .history-url {
     display: block;
     font-family: var(--font-mono);
-    font-size: 14px;
+    font-size: 13px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     user-select: all;
 }
 
-.history-url .u-host,
+.history-url .u-scheme,
 .history-url .u-sep,
 .history-url .u-frag {
     color: var(--text-tertiary);
+}
+
+.history-url .u-host {
+    color: var(--text);
 }
 
 .history-url .u-name {
@@ -908,12 +916,11 @@ textarea.form-control {
     font-weight: 600;
 }
 
-/* Line 2 (kind + expiry) in mono, matching B's techy second line in the mockup. */
+/* Line 2: kind pill + expiry, in the UI font (mockup A). */
 .history-meta {
     display: flex;
     align-items: center;
     gap: 7px;
-    font-family: var(--font-mono);
     font-size: 11.5px;
     color: var(--text-secondary);
     white-space: nowrap;
