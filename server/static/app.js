@@ -38,11 +38,11 @@
         return hasScheme(t) || looksLikeDomain(t) ? "redirect" : "text";
     };
     const kindLabel = (k) => (k === "redirect" ? "Redirect" : "Text");
-    // The colour-coded kind pill (Redirect blue, Text post-it yellow), shared by the
+    // The kind as a colour-coded word (Redirect blue, Text yellow), shared by the
     // history rows and the result meta.
-    const kindPill = (k) => {
+    const kindWord = (k) => {
         const el = document.createElement("span");
-        el.className = `kind-pill ${k === "redirect" ? "redirect" : "text"}`;
+        el.className = `kind-word ${k === "redirect" ? "redirect" : "text"}`;
         el.textContent = kindLabel(k);
         return el;
     };
@@ -127,7 +127,7 @@
         else if (s < 82800) { const h = Math.round(s / 3600); unit = `${h} hour${h === 1 ? "" : "s"}`; short = `${h}h`; }
         else { const days = Math.round(s / 86400); unit = `${days} day${days === 1 ? "" : "s"}`; short = `${days}d`; }
         const level = s < 60 ? "now" : s <= 300 ? "soon" : "";
-        return { text: `expires in ${unit}`, compact: short, level };
+        return { text: `${unit} left`, compact: short, level };
     };
     // Result spans show the full phrase; history spans set data-compact for "1h"/"4m".
     const updateCountdown = (span) => {
@@ -136,12 +136,11 @@
         span.classList.toggle("expiring-soon", level === "soon");
         span.classList.toggle("expiring-now", level === "now");
     };
-    // Build "<Kind> · expires in <live countdown><uses>" into `metaEl` (no innerHTML).
-    // The result names the kind in plain text — no chip; the pill lives only in the
-    // history rows now, and the big hero word already carries the colour.
+    // Build "<Kind> · <green time left><uses>" into `metaEl` (no innerHTML): the kind
+    // as a coloured word, then the green countdown, then any use limit.
     const buildMeta = (metaEl, kind, expiresIso, uses) => {
         metaEl.replaceChildren();
-        metaEl.append(`${kindLabel(kind)} · `);
+        metaEl.append(kindWord(kind), " · ");
         const span = document.createElement("span");
         span.className = "countdown";
         span.dataset.expires = expiresIso ?? "";
@@ -302,8 +301,8 @@
             if (isExpired(it)) li.classList.add("expired");
 
             // Two-line entry (mockup A): line 1 the full tri-colour URL (dim scheme,
-            // standout host, accent name), line 2 the kind pill + expiry. Copy and ×
-            // stay vertically centred beside the text block.
+            // standout host, accent name), line 2 the coloured kind word + green time
+            // (mockup H3). Copy and × stay vertically centred beside the text block.
             const txt = document.createElement("div");
             txt.className = "history-text";
 
@@ -313,7 +312,7 @@
 
             const meta = document.createElement("small");
             meta.className = "history-meta";
-            meta.append(kindPill(it.kind), " ");
+            meta.append(kindWord(it.kind), " · ");
             const span = document.createElement("span");
             span.className = "countdown";
             span.dataset.expires = it.expires ?? "";

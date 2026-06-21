@@ -9,8 +9,10 @@
     --result: #10b981;
     --warn: #c77a00;
     --danger: #d70015;
-    /* "Text" kind — amber ink for the tinted Text chip (matches the history-list mockup). */
-    --text-kind: #b07c00;
+    /* "Text" kind word — a golden yellow (legible on the light glass). */
+    --text-kind: #b8910a;
+    /* Vibrant purple — the standout border on the create input. */
+    --purple: #af52de;
 
     --bg-1: #e7e8ec;
     --bg-2: #f6f7f9;
@@ -47,6 +49,7 @@
         --warn: #ffd60a;
         --danger: #ff453a;
         --text-kind: #ffd60a;
+        --purple: #bf5af2;
 
         --bg-1: #121214;
         --bg-2: #202024;
@@ -170,7 +173,8 @@ form {
     font-size: 16px;
     color: var(--text);
     background: var(--field-bg);
-    border: 0.5px solid var(--field-border);
+    /* A thin, vibrant purple line so the input is the obvious focal point. */
+    border: 1.5px solid var(--purple);
     border-radius: var(--radius-control);
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
     transition: border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
@@ -184,8 +188,8 @@ form {
 
 .form-control:focus {
     outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 28%, transparent);
+    border-color: var(--purple);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--purple) 26%, transparent);
 }
 
 /* Greyed after a successful submit; focusing or editing the field restores it. */
@@ -650,7 +654,12 @@ textarea.form-control {
     color: var(--text-secondary);
 }
 
-/* Live "expires in" colouring as the deadline nears. */
+/* Time left reads green (alive) by default, then warns as the deadline nears. */
+.countdown {
+    color: var(--switch-on);
+    font-weight: 600;
+}
+
 .countdown.expiring-soon {
     color: var(--warn);
     font-weight: 600;
@@ -878,28 +887,19 @@ textarea.form-control {
     text-decoration: underline;
 }
 
-/* Colour-coded kind pill, used in the history rows (the result names the kind in
-   plain text instead). Both are tinted chips of equal weight — Redirect blue, Text
-   amber — matching the history-list mockup. */
-.kind-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+/* The kind as a coloured word (mockup H3 / Rb): Redirect in accent blue, Text in
+   golden yellow — no chip, sitting before the green time on the meta line. */
+.kind-word {
     flex: none;
-    padding: 1px 7px;
-    font-size: 10px;
     font-weight: 600;
-    border-radius: 5px;
 }
 
-.kind-pill.redirect {
+.kind-word.redirect {
     color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 13%, transparent);
 }
 
-.kind-pill.text {
+.kind-word.text {
     color: var(--text-kind);
-    background: color-mix(in srgb, var(--text-kind) 16%, transparent);
 }
 
 /* Two-line history entry (mockup A): the full URL on top, the kind pill + expiry
