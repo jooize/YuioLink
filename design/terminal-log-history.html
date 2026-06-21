@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YuioLink — saved design: terminal-log history</title>
+<!--
+  Saved design exploration — the "terminal log" treatment for the created-link
+  history. Liked the look; parking it here until we find where it fits (a power /
+  developer view, a toggle, an easter egg…). Uses "uses=inf" rather than the ∞
+  glyph in the log.
+
+  PALETTE (terminal panel):
+    background   #0c1411   (near-black green-tinted)
+    border       #1d2b25
+    base text    #cbe9d4
+    prompt  (>)  #5ad17a   green
+    key (name)   #7fd0ff   blue
+    dim / meta   #8aa79a   muted green-grey
+    warn         #ffd166   amber (expiring soon)
+    gone         #ff6b6b   red (expired)
+  The panel stays dark in light mode too — that contrast is the point.
+-->
+<style>
+:root {
+    --bg-1: #e7e8ec; --bg-2: #f6f7f9;
+    --glow-1: rgba(0,122,255,0.20); --glow-2: rgba(255,64,129,0.14);
+    --text: #1d1d1f; --text-secondary: rgba(60,60,67,0.6); --text-tertiary: rgba(60,60,67,0.4);
+    --accent: #007aff;
+    --card-bg: rgba(255,255,255,0.58); --card-border: rgba(255,255,255,0.7); --card-highlight: rgba(255,255,255,0.9);
+    --card-shadow: 0 24px 70px -22px rgba(20,24,40,0.42), 0 8px 22px -14px rgba(20,24,40,0.28);
+    --separator: rgba(0,0,0,0.08);
+    --radius-window: 28px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Code", monospace;
+
+    /* Terminal palette (see comment above) */
+    --term-bg: #0c1411; --term-border: #1d2b25; --term-text: #cbe9d4;
+    --term-prompt: #5ad17a; --term-key: #7fd0ff; --term-dim: #8aa79a;
+    --term-warn: #ffd166; --term-gone: #ff6b6b;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-1: #121214; --bg-2: #202024;
+        --glow-1: rgba(10,132,255,0.22); --glow-2: rgba(191,90,242,0.18);
+        --text: #f5f5f7; --text-secondary: rgba(235,235,245,0.6); --text-tertiary: rgba(235,235,245,0.35);
+        --accent: #0a84ff;
+        --card-bg: rgba(40,40,44,0.55); --card-border: rgba(255,255,255,0.12); --card-highlight: rgba(255,255,255,0.1);
+        --card-shadow: 0 28px 80px -24px rgba(0,0,0,0.7), 0 10px 26px -16px rgba(0,0,0,0.6);
+        --separator: rgba(255,255,255,0.1);
+    }
+}
+* { box-sizing: border-box; }
+html {
+    min-height: 100%; background-color: var(--bg-1);
+    background-image:
+        radial-gradient(1100px 760px at 12% 6%, var(--glow-1), transparent 60%),
+        radial-gradient(1000px 720px at 88% 96%, var(--glow-2), transparent 58%),
+        linear-gradient(155deg, var(--bg-2), var(--bg-1));
+    background-attachment: fixed;
+}
+body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    gap: 24px; padding: 48px 18px 64px; font-family: var(--font); color: var(--text);
+    -webkit-font-smoothing: antialiased;
+}
+.page-head { width: min(100%, 440px); text-align: center; }
+.page-head h1 { margin: 0; font-size: 21px; font-weight: 600; letter-spacing: -0.02em; }
+.page-head p { margin: 8px auto 0; max-width: 40ch; font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+
+.window {
+    width: min(100%, 440px); background: var(--card-bg);
+    -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%);
+    border: 0.5px solid var(--card-border); border-radius: var(--radius-window);
+    box-shadow: var(--card-shadow), inset 0 1px 0 var(--card-highlight); padding: 22px 24px 24px;
+}
+.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.head .title { font-size: 12.5px; font-weight: 600; color: var(--accent); }
+.head .title::before { content: "\203A"; display: inline-block; margin-right: 6px; color: var(--text-tertiary); transform: rotate(90deg); }
+.clear { font: inherit; font-size: 12.5px; color: #ff9500; background: none; border: 0; padding: 0; cursor: pointer; }
+
+.term {
+    background: var(--term-bg); border: 0.5px solid var(--term-border); border-radius: 10px;
+    padding: 13px 15px; font-family: var(--font-mono); font-size: 12px; line-height: 1.8;
+    color: var(--term-text); overflow-x: auto;
+}
+.term .ln { white-space: nowrap; }
+.term .p { color: var(--term-prompt); }
+.term .k { color: var(--term-key); }
+.term .t { color: var(--term-dim); }
+.term .warn { color: var(--term-warn); }
+.term .gone { color: var(--term-gone); }
+.term .cur { color: var(--term-prompt); }
+</style>
+</head>
+<body>
+<div class="page-head">
+    <h1>Saved: terminal-log history</h1>
+    <p>Parked for later. A console feed of created links — uses <code>=inf</code> for unlimited; palette documented at the top of this file.</p>
+</div>
+<div class="window">
+    <div class="head"><span class="title">Local History</span><button class="clear">Clear</button></div>
+    <div class="term">
+        <div class="ln"><span class="p">&gt;</span> link <span class="k">HeLloWorD</span> <span class="t">redirect ttl=1h uses=inf</span></div>
+        <div class="ln"><span class="p">&gt;</span> link <span class="k">BrAvEqUiT</span> <span class="warn">text ttl=4m uses=1</span></div>
+        <div class="ln"><span class="p">&gt;</span> link <span class="k">QuIeTnEsS</span> <span class="t">redirect ttl=7d uses=12</span></div>
+        <div class="ln"><span class="p">&gt;</span> link <span class="k">ZeStYfRog</span> <span class="gone">redirect EXPIRED</span></div>
+        <div class="ln"><span class="cur">&gt;</span> <span class="t">_</span></div>
+    </div>
+</div>
+</body>
+</html>
