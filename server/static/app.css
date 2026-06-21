@@ -1132,11 +1132,14 @@ textarea.form-control {
     text-decoration: underline;
 }
 
-/* The grace-window out: also delete the just-forgotten link from the server. */
+/* The grace-window out: also delete the just-forgotten link from the server. Its label
+   counts down the seconds left; tabular figures keep the width steady as it ticks. */
 .history-tomb-delete {
     flex: none;
     font-family: inherit;
     font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
     color: var(--danger);
     background: none;
     border: 0;

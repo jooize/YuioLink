@@ -339,11 +339,12 @@
                 msg.className = "history-tomb-msg";
                 msg.textContent = tombMessage(it);
                 li.append(msg);
-                if (it.tombstone === "forgotten" && it.name && it.token) {
+                if (it.tombstone === "forgotten" && it.until && it.name && it.token) {
                     const del = document.createElement("button");
                     del.className = "history-tomb-delete";
                     del.type = "button";
-                    del.textContent = "Delete";
+                    del.dataset.until = String(it.until);
+                    del.textContent = graceLabel(it.until);
                     del.title = "Also delete it from the server — the link stops working for everyone.";
                     del.addEventListener("click", () => deleteForgotten(it, li));
                     li.append(del);
@@ -424,12 +425,14 @@
     // stands on the server.
     const tombMessage = (it) => {
         switch (it.tombstone) {
-            case "deleted": return "Removed from this device and the server";
-            case "gone": return "Removed — the link had already expired";
-            case "forgotten": return "Removed from this device — still on the server";
+            case "deleted": return "Removed from this device and deleted from the server";
+            case "gone": return "Removed from this device — the link has expired";
+            case "forgotten": return "Removed from this device — the link still works";
             default: return "Removed from this device";
         }
     };
+    // Label for a grace-window Delete button: the action plus the seconds left to use it.
+    const graceLabel = (until) => `Delete · ${Math.max(1, Math.ceil((until - Date.now()) / 1000))}s`;
     // Replace the entry in place with a tombstone, fully purging its url / name / token
     // from memory and storage. The tombstone holds no link details and can itself be
     // cleared.
@@ -456,28 +459,32 @@
             memHistory[i] = { tombstone: "gone" };
         } else if (it.token && it.name) {
             memHistory[i] = { tombstone: "forgotten", name: it.name, token: it.token, until: Date.now() + FORGET_GRACE_MS };
-            scheduleForgetPurge();
+            tickForgetGrace();
         } else {
             memHistory[i] = { tombstone: "forgotten" };
         }
         persistNow();
         renderHistory();
     };
-    // Strip the retained name/token from forgotten tombstones past their grace window, then
-    // re-arm for the next one due (also covers graces restored from localStorage).
-    let forgetPurgeTimer = null;
-    const scheduleForgetPurge = () => {
-        if (forgetPurgeTimer) { clearTimeout(forgetPurgeTimer); forgetPurgeTimer = null; }
+    // Drive the forget grace windows: each second, refresh the countdown shown on the grace
+    // Delete buttons; when one lapses, strip its name/token (re-rendering so the button
+    // goes), and stop ticking once none remain. Also covers graces restored from storage.
+    let forgetGraceTimer = null;
+    const tickForgetGrace = () => {
+        if (forgetGraceTimer) { clearTimeout(forgetGraceTimer); forgetGraceTimer = null; }
         const now = Date.now();
-        let changed = false;
-        let next = Infinity;
+        let purged = false;
+        let active = false;
         for (const it of memHistory) {
             if (!it.until) continue;
-            if (it.until <= now) { delete it.name; delete it.token; delete it.until; changed = true; }
-            else next = Math.min(next, it.until);
+            if (it.until <= now) { delete it.name; delete it.token; delete it.until; purged = true; }
+            else active = true;
         }
-        if (changed) { persistNow(); renderHistory(); }
-        if (next !== Infinity) forgetPurgeTimer = setTimeout(scheduleForgetPurge, Math.max(50, next - now));
+        if (purged) { persistNow(); renderHistory(); }
+        for (const btn of document.querySelectorAll(".history-tomb-delete[data-until]")) {
+            btn.textContent = graceLabel(Number(btn.dataset.until));
+        }
+        if (active) forgetGraceTimer = setTimeout(tickForgetGrace, 1000);
     };
 
     // While the server is contacted, swap the overlay to a spinner; on failure offer
@@ -912,7 +919,7 @@
                 }
             }
         }
-        scheduleForgetPurge(); // clear/arm any grace windows restored from localStorage
+        tickForgetGrace(); // clear/arm any grace windows restored from localStorage
         scheduleTick();
     });
 })();
