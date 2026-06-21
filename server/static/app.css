@@ -1013,7 +1013,9 @@ textarea.form-control {
     gap: 8px;
     /* Extra right padding clears the × column so the actions never slide under it. */
     padding: 0 38px 0 12px;
-    background: var(--field-bg);
+    /* Near-opaque so the row underneath does not bleed through (--field-bg is only
+       6% in dark mode); the blur still softens the edge. */
+    background: color-mix(in srgb, var(--bg-2) 93%, transparent);
     -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     border-radius: 10px;
