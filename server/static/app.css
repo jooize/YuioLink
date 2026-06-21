@@ -9,7 +9,8 @@
     --result: #10b981;
     --warn: #c77a00;
     --danger: #d70015;
-    --text-kind: #8b5cf6;
+    /* "Text" kind — a notepad/post-it yellow (an amber that stays readable). */
+    --text-kind: #b07c00;
 
     --bg-1: #e7e8ec;
     --bg-2: #f6f7f9;
@@ -45,7 +46,7 @@
         --result: #34d399;
         --warn: #ffd60a;
         --danger: #ff453a;
-        --text-kind: #b794ff;
+        --text-kind: #ffd60a;
 
         --bg-1: #121214;
         --bg-2: #202024;
@@ -277,10 +278,10 @@ textarea.form-control {
     line-height: 1;
 }
 
-/* The injected "A billion" chip (app.js) stands out in purple — matching the
-   Enable Local History pill — marking it as the special preset. */
+/* The injected "A billion" chip (app.js) stands out in the accent colour,
+   marking it as the special preset. */
 .seg-label.seg-billion {
-    color: var(--text-kind);
+    color: var(--accent);
     font-weight: 600;
 }
 
@@ -554,18 +555,30 @@ textarea.form-control {
     margin-bottom: 11px;
 }
 
-/* The created link — the hero of the result: prominent, centred, and fully
-   selectable. Wraps rather than truncating so the whole link is visible. The URL
-   is rendered in parts (app.js): a dim scheme, a standout host, and the memorable
-   word most highlighted. */
-.result-url {
+/* The link name as the giant hero (direction R4): the memorable word, big and in
+   the accent colour, centred and selectable. */
+.result-word {
     display: block;
     font-family: var(--font-mono);
-    font-size: 16.5px;
-    line-height: 1.45;
+    font-size: clamp(24px, 8vw, 32px);
+    font-weight: 700;
+    line-height: 1.1;
     letter-spacing: -0.01em;
     word-break: break-all;
-    color: var(--text);
+    color: var(--accent);
+    user-select: all;
+}
+
+/* The full URL beneath the hero word: small and quiet — dim scheme, standout host
+   — rendered in parts by app.js. Wraps so the whole link stays visible/copyable. */
+.result-url {
+    display: block;
+    margin-top: 6px;
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    line-height: 1.4;
+    word-break: break-all;
+    color: var(--text-tertiary);
     user-select: all;
 }
 
@@ -576,12 +589,11 @@ textarea.form-control {
 }
 
 .result-url .u-host {
-    color: var(--text);
+    color: var(--text-secondary);
 }
 
 .result-url .u-name {
     color: var(--accent);
-    font-weight: 600;
 }
 
 /* The preview page uses a plainer inline code (no box). */

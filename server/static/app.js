@@ -426,6 +426,7 @@
         const submitBtn = document.getElementById("submit");
         const clearBtn = document.getElementById("clear");
         const linkEl = document.getElementById("link-element");
+        const linkWordEl = document.getElementById("link-word");
         const metaEl = document.getElementById("link-expiry");
         const panel = document.getElementById("link-panel");
         const ttlCustomValue = document.getElementById("ttl-custom-value");
@@ -570,6 +571,7 @@
         });
 
         const showReady = (url, kind, expiresIso, uses, defaultedOnce) => {
+            if (linkWordEl) linkWordEl.textContent = url.split("#")[0].split("/").pop();
             renderUrlInto(linkEl, url);
             buildMeta(metaEl, kind, expiresIso, uses);
             const note = document.getElementById("result-note");

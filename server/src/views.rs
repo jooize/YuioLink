@@ -37,16 +37,23 @@ fn document_full(head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
     }
 }
 
+/// The link name — the last path segment, minus any `#fragment` — shown as the hero.
+fn link_name(url: &str) -> &str {
+    url.split('#').next().unwrap_or(url).rsplit('/').next().unwrap_or(url)
+}
+
 /// The result `<output>` shown after a link is created (server-rendered on the
-/// no-JS path, populated in place by `app.js` otherwise). The URL is the focus;
-/// a single meta line carries kind, expiry, and any use limit.
+/// no-JS path, populated in place by `app.js` otherwise). The memorable word (the
+/// link name) is the hero; the full URL sits small beneath it; a single meta line
+/// carries kind, expiry, and any use limit.
 fn result_output(url: Option<&str>, meta: Markup) -> Markup {
     html! {
         // tabindex=-1: focused after creation so the link selection survives for ⌘C
         // and the next Tab lands on the input (the panel precedes the form in the DOM).
         output.result #link-panel tabindex="-1" hidden[url.is_none()] {
-            // URL as the hero (coloured, centred); the meta line and a Copy pill sit
-            // beneath, with an optional note last (e.g. when a blank limit defaulted).
+            // The link name is the giant hero (R4); the full URL sits small beneath,
+            // then the meta line and a Copy pill, with an optional note last.
+            code.result-word #link-word { @if let Some(u) = url { (link_name(u)) } }
             code.result-url #link-element { @if let Some(u) = url { (u) } }
             div.result-foot {
                 small.result-meta #link-expiry { (meta) }
