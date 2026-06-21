@@ -899,9 +899,11 @@ textarea.form-control {
     min-width: 0;
 }
 
-/* The full tri-colour URL (mockup A) — dim scheme, standout host, accent name. */
+/* The full tri-colour URL (mockup A) — dim scheme, standout host, accent name.
+   flex: 0 1 auto (not 1) so the box hugs the text and the check sits right after it,
+   while still shrinking + ellipsizing when the URL is too long for the row. */
 .history-url {
-    flex: 1;
+    flex: 0 1 auto;
     min-width: 0;
     font-family: var(--font-mono);
     font-size: 13px;
