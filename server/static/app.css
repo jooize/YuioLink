@@ -9,8 +9,9 @@
     --result: #10b981;
     --warn: #c77a00;
     --danger: #d70015;
-    /* "Text" kind word — a bright golden yellow. */
-    --text-kind: #eec100;
+    /* "Text" kind word — a cyan/teal. Darker on the light glass so it stays legible
+       (the dark theme uses the bright #0affe4). */
+    --text-kind: #0a9d8e;
     /* Vibrant purple — the standout border on the create input. */
     --purple: #af52de;
 
@@ -48,7 +49,7 @@
         --result: #34d399;
         --warn: #ffd60a;
         --danger: #ff453a;
-        --text-kind: #ffd60a;
+        --text-kind: #0affe4;
         --purple: #bf5af2;
 
         --bg-1: #121214;
@@ -340,7 +341,7 @@ textarea.form-control {
 .custom-hint {
     flex: 0 0 100%;
     margin-top: 2px;
-    padding-left: 4px;
+    padding-left: 8px;
     font-size: 12px;
     color: var(--text-secondary);
 }
