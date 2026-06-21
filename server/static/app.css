@@ -9,8 +9,8 @@
     --result: #10b981;
     --warn: #c77a00;
     --danger: #d70015;
-    /* "Text" kind — a bright notepad/post-it yellow (used as the pill background). */
-    --text-kind: #ffd83a;
+    /* "Text" kind — a muted notepad-yellow chip (used as the history pill background). */
+    --text-kind: #e9c44e;
 
     --bg-1: #e7e8ec;
     --bg-2: #f6f7f9;
@@ -46,7 +46,7 @@
         --result: #34d399;
         --warn: #ffd60a;
         --danger: #ff453a;
-        --text-kind: #ffd60a;
+        --text-kind: #d4bb55;
 
         --bg-1: #121214;
         --bg-2: #202024;
@@ -592,9 +592,11 @@ textarea.form-control {
     color: var(--text-secondary);
 }
 
+/* R4: the link name is already the giant hero above, so keep it quiet here — the
+   whole sub-URL reads as one calm address instead of re-accenting the name. */
 .result-url .u-name {
-    color: var(--accent);
-    font-weight: 600;
+    color: var(--text-tertiary);
+    font-weight: 400;
 }
 
 /* The preview page uses a plainer inline code (no box). */
@@ -844,9 +846,9 @@ textarea.form-control {
     text-decoration: underline;
 }
 
-/* Colour-coded kind pill, shared by the result meta and the history rows.
-   Redirect is a tinted-blue chip; Text is a bright post-it-yellow chip with dark
-   ink (so it reads as a note and stays legible in both themes). */
+/* Colour-coded kind pill, used in the history rows (the result names the kind in
+   plain text instead). Redirect is a tinted-blue chip; Text is a muted notepad-yellow
+   chip with dark ink (so it reads as a note and stays legible in both themes). */
 .kind-pill {
     display: inline-flex;
     align-items: center;
@@ -868,8 +870,8 @@ textarea.form-control {
     background: var(--text-kind);
 }
 
-/* Two-line history entry (mockup A): URL on top, kind pill + expiry beneath, with
-   Copy and × vertically centred beside the text block. */
+/* Two-line history entry (mockup B, word-forward): the link name leads on top, the
+   kind pill + expiry beneath, with Copy and × vertically centred beside the block. */
 .history-text {
     flex: 1;
     min-width: 0;
@@ -878,24 +880,43 @@ textarea.form-control {
     gap: 3px;
 }
 
+/* Line 1 leads with the memorable word: the scheme is dropped and the host dimmed,
+   so the link name (accent) is what the eye lands on. */
 .history-url {
     display: block;
     font-family: var(--font-mono);
-    font-size: 13px;
-    color: var(--text);
+    font-size: 14.5px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     user-select: all;
 }
 
+.history-url .u-host,
+.history-url .u-sep,
+.history-url .u-frag {
+    color: var(--text-tertiary);
+}
+
+.history-url .u-name {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* Line 2 (kind + expiry) in mono, echoing B's techy second line; the pill keeps the
+   UI font so it stays a crisp chip. */
 .history-meta {
     display: flex;
     align-items: center;
     gap: 7px;
-    font-size: 11.5px;
+    font-family: var(--font-mono);
+    font-size: 11px;
     color: var(--text-secondary);
     white-space: nowrap;
+}
+
+.history-meta .kind-pill {
+    font-family: var(--font);
 }
 
 .history-copy {

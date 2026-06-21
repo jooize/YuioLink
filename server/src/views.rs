@@ -48,8 +48,9 @@ fn link_name(url: &str) -> &str {
 /// carries kind, expiry, and any use limit.
 fn result_output(url: Option<&str>, meta: Markup) -> Markup {
     html! {
-        // tabindex=-1: focused after creation so the link selection survives for ⌘C
-        // and the next Tab lands on the input (the panel precedes the form in the DOM).
+        // tabindex=-1: focused after creation so ⌘C copies the link (app.js intercepts
+        // it — no visible selection needed) and the next Tab lands on the input (the
+        // panel precedes the form in the DOM).
         output.result #link-panel tabindex="-1" hidden[url.is_none()] {
             // The link name is the giant hero (R4); the full URL sits small beneath,
             // then the meta line and a Copy pill, with an optional note last.

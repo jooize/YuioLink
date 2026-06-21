@@ -50,6 +50,7 @@
 
     // --- clipboard ---
     const flashCopied = (button) => {
+        if (!button) return;
         button.classList.add("copied");
         button.textContent = "Copied";
         setTimeout(() => {
@@ -83,6 +84,26 @@
             el.append(s);
         };
         add("u-scheme", scheme);
+        add("u-host", host);
+        if (path) { add("u-sep", "/"); add("u-name", path.slice(1)); }
+        add("u-frag", frag);
+    };
+
+    // History variant (mockup B, "word-forward"): drop the scheme and dim the host so
+    // the link name leads. textContent is still the wieldy "host/name" — the row's Copy
+    // button copies the full URL (with scheme), so this only affects the visible text.
+    const renderUrlWordForward = (el, url) => {
+        el.replaceChildren();
+        const m = url.match(/^([a-z][a-z0-9+.-]*:\/\/)([^/]+)(\/[^#]*)?(#.*)?$/i);
+        if (!m) { el.textContent = url; return; }
+        const [, , host, path, frag] = m;
+        const add = (cls, text) => {
+            if (!text) return;
+            const s = document.createElement("span");
+            s.className = cls;
+            s.textContent = text;
+            el.append(s);
+        };
         add("u-host", host);
         if (path) { add("u-sep", "/"); add("u-name", path.slice(1)); }
         add("u-frag", frag);
@@ -129,10 +150,12 @@
         span.classList.toggle("expiring-soon", level === "soon");
         span.classList.toggle("expiring-now", level === "now");
     };
-    // Build "<kind pill> expires in <live countdown><uses>" into `metaEl` (no innerHTML).
+    // Build "<Kind> · expires in <live countdown><uses>" into `metaEl` (no innerHTML).
+    // The result names the kind in plain text — no chip; the pill lives only in the
+    // history rows now, and the big hero word already carries the colour.
     const buildMeta = (metaEl, kind, expiresIso, uses) => {
         metaEl.replaceChildren();
-        metaEl.append(kindPill(kind), " ");
+        metaEl.append(`${kindLabel(kind)} · `);
         const span = document.createElement("span");
         span.className = "countdown";
         span.dataset.expires = expiresIso ?? "";
@@ -178,6 +201,23 @@
             btn.hidden = false;
             btn.addEventListener("click", () => copyToClipboard(linkEl.textContent.trim(), btn));
         }
+    };
+
+    // ⌘C copies the link even with nothing visibly selected (tidier than a highlighted
+    // selection). While the result panel holds focus and the user hasn't made their own
+    // selection inside it, intercept ⌘C / Ctrl-C and copy the link URL, flashing Copy.
+    const enableQuietCopy = (panel, linkEl) => {
+        panel.addEventListener("keydown", (event) => {
+            const isCopy = (event.metaKey || event.ctrlKey) && (event.key === "c" || event.key === "C");
+            if (!isCopy) return;
+            // Respect a real selection the user made within the panel — let it copy natively.
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed && panel.contains(sel.anchorNode)) return;
+            const url = linkEl.textContent.trim();
+            if (!url) return;
+            event.preventDefault();
+            copyToClipboard(url, document.getElementById("copy-result"));
+        });
     };
 
     // --- created-link history ---
@@ -274,14 +314,15 @@
             li.className = "history-item";
             if (isExpired(it)) li.classList.add("expired");
 
-            // Two-line entry (mockup A): line 1 the tri-colour URL, line 2 the kind
-            // pill + expiry. Copy and × stay vertically centred beside the text block.
+            // Two-line entry (mockup B, word-forward): line 1 leads with the link name
+            // (dim host, scheme dropped), line 2 the kind pill + expiry. Copy and × stay
+            // vertically centred beside the text block.
             const txt = document.createElement("div");
             txt.className = "history-text";
 
             const url = document.createElement("code");
             url.className = "history-url";
-            renderUrlInto(url, it.url);
+            renderUrlWordForward(url, it.url);
 
             const meta = document.createElement("small");
             meta.className = "history-meta";
@@ -484,12 +525,25 @@
             return null;
         };
 
-        // The primary button names what it will create.
+        // Holding Option/Alt forces a Text link even when the input looks like a URL.
+        // We track whether it is held so the button label reflects what a submit makes.
+        let altHeld = false;
+
+        // The primary button names what it will create (Option flips a URL to Text).
         const updateSubmitLabel = () => {
-            submitBtn.textContent = content.value.trim() === ""
-                ? "Create Link"
-                : `Create ${kindLabel(detectKind(content.value))} Link`;
+            const empty = content.value.trim() === "";
+            const kind = altHeld ? "text" : detectKind(content.value);
+            submitBtn.textContent = empty ? "Create Link" : `Create ${kindLabel(kind)} Link`;
+            // Hint the hidden override only when it would change the outcome (a URL that
+            // would otherwise redirect), so the tooltip is never misleading.
+            submitBtn.title = (!empty && !altHeld && detectKind(content.value) === "redirect")
+                ? "Hold Option to share as a Text link instead"
+                : "";
         };
+        const setAlt = (on) => { if (altHeld !== on) { altHeld = on; updateSubmitLabel(); } };
+        window.addEventListener("keydown", (e) => { if (e.key === "Alt") setAlt(true); });
+        window.addEventListener("keyup", (e) => { if (e.key === "Alt") setAlt(false); });
+        window.addEventListener("blur", () => setAlt(false));
 
         const autosize = () => {
             content.style.height = "auto";
@@ -554,10 +608,13 @@
             if (cleaned.length === 9) selectBillion();
         });
 
-        // Redirect: Enter submits. Text: Enter = newline, Cmd/Ctrl-Enter submits.
+        // Redirect: Enter submits (Shift-Enter inserts a newline). Text: Enter = newline,
+        // Cmd/Ctrl-Enter submits. Holding Option forces Text, so a URL then behaves like
+        // text — Option-Cmd-Enter submits it as a Text link (plain Enter just newlines).
         content.addEventListener("keydown", (event) => {
             if (event.key !== "Enter") return;
-            if (detectKind(content.value) === "redirect") {
+            const kind = event.altKey ? "text" : detectKind(content.value);
+            if (kind === "redirect") {
                 if (!event.shiftKey) { event.preventDefault(); form.requestSubmit(); }
             } else if (event.metaKey || event.ctrlKey) {
                 event.preventDefault();
@@ -582,17 +639,14 @@
                 if (defaultedOnce) note.textContent = "Limit not specified, so this link opens once.";
             }
             panel.hidden = false;
-            const range = document.createRange();
-            range.selectNodeContents(linkEl);
-            const sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(range);
-            // Focus the panel (which precedes the form in the DOM) so the link
-            // selection survives for ⌘C and the next Tab lands on the input.
+            // Focus the panel (it precedes the form in the DOM) so ⌘C copies the link
+            // (the quiet-copy handler) and the next Tab lands on the input — with no
+            // visible text selection, which looks tidier.
             panel.focus({ preventScroll: true });
         };
 
-        const createLink = async () => {
+        // forceText (Option held) overrides detection so a URL is stored as Text.
+        const createLink = async (forceText = altHeld) => {
             const raw = content.value;
             clearFormError();
             if (raw.trim() === "") { content.focus(); return; }
@@ -608,7 +662,7 @@
                 defaultedOnce = true;
             }
 
-            const kind = detectKind(raw);
+            const kind = forceText ? "text" : detectKind(raw);
             const payload = kind === "redirect" ? normalizeTarget(raw.trim()) : raw;
 
             const restore = submitBtn.textContent;
@@ -673,6 +727,7 @@
         });
 
         setupResultCopy(linkEl);
+        enableQuietCopy(panel, linkEl);
 
         // Split pill: left status jumps to the list (without leaving #history in the
         // address bar); right toggle flips local persistence.
@@ -755,11 +810,12 @@
                     const metaEl = document.getElementById("link-expiry");
                     if (metaEl) buildMeta(metaEl, entry.kind, entry.expires, entry.uses);
                     setupResultCopy(resultLink);
-                    const range = document.createRange();
-                    range.selectNodeContents(resultLink);
-                    const sel = window.getSelection();
-                    sel.removeAllRanges();
-                    sel.addRange(range);
+                    // Quiet ⌘C: focus the panel and copy on ⌘C without a visible selection.
+                    const panel = document.getElementById("link-panel");
+                    if (panel) {
+                        enableQuietCopy(panel, resultLink);
+                        panel.focus({ preventScroll: true });
+                    }
                 }
             }
         }
