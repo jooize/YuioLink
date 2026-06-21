@@ -700,6 +700,14 @@ textarea.form-control {
     border-color: color-mix(in srgb, var(--switch-on) 30%, transparent);
 }
 
+/* Expired link: nothing to copy — the button goes inert and neutral. */
+.result-copy:disabled {
+    color: var(--text-tertiary);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    border-color: var(--separator);
+    cursor: not-allowed;
+}
+
 /* Text-link viewer body. */
 .text-body {
     margin: 16px 0 0;

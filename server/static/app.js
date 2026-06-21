@@ -117,12 +117,13 @@
     const SET_GRACE_MS = 30000;
     const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
     // Remaining time as { text, compact, level }. Minutes/hours/days read the SET value for a
-    // 30s grace (e.g. "1 hour"), then count down by FLOOR in the largest whole unit — truthful
-    // and skip-free: "1 hour" -> "59 minutes" -> "58 minutes" ..., "1 day" -> "23 hours". A
-    // 5-minute link reads "5 minutes" for 30s, "4 minutes" for the next 30s, then "3 minutes"
-    // from ~4:00. Seconds are floored & per-second; the last two minutes count seconds
-    // ("1m59s"); under a minute is bare seconds. "expired" keys off the real deadline (never
-    // early; last partial second reads "1 second"). Flags "soon" (≤5 min, yellow) then "now".
+    // 30s grace (e.g. "1 hour"). DAYS then round UP and hold (a 7-day link reads "7 days"
+    // until a full day passes, then "6 days" — coarse and steady at the top). HOURS and
+    // MINUTES count down by FLOOR (truthful, skip-free): "1 day" -> "23 hours", "1 hour" ->
+    // "59 minutes". A 5-minute link reads "5 minutes" for 30s, "4 minutes" for the next 30s,
+    // then "3 minutes" from ~4:00. Seconds are floored & per-second; the last two minutes
+    // count seconds ("1m59s"); under a minute is bare seconds. "expired" keys off the real
+    // deadline (never early; last partial second reads "1 second"). "soon" (≤5 min) then "now".
     const formatCountdown = (expiresIso, createdMs) => {
         const d = parseUtc(expiresIso);
         if (!d || Number.isNaN(d.getTime())) return { text: "", compact: "", level: "" };
@@ -147,7 +148,7 @@
         else if (s < 120) { const sec = s - 60; unit = sec ? `1 minute ${plural(sec, "second")}` : "1 minute"; short = sec ? `1m${sec}s` : "1m"; }
         else if (ms < 3600000) { const m = Math.floor(ms / 60000); unit = plural(m, "minute"); short = `${m}m`; }
         else if (ms < 86400000) { const h = Math.floor(ms / 3600000); unit = plural(h, "hour"); short = `${h}h`; }
-        else { const days = Math.floor(ms / 86400000); unit = plural(days, "day"); short = `${days}d`; }
+        else { const days = Math.ceil(ms / 86400000); unit = plural(days, "day"); short = `${days}d`; } // days round up & hold (stay same until the day turns)
         const level = s < 60 ? "now" : s <= 300 ? "soon" : "";
         return { text: `${unit} left`, compact: short, level };
     };
@@ -158,9 +159,16 @@
         span.classList.toggle("expiring-soon", level === "soon");
         span.classList.toggle("expiring-now", level === "now");
         // A dead result strikes through its name word and URL (the history list dims
-        // its rows instead). History countdowns sit outside .result, so this no-ops
-        // for them. Live, since this runs every tick via tickCountdowns().
-        span.closest(".result")?.classList.toggle("expired", text === "expired");
+        // its rows instead) and disables Copy — the link no longer resolves. History
+        // countdowns sit outside .result, so this no-ops for them. Live, since this runs
+        // every tick via tickCountdowns().
+        const panel = span.closest(".result");
+        if (panel) {
+            const dead = text === "expired";
+            panel.classList.toggle("expired", dead);
+            const copyBtn = panel.querySelector(".result-copy");
+            if (copyBtn) copyBtn.disabled = dead;
+        }
     };
     // Build "<Kind> · <green time left><uses>" into `metaEl` (no innerHTML): the kind
     // as a coloured word, then the green countdown, then any use limit.
@@ -249,6 +257,7 @@
         panel.addEventListener("keydown", (event) => {
             const isCopy = (event.metaKey || event.ctrlKey) && (event.key === "c" || event.key === "C");
             if (!isCopy) return;
+            if (panel.classList.contains("expired")) return; // dead link: nothing to copy
             // Respect a real selection the user made within the panel — let it copy natively.
             const sel = window.getSelection();
             if (sel && !sel.isCollapsed && panel.contains(sel.anchorNode)) return;
