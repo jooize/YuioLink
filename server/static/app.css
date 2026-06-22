@@ -9,9 +9,10 @@
     --result: #10b981;
     --warn: #c77a00;
     --danger: #d70015;
-    /* "Text" kind word — a cyan/teal. Darker on the light glass so it stays legible
-       (the dark theme uses the bright #0affe4). */
-    --text-kind: #0a9d8e;
+    /* "Text" kind word — a cyan/teal. Darker on the light glass so it stays legible:
+       this hits ~4.8:1 on the card, meeting WCAG AA for 11.5px text
+       (the dark theme uses the bright #0affe4 on its dark card). */
+    --text-kind: #127c70;
     /* Vibrant purple — the standout border on the create input. */
     --purple: #af52de;
 
