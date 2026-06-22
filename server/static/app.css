@@ -884,6 +884,8 @@ textarea.form-control {
     display: flex;
     align-items: center;
     gap: 10px;
+    /* A uniform row height so a one-line tombstone matches a two-line live row. */
+    min-height: 56px;
     padding: 11px 13px;
     border-bottom: 0.5px solid var(--separator);
 }
