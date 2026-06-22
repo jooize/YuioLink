@@ -234,11 +234,17 @@ Remove `crypto.js` / `redirect.js` references (encryption gone); keep `text.js` 
 
 ## 9. Open questions / decisions to confirm during build
 
-- **API limited-destination leak.** `GET /api/v1/links/:name` returns the full destination
-  without consuming, bypassing the domain-only reveal gate for limited links. Closing CORS
-  does NOT fix this (CORS only stops browser cross-origin calls; curl/servers are unaffected).
-  Decide: (a) accept it, or (b) gate/limit the API too (e.g. domain-only for limited links).
+- **API limited-destination leak — DECIDED (2026-06-23): accept it.** `GET
+  /api/v1/links/:name` returns the full destination without consuming, including for limited
+  links. That is fine; the API is not gated. Abuse is handled by **rate limiting**, added
+  **later** (see Deferred), not by gating destinations.
 - **HMAC secret lifecycle** for reveal tokens (persisted vs per-process random).
 - **og:image rasterisation** dependency weight (`resvg`) and PNG caching strategy.
 - **Hits semantics**: a hit is counted at `go` (unlimited) or at `reveal` (limited). One use
   per access either way — document it in user-facing copy if needed.
+
+## 10. Deferred (post-launch)
+
+- **Rate limiting on `/api/v1`** — the chosen mitigation for API abuse (since the API is not
+  gated and stays publicly callable by non-browser clients). Add before any public launch;
+  out of scope for this build.
