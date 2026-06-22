@@ -117,8 +117,10 @@ Replace the current `/:name` handling:
 ```
 - **Drop the old `+` preview convention** (`name.strip_suffix('+')` in `resolve`). `GET /:name`
   is now the preview.
-- API under `/api/v1` is unchanged (read does not consume). See Open Question on whether the
-  API should also gate limited destinations.
+- API under `/api/v1`: read still does not consume. **Remove the open `CorsLayer`** (decided
+  2026-06-23) so the API is **same-origin** — the "host your own browser frontend" rationale
+  died with encryption. See Open Question on gating limited destinations (CORS does not solve
+  it for non-browser clients).
 
 ### Revealed-view token
 
@@ -233,8 +235,9 @@ Remove `crypto.js` / `redirect.js` references (encryption gone); keep `text.js` 
 ## 9. Open questions / decisions to confirm during build
 
 - **API limited-destination leak.** `GET /api/v1/links/:name` returns the full destination
-  without consuming. That bypasses the domain-only reveal gate for limited links. Decide:
-  (a) accept it (the REST API is a trusted-client surface), or (b) also gate/limit it.
+  without consuming, bypassing the domain-only reveal gate for limited links. Closing CORS
+  does NOT fix this (CORS only stops browser cross-origin calls; curl/servers are unaffected).
+  Decide: (a) accept it, or (b) gate/limit the API too (e.g. domain-only for limited links).
 - **HMAC secret lifecycle** for reveal tokens (persisted vs per-process random).
 - **og:image rasterisation** dependency weight (`resvg`) and PNG caching strategy.
 - **Hits semantics**: a hit is counted at `go` (unlimited) or at `reveal` (limited). One use
