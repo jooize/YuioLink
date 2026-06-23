@@ -1,6 +1,9 @@
 //! Runtime configuration, sourced from the environment with sane defaults.
 
 use std::env;
+use std::sync::Arc;
+
+use rand::RngCore;
 
 /// Smallest accepted link lifetime (1 minute).
 pub const MIN_TTL_SECS: i64 = 60;
@@ -23,14 +26,11 @@ pub struct Config {
     pub max_ttl_secs: i64,
     /// How often the reaper deletes expired rows, in seconds.
     pub reap_interval_secs: u64,
-    /// Whether this server offers client-side encryption. Off by default so the
-    /// public yuio.link instance need not be trusted; an operator opts in with
-    /// `YUIOLINK_ENCRYPTION=1` (and their frontend can point at any backend).
-    pub encryption_enabled: bool,
-    /// API base URL the page's JS targets, exposed as a `<meta>` tag. Empty means
-    /// same-origin; set `YUIOLINK_API_BASE` to point a hosted frontend at another
-    /// backend (which may be the one that has encryption enabled).
-    pub api_base: String,
+    /// Secret keying the HMAC reveal tokens (see `token`). Sourced from
+    /// `YUIOLINK_SECRET`; when unset, a fresh random secret is generated per
+    /// process — acceptable because the only effect of rotation is invalidating
+    /// outstanding (10-minute) reveal tokens.
+    pub secret: Arc<[u8]>,
 }
 
 impl Config {
@@ -57,13 +57,14 @@ impl Config {
             .filter(|&v| v > 0)
             .unwrap_or(DEFAULT_REAP_SECS);
 
-        let encryption_enabled = env::var("YUIOLINK_ENCRYPTION")
-            .ok()
-            .is_some_and(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "on" | "yes"));
-
-        let api_base = env::var("YUIOLINK_API_BASE")
-            .map(|v| v.trim_end_matches('/').to_string())
-            .unwrap_or_default();
+        let secret: Arc<[u8]> = match env::var("YUIOLINK_SECRET") {
+            Ok(s) if !s.is_empty() => Arc::from(s.into_bytes()),
+            _ => {
+                let mut bytes = [0u8; 32];
+                rand::rngs::OsRng.fill_bytes(&mut bytes);
+                Arc::from(bytes.as_slice())
+            }
+        };
 
         Self {
             bind,
@@ -71,8 +72,7 @@ impl Config {
             db_path,
             max_ttl_secs,
             reap_interval_secs,
-            encryption_enabled,
-            api_base,
+            secret,
         }
     }
 }

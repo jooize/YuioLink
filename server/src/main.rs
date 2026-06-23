@@ -1,17 +1,15 @@
 mod config;
 mod db;
 mod error;
+mod token;
+mod urlview;
 mod views;
 mod web;
 
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::Router;
-use axum::http::{Method, header};
-use axum::routing::{get, post};
 use tokio::net::TcpListener;
-use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -34,7 +32,6 @@ async fn main() -> anyhow::Result<()> {
         db = %config.db_path,
         max_ttl_secs = config.max_ttl_secs,
         reap_interval_secs = config.reap_interval_secs,
-        encryption_enabled = config.encryption_enabled,
         "starting YuioLink server"
     );
 
@@ -44,44 +41,17 @@ async fn main() -> anyhow::Result<()> {
         pool: pool.clone(),
         base_url: Arc::from(config.base_url.as_str()),
         max_ttl_secs: config.max_ttl_secs,
-        encryption_enabled: config.encryption_enabled,
-        api_base: Arc::from(config.api_base.as_str()),
+        secret: config.secret.clone(),
     };
 
     spawn_reaper(pool, config.reap_interval_secs);
 
-    let app = Router::new()
-        .route("/", get(web::index).post(web::form_create))
-        .route("/static/app.css", get(web::app_css))
-        .route("/static/crypto.js", get(web::crypto_js))
-        .route("/static/app.js", get(web::app_js))
-        .route("/static/redirect.js", get(web::redirect_js))
-        .route("/static/text.js", get(web::text_js))
-        .nest("/api/v1", api_routes())
-        .route("/create", post(web::create_plain))
-        .route("/:name", get(web::resolve))
-        .fallback(fallback)
-        .layer(TraceLayer::new_for_http())
-        .with_state(state);
+    let app = web::router(state).layer(TraceLayer::new_for_http());
 
     let listener = TcpListener::bind(&config.bind).await?;
     tracing::info!(addr = %config.bind, "listening");
     axum::serve(listener, app).await?;
     Ok(())
-}
-
-/// The REST API, with open CORS so a trusted third-party client can run against
-/// yuio.link: any origin, no credentials, GET/POST, content-type header only.
-fn api_routes() -> Router<AppState> {
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods([Method::GET, Method::POST, Method::DELETE])
-        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
-
-    Router::new()
-        .route("/links", post(web::api_create_link))
-        .route("/links/:name", get(web::api_get_link).delete(web::api_delete_link))
-        .layer(cors)
 }
 
 /// Periodically delete expired rows, recycling their names back into the
@@ -98,8 +68,4 @@ fn spawn_reaper(pool: sqlx::SqlitePool, interval_secs: u64) {
             }
         }
     });
-}
-
-async fn fallback() -> error::AppError {
-    error::AppError::NotFound
 }

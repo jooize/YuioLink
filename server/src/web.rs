@@ -3,15 +3,22 @@
 //! Three surfaces share one creation path ([`create_link`]):
 //! - No-JS browser form: `POST /` -> a server-rendered result page.
 //! - Terminal convenience: `POST /create` -> the short URL as text/JSON.
-//! - Canonical REST API under `/api/v1`: versioned JSON, `201 + Location`, open
-//!   CORS so a trusted third-party client can run against any backend.
+//! - Canonical REST API under `/api/v1`: versioned JSON, `201 + Location`,
+//!   same-origin (no open CORS).
+//!
+//! Resolution is the always-preview model: `GET /:name` renders an interstitial
+//! (or, for unlimited text, the text) and spends no use; consuming is a separate
+//! POST that 303-redirects (Post/Redirect/Get), so unfurl crawlers cannot burn a
+//! link.
 
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::extract::{Form, Path, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{Html, IntoResponse, Redirect, Response};
-use axum::Json;
+use axum::routing::{get, post};
+use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
@@ -20,8 +27,9 @@ use yuiolink_core::{
 };
 
 use crate::config::{DEFAULT_TTL_SECS, MIN_TTL_SECS};
-use crate::db::{self, NewLink};
-use crate::{error::AppError, views};
+use crate::db::{self, LinkDetail, NewLink};
+use crate::views::{self, Interstitial, RevealedTarget, RevealedView, Target};
+use crate::{error::AppError, token, urlview};
 
 /// Cap on stored content (~64 KB) — enough for a long URL or a Text snippet,
 /// small enough to keep a single ephemeral row cheap.
@@ -35,8 +43,47 @@ pub struct AppState {
     pub pool: SqlitePool,
     pub base_url: Arc<str>,
     pub max_ttl_secs: i64,
-    pub encryption_enabled: bool,
-    pub api_base: Arc<str>,
+    /// Secret keying the HMAC reveal tokens (see [`crate::token`]).
+    pub secret: Arc<[u8]>,
+}
+
+fn now_unix() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// Build the application router (without the trace layer, which `main` adds). The
+/// always-preview model: `GET /:name` previews (no use spent); the POST endpoints
+/// consume and 303 (Post/Redirect/Get).
+pub fn router(state: AppState) -> Router {
+    Router::new()
+        .route("/", get(index).post(form_create))
+        .route("/static/app.css", get(app_css))
+        .route("/static/app.js", get(app_js))
+        .route("/static/text.js", get(text_js))
+        .nest("/api/v1", api_routes())
+        .route("/create", post(create_plain))
+        .route("/:name", get(resolve))
+        .route("/:name/go", post(go))
+        .route("/:name/reveal", post(reveal))
+        .route("/:name/revealed", get(revealed))
+        .fallback(not_found_fallback)
+        .with_state(state)
+}
+
+/// The REST API. Same-origin only (no CORS): the page's own JS calls it, and the
+/// "host your own browser frontend against yuio.link" rationale for open CORS was
+/// dropped along with client-side encryption.
+fn api_routes() -> Router<AppState> {
+    Router::new()
+        .route("/links", post(api_create_link))
+        .route("/links/:name", get(api_get_link).delete(api_delete_link))
+}
+
+async fn not_found_fallback() -> AppError {
+    AppError::NotFound
 }
 
 // --------------------------------------------------------------------------
@@ -61,14 +108,10 @@ async fn create_link(
     raw_content: &str,
     ttl_seconds: i64,
     max_uses: Option<i64>,
-    encrypted: bool,
     delete_token: Option<&str>,
 ) -> Result<db::InsertedLink, CreateError> {
     use CreateError::BadRequest;
 
-    if encrypted && !state.encryption_enabled {
-        return Err(BadRequest("Encryption is turned off on this server.".into()));
-    }
     if raw_content.trim().is_empty() {
         return Err(BadRequest("Enter a link to redirect, or some text to share.".into()));
     }
@@ -80,10 +123,9 @@ async fn create_link(
         Some(_) => return Err(BadRequest("That is not a link type we recognize.".into())),
     };
 
-    // Redirects are trimmed + normalized + scheme-checked (unless they are opaque
-    // ciphertext); text is kept exactly as typed.
+    // Redirects are trimmed + normalized + scheme-checked; text is kept exactly as
+    // typed (newlines and all).
     let (content, content_type): (String, Option<&str>) = match kind {
-        Kind::Redirect if encrypted => (raw_content.to_string(), None),
         Kind::Redirect => {
             let normalized = normalize_target(raw_content.trim());
             // Store the canonical (ASCII / IDNA-encoded) form so it is a valid
@@ -114,7 +156,6 @@ async fn create_link(
             kind: kind.as_str(),
             content: &content,
             content_type,
-            encrypted,
             ttl_seconds,
             max_uses,
             delete_token,
@@ -132,7 +173,7 @@ async fn create_link(
 // --------------------------------------------------------------------------
 
 pub async fn index(State(state): State<AppState>) -> Html<String> {
-    Html(views::index_page(state.encryption_enabled, &state.api_base, state.max_ttl_secs).into_string())
+    Html(views::index_page(state.max_ttl_secs).into_string())
 }
 
 /// `POST /` — the no-JavaScript create path. A plain HTML form submits here and
@@ -168,7 +209,7 @@ pub async fn form_create(State(state): State<AppState>, Form(form): Form<FormCre
     // No kind field: the server detects it (a URL is a redirect, else text).
     // No-JS form: no token issued (nowhere to keep it), so these links are not
     // API-deletable — fail closed.
-    match create_link(&state, None, &form.content, ttl_seconds, max_uses, false, None).await {
+    match create_link(&state, None, &form.content, ttl_seconds, max_uses, None).await {
         Ok(inserted) => {
             let url = format!("{}{}", state.base_url, inserted.name);
             let kind_label = match detect_kind(&form.content) {
@@ -214,62 +255,168 @@ fn form_error(msg: &str) -> Response {
         .into_response()
 }
 
-pub async fn resolve(
-    State(state): State<AppState>,
-    Path(name): Path<String>,
-) -> Result<Response, AppError> {
-    // A trailing "+" requests the preview/info page instead of resolving (the
-    // bit.ly convention). A preview is safe: no redirect, no hit counted, and it
-    // reads through `get_link_live` so expired/exhausted links 404.
-    if let Some(base) = name.strip_suffix('+') {
-        let d = db::get_link_live(&state.pool, base)
-            .await
-            .map_err(AppError::internal)?
-            .ok_or(AppError::NotFound)?;
-        let short_url = format!("{}{}", state.base_url, base);
-        let target = (d.kind == "redirect" && !d.encrypted).then_some(d.content.as_str());
-        let kind_label = if d.kind == "text" { "Text" } else { "Redirect" };
-        let page = views::preview_page(views::Preview {
+/// `GET /:name` — the mandatory preview. Spends **no** use. A live redirect (or
+/// limited Text) renders the interstitial; unlimited Text renders immediately
+/// (and counts a hit); a spent/withdrawn link is 410 Gone; an
+/// expired/recycled/unknown name is 404.
+pub async fn resolve(State(state): State<AppState>, Path(name): Path<String>) -> Response {
+    let live = match db::get_link_live(&state.pool, &name).await {
+        Ok(v) => v,
+        Err(e) => return AppError::internal(e).into_response(),
+    };
+    let Some(d) = live else {
+        return tombstone_or_missing(&state, &name).await;
+    };
+
+    match (d.kind.as_str(), d.max_uses.is_some()) {
+        // Unlimited Text has no external destination to vet — open it straight
+        // away. This counts a hit (there is no use limit to gate).
+        ("text", false) => {
+            if let Err(e) = db::consume_link(&state.pool, &name).await {
+                return AppError::internal(e).into_response();
+            }
+            Html(views::text_view_page(&d.content).into_string()).into_response()
+        }
+        // Redirects always preview; limited Text shows only that it exists.
+        ("redirect", _) | ("text", true) => interstitial_response(&state, &d),
+        _ => AppError::NotFound.into_response(),
+    }
+}
+
+/// Render the interstitial for a live link without consuming it.
+fn interstitial_response(state: &AppState, d: &LinkDetail) -> Response {
+    let base_host = views::host_from_base(&state.base_url);
+    let short_url = format!("{}{}", state.base_url, d.name);
+    let markup = if d.kind == "redirect" {
+        let url = urlview::parse(&d.content);
+        views::interstitial_page(Interstitial {
+            base_host,
+            name: &d.name,
             short_url: &short_url,
-            kind: kind_label,
-            encrypted: d.encrypted,
-            target,
-            hits: d.hits,
-            created_at: &d.created_at,
             expires_at: &d.expires_at,
             max_uses: d.max_uses,
-        });
-        return Ok(Html(page.into_string()).into_response());
+            target: Target::Redirect(&url),
+        })
+    } else {
+        views::interstitial_page(Interstitial {
+            base_host,
+            name: &d.name,
+            short_url: &short_url,
+            expires_at: &d.expires_at,
+            max_uses: d.max_uses,
+            target: Target::TextSnippet,
+        })
+    };
+    Html(markup.into_string()).into_response()
+}
+
+/// A name that is not live: a still-reserved tombstone (used-up or withdrawn) is
+/// 410 Gone; an expired/recycled/unknown name is 404 Not Found.
+async fn tombstone_or_missing(state: &AppState, name: &str) -> Response {
+    match db::get_link_any(&state.pool, name).await {
+        Ok(Some(d)) => (
+            StatusCode::GONE,
+            Html(views::gone_page(Some(&d.expires_at)).into_string()),
+        )
+            .into_response(),
+        Ok(None) => (
+            StatusCode::NOT_FOUND,
+            Html(views::not_found_page().into_string()),
+        )
+            .into_response(),
+        Err(e) => AppError::internal(e).into_response(),
+    }
+}
+
+/// `POST /:name/go` — consume an **unlimited** redirect and 303 to its
+/// destination (Post/Redirect/Get keeps the back button clean). The link shape is
+/// immutable, so we verify it before spending a hit: a non-matching shape returns
+/// 404 without consuming.
+pub async fn go(State(state): State<AppState>, Path(name): Path<String>) -> Response {
+    match db::get_link_live(&state.pool, &name).await {
+        Ok(Some(d)) if d.kind == "redirect" && d.max_uses.is_none() => {}
+        Ok(Some(_)) => return AppError::NotFound.into_response(),
+        Ok(None) => return tombstone_or_missing(&state, &name).await,
+        Err(e) => return AppError::internal(e).into_response(),
+    }
+    match db::consume_link(&state.pool, &name).await {
+        Ok(Some(d)) if validate_redirect(&d.content, DEFAULT_ALLOWED_SCHEMES).is_ok() => {
+            Redirect::to(&d.content).into_response()
+        }
+        // Stored an unexpected scheme somehow — refuse rather than reflect it.
+        Ok(Some(_)) => AppError::NotFound.into_response(),
+        // Died between the shape check and the consume.
+        Ok(None) => tombstone_or_missing(&state, &name).await,
+        Err(e) => AppError::internal(e).into_response(),
+    }
+}
+
+/// `POST /:name/reveal` — consume a **limited** link (redirect or Text), then 303
+/// to its token-gated revealed view. The use is spent here; the revealed GET only
+/// re-renders, so refresh/back is safe.
+pub async fn reveal(State(state): State<AppState>, Path(name): Path<String>) -> Response {
+    match db::get_link_live(&state.pool, &name).await {
+        Ok(Some(d)) if d.max_uses.is_some() => {}
+        Ok(Some(_)) => return AppError::NotFound.into_response(),
+        Ok(None) => return tombstone_or_missing(&state, &name).await,
+        Err(e) => return AppError::internal(e).into_response(),
+    }
+    match db::consume_link(&state.pool, &name).await {
+        Ok(Some(d)) => {
+            let t = token::mint(&state.secret, &d.name, now_unix() + token::TTL_SECS);
+            Redirect::to(&format!("/{}/revealed?t={t}", d.name)).into_response()
+        }
+        Ok(None) => tombstone_or_missing(&state, &name).await,
+        Err(e) => AppError::internal(e).into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct RevealedQuery {
+    t: Option<String>,
+}
+
+/// `GET /:name/revealed?t=…` — the token-gated revealed view. The token (minted at
+/// reveal) authorises re-rendering without re-consuming, so refresh/back is safe.
+/// Content is read from the (possibly tombstoned) row via `get_link_any`.
+pub async fn revealed(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+    axum::extract::Query(q): axum::extract::Query<RevealedQuery>,
+) -> Result<Response, AppError> {
+    let token = q.t.ok_or(AppError::NotFound)?;
+    let token_name =
+        token::verify(&state.secret, &token, now_unix()).ok_or(AppError::NotFound)?;
+    // The token names the link it authorises; it must match the path.
+    if !token_name.eq_ignore_ascii_case(&name) {
+        return Err(AppError::NotFound);
     }
 
-    // Resolving consumes a use (atomically) for both kinds; expired or exhausted
-    // links 404 because the UPDATE matches no row.
-    let d = db::consume_link(&state.pool, &name)
+    let d = db::get_link_any(&state.pool, &name)
         .await
         .map_err(AppError::internal)?
         .ok_or(AppError::NotFound)?;
 
-    match d.kind.as_str() {
+    let base_host = views::host_from_base(&state.base_url);
+    let markup = match d.kind.as_str() {
         "redirect" => {
-            if d.encrypted {
-                Ok(Html(views::encrypted_redirect_page(&d.content).into_string()).into_response())
-            } else if validate_redirect(&d.content, DEFAULT_ALLOWED_SCHEMES).is_ok() {
-                Ok(Redirect::to(&d.content).into_response())
-            } else {
-                // Stored an unexpected scheme somehow — refuse rather than reflect it.
-                Err(AppError::NotFound)
-            }
+            let url = urlview::parse(&d.content);
+            views::revealed_page(RevealedView {
+                base_host,
+                name: &d.name,
+                expires_at: &d.expires_at,
+                target: RevealedTarget::Redirect { url: &url, href: &d.content },
+            })
         }
-        "text" => {
-            if d.encrypted {
-                Ok(Html(views::encrypted_text_page(&d.content).into_string()).into_response())
-            } else {
-                // Rendered as an escaped <pre> (text/plain) — never live HTML.
-                Ok(Html(views::text_view_page(&d.content).into_string()).into_response())
-            }
-        }
-        _ => Err(AppError::NotFound),
-    }
+        "text" => views::revealed_page(RevealedView {
+            base_host,
+            name: &d.name,
+            expires_at: &d.expires_at,
+            target: RevealedTarget::Text(&d.content),
+        }),
+        _ => return Err(AppError::NotFound),
+    };
+    Ok(Html(markup.into_string()).into_response())
 }
 
 // --------------------------------------------------------------------------
@@ -320,8 +467,8 @@ pub async fn create_plain(
         None => None,
     };
 
-    // Auto-detect kind (None); never encrypted.
-    let inserted = match create_link(&state, None, parsed.content, ttl_seconds, max_uses, false, None).await
+    // Auto-detect kind (None).
+    let inserted = match create_link(&state, None, parsed.content, ttl_seconds, max_uses, None).await
     {
         Ok(inserted) => inserted,
         Err(CreateError::BadRequest(msg)) => {
@@ -462,8 +609,6 @@ pub struct FormCreate {
 pub struct CreateRequest {
     pub kind: String,
     pub content: String,
-    #[serde(default)]
-    pub encrypted: bool,
     /// Lifetime in seconds; omitted -> [`DEFAULT_TTL_SECS`].
     #[serde(default)]
     pub ttl_seconds: Option<i64>,
@@ -493,13 +638,10 @@ pub struct ApiLink {
     pub name: String,
     pub kind: String,
     pub url: String,
-    pub encrypted: bool,
-    /// The destination, only for unencrypted redirects (the server cannot read
-    /// an encrypted target).
+    /// The destination, for redirect links.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
-    /// The body for Text links (plaintext, or `yl1.` ciphertext for out-of-band
-    /// decryption). Reading it here does not count against `max_uses`.
+    /// The body for Text links. Reading it here does not count against `max_uses`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
     pub hits: i64,
@@ -557,7 +699,6 @@ pub async fn api_create_link(
         &req.content,
         ttl_seconds,
         req.max_uses,
-        req.encrypted,
         Some(&delete_token),
     )
     .await?;
@@ -585,10 +726,12 @@ fn bearer_token(headers: &HeaderMap) -> Option<&str> {
         .strip_prefix("Bearer ")
 }
 
-/// `DELETE /api/v1/links/:name` — delete a link, authorized by the per-link
+/// `DELETE /api/v1/links/:name` — withdraw a link, authorized by the per-link
 /// secret from creation sent as `Authorization: Bearer <token>`. Returns
-/// `204 No Content` on success. A missing/wrong token or unknown name both
-/// return `404` so the endpoint reveals nothing about which links exist.
+/// `204 No Content` on success. Withdrawing does not free the name: it tombstones
+/// the row (it then resolves as 410 Gone) and the name stays reserved until
+/// expiry, so it cannot be silently repurposed. A missing/wrong token or unknown
+/// name both return `404` so the endpoint reveals nothing about which links exist.
 pub async fn api_delete_link(
     State(state): State<AppState>,
     Path(name): Path<String>,
@@ -622,7 +765,7 @@ pub async fn api_get_link(
         .ok_or(ApiError::NotFound)?;
 
     let (target, content) = match d.kind.as_str() {
-        "redirect" => ((!d.encrypted).then(|| d.content.clone()), None),
+        "redirect" => (Some(d.content.clone()), None),
         "text" => (None, Some(d.content.clone())),
         _ => (None, None),
     };
@@ -631,7 +774,6 @@ pub async fn api_get_link(
         url: format!("{}{}", state.base_url, d.name),
         name: d.name,
         kind: d.kind,
-        encrypted: d.encrypted,
         target,
         content,
         hits: d.hits,
@@ -657,9 +799,7 @@ macro_rules! static_asset {
 }
 
 static_asset!(app_css, "app.css", "text/css; charset=utf-8");
-static_asset!(crypto_js, "crypto.js", "text/javascript; charset=utf-8");
 static_asset!(app_js, "app.js", "text/javascript; charset=utf-8");
-static_asset!(redirect_js, "redirect.js", "text/javascript; charset=utf-8");
 static_asset!(text_js, "text.js", "text/javascript; charset=utf-8");
 
 #[cfg(test)]
@@ -703,5 +843,190 @@ mod tests {
         assert_eq!(parse_duration("3d"), Some(259200));
         assert_eq!(parse_duration("nope"), None);
         assert_eq!(parse_duration(""), None);
+    }
+
+    // ----------------------------------------------------------------------
+    // HTTP-level flow tests (the always-preview model end to end)
+    // ----------------------------------------------------------------------
+
+    use axum::body::Body;
+    use axum::http::Request;
+    use http_body_util::BodyExt;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use tower::ServiceExt;
+
+    static COUNTER: AtomicU32 = AtomicU32::new(0);
+
+    async fn test_state() -> AppState {
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!("yuiolink-web-{}-{n}.db", std::process::id()));
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{suffix}", path.display()));
+        }
+        AppState {
+            pool: db::connect(path.to_str().unwrap()).await.unwrap(),
+            base_url: Arc::from("http://yuio.test/"),
+            max_ttl_secs: 604800,
+            secret: Arc::from(b"test-secret".as_slice()),
+        }
+    }
+
+    fn redirect(content: &str, max_uses: Option<i64>) -> NewLink<'_> {
+        NewLink {
+            kind: "redirect",
+            content,
+            content_type: None,
+            ttl_seconds: 3600,
+            max_uses,
+            delete_token: Some("tok"),
+        }
+    }
+
+    async fn send(state: &AppState, req: Request<Body>) -> (StatusCode, HeaderMap, String) {
+        let resp = router(state.clone()).oneshot(req).await.unwrap();
+        let status = resp.status();
+        let headers = resp.headers().clone();
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        (status, headers, String::from_utf8(bytes.to_vec()).unwrap())
+    }
+
+    fn get(uri: &str) -> Request<Body> {
+        Request::builder().uri(uri).body(Body::empty()).unwrap()
+    }
+
+    fn post(uri: &str) -> Request<Body> {
+        Request::builder().method("POST").uri(uri).body(Body::empty()).unwrap()
+    }
+
+    async fn hits(state: &AppState, name: &str) -> i64 {
+        db::get_link_any(&state.pool, name).await.unwrap().unwrap().hits
+    }
+
+    #[tokio::test]
+    async fn unlimited_redirect_previews_then_consumes() {
+        let st = test_state().await;
+        let l = db::insert_link(&st.pool, redirect("https://example.com/x", None)).await.unwrap();
+
+        // GET previews: 200 interstitial, no hit, full URL + amber Continue. A
+        // crawler doing exactly this can never spend a use.
+        let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(body.contains("Continue to example.com"), "interstitial body: {body}");
+        assert_eq!(hits(&st, &l.name).await, 0);
+
+        // POST /go consumes: 303 straight to the destination, hit counted.
+        let (s, h, _) = send(&st, post(&format!("/{}/go", l.name))).await;
+        assert_eq!(s, StatusCode::SEE_OTHER);
+        assert_eq!(h.get("location").unwrap(), "https://example.com/x");
+        assert_eq!(hits(&st, &l.name).await, 1);
+    }
+
+    #[tokio::test]
+    async fn one_time_reveal_flow_then_gone() {
+        let st = test_state().await;
+        let l = db::insert_link(
+            &st.pool,
+            redirect("https://secret.example.com/zzz-gated-path", Some(1)),
+        )
+        .await
+        .unwrap();
+
+        // GET previews domain-only: Reveal button, full path gated, no hit.
+        let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(body.contains("Reveal Destination"));
+        assert!(!body.contains("zzz-gated-path"), "path must be gated: {body}");
+        assert_eq!(hits(&st, &l.name).await, 0);
+
+        // POST /reveal consumes once and 303s to the token-gated revealed view.
+        let (s, h, _) = send(&st, post(&format!("/{}/reveal", l.name))).await;
+        assert_eq!(s, StatusCode::SEE_OTHER);
+        let loc = h.get("location").unwrap().to_str().unwrap().to_string();
+        assert!(loc.starts_with(&format!("/{}/revealed?t=", l.name)));
+        assert_eq!(hits(&st, &l.name).await, 1);
+
+        // The revealed GET shows the full URL and does NOT consume again.
+        let (s, _, body) = send(&st, get(&loc)).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(body.contains("zzz-gated-path"), "revealed body: {body}");
+        send(&st, get(&loc)).await; // re-render is safe
+        assert_eq!(hits(&st, &l.name).await, 1);
+
+        // The link itself is spent: 410 Gone.
+        let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
+        assert_eq!(s, StatusCode::GONE);
+        assert!(body.contains("410"));
+    }
+
+    #[tokio::test]
+    async fn tampered_reveal_token_is_404() {
+        let st = test_state().await;
+        let l = db::insert_link(&st.pool, redirect("https://example.com", Some(1))).await.unwrap();
+        let (s, _, _) = send(&st, get(&format!("/{}/revealed?t=forged.sig", l.name))).await;
+        assert_eq!(s, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn unlimited_text_opens_immediately_and_counts_hit() {
+        let st = test_state().await;
+        let l = db::insert_link(
+            &st.pool,
+            NewLink {
+                kind: "text",
+                content: "hello plaintext",
+                content_type: Some("text/plain"),
+                ttl_seconds: 3600,
+                max_uses: None,
+                delete_token: None,
+            },
+        )
+        .await
+        .unwrap();
+        let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(body.contains("hello plaintext"));
+        assert_eq!(hits(&st, &l.name).await, 1);
+    }
+
+    #[tokio::test]
+    async fn unknown_name_is_404() {
+        let st = test_state().await;
+        let (s, _, body) = send(&st, get("/doesnotexist")).await;
+        assert_eq!(s, StatusCode::NOT_FOUND);
+        assert!(body.contains("404"));
+    }
+
+    #[tokio::test]
+    async fn withdraw_via_api_then_gone() {
+        let st = test_state().await;
+        let l = db::insert_link(&st.pool, redirect("https://example.com", None)).await.unwrap();
+
+        let req = Request::builder()
+            .method("DELETE")
+            .uri(format!("/api/v1/links/{}", l.name))
+            .header("authorization", "Bearer tok")
+            .body(Body::empty())
+            .unwrap();
+        let (s, _, _) = send(&st, req).await;
+        assert_eq!(s, StatusCode::NO_CONTENT);
+
+        let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
+        assert_eq!(s, StatusCode::GONE);
+        assert!(body.contains("withdrawn"));
+    }
+
+    #[tokio::test]
+    async fn idn_lookalike_shows_warning_and_punycode() {
+        let st = test_state().await;
+        // аpple.com with a Cyrillic 'а' — a homograph attack.
+        let host = idna::domain_to_ascii("аpple.com").unwrap();
+        let l = db::insert_link(&st.pool, redirect(&format!("https://{host}/login"), None))
+            .await
+            .unwrap();
+        let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(body.contains("Lookalike domain"));
+        assert!(body.contains(&host), "punycode must be shown: {body}");
+        assert!(body.contains("Continue Anyway"));
     }
 }

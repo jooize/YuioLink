@@ -19,17 +19,21 @@ impl AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        let (status, message) = match &self {
-            AppError::NotFound => (StatusCode::NOT_FOUND, "That link does not exist."),
+        match self {
+            // The friendly, by-design 404: links are ephemeral.
+            AppError::NotFound => (
+                StatusCode::NOT_FOUND,
+                Html(views::not_found_page().into_string()),
+            )
+                .into_response(),
             AppError::Internal(detail) => {
                 tracing::error!(error = %detail, "internal server error");
-                (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong.")
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Html(views::error_page(500, "Something went wrong.").into_string()),
+                )
+                    .into_response()
             }
-        };
-        (
-            status,
-            Html(views::error_page(status.as_u16(), message).into_string()),
-        )
-            .into_response()
+        }
     }
 }
