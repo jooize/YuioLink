@@ -260,7 +260,13 @@ fn form_error(msg: &str) -> Response {
 /// limited Text) renders the interstitial; unlimited Text renders immediately
 /// (and counts a hit); a spent/withdrawn link is 410 Gone; an
 /// expired/recycled/unknown name is 404.
+///
+/// A trailing `+` is accepted and ignored (the bit.ly "show me the preview"
+/// convention): since every link already previews, `/:name+` just behaves like
+/// `/:name`, so anyone reaching for `+` out of habit still lands here. Names are
+/// alphanumeric words, so a `+` is never part of one.
 pub async fn resolve(State(state): State<AppState>, Path(name): Path<String>) -> Response {
+    let name = name.strip_suffix('+').map(str::to_string).unwrap_or(name);
     let live = match db::get_link_live(&state.pool, &name).await {
         Ok(v) => v,
         Err(e) => return AppError::internal(e).into_response(),
@@ -1026,6 +1032,26 @@ mod tests {
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("hello plaintext"));
         assert_eq!(hits(&st, &l.name).await, 1);
+    }
+
+    #[tokio::test]
+    async fn trailing_plus_and_any_case_resolve_to_canonical_preview() {
+        let st = test_state().await;
+        let l = db::insert_link(&st.pool, redirect("https://example.com/x", None)).await.unwrap();
+
+        // A trailing "+" is accepted and behaves like the bare name (no use spent).
+        let (s, _, body) = send(&st, get(&format!("/{}+", l.name))).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(body.contains("Continue to example.com"));
+        assert_eq!(hits(&st, &l.name).await, 0);
+
+        // Typing a different case resolves (NOCASE) and the preview shows the
+        // canonical stored name, not what was typed.
+        let typed = l.name.to_uppercase();
+        assert_ne!(typed, l.name);
+        let (s, _, body) = send(&st, get(&format!("/{typed}"))).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(body.contains(&format!(r#"<span class="name">{}</span>"#, l.name)));
     }
 
     #[tokio::test]
