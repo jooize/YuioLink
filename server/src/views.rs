@@ -12,13 +12,13 @@ use crate::urlview::{IdnWarning, UrlView};
 
 /// The shared page shell: head, the glass "app window", and the masthead.
 fn document(body: Markup, scripts: Markup) -> Markup {
-    document_full(html! {}, body, scripts)
+    document_full("YuioLink", html! {}, body, scripts)
 }
 
 /// As [`document`], but with extra `<head>` markup (e.g. OG tags). The masthead
 /// `<h1>` links home so every page has a way back to create another link (the
 /// per-page "Back to YuioLink" footer link is gone).
-fn document_full(head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
+fn document_full(title: &str, head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
     html! {
         (DOCTYPE)
         html lang="en" {
@@ -26,7 +26,7 @@ fn document_full(head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover";
                 meta name="color-scheme" content="light dark";
-                title { "YuioLink" }
+                title { (title) }
                 link rel="stylesheet" href="/static/app.css";
                 (head_extra)
             }
@@ -270,7 +270,14 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
         }
     };
     let scripts = html! { script src="/static/app.js" {} };
-    document(body, scripts)
+    document_full(
+        "YuioLink — Wieldy Ephemeral Link",
+        html! {
+            meta name="description" content="Redirects and text snippets that always expire — never permanent, and every link shows where it leads before you go.";
+        },
+        body,
+        scripts,
+    )
 }
 
 /// The no-JS result page shown after `POST /` creates a link. "Open link" leads
@@ -331,7 +338,7 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
             Target::TextSnippet => (text_snippet_block(&i, one_time)),
         }
     };
-    document_full(interstitial_head(&i, one_time), body, html! {})
+    document_full("YuioLink", interstitial_head(&i, one_time), body, html! {})
 }
 
 /// `<head>` Open Graph / theme-color tags so a shared link unfurls trustworthily.
