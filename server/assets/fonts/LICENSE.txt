@@ -1,0 +1,10 @@
+DejaVu fonts (DejaVuSans.ttf, DejaVuSansMono.ttf), version 2.37.
+Bundled and embedded in the server binary for server-side share-card (og:image)
+text rendering, so cards render with no system fonts installed.
+
+Fonts are (c) 2003 Bitstream, Inc. (Bitstream Vera Fonts) and
+(c) 2006 Tavmjong Bah (Arev Fonts); the DejaVu changes are released into the
+public domain. Distributed under the Bitstream Vera / DejaVu Fonts License, a
+permissive, freely redistributable license.
+
+Full license text: https://dejavu-fonts.github.io/License.html

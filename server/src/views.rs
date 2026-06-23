@@ -349,12 +349,19 @@ fn interstitial_head(i: &Interstitial, one_time: bool) -> Markup {
                 "{kind} redirect that expires {} and may change after.",
                 format_card_date(i.expires_at)
             );
+            let card = format!("{}/card.png", i.short_url);
             html! {
                 meta property="og:site_name" content="YuioLink";
                 meta property="og:type" content="website";
                 meta property="og:title" content=(title);
                 meta property="og:description" content=(desc);
                 meta property="og:url" content=(i.short_url);
+                meta property="og:image" content=(card);
+                meta property="og:image:width" content="1200";
+                meta property="og:image:height" content="630";
+                meta name="twitter:card" content="summary_large_image";
+                meta name="twitter:title" content=(title);
+                meta name="twitter:description" content=(desc);
                 meta name="theme-color" content="#007aff";
             }
         }

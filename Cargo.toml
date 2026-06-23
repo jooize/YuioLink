@@ -33,6 +33,11 @@ psl = "2"
 hmac = "0.12"
 sha2 = "0.10"
 
+# Share-card image: pure-Rust SVG -> PNG (no C system libraries). Text rendering
+# only -- drops the SVG-embedded-raster decoders (gif/webp/jpeg) and system-font
+# loading, since the card is an SVG we generate with bundled fonts.
+resvg = { version = "0.44", default-features = false, features = ["text"] }
+
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

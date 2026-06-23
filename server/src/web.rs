@@ -29,7 +29,7 @@ use yuiolink_core::{
 use crate::config::{DEFAULT_TTL_SECS, MIN_TTL_SECS};
 use crate::db::{self, LinkDetail, NewLink};
 use crate::views::{self, Interstitial, RevealedTarget, RevealedView, Target};
-use crate::{error::AppError, token, urlview};
+use crate::{card, error::AppError, token, urlview};
 
 /// Cap on stored content (~64 KB) — enough for a long URL or a Text snippet,
 /// small enough to keep a single ephemeral row cheap.
@@ -69,6 +69,7 @@ pub fn router(state: AppState) -> Router {
         .route("/:name/go", post(go))
         .route("/:name/reveal", post(reveal))
         .route("/:name/revealed", get(revealed))
+        .route("/:name/card.png", get(card_image))
         .fallback(not_found_fallback)
         .with_state(state)
 }
@@ -417,6 +418,45 @@ pub async fn revealed(
         _ => return Err(AppError::NotFound),
     };
     Ok(Html(markup.into_string()).into_response())
+}
+
+/// `GET /:name/card.png` — the og:image share card for a live redirect. Spends no
+/// use (crawlers fetch it). The card always shows the destination domain.
+pub async fn card_image(State(state): State<AppState>, Path(name): Path<String>) -> Response {
+    let d = match db::get_link_live(&state.pool, &name).await {
+        Ok(Some(d)) if d.kind == "redirect" => d,
+        // No card for non-redirects, or for spent/withdrawn/expired/unknown names.
+        Ok(_) => return AppError::NotFound.into_response(),
+        Err(e) => return AppError::internal(e).into_response(),
+    };
+
+    let url = urlview::parse(&d.content);
+    let kicker = if d.max_uses == Some(1) {
+        "One-time redirect"
+    } else {
+        "Ephemeral redirect"
+    };
+    let foot = format!(
+        "expires {} · may change after",
+        views::format_card_date(&d.expires_at)
+    );
+
+    match card::render_png(&card::Card {
+        kicker,
+        domain: &url.card_domain(),
+        foot: &foot,
+    }) {
+        Some(png) => (
+            [
+                (header::CONTENT_TYPE, "image/png"),
+                // Immutable for the link's life; safe for crawlers to cache.
+                (header::CACHE_CONTROL, "public, max-age=3600"),
+            ],
+            png,
+        )
+            .into_response(),
+        None => AppError::internal("card render failed").into_response(),
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -1013,6 +1053,41 @@ mod tests {
         let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
         assert_eq!(s, StatusCode::GONE);
         assert!(body.contains("withdrawn"));
+    }
+
+    #[tokio::test]
+    async fn card_png_renders_and_spends_no_use() {
+        let st = test_state().await;
+        let l = db::insert_link(&st.pool, redirect("https://example.com/blog", None)).await.unwrap();
+
+        // A crawler hitting the interstitial and the card never bumps hits.
+        send(&st, get(&format!("/{}", l.name))).await;
+        let resp = router(st.clone())
+            .oneshot(get(&format!("/{}/card.png", l.name)))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.headers().get("content-type").unwrap(), "image/png");
+        let png = resp.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(&png[1..4], b"PNG");
+        assert_eq!(hits(&st, &l.name).await, 0);
+
+        // Text links have no card.
+        let t = db::insert_link(
+            &st.pool,
+            NewLink {
+                kind: "text",
+                content: "hi",
+                content_type: Some("text/plain"),
+                ttl_seconds: 3600,
+                max_uses: None,
+                delete_token: None,
+            },
+        )
+        .await
+        .unwrap();
+        let (s, _, _) = send(&st, get(&format!("/{}/card.png", t.name))).await;
+        assert_eq!(s, StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]

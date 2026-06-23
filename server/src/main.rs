@@ -1,3 +1,4 @@
+mod card;
 mod config;
 mod db;
 mod error;
