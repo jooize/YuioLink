@@ -164,7 +164,6 @@ fn result_output(url: Option<&str>, meta: Markup) -> Markup {
                     button.result-copy #copy-result type="button" hidden { "Copy" }
                 }
             }
-            small.result-note #result-note hidden {}
         }
     }
 }
@@ -238,12 +237,9 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                     }
                     input.seg-radio #limit-1 type="radio" name="limit" value="1";
                     label.seg-label for="limit-1" { "Once" }
-                    input.seg-radio #limit-custom type="radio" name="limit" value="custom";
-                    label.seg-label for="limit-custom" { "Specify" }
                 }
-                div.custom-field #limit-custom-field {
-                    input #limit-custom-value.custom-num name="limit_custom" type="number"
-                        min="1" max="1000000000" step="1" inputmode="numeric" placeholder="Times";
+                small.picker-note {
+                    "One-time links get a long, unguessable name. Unlimited links get a short, handy name that others could guess — convenient, not private."
                 }
             }
         }
@@ -560,7 +556,7 @@ pub fn revealed_page(r: RevealedView) -> Markup {
                 (render_url(url))
                 @if let Some(w) = idn_warning(url) { (idn_panel(w)) }
                 a class=(GO_BTN) href=(href) rel="noopener noreferrer" { (continue_label(url)) }
-                p.pv-revealed { "Destination revealed — this used one view." }
+                p.pv-revealed { "One view used." }
                 p.pv-meta { "Expires in " (humanize_expires_in(r.expires_at)) }
                 span.pv-caution.single { strong { "Always check the destination." } }
             };
@@ -568,7 +564,7 @@ pub fn revealed_page(r: RevealedView) -> Markup {
         }
         RevealedTarget::Text(text) => {
             let body = html! {
-                p.pv-revealed { "Text revealed — this used one view." }
+                p.pv-revealed { "One view used." }
                 pre.text-body #text-body { (text) }
                 button.btn.btn-block #copy-text type="button" { "Copy" }
             };
@@ -601,7 +597,7 @@ pub fn gone_page(expires_at: Option<&str>) -> Markup {
         @if let Some(exp) = expires_at {
             p.meta { "Its name stays reserved for " (humanize_expires_in(exp)) "." }
         }
-        a.btn.btn-block href="/" { "Create a new link" }
+        a.btn.btn-block href="/" { "Create a New Link" }
     };
     document(body, html! {})
 }
@@ -612,7 +608,7 @@ pub fn not_found_page() -> Markup {
     let body = html! {
         p.error-code { "404" }
         p { "This link has expired or never existed — links on YuioLink are ephemeral." }
-        a.btn.btn-block href="/" { "Create a new link" }
+        a.btn.btn-block href="/" { "Create a New Link" }
     };
     document(body, html! {})
 }

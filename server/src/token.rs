@@ -2,11 +2,11 @@
 //! link without re-consuming it.
 //!
 //! When a limited link is consumed at `POST /:name/reveal`, the use is spent
-//! immediately and the response 303-redirects to `GET /:name/revealed?t=<token>`.
-//! That GET must be safe to refresh and back-button, so it cannot consume again;
-//! the token is what authorises the re-render. It carries the link name and an
-//! expiry, signed with the server secret, so it can be verified with no stored
-//! state.
+//! immediately and the response 303-redirects to `GET /:name/revealed`, carrying
+//! the token in a short-lived, path-scoped `yl_reveal` cookie. That GET must be
+//! safe to refresh and back-button, so it cannot consume again; the token is what
+//! authorises the re-render. It carries the link name and an expiry, signed with
+//! the server secret, so it can be verified with no stored state.
 //!
 //! Format: `base64url(name|exp) "." base64url(HMAC_SHA256(secret, "name|exp"))`,
 //! where `exp` is a Unix timestamp (seconds). The MAC is taken over the textual
@@ -20,7 +20,7 @@ use sha2::Sha256;
 type HmacSha256 = Hmac<Sha256>;
 
 /// How long a freshly minted reveal token stays valid (10 minutes) — long enough
-/// to read and click through, short enough that a leaked URL is not a lasting
+/// to read and click through, short enough that a leaked token is not a lasting
 /// capability. The link's own expiry still bounds everything.
 pub const TTL_SECS: i64 = 10 * 60;
 

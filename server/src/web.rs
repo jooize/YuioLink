@@ -34,9 +34,6 @@ use crate::{card, error::AppError, token, urlview};
 /// Cap on stored content (~64 KB) — enough for a long URL or a Text snippet,
 /// small enough to keep a single ephemeral row cheap.
 const MAX_CONTENT_BYTES: usize = 64 * 1024;
-/// Cap on a link's view limit (one billion) — effectively unlimited, but bounded so a
-/// request cannot ask for an absurd count. Mirrors the input's `max` on the page.
-const MAX_USES: i64 = 1_000_000_000;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -68,7 +65,6 @@ pub fn router(state: AppState) -> Router {
         .route("/:name", get(resolve))
         .route("/:name/go", post(go))
         .route("/:name/reveal", post(reveal))
-        .route("/:name/revealed", get(revealed))
         .route("/:name/card.png", get(card_image))
         .fallback(not_found_fallback)
         .with_state(state)
@@ -142,13 +138,17 @@ async fn create_link(
         return Err(BadRequest("That is too large to share (the limit is 64 KB).".into()));
     }
     check_ttl(ttl_seconds, state.max_ttl_secs).map_err(BadRequest)?;
-    if let Some(n) = max_uses {
-        if n <= 0 {
-            return Err(BadRequest("Enter a view limit of one or more.".into()));
-        }
-        if n > MAX_USES {
-            return Err(BadRequest("The view limit can be at most 1,000,000,000.".into()));
-        }
+    // A link is either unlimited (no limit) or single-use. Storage keeps a general
+    // remaining-uses counter, but creation only ever sets one view, so reject any
+    // other count rather than silently coercing it (which would surprise a caller
+    // who asked for, say, five and got a link that dies after one).
+    if let Some(n) = max_uses
+        && n != 1
+    {
+        return Err(BadRequest(
+            "A link is either unlimited or single-use: set the view limit to 1, or leave it off."
+                .into(),
+        ));
     }
 
     db::insert_link(
@@ -193,17 +193,9 @@ pub async fn form_create(State(state): State<AppState>, Form(form): Form<FormCre
         None => DEFAULT_TTL_SECS,
     };
 
-    // Limit: unlimited (default), exactly 1, or a custom positive count. A "Specify"
-    // left blank defaults to Once, matching the JS path.
+    // Limit: unlimited (default) or single-use. Those are the only two types.
     let max_uses = match form.limit.as_deref() {
         Some("1") => Some(1),
-        Some("custom") => match form.limit_custom.as_deref().map(str::trim) {
-            Some(s) if !s.is_empty() => match s.parse::<i64>() {
-                Ok(n) => Some(n),
-                Err(_) => return form_error("Enter the view limit as a whole number."),
-            },
-            _ => Some(1),
-        },
         _ => None,
     };
 
@@ -265,8 +257,21 @@ fn form_error(msg: &str) -> Response {
 /// convention): since every link already previews, `/:name+` just behaves like
 /// `/:name`, so anyone reaching for `+` out of habit still lands here. Names are
 /// alphanumeric words, so a `+` is never part of one.
-pub async fn resolve(State(state): State<AppState>, Path(name): Path<String>) -> Response {
+pub async fn resolve(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+) -> Response {
     let name = name.strip_suffix('+').map(str::to_string).unwrap_or(name);
+    // A visitor carrying a valid reveal capability (the `yl_reveal` cookie set when
+    // they POSTed /:name/reveal) sees the revealed view right here at the clean
+    // `/:name` URL — refresh/back safe, reading even a now-tombstoned row.
+    if let Some(token) = reveal_cookie(&headers)
+        && token::verify(&state.secret, &token, now_unix())
+            .is_some_and(|n| n.eq_ignore_ascii_case(&name))
+    {
+        return revealed_view(&state, &name).await;
+    }
     let live = match db::get_link_live(&state.pool, &name).await {
         Ok(v) => v,
         Err(e) => return AppError::internal(e).into_response(),
@@ -371,39 +376,47 @@ pub async fn reveal(State(state): State<AppState>, Path(name): Path<String>) -> 
     match db::consume_link(&state.pool, &name).await {
         Ok(Some(d)) => {
             let t = token::mint(&state.secret, &d.name, now_unix() + token::TTL_SECS);
-            Redirect::to(&format!("/{}/revealed?t={t}", d.name)).into_response()
+            // Carry the reveal capability in a short-lived, path-scoped cookie rather
+            // than the URL, so the revealed page has a clean address and the token
+            // never lands in browser history, referrers, or server logs. `Secure`
+            // only when actually served over HTTPS, so local http dev still works.
+            let secure = if state.base_url.starts_with("https") { "; Secure" } else { "" };
+            let cookie = format!(
+                "yl_reveal={t}; Path=/{}; Max-Age={}; HttpOnly; SameSite=Lax{secure}",
+                d.name,
+                token::TTL_SECS,
+            );
+            let mut resp = Redirect::to(&format!("/{}", d.name)).into_response();
+            resp.headers_mut().append(
+                header::SET_COOKIE,
+                axum::http::HeaderValue::from_str(&cookie).expect("reveal cookie is ASCII"),
+            );
+            resp
         }
         Ok(None) => tombstone_or_missing(&state, &name).await,
         Err(e) => AppError::internal(e).into_response(),
     }
 }
 
-#[derive(Deserialize)]
-pub struct RevealedQuery {
-    t: Option<String>,
+/// Pull the `yl_reveal` capability token out of the request `Cookie` header.
+fn reveal_cookie(headers: &HeaderMap) -> Option<String> {
+    let raw = headers.get(header::COOKIE)?.to_str().ok()?;
+    raw.split(';')
+        .filter_map(|kv| kv.trim().split_once('='))
+        .find(|(k, _)| *k == "yl_reveal")
+        .map(|(_, v)| v.trim().to_string())
 }
 
-/// `GET /:name/revealed?t=…` — the token-gated revealed view. The token (minted at
-/// reveal) authorises re-rendering without re-consuming, so refresh/back is safe.
-/// Content is read from the (possibly tombstoned) row via `get_link_any`.
-pub async fn revealed(
-    State(state): State<AppState>,
-    Path(name): Path<String>,
-    axum::extract::Query(q): axum::extract::Query<RevealedQuery>,
-) -> Result<Response, AppError> {
-    let token = q.t.ok_or(AppError::NotFound)?;
-    let token_name =
-        token::verify(&state.secret, &token, now_unix()).ok_or(AppError::NotFound)?;
-    // The token names the link it authorises; it must match the path.
-    if !token_name.eq_ignore_ascii_case(&name) {
-        return Err(AppError::NotFound);
-    }
-
-    let d = db::get_link_any(&state.pool, &name)
-        .await
-        .map_err(AppError::internal)?
-        .ok_or(AppError::NotFound)?;
-
+/// Render the revealed view for `name`, reading even a now-tombstoned row. The
+/// caller (`resolve`) has already verified the `yl_reveal` capability, so this
+/// re-renders without consuming — served at the clean `/:name` URL on a revealer's
+/// revisit, refresh, or back-button.
+async fn revealed_view(state: &AppState, name: &str) -> Response {
+    let d = match db::get_link_any(&state.pool, name).await {
+        Ok(Some(d)) => d,
+        Ok(None) => return AppError::NotFound.into_response(),
+        Err(e) => return AppError::internal(e).into_response(),
+    };
     let base_host = views::host_from_base(&state.base_url);
     let markup = match d.kind.as_str() {
         "redirect" => {
@@ -421,9 +434,9 @@ pub async fn revealed(
             expires_at: &d.expires_at,
             target: RevealedTarget::Text(&d.content),
         }),
-        _ => return Err(AppError::NotFound),
+        _ => return AppError::NotFound.into_response(),
     };
-    Ok(Html(markup.into_string()).into_response())
+    Html(markup.into_string()).into_response()
 }
 
 /// `GET /:name/card.png` — the og:image share card for a live redirect. Spends no
@@ -643,12 +656,9 @@ pub struct FormCreate {
     /// Custom-expiry unit: `m`, `h`, or `d`.
     #[serde(default)]
     pub ttl_unit: Option<String>,
-    /// Use limit: `unlimited`, `1`, or `custom`.
+    /// Use limit: `unlimited` or `1` (single-use).
     #[serde(default)]
     pub limit: Option<String>,
-    /// Custom use limit, used when `limit` is `custom`.
-    #[serde(default)]
-    pub limit_custom: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -658,7 +668,9 @@ pub struct CreateRequest {
     /// Lifetime in seconds; omitted -> [`DEFAULT_TTL_SECS`].
     #[serde(default)]
     pub ttl_seconds: Option<i64>,
-    /// Burn-after-N-reads; omitted -> unlimited (within the TTL).
+    /// `1` makes the link single-use (burn after one view); omitted/null is
+    /// unlimited within the TTL. Any other value is rejected — a link is either
+    /// unlimited or single-use.
     #[serde(default)]
     pub max_uses: Option<i64>,
 }
@@ -984,32 +996,56 @@ mod tests {
         assert!(!body.contains("zzz-gated-path"), "path must be gated: {body}");
         assert_eq!(hits(&st, &l.name).await, 0);
 
-        // POST /reveal consumes once and 303s to the token-gated revealed view.
+        // POST /reveal consumes once and 303s to the clean /:name URL, with the
+        // capability token in a Set-Cookie header (not the URL).
         let (s, h, _) = send(&st, post(&format!("/{}/reveal", l.name))).await;
         assert_eq!(s, StatusCode::SEE_OTHER);
         let loc = h.get("location").unwrap().to_str().unwrap().to_string();
-        assert!(loc.starts_with(&format!("/{}/revealed?t=", l.name)));
+        assert_eq!(loc, format!("/{}", l.name));
+        let set_cookie = h.get("set-cookie").unwrap().to_str().unwrap();
+        assert!(set_cookie.starts_with("yl_reveal="));
+        let cookie = set_cookie.split(';').next().unwrap().to_string();
         assert_eq!(hits(&st, &l.name).await, 1);
 
-        // The revealed GET shows the full URL and does NOT consume again.
-        let (s, _, body) = send(&st, get(&loc)).await;
+        // The revealed GET (carrying the cookie) shows the full URL and does NOT
+        // consume again.
+        let revealed_get = |c: &str| {
+            Request::builder()
+                .uri(loc.as_str())
+                .header("cookie", c)
+                .body(Body::empty())
+                .unwrap()
+        };
+        let (s, _, body) = send(&st, revealed_get(&cookie)).await;
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("zzz-gated-path"), "revealed body: {body}");
-        send(&st, get(&loc)).await; // re-render is safe
+        send(&st, revealed_get(&cookie)).await; // re-render is safe
         assert_eq!(hits(&st, &l.name).await, 1);
 
-        // The link itself is spent: 410 Gone.
+        // Without the cookie the link is spent: 410 Gone, content not shown.
         let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
         assert_eq!(s, StatusCode::GONE);
         assert!(body.contains("410"));
+        assert!(!body.contains("zzz-gated-path"));
     }
 
     #[tokio::test]
-    async fn tampered_reveal_token_is_404() {
+    async fn forged_reveal_cookie_does_not_reveal() {
         let st = test_state().await;
-        let l = db::insert_link(&st.pool, redirect("https://example.com", Some(1))).await.unwrap();
-        let (s, _, _) = send(&st, get(&format!("/{}/revealed?t=forged.sig", l.name))).await;
-        assert_eq!(s, StatusCode::NOT_FOUND);
+        let l = db::insert_link(&st.pool, redirect("https://example.com/zzz-gated", Some(1)))
+            .await
+            .unwrap();
+        // A forged cookie fails the HMAC check, so /:name falls through to the
+        // normal preview: 200, domain-only, the gated path NOT shown, no consume.
+        let forged = Request::builder()
+            .uri(format!("/{}", l.name))
+            .header("cookie", "yl_reveal=forged.sig")
+            .body(Body::empty())
+            .unwrap();
+        let (s, _, body) = send(&st, forged).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(!body.contains("zzz-gated"), "forged cookie must not reveal: {body}");
+        assert_eq!(hits(&st, &l.name).await, 0);
     }
 
     #[tokio::test]
@@ -1060,6 +1096,27 @@ mod tests {
         let (s, _, body) = send(&st, get("/doesnotexist")).await;
         assert_eq!(s, StatusCode::NOT_FOUND);
         assert!(body.contains("404"));
+    }
+
+    #[tokio::test]
+    async fn api_rejects_multi_use_but_allows_single_use() {
+        let st = test_state().await;
+        let create = |max: i64| {
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/links")
+                .header("content-type", "application/json")
+                .body(Body::from(format!(
+                    r#"{{"kind":"redirect","content":"https://example.com","max_uses":{max}}}"#
+                )))
+                .unwrap()
+        };
+        // N > 1 is refused with 400 — no silent coercion to single-use.
+        let (s, _, _) = send(&st, create(5)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+        // Single-use is accepted.
+        let (s, _, _) = send(&st, create(1)).await;
+        assert_eq!(s, StatusCode::CREATED);
     }
 
     #[tokio::test]

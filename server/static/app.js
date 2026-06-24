@@ -296,17 +296,32 @@
     const newId = () => (self.crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
     const withIds = (list) => (Array.isArray(list) ? list.map((e) => (e && e.id ? e : { ...e, id: newId() })) : []);
     const readStored = () => { try { return withIds(JSON.parse(lsGet(HISTORY_KEY))); } catch { return []; } };
-    // Merge two lists (this tab + storage/another tab): keyed by id, a removal (tombstone)
-    // wins over a live copy of the same entry, links de-dupe by url, newest (created) first.
+    // Removing an entry can't be done by absence: another open tab still holds it in
+    // memory and the next merge would union it back (resurrecting it). So a removal
+    // leaves a "cleared" death-certificate that propagates through the merge like any
+    // tombstone, then self-destructs once every open tab has had time to adopt it.
+    const CLEARED_TTL_MS = 60000;
+    const clearedMarker = (it) => ({ id: it.id, created: it.created, tombstone: "cleared", clearedAt: Date.now() });
+    // Merge precedence for the same id: a "cleared" certificate beats every other state,
+    // any other tombstone (forgotten/gone/broken/deleted) beats a live copy, and ties
+    // keep whichever was seen first. This is what lets a removal win over a stale live copy.
+    const mergeRank = (e) => (e.tombstone === "cleared" ? 2 : e.tombstone ? 1 : 0);
+    // Merge two lists (this tab + storage/another tab): keyed by id with the precedence
+    // above, expired "cleared" certificates garbage-collected, links de-duped by url,
+    // newest (created) first.
     const mergeHistories = (a, b) => {
         const byId = new Map();
         for (const e of [...a, ...b]) {
             if (!e || !e.id) continue;
             const prev = byId.get(e.id);
-            if (!prev || (e.tombstone && !prev.tombstone)) byId.set(e.id, e);
+            if (!prev || mergeRank(e) > mergeRank(prev)) byId.set(e.id, e);
         }
+        const now = Date.now();
         const seenUrl = new Set();
         const out = [...byId.values()]
+            // Drop death-certificates once they have had time to propagate — kept this
+            // long only so other open tabs can adopt the removal before it vanishes.
+            .filter((e) => !(e.tombstone === "cleared" && now - (e.clearedAt ?? 0) > CLEARED_TTL_MS))
             .sort((x, y) => (y.created ?? 0) - (x.created ?? 0))
             .filter((e) => !e.url || (!seenUrl.has(e.url) && seenUrl.add(e.url)));
         if (out.length > HISTORY_MAX) out.length = HISTORY_MAX;
@@ -320,7 +335,7 @@
     const loadPersisted = () => {
         persistEnabled = lsGet(PERSIST_KEY) === "1";
         if (persistEnabled) {
-            memHistory = readStored();
+            memHistory = mergeHistories(readStored(), []); // normalize + GC stale certificates
             historyOpen = lsGet(OPEN_KEY) !== "0"; // restore the open/closed choice (default open)
         } else {
             lsDel(OPEN_KEY); // history off: forget any saved openness
@@ -357,7 +372,8 @@
 
     const renderHistory = () => {
         persistNow();
-        const shown = [...memHistory];
+        // "cleared" certificates are bookkeeping for the cross-tab merge — never shown.
+        const shown = memHistory.filter((it) => it.tombstone !== "cleared");
         const n = shown.length;
         const linkCount = shown.filter((it) => !it.tombstone).length; // tombstones are not links
 
@@ -520,7 +536,9 @@
     const clearTombstone = (it) => {
         const i = findEntry(it);
         if (i === -1) return;
-        memHistory = memHistory.filter((e) => e.id !== it.id);
+        // Leave a death-certificate rather than dropping the row, so the removal sticks
+        // across tabs instead of being resurrected by another tab's stale copy.
+        memHistory[i] = clearedMarker(memHistory[i]);
         persistNow();
         renderHistory();
     };
@@ -678,16 +696,14 @@
         const metaEl = document.getElementById("link-expiry");
         const panel = document.getElementById("link-panel");
         const ttlCustomValue = document.getElementById("ttl-custom-value");
-        const limitCustomValue = document.getElementById("limit-custom-value");
 
         // Field-level problems (not a number, below 1, not whole) are left to the
-        // number inputs' native validation — no hand-rolled checks. A Specify box is
-        // only meaningful while its segment is selected, so disable the inactive ones:
+        // number input's native validation — no hand-rolled checks. The Specify box is
+        // only meaningful while its segment is selected, so disable it otherwise:
         // a disabled control is skipped by native validation and not submitted, which
         // keeps a stale hidden value from silently blocking the form.
         const syncCustomEnabled = () => {
             ttlCustomValue.disabled = checkedValue("ttl_seconds", "3600") !== "custom";
-            limitCustomValue.disabled = checkedValue("limit", "unlimited") !== "custom";
         };
 
         // Whole-form errors (a failed request, a server rejection) shown on the page
@@ -721,15 +737,9 @@
             }
             return Number.parseInt(v, 10);
         };
-        const maxUses = () => {
-            const v = checkedValue("limit", "unlimited");
-            if (v === "1") return 1;
-            if (v === "custom") {
-                const n = Number.parseInt(limitCustomValue.value, 10);
-                return !Number.isNaN(n) && n > 0 ? n : null;
-            }
-            return null;
-        };
+        // Two use-types only: once (single-use) or unlimited. A one-time link gets a
+        // long, unguessable name; an unlimited one gets a short, handy (guessable) name.
+        const maxUses = () => (checkedValue("limit", "unlimited") === "1" ? 1 : null);
 
         // Holding Option/Alt forces a Text link even when the input looks like a URL.
         // We track whether it is held so the button label reflects what a submit makes.
@@ -768,26 +778,13 @@
             if (currentResultUrl) panel.classList.toggle("stale", content.value !== resultSourceValue);
         });
 
-        // Switching segments toggles which Specify box native validation sees, and
-        // picking "Specify" focuses its field.
+        // Switching the expiry segment toggles whether its Specify box is validated,
+        // and picking "Specify" focuses the field.
         for (const r of document.querySelectorAll('input[name="ttl_seconds"]'))
             r.addEventListener("change", () => {
                 syncCustomEnabled();
                 if (document.getElementById("ttl-custom")?.checked) ttlCustomValue.focus();
             });
-        for (const r of document.querySelectorAll('input[name="limit"]'))
-            r.addEventListener("change", () => {
-                syncCustomEnabled();
-                if (document.getElementById("limit-custom")?.checked) limitCustomValue.focus();
-            });
-
-        // Keep the view limit a whole number, digits only (no leading zeros), capped at
-        // one billion.
-        limitCustomValue.addEventListener("input", () => {
-            let cleaned = limitCustomValue.value.replace(/\D+/g, "").replace(/^0+(?=\d)/, "");
-            if (cleaned !== "" && Number(cleaned) > 1000000000) cleaned = "1000000000";
-            if (cleaned !== limitCustomValue.value) limitCustomValue.value = cleaned;
-        });
 
         // Redirect: Enter submits (Shift-Enter inserts a newline). Text: Enter = newline,
         // Cmd/Ctrl-Enter submits. Holding Option forces Text, so a URL then behaves like
@@ -810,15 +807,10 @@
             content.setSelectionRange(n, n);
         });
 
-        const showReady = (url, kind, expiresIso, uses, defaultedOnce) => {
+        const showReady = (url, kind, expiresIso, uses) => {
             if (linkWordEl) linkWordEl.textContent = url.split("#")[0].split("/").pop();
             renderUrlInto(linkEl, url);
             buildMeta(metaEl, kind, expiresIso, uses);
-            const note = document.getElementById("result-note");
-            if (note) {
-                note.hidden = !defaultedOnce;
-                if (defaultedOnce) note.textContent = "Limit not specified, so this link opens once.";
-            }
             panel.hidden = false;
             // Focus the panel (it precedes the form in the DOM) so ⌘C copies the link
             // (the quiet-copy handler) and the next Tab lands on the input — with no
@@ -832,16 +824,10 @@
             clearFormError();
             if (raw.trim() === "") { content.focus(); return; }
 
-            // The number inputs' native validation has already run (a submit only
-            // reaches here once it passes), so this only fills the gaps it can't: an
-            // empty Specify-limit takes the default of Once, noted on the result.
+            // The expiry Specify box's native validation has already run (a submit only
+            // reaches here once it passes); the limit is now just once-or-unlimited.
             const ttl = ttlSeconds();
-            let uses = maxUses();
-            let defaultedOnce = false;
-            if (checkedValue("limit", "unlimited") === "custom" && limitCustomValue.value.trim() === "") {
-                uses = 1;
-                defaultedOnce = true;
-            }
+            const uses = maxUses();
 
             const kind = forceText ? "text" : detectKind(raw);
             const payload = kind === "redirect" ? normalizeTarget(raw.trim()) : raw;
@@ -875,7 +861,7 @@
                 const data = await resp.json();
                 const url = data.url + fragment;
                 currentResultUrl = url;
-                showReady(url, kind, data.expires_at, uses, defaultedOnce);
+                showReady(url, kind, data.expires_at, uses);
                 // Keep the name + delete token so the history row can offer a real
                 // server delete (token is undefined if the backend didn't send one).
                 addHistory({ url, name: data.name, kind, uses, expires: data.expires_at, token: data.delete_token, created: Date.now() });
@@ -930,15 +916,17 @@
         });
 
         document.getElementById("history-clear")?.addEventListener("click", () => {
-            memHistory = [];
-            lsDel(HISTORY_KEY);
+            // Tombstone every row (don't just empty the list) so the clear propagates to
+            // other tabs instead of being undone by their in-memory copies.
+            memHistory = memHistory.map(clearedMarker);
+            persistNow();
             renderHistory();
         });
         document.getElementById("history-toggle")?.addEventListener("click", () => {
             setHistoryOpen(!historyOpen);
         });
         document.getElementById("history-clear-expired")?.addEventListener("click", () => {
-            memHistory = memHistory.filter((it) => !isExpired(it));
+            memHistory = memHistory.map((it) => (isExpired(it) ? clearedMarker(it) : it));
             persistNow();
             renderHistory();
         });
