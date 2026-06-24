@@ -1,21 +1,23 @@
 //! Link-name generation, redirect-target validation, and redirect-vs-text
 //! detection.
 
-use std::time::Duration;
-
 use rand::RngCore;
 use rand::rngs::OsRng;
 use url::Url;
 
 use crate::words::{WORD_COUNT, words};
 
-/// Default max link lifetime used to scale the word count (7 days). The server
-/// enforces its own configurable maximum; this constant only bounds how many
-/// words a name needs, which tops out at two regardless of a larger server max.
-pub const MAX_TTL_SECS: u64 = 7 * 24 * 60 * 60;
+/// Words in a public (unlimited) name. A public link guards nothing — there is
+/// no view to burn and no secrecy promised — so it gets a single wieldy word and
+/// grows by one only when names run short (see [`words_for_uses`]).
+pub const PUBLIC_WORDS: usize = 1;
 
-/// One full day, in seconds — the boundary below which a one-word name suffices.
-const ONE_DAY_SECS: u64 = 24 * 60 * 60;
+/// Words in a limited (single-use) name. The whole value of a limited link is its
+/// one un-spent view, which an enumerator could burn by guessing the name, so the
+/// name must stand on its own as a secret: four words over the ~3500-word list is
+/// ~47 bits, unguessable enough to protect that view for the full 7-day maximum
+/// without a separate capability token.
+pub const LIMITED_WORDS: usize = 4;
 
 /// What a link carries. Both kinds share one namespace and one storage table;
 /// the kind only changes how the stored `content` is resolved and rendered.
@@ -37,14 +39,17 @@ impl Kind {
     }
 }
 
-/// Number of words a name needs for a given lifetime. Shorter-lived links get
-/// shorter, wieldier names because they free their name back into the scarce
-/// short namespace sooner: <=1 day -> one word; up to the 7-day max -> two.
-/// (A one-word name that collides is grown to two at insert time, so a 1-day
-/// link is effectively 1-2 words.)
-pub fn words_for_ttl(ttl: Duration) -> usize {
-    let secs = ttl.as_secs().min(MAX_TTL_SECS);
-    if secs <= ONE_DAY_SECS { 1 } else { 2 }
+/// Number of words a fresh name needs, keyed off the link's *use-type* rather
+/// than its lifetime. A public/unlimited link ([`None`]) has nothing to protect,
+/// so it gets [`PUBLIC_WORDS`] (one wieldy word, grown on collision at insert
+/// time as a capacity valve). A limited link ([`Some`], single-use or otherwise)
+/// must resist a guesser burning its view, so its name carries the entropy:
+/// [`LIMITED_WORDS`]. TTL still sets expiry but no longer drives name length.
+pub fn words_for_uses(max_uses: Option<i64>) -> usize {
+    match max_uses {
+        None => PUBLIC_WORDS,
+        Some(_) => LIMITED_WORDS,
+    }
 }
 
 /// Render words in YuioLink's alternating-case display form: the first word
@@ -214,7 +219,7 @@ mod tests {
 
     #[test]
     fn names_are_distinct() {
-        // Two-word names: 1296^2 ≈ 1.7M, so 1000 draws collide vanishingly rarely.
+        // Two-word names: 3518^2 ≈ 12.4M, so 1000 draws collide vanishingly rarely.
         let set: HashSet<String> = (0..1000).map(|_| generate_name(2)).collect();
         assert!(set.len() > 990);
     }
@@ -227,12 +232,10 @@ mod tests {
     }
 
     #[test]
-    fn words_for_ttl_boundaries() {
-        assert_eq!(words_for_ttl(Duration::from_secs(15 * 60)), 1); // 15 min
-        assert_eq!(words_for_ttl(Duration::from_secs(ONE_DAY_SECS)), 1); // 1 day (default)
-        assert_eq!(words_for_ttl(Duration::from_secs(ONE_DAY_SECS + 1)), 2); // just over a day
-        assert_eq!(words_for_ttl(Duration::from_secs(MAX_TTL_SECS)), 2); // 7 days (max)
-        assert_eq!(words_for_ttl(Duration::from_secs(MAX_TTL_SECS * 10)), 2); // clamped
+    fn words_for_uses_keys_off_use_type() {
+        assert_eq!(words_for_uses(None), PUBLIC_WORDS); // unlimited: wieldy 1-word
+        assert_eq!(words_for_uses(Some(1)), LIMITED_WORDS); // single-use: protected
+        assert_eq!(words_for_uses(Some(5)), LIMITED_WORDS); // any limit is protected
     }
 
     #[test]

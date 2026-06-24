@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
 
-use yuiolink_core::{generate_name, words_for_ttl};
+use yuiolink_core::{generate_name, words_for_uses};
 
 #[derive(sqlx::FromRow)]
 pub struct LinkDetail {
@@ -115,13 +115,14 @@ pub async fn consume_link(
 }
 
 /// Insert a link under a freshly generated name. The word count starts from the
-/// TTL and grows by one after every `COLLISION_GROW_AT` unique-name collisions,
-/// so a crowded short namespace still resolves quickly.
+/// link's use-type (a public link gets one word; a limited link gets four for
+/// entropy) and grows by one after every `COLLISION_GROW_AT` unique-name
+/// collisions, so a crowded namespace still resolves quickly.
 pub async fn insert_link(pool: &SqlitePool, link: NewLink<'_>) -> Result<InsertedLink, sqlx::Error> {
     /// Grow the name by a word after this many collisions in a row.
     const COLLISION_GROW_AT: u32 = 8;
 
-    let mut words = words_for_ttl(Duration::from_secs(link.ttl_seconds.max(0) as u64));
+    let mut words = words_for_uses(link.max_uses);
     let mut collisions: u32 = 0;
 
     loop {

@@ -13,7 +13,7 @@ pub mod words;
 pub use content::ContentType;
 pub use crypto::{CryptoError, LinkKey, generate_token, open, seal, seal_str};
 pub use link::{
-    DEFAULT_ALLOWED_SCHEMES, Kind, MAX_TTL_SECS, UriError, detect_kind, generate_name, has_scheme,
-    validate_redirect, words_for_ttl,
+    DEFAULT_ALLOWED_SCHEMES, Kind, LIMITED_WORDS, PUBLIC_WORDS, UriError, detect_kind,
+    generate_name, has_scheme, validate_redirect, words_for_uses,
 };
 pub use words::{WORD_COUNT, words};

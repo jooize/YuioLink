@@ -1,28 +1,30 @@
-//! The EFF Short Wordlist #1 — 1296 short, memorable, easy-to-type words used to
-//! build YuioLink's "shoutkey" link names (e.g. `braveOTTER`).
+//! The YuioLink curated wordlist — 3518 short (<=6 letter), memorable,
+//! easy-to-type, broadly inoffensive words used to build the "shoutkey" link
+//! names (e.g. `braveOTTER`).
 //!
-//! The list is the canonical EFF short list (each word 3-5 letters, the first
-//! three letters unique). It is embedded verbatim so the server, the future CLI,
-//! and the macOS app all draw names from the same namespace.
+//! The list is embedded verbatim so the server, the future CLI, and the macOS
+//! app all draw names from the same namespace. A bigger list buys entropy per
+//! word: ~11.8 bits each, so a four-word single-use name clears ~47 bits — enough
+//! that the name itself, with no separate secret, resists enumeration of the
+//! single view it guards. See `tools/` for the curation provenance.
 //!
-//! Source: Electronic Frontier Foundation, "EFF Short Wordlist #1", at
-//! <https://www.eff.org/files/2016/09/08/eff_short_wordlist_1.txt>. The official
-//! file is tab-separated (`dice-number<TAB>word`); `eff_short.txt` is that file
-//! with the dice column stripped, leaving one word per line in the original
-//! order. Verified identical to the official words (sha256 of the word column:
-//! 36ecca49e4fa20ca84b176c32f2e9c82f98f446585190e75f9879a95c08247bf).
-//! Licensed CC BY 3.0 US (<https://creativecommons.org/licenses/by/3.0/us/>).
+//! Provenance: a length-capped (<=6 chars) union of the EFF Short Wordlist #1,
+//! BIP39, and the EFF Large list (base forms only), then hand-curated down with
+//! `tools/wordlist-curator.html` — dropping the rarest words, redundant plurals,
+//! brands/trademarks, slurs and adult/clinical terms, and hard-to-spell entries.
+//! The curation lens was "anyone can use this": short, memorable, concrete,
+//! unsurprising words. The canonical source of truth is
+//! `tools/yuiolink-curated.txt`, copied here as `words.txt`.
 //!
-//! Note: the list contains one hyphenated entry, `yo-yo`; it is kept as-is so the
-//! embedded list stays identical to the published EFF list.
+//! Note: the list contains one hyphenated entry, `yo-yo`; it is kept as-is.
 
 use std::sync::OnceLock;
 
 /// The raw wordlist, one lowercase word per line.
-const WORDS_RAW: &str = include_str!("eff_short.txt");
+const WORDS_RAW: &str = include_str!("words.txt");
 
-/// Number of words in the list (4-dice diceware: 6^4).
-pub const WORD_COUNT: usize = 1296;
+/// Number of words in the list.
+pub const WORD_COUNT: usize = 3518;
 
 /// The word list, split once and cached.
 pub fn words() -> &'static [&'static str] {
@@ -45,18 +47,23 @@ mod tests {
     fn list_has_expected_size_and_bounds() {
         let w = words();
         assert_eq!(w.len(), WORD_COUNT);
-        assert_eq!(w[0], "acid");
+        // The embedded list is sorted; these anchor the first and last entries.
+        assert_eq!(w[0], "abacus");
         assert_eq!(*w.last().unwrap(), "zoom");
     }
 
     #[test]
-    fn words_are_lowercase_ascii() {
-        // Every word is lowercase ASCII; `yo-yo` is the lone hyphenated entry.
+    fn words_are_short_lowercase_ascii() {
+        // Every word is lowercase ASCII and at most six letters; `yo-yo` is the
+        // lone hyphenated entry (its hyphen does not count toward the cap).
         for &word in words() {
             assert!(
-                word.bytes()
-                    .all(|b| b.is_ascii_lowercase() || b == b'-'),
+                word.bytes().all(|b| b.is_ascii_lowercase() || b == b'-'),
                 "unexpected character in {word:?}"
+            );
+            assert!(
+                word.chars().filter(|&c| c != '-').count() <= 6,
+                "word longer than six letters: {word:?}"
             );
         }
     }
