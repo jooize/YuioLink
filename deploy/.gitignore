@@ -1,0 +1,4 @@
+# Build scratch: the rootfs exported by `container build -o type=local`.
+# The deployable binary lands at out/linux_amd64/usr/local/bin/yuiolink-server
+# but is reproducible from the repo Dockerfile, so it is never committed.
+/out/

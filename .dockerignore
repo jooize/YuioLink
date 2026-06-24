@@ -1,6 +1,11 @@
 # Keep the build context small and reproducible: no build output, VCS, scratch,
 # or local databases. Source + manifests only.
 target
+.agents-cargo
+.direnv
+repo-archive
+deploy
+node_modules
 .git
 .tmp
 .trash
