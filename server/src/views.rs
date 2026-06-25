@@ -48,6 +48,38 @@ fn link_name(url: &str) -> &str {
     url.split('#').next().unwrap_or(url).rsplit('/').next().unwrap_or(url)
 }
 
+/// Split a shoutkey name into its alternating-case words: `runnyDUSK` -> `runny`,
+/// `DUSK`. A boundary is any adjacent pair of ASCII letters whose case differs;
+/// hyphens (the lone `yo-yo`) stay within their word.
+fn name_words(name: &str) -> Vec<&str> {
+    let b = name.as_bytes();
+    let mut words = Vec::new();
+    let mut start = 0;
+    for i in 1..b.len() {
+        let (p, c) = (b[i - 1], b[i]);
+        if (p.is_ascii_lowercase() && c.is_ascii_uppercase())
+            || (p.is_ascii_uppercase() && c.is_ascii_lowercase())
+        {
+            words.push(&name[start..i]);
+            start = i;
+        }
+    }
+    if start < b.len() {
+        words.push(&name[start..]);
+    }
+    words
+}
+
+/// Render a shoutkey name with each word in an alternating colour, so a multi-word
+/// name reads as separate words (`braveOTTER`). Mirrors the client's `nameSpans`.
+fn highlight_name(name: &str) -> Markup {
+    html! {
+        @for (i, word) in name_words(name).into_iter().enumerate() {
+            span class=(format!("nw nw-{}", i % 2)) { (word) }
+        }
+    }
+}
+
 /// The display host (no scheme, no trailing slash) of the public base URL, e.g.
 /// `https://yuio.link/` -> `yuio.link`. Used for the interstitial source line.
 pub fn host_from_base(base_url: &str) -> &str {
@@ -156,7 +188,7 @@ pub fn humanize_duration(secs: i64) -> String {
 fn result_output(url: Option<&str>, meta: Markup) -> Markup {
     html! {
         output.result #link-panel tabindex="-1" hidden[url.is_none()] {
-            code.result-word #link-word { @if let Some(u) = url { (link_name(u)) } }
+            code.result-word #link-word { @if let Some(u) = url { (highlight_name(link_name(u))) } }
             code.result-url #link-element { @if let Some(u) = url { (u) } }
             div.result-foot {
                 small.result-meta #link-expiry { (meta) }
@@ -201,8 +233,24 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             }
             p.form-error #form-error role="alert" hidden {}
 
+            div.picker.type-picker {
+                div.segmented {
+                    input.seg-radio #type-public type="radio" name="link_type" value="public" checked;
+                    label.seg-label for="type-public" { "Public Link" }
+                    input.seg-radio #type-private type="radio" name="link_type" value="private";
+                    label.seg-label for="type-private" { "Private Link" }
+                    input.seg-radio #type-once type="radio" name="link_type" value="once";
+                    label.seg-label for="type-once" { "One-Time Link" }
+                }
+                // One description line shows for the selected type (CSS :has, so it
+                // works without JavaScript).
+                p.picker-note.for-public { "Convenient link with 1–3 words by shortest available. Not private!" }
+                p.picker-note.for-private { "Private link with 4 words. (Unguessable in 48 bits namespace.)" }
+                p.picker-note.for-once { "Single-use link with 4 words. (Unguessable in 48 bits namespace.)" }
+            }
+
             fieldset.picker {
-                legend { "Expires in" }
+                legend { "Expires after" }
                 div.segmented {
                     input.seg-radio #ttl-600 type="radio" name="ttl_seconds" value="600";
                     label.seg-label for="ttl-600" { "10 minutes" }
@@ -228,20 +276,6 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                 }
             }
 
-            fieldset.picker {
-                legend { "Limit views to" }
-                div.segmented {
-                    input.seg-radio #limit-unlimited type="radio" name="limit" value="unlimited" checked;
-                    label.seg-label for="limit-unlimited" {
-                        span.infinity aria-label="Unlimited" { "∞" }
-                    }
-                    input.seg-radio #limit-1 type="radio" name="limit" value="1";
-                    label.seg-label for="limit-1" { "Once" }
-                }
-                small.picker-note {
-                    "One-time links get a long, unguessable name. Unlimited links get a short, handy name that others could guess — convenient, not private."
-                }
-            }
         }
 
         // Created-link history (bottom). Kept in memory for the session unless the
@@ -252,11 +286,13 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                     span.history-chevron aria-hidden="true" { "›" }
                     span.history-title { "Local History" }
                 }
-                button.history-clear #history-clear type="button" { "Clear" }
+                div.history-head-actions {
+                    button.history-clear-expired #history-clear-expired type="button" hidden { "Clear Expired" }
+                    button.history-clear #history-clear type="button" { "Clear All" }
+                }
             }
             div.history-body {
                 ul.history-list #history-list {}
-                button.history-clear-expired #history-clear-expired type="button" hidden { "Clear Expired" }
             }
         }
 

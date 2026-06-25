@@ -105,6 +105,7 @@ async fn create_link(
     raw_content: &str,
     ttl_seconds: i64,
     max_uses: Option<i64>,
+    private: bool,
     delete_token: Option<&str>,
 ) -> Result<db::InsertedLink, CreateError> {
     use CreateError::BadRequest;
@@ -159,6 +160,7 @@ async fn create_link(
             content_type,
             ttl_seconds,
             max_uses,
+            private,
             delete_token,
         },
     )
@@ -193,16 +195,18 @@ pub async fn form_create(State(state): State<AppState>, Form(form): Form<FormCre
         None => DEFAULT_TTL_SECS,
     };
 
-    // Limit: unlimited (default) or single-use. Those are the only two types.
-    let max_uses = match form.limit.as_deref() {
-        Some("1") => Some(1),
-        _ => None,
+    // One control picks the link's type: public (short, guessable, reusable),
+    // private (long unguessable, reusable), or once (long unguessable, single-use).
+    let (max_uses, private) = match form.link_type.as_deref() {
+        Some("once") => (Some(1), false),
+        Some("private") => (None, true),
+        _ => (None, false), // public (default)
     };
 
     // No kind field: the server detects it (a URL is a redirect, else text).
     // No-JS form: no token issued (nowhere to keep it), so these links are not
     // API-deletable — fail closed.
-    match create_link(&state, None, &form.content, ttl_seconds, max_uses, None).await {
+    match create_link(&state, None, &form.content, ttl_seconds, max_uses, private, None).await {
         Ok(inserted) => {
             let url = format!("{}{}", state.base_url, inserted.name);
             let kind_label = match detect_kind(&form.content) {
@@ -527,7 +531,7 @@ pub async fn create_plain(
     };
 
     // Auto-detect kind (None).
-    let inserted = match create_link(&state, None, parsed.content, ttl_seconds, max_uses, None).await
+    let inserted = match create_link(&state, None, parsed.content, ttl_seconds, max_uses, false, None).await
     {
         Ok(inserted) => inserted,
         Err(CreateError::BadRequest(msg)) => {
@@ -656,9 +660,9 @@ pub struct FormCreate {
     /// Custom-expiry unit: `m`, `h`, or `d`.
     #[serde(default)]
     pub ttl_unit: Option<String>,
-    /// Use limit: `unlimited` or `1` (single-use).
+    /// Link type: `public` (default), `private`, or `once`.
     #[serde(default)]
-    pub limit: Option<String>,
+    pub link_type: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -673,6 +677,10 @@ pub struct CreateRequest {
     /// unlimited or single-use.
     #[serde(default)]
     pub max_uses: Option<i64>,
+    /// Request a private (long, unguessable) name for an unlimited link. Ignored
+    /// for single-use links, which always get the long name.
+    #[serde(default)]
+    pub private: bool,
 }
 // Note: `content_type` is intentionally absent — minimal Text renders plaintext
 // only. Rich Text (a later step, on a sandboxed origin) will reintroduce it with
@@ -757,6 +765,7 @@ pub async fn api_create_link(
         &req.content,
         ttl_seconds,
         req.max_uses,
+        req.private,
         Some(&delete_token),
     )
     .await?;
@@ -936,6 +945,7 @@ mod tests {
             content_type: None,
             ttl_seconds: 3600,
             max_uses,
+            private: false,
             delete_token: Some("tok"),
         }
     }
@@ -1059,6 +1069,7 @@ mod tests {
                 content_type: Some("text/plain"),
                 ttl_seconds: 3600,
                 max_uses: None,
+                private: false,
                 delete_token: None,
             },
         )
@@ -1164,6 +1175,7 @@ mod tests {
                 content_type: Some("text/plain"),
                 ttl_seconds: 3600,
                 max_uses: None,
+                private: false,
                 delete_token: None,
             },
         )

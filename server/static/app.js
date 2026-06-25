@@ -77,8 +77,23 @@
         }
     };
 
+    // Split a shoutkey name at its case boundaries ("runnyDUSK" -> "runny","DUSK")
+    // and render each word in an alternating colour, so a multi-word name reads as
+    // separate words. Returns a fragment of <span class="nw nw-0|nw-1"> words.
+    const NAME_WORDS = /[a-z0-9]+(?:-[a-z0-9]+)*|[A-Z0-9]+(?:-[A-Z0-9]+)*/g;
+    const nameSpans = (name) => {
+        const frag = document.createDocumentFragment();
+        (name.match(NAME_WORDS) || [name]).forEach((w, i) => {
+            const s = document.createElement("span");
+            s.className = `nw nw-${i % 2}`;
+            s.textContent = w;
+            frag.append(s);
+        });
+        return frag;
+    };
+
     // Render a URL into `el` as styled parts: a dim scheme, a standout host, and the
-    // memorable word (the link name) most highlighted; any #fragment stays dim.
+    // memorable word (the link name) highlighted by word; any #fragment stays dim.
     // textContent still returns the whole URL, so copy and ⌘C are unaffected.
     const renderUrlInto = (el, url) => {
         el.replaceChildren();
@@ -94,7 +109,13 @@
         };
         add("u-scheme", scheme);
         add("u-host", host);
-        if (path) { add("u-sep", "/"); add("u-name", path.slice(1)); }
+        if (path) {
+            add("u-sep", "/");
+            const nm = document.createElement("span");
+            nm.className = "u-name";
+            nm.append(nameSpans(path.slice(1)));
+            el.append(nm);
+        }
         add("u-frag", frag);
     };
 
@@ -275,7 +296,6 @@
     const HISTORY_KEY = "yuiolink:history";
     const PERSIST_KEY = "yuiolink:history:persist";
     const OPEN_KEY = "yuiolink:history:open";
-    const HISTORY_MAX = 20;
     let memHistory = [];
     let persistEnabled = false;
     // The history panel is open by default each visit; the open/closed choice is only
@@ -324,7 +344,6 @@
             .filter((e) => !(e.tombstone === "cleared" && now - (e.clearedAt ?? 0) > CLEARED_TTL_MS))
             .sort((x, y) => (y.created ?? 0) - (x.created ?? 0))
             .filter((e) => !e.url || (!seenUrl.has(e.url) && seenUrl.add(e.url)));
-        if (out.length > HISTORY_MAX) out.length = HISTORY_MAX;
         return out;
     };
 
@@ -366,7 +385,6 @@
         if (persistEnabled) memHistory = mergeHistories(memHistory, readStored()); // pick up other tabs first
         memHistory = memHistory.filter((it) => it.url !== entry.url);
         memHistory.unshift(entry);
-        if (memHistory.length > HISTORY_MAX) memHistory.length = HISTORY_MAX;
         persistNow();
     };
 
@@ -447,12 +465,8 @@
             li.className = "history-item";
             if (isExpired(it)) li.classList.add("expired");
 
-            // Two-line entry (mockup A): line 1 the full tri-colour URL (dim scheme,
-            // standout host, accent name), line 2 the coloured kind word + green time
-            // (mockup H3). Copy and × stay vertically centred beside the text block.
-            const txt = document.createElement("div");
-            txt.className = "history-text";
-
+            // Line 1: the full-width tri-colour URL (dim scheme, standout host, the
+            // name highlighted by word) with a trailing green copy-check.
             const l1 = document.createElement("div");
             l1.className = "history-l1";
             const url = document.createElement("code");
@@ -463,6 +477,9 @@
             check.setAttribute("aria-hidden", "true");
             l1.append(url, check);
 
+            // Line 2: kind word + green time on the left, the actions on the right.
+            const foot = document.createElement("div");
+            foot.className = "history-foot";
             const meta = document.createElement("small");
             meta.className = "history-meta";
             meta.append(kindWord(it.kind), " · ");
@@ -475,26 +492,26 @@
             const suffix = usesSuffixShort(it.uses);
             if (suffix) meta.append(suffix);
 
-            txt.append(l1, meta);
-
+            const actions = document.createElement("div");
+            actions.className = "history-actions";
             const copy = document.createElement("button");
             copy.className = "history-copy";
             copy.type = "button";
             copy.textContent = "Copy";
             copy.addEventListener("click", () => copyToClipboard(it.url, copy, () => flashClass(check, "show")));
-
-            const del = document.createElement("button");
-            del.className = "history-delete";
-            del.type = "button";
-            del.setAttribute("aria-label", "Remove");
-            del.textContent = "×"; // ×
-            // The same × toggles the prompt — it stays put (sits above the overlay).
-            del.addEventListener("click", () => {
+            const remove = document.createElement("button");
+            remove.className = "history-remove";
+            remove.type = "button";
+            remove.textContent = "Remove…";
+            // Toggles the confirm prompt drawn over the row (it sits above the overlay).
+            remove.addEventListener("click", () => {
                 if (li.classList.contains("confirming")) closeConfirm(li);
                 else openConfirm(li, it);
             });
+            actions.append(copy, remove);
+            foot.append(meta, actions);
 
-            li.append(txt, copy, del);
+            li.append(l1, foot);
             listEl.append(li);
         }
         const clearExpired = document.getElementById("history-clear-expired");
@@ -737,9 +754,11 @@
             }
             return Number.parseInt(v, 10);
         };
-        // Two use-types only: once (single-use) or unlimited. A one-time link gets a
-        // long, unguessable name; an unlimited one gets a short, handy (guessable) name.
-        const maxUses = () => (checkedValue("limit", "unlimited") === "1" ? 1 : null);
+        // One control picks the type: public (reusable, short, guessable), private
+        // (reusable, long unguessable name), or once (single-use, long name).
+        const linkType = () => checkedValue("link_type", "public");
+        const maxUses = () => (linkType() === "once" ? 1 : null);
+        const isPrivate = () => linkType() === "private";
 
         // Holding Option/Alt forces a Text link even when the input looks like a URL.
         // We track whether it is held so the button label reflects what a submit makes.
@@ -808,7 +827,7 @@
         });
 
         const showReady = (url, kind, expiresIso, uses) => {
-            if (linkWordEl) linkWordEl.textContent = url.split("#")[0].split("/").pop();
+            if (linkWordEl) linkWordEl.replaceChildren(nameSpans(url.split("#")[0].split("/").pop()));
             renderUrlInto(linkEl, url);
             buildMeta(metaEl, kind, expiresIso, uses);
             panel.hidden = false;
@@ -828,13 +847,16 @@
             // reaches here once it passes); the limit is now just once-or-unlimited.
             const ttl = ttlSeconds();
             const uses = maxUses();
+            const priv = isPrivate();
 
             const kind = forceText ? "text" : detectKind(raw);
             const payload = kind === "redirect" ? normalizeTarget(raw.trim()) : raw;
 
             const restore = submitBtn.textContent;
             submitBtn.disabled = true;
-            submitBtn.textContent = "Creating…";
+            // Only show "Creating…" if the request runs long enough to notice; a fast
+            // create would otherwise flash the label pointlessly.
+            const creatingLabel = setTimeout(() => { submitBtn.textContent = "Creating…"; }, 150);
             try {
                 let bodyContent = payload;
                 let fragment = "";
@@ -852,6 +874,7 @@
                         encrypted: !!encrypt?.checked,
                         ttl_seconds: ttl,
                         max_uses: uses,
+                        private: priv,
                     }),
                 });
                 if (!resp.ok) {
@@ -874,6 +897,7 @@
             } catch (e) {
                 showFormError(e.message || "Could not create the link.");
             } finally {
+                clearTimeout(creatingLabel);
                 submitBtn.disabled = false;
                 submitBtn.textContent = restore;
             }

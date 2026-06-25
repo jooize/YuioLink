@@ -337,7 +337,7 @@ textarea.form-control {
     color: var(--text-secondary);
 }
 
-/* Explanatory note under a picker (e.g. the wieldy-vs-private tradeoff on Limit). */
+/* Explanatory note under a picker (e.g. the per-type line on the Type picker). */
 .picker-note {
     display: block;
     margin-top: 7px;
@@ -346,6 +346,16 @@ textarea.form-control {
     line-height: 1.4;
     color: var(--text-secondary);
 }
+
+/* The Type picker has no legend and sits above Expiry; show only the description
+   line for the checked type. :has drives it, so it works without JavaScript. */
+.type-picker .picker-note { display: none; }
+.type-picker:has(#type-public:checked) .for-public,
+.type-picker:has(#type-private:checked) .for-private,
+.type-picker:has(#type-once:checked) .for-once { display: block; }
+
+/* Keep each of the three type labels on a single line. */
+.type-picker .seg-label { white-space: nowrap; }
 
 /* Whole-form error under the action — on-page, never an alert. Danger colour since
    it means the link was not created. */
@@ -564,7 +574,7 @@ textarea.form-control {
     word-break: break-all;
     margin-bottom: 4px;
     color: var(--accent);
-    user-select: all;
+    user-select: text;
 }
 
 /* The full URL beneath the hero word: small and quiet — dim scheme, standout host
@@ -577,7 +587,7 @@ textarea.form-control {
     line-height: 1.4;
     word-break: break-all;
     color: var(--text-tertiary);
-    user-select: all;
+    user-select: text;
 }
 
 /* Copy confirmation: a green check trails the URL on copy (the Copy button or ⌘C),
@@ -620,6 +630,12 @@ textarea.form-control {
     font-weight: 400;
 }
 
+/* Shoutkey name words, alternating colour so a multi-word name reads as separate
+   words (the result hero, the URL name, history rows, and the interstitial). The
+   explicit per-word colour overrides whatever the surrounding context paints. */
+.nw-0 { color: var(--accent); }
+.nw-1 { color: var(--purple); }
+
 /* The preview page uses a plainer inline code (no box). Must exclude the result
    hero word — this selector (0,2,1) otherwise outweighs `.result-word` (0,1,0) and
    would shrink the hero to 13px in `var(--text)` instead of the 30px accent. */
@@ -629,7 +645,7 @@ textarea.form-control {
     font-size: 13px;
     word-break: break-all;
     color: var(--text);
-    user-select: all;
+    user-select: text;
 }
 
 /* Foot beneath the hero URL: the meta line, then the Copy pill, centred. */
@@ -1110,8 +1126,9 @@ textarea.form-control {
 .history-item {
     position: relative;
     display: flex;
-    align-items: center;
-    gap: 10px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
     /* A uniform row height so a one-line tombstone matches a two-line live row. */
     min-height: 56px;
     padding: 11px 13px;
@@ -1125,7 +1142,8 @@ textarea.form-control {
 /* Expired links stay in the list until cleared via "Clear Expired". Only the dead
    link's text fades — the × and its remove menu stay fully lit so it is easy to clear
    (dimming the whole row would dim the confirm overlay drawn over it too). */
-.history-item.expired .history-text {
+.history-item.expired .history-url,
+.history-item.expired .history-meta {
     opacity: 0.5;
 }
 
@@ -1135,12 +1153,12 @@ textarea.form-control {
     color: var(--text-secondary);
 }
 
+/* Clear Expired only tidies dead links -> green (safe). It sits beside Clear All in
+   the head; app.js keeps it hidden until something has actually expired. */
 .history-clear-expired {
-    display: block;
-    margin: 12px auto 0;
     font-family: inherit;
-    font-size: 12px;
-    color: #ff9500;
+    font-size: 12.5px;
+    color: var(--result);
     background: none;
     border: 0;
     padding: 0;
@@ -1166,14 +1184,21 @@ textarea.form-control {
     color: var(--text-kind);
 }
 
-/* Two-line history entry (mockup A): the full URL on top, the kind pill + expiry
-   beneath, with Copy and × vertically centred beside the block. */
-.history-text {
-    flex: 1;
-    min-width: 0;
+/* Line 2 of a history entry: the meta on the left, the actions (Copy, Remove) on
+   the right. Line 1 (the full-width URL) sits above it. */
+.history-foot {
     display: flex;
-    flex-direction: column;
-    gap: 3px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+}
+
+.history-actions {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 /* Line 1: the tri-colour URL plus a trailing green copy-check, on one row. */
@@ -1184,18 +1209,18 @@ textarea.form-control {
     min-width: 0;
 }
 
-/* The full tri-colour URL (mockup A) — dim scheme, standout host, accent name.
-   flex: 0 1 auto (not 1) so the box hugs the text and the check sits right after it,
-   while still shrinking + ellipsizing when the URL is too long for the row. */
+/* The full-width tri-colour URL — dim scheme, standout host, the name highlighted
+   by word. flex: 1 so it takes the whole line (the actions moved to line 2); it
+   still ellipsizes when a redirect URL is too long for the row. */
 .history-url {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
     min-width: 0;
     font-family: var(--font-mono);
     font-size: 13px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    user-select: all;
+    user-select: text;
 }
 
 /* Green check trailing the URL on copy (matches the result); opacity-toggled so the
@@ -1263,26 +1288,26 @@ textarea.form-control {
     text-decoration: none;
 }
 
-/* Per-item delete: a quiet × that toggles the confirm overlay. It sits above the
-   overlay (z-index) and keeps its place, so opening the prompt never moves it. */
-.history-delete {
+/* Per-item Remove…: a quiet text button beside Copy that toggles the confirm
+   overlay. It sits above the overlay (z-index) so clicking it again closes the
+   prompt (there is no separate cancel). */
+.history-remove {
     position: relative;
     z-index: 2;
     flex: none;
     font-family: inherit;
-    font-size: 17px;
-    line-height: 1;
-    color: var(--text-tertiary);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
     background: none;
     border: 0;
-    padding: 2px 5px;
-    border-radius: 6px;
+    padding: 6px 2px;
     cursor: pointer;
 }
 
-.history-delete:hover {
+.history-remove:hover {
     color: var(--danger);
-    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    text-decoration: underline;
 }
 
 /* Confirmation drawn over the row: a short prompt and the two ways to remove. */
@@ -1376,6 +1401,8 @@ textarea.form-control {
    old dashed border (which vanished on the last row and read as noise). The muted fill
    reads as "emptied" in any position; it keeps the list's solid hairline separators. */
 .history-tomb {
+    flex-direction: row;
+    align-items: center;
     justify-content: space-between;
     background: color-mix(in srgb, var(--text) 6%, transparent);
 }
@@ -1422,15 +1449,21 @@ textarea.form-control {
     text-decoration: underline;
 }
 
+/* Clear All and Clear Expired live together at the top-right of the history head. */
+.history-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+/* Clear All wipes the whole local list -> red (destructive). */
 .history-clear {
     font-family: inherit;
     font-size: 12.5px;
-    color: #ff9500;
+    color: var(--danger);
     background: none;
     border: 0;
     padding: 0;
-    /* Nudge it in from the window edge so it does not sit flush against the corner. */
-    margin-right: 6px;
     cursor: pointer;
 }
 

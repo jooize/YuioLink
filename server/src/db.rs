@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
 
-use yuiolink_core::{generate_name, words_for_uses};
+use yuiolink_core::{generate_name, words_for};
 
 #[derive(sqlx::FromRow)]
 pub struct LinkDetail {
@@ -38,6 +38,9 @@ pub struct NewLink<'a> {
     pub content_type: Option<&'a str>,
     pub ttl_seconds: i64,
     pub max_uses: Option<i64>,
+    /// Request a private (long, unguessable) name even for an unlimited link. A
+    /// limited link is always given the long name regardless of this flag.
+    pub private: bool,
     /// Secret that authorizes deleting this link later; `None` means the link
     /// cannot be deleted via the API (no holder).
     pub delete_token: Option<&'a str>,
@@ -122,7 +125,7 @@ pub async fn insert_link(pool: &SqlitePool, link: NewLink<'_>) -> Result<Inserte
     /// Grow the name by a word after this many collisions in a row.
     const COLLISION_GROW_AT: u32 = 8;
 
-    let mut words = words_for_uses(link.max_uses);
+    let mut words = words_for(link.max_uses, link.private);
     let mut collisions: u32 = 0;
 
     loop {
@@ -207,6 +210,7 @@ mod tests {
             content_type: None,
             ttl_seconds: 3600,
             max_uses,
+            private: false,
             delete_token: Some("tok"),
         }
     }
@@ -276,5 +280,18 @@ mod tests {
         // The reaper frees the name (the only path that recycles it).
         assert_eq!(reap_expired(&pool).await.unwrap(), 1);
         assert_eq!(reap_expired(&pool).await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn private_unlimited_link_gets_a_long_name() {
+        let pool = test_pool().await;
+        // A public unlimited link is one lowercase word (no case boundary).
+        let public = insert_link(&pool, redirect("https://example.com/a", None)).await.unwrap();
+        assert!(!public.name.chars().any(|c| c.is_ascii_uppercase()), "{}", public.name);
+        // A private unlimited link is four words, so alternating-case adds uppercase.
+        let mut nl = redirect("https://example.com/b", None);
+        nl.private = true;
+        let private = insert_link(&pool, nl).await.unwrap();
+        assert!(private.name.chars().any(|c| c.is_ascii_uppercase()), "{}", private.name);
     }
 }

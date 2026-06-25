@@ -39,16 +39,17 @@ impl Kind {
     }
 }
 
-/// Number of words a fresh name needs, keyed off the link's *use-type* rather
-/// than its lifetime. A public/unlimited link ([`None`]) has nothing to protect,
-/// so it gets [`PUBLIC_WORDS`] (one wieldy word, grown on collision at insert
-/// time as a capacity valve). A limited link ([`Some`], single-use or otherwise)
-/// must resist a guesser burning its view, so its name carries the entropy:
-/// [`LIMITED_WORDS`]. TTL still sets expiry but no longer drives name length.
-pub fn words_for_uses(max_uses: Option<i64>) -> usize {
-    match max_uses {
-        None => PUBLIC_WORDS,
-        Some(_) => LIMITED_WORDS,
+/// Number of words a fresh name needs. A name must be unguessable
+/// ([`LIMITED_WORDS`]) when EITHER the link is limited — a guesser could burn its
+/// single view — OR the creator asked for a private reusable link. An ordinary
+/// public link has nothing to protect, so it gets one wieldy [`PUBLIC_WORDS`] word
+/// (grown on collision at insert time as a capacity valve). TTL never drives name
+/// length.
+pub fn words_for(max_uses: Option<i64>, private: bool) -> usize {
+    if private || max_uses.is_some() {
+        LIMITED_WORDS
+    } else {
+        PUBLIC_WORDS
     }
 }
 
@@ -232,10 +233,11 @@ mod tests {
     }
 
     #[test]
-    fn words_for_uses_keys_off_use_type() {
-        assert_eq!(words_for_uses(None), PUBLIC_WORDS); // unlimited: wieldy 1-word
-        assert_eq!(words_for_uses(Some(1)), LIMITED_WORDS); // single-use: protected
-        assert_eq!(words_for_uses(Some(5)), LIMITED_WORDS); // any limit is protected
+    fn words_for_keys_off_privacy_and_use_type() {
+        assert_eq!(words_for(None, false), PUBLIC_WORDS); // public: wieldy 1-word
+        assert_eq!(words_for(None, true), LIMITED_WORDS); // private reusable: unguessable
+        assert_eq!(words_for(Some(1), false), LIMITED_WORDS); // single-use: always unguessable
+        assert_eq!(words_for(Some(5), true), LIMITED_WORDS);
     }
 
     #[test]
