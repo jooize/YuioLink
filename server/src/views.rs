@@ -185,11 +185,14 @@ pub fn humanize_duration(secs: i64) -> String {
 /// no-JS path, populated in place by `app.js` otherwise). The memorable word (the
 /// link name) is the hero; the full URL sits small beneath it; a single meta line
 /// carries kind, expiry, and any use limit.
-fn result_output(url: Option<&str>, meta: Markup) -> Markup {
+fn result_output(url: Option<&str>, meta: Markup, note: Option<&str>) -> Markup {
     html! {
         output.result #link-panel tabindex="-1" hidden[url.is_none()] {
             code.result-word #link-word { @if let Some(u) = url { (highlight_name(link_name(u))) } }
             code.result-url #link-element { @if let Some(u) = url { (u) } }
+            // Shown when a public link got more than one word because the short
+            // tiers are crowded; app.js fills this for the in-place result too.
+            small.result-note #result-note hidden[note.is_none()] { @if let Some(n) = note { (n) } }
             div.result-foot {
                 small.result-meta #link-expiry { (meta) }
                 div.result-actions {
@@ -220,7 +223,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
 
         // The created link (latest), shown above the input. app.js fills it in place;
         // the no-JS path reloads to a result page.
-        (result_output(None, html! {}))
+        (result_output(None, html! {}, None))
 
         form #create-form method="post" action="/" {
             textarea #content.form-control name="content" rows="1"
@@ -314,7 +317,14 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
 
 /// The no-JS result page shown after `POST /` creates a link. "Open link" leads
 /// to the link's own interstitial (the always-preview), not straight out.
-pub fn result_page(url: &str, kind_label: &str, expires_at: &str, max_uses: Option<i64>) -> Markup {
+pub fn result_page(
+    url: &str,
+    kind_label: &str,
+    expires_at: &str,
+    max_uses: Option<i64>,
+    private: bool,
+    words: usize,
+) -> Markup {
     let meta = html! {
         (kind_label) " · expires " (expires_at) " UTC"
         @match max_uses {
@@ -323,8 +333,12 @@ pub fn result_page(url: &str, kind_label: &str, expires_at: &str, max_uses: Opti
             None => {}
         }
     };
+    // A public link is normally one word; more means the short tiers are crowded.
+    let note = (max_uses.is_none() && !private && words > 1).then(|| {
+        format!("Short names are in high demand right now, so this link uses {words} words.")
+    });
     let body = html! {
-        (result_output(Some(url), meta))
+        (result_output(Some(url), meta, note.as_deref()))
         a.btn.btn-block href=(url) { "Open link" }
         p { a href="/" { "Create another" } }
     };

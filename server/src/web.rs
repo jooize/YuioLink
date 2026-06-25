@@ -12,6 +12,7 @@
 //! link.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::extract::{Form, Path, State};
@@ -42,6 +43,14 @@ pub struct AppState {
     pub max_ttl_secs: i64,
     /// Secret keying the HMAC reveal tokens (see [`crate::token`]).
     pub secret: Arc<[u8]>,
+    /// Live name count per word-tier (1..=4 words), refreshed by the reaper. The
+    /// create path reads it to choose the shortest available public name.
+    pub occupancy: Arc<[AtomicU64; 4]>,
+}
+
+/// A point-in-time copy of the per-tier occupancy for one create.
+fn occupancy_snapshot(occ: &[AtomicU64; 4]) -> db::Occupancy {
+    std::array::from_fn(|i| occ[i].load(Ordering::Relaxed))
 }
 
 fn now_unix() -> i64 {
@@ -152,6 +161,7 @@ async fn create_link(
         ));
     }
 
+    let occupancy = occupancy_snapshot(&state.occupancy);
     db::insert_link(
         &state.pool,
         NewLink {
@@ -163,6 +173,7 @@ async fn create_link(
             private,
             delete_token,
         },
+        &occupancy,
     )
     .await
     .map_err(|e| {
@@ -214,7 +225,15 @@ pub async fn form_create(State(state): State<AppState>, Form(form): Form<FormCre
                 Kind::Text => "Text",
             };
             Html(
-                views::result_page(&url, kind_label, &inserted.expires_at, max_uses).into_string(),
+                views::result_page(
+                    &url,
+                    kind_label,
+                    &inserted.expires_at,
+                    max_uses,
+                    private,
+                    inserted.words,
+                )
+                .into_string(),
             )
             .into_response()
         }
@@ -554,6 +573,7 @@ pub async fn create_plain(
             name: inserted.name,
             url,
             expires_at: inserted.expires_at,
+            words: inserted.words,
             delete_token: None,
         })
         .into_response()
@@ -691,6 +711,9 @@ pub struct CreateResponse {
     pub name: String,
     pub url: String,
     pub expires_at: String,
+    /// Word count of the issued name. The page shows a note when a public link got
+    /// more than one word because the short tiers are crowded.
+    pub words: usize,
     /// One-time secret that authorizes deleting this link (DELETE with
     /// `Authorization: Bearer <token>`). Returned only here; never stored
     /// anywhere the client doesn't put it. Absent when the link was made
@@ -779,6 +802,7 @@ pub async fn api_create_link(
             name: inserted.name,
             url,
             expires_at: inserted.expires_at,
+            words: inserted.words,
             delete_token: Some(delete_token),
         }),
     ))
@@ -935,6 +959,7 @@ mod tests {
             base_url: Arc::from("http://yuio.test/"),
             max_ttl_secs: 604800,
             secret: Arc::from(b"test-secret".as_slice()),
+            occupancy: Arc::new(std::array::from_fn(|_| std::sync::atomic::AtomicU64::new(0))),
         }
     }
 
@@ -973,7 +998,7 @@ mod tests {
     #[tokio::test]
     async fn unlimited_redirect_previews_then_consumes() {
         let st = test_state().await;
-        let l = db::insert_link(&st.pool, redirect("https://example.com/x", None)).await.unwrap();
+        let l = db::insert_link(&st.pool, redirect("https://example.com/x", None), &db::EMPTY_OCCUPANCY).await.unwrap();
 
         // GET previews: 200 interstitial, no hit, full URL + amber Continue. A
         // crawler doing exactly this can never spend a use.
@@ -995,6 +1020,7 @@ mod tests {
         let l = db::insert_link(
             &st.pool,
             redirect("https://secret.example.com/zzz-gated-path", Some(1)),
+            &db::EMPTY_OCCUPANCY,
         )
         .await
         .unwrap();
@@ -1042,9 +1068,13 @@ mod tests {
     #[tokio::test]
     async fn forged_reveal_cookie_does_not_reveal() {
         let st = test_state().await;
-        let l = db::insert_link(&st.pool, redirect("https://example.com/zzz-gated", Some(1)))
-            .await
-            .unwrap();
+        let l = db::insert_link(
+            &st.pool,
+            redirect("https://example.com/zzz-gated", Some(1)),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
         // A forged cookie fails the HMAC check, so /:name falls through to the
         // normal preview: 200, domain-only, the gated path NOT shown, no consume.
         let forged = Request::builder()
@@ -1072,6 +1102,7 @@ mod tests {
                 private: false,
                 delete_token: None,
             },
+            &db::EMPTY_OCCUPANCY,
         )
         .await
         .unwrap();
@@ -1084,7 +1115,7 @@ mod tests {
     #[tokio::test]
     async fn trailing_plus_and_any_case_resolve_to_canonical_preview() {
         let st = test_state().await;
-        let l = db::insert_link(&st.pool, redirect("https://example.com/x", None)).await.unwrap();
+        let l = db::insert_link(&st.pool, redirect("https://example.com/x", None), &db::EMPTY_OCCUPANCY).await.unwrap();
 
         // A trailing "+" is accepted and behaves like the bare name (no use spent).
         let (s, _, body) = send(&st, get(&format!("/{}+", l.name))).await;
@@ -1133,7 +1164,7 @@ mod tests {
     #[tokio::test]
     async fn withdraw_via_api_then_gone() {
         let st = test_state().await;
-        let l = db::insert_link(&st.pool, redirect("https://example.com", None)).await.unwrap();
+        let l = db::insert_link(&st.pool, redirect("https://example.com", None), &db::EMPTY_OCCUPANCY).await.unwrap();
 
         let req = Request::builder()
             .method("DELETE")
@@ -1152,7 +1183,7 @@ mod tests {
     #[tokio::test]
     async fn card_png_renders_and_spends_no_use() {
         let st = test_state().await;
-        let l = db::insert_link(&st.pool, redirect("https://example.com/blog", None)).await.unwrap();
+        let l = db::insert_link(&st.pool, redirect("https://example.com/blog", None), &db::EMPTY_OCCUPANCY).await.unwrap();
 
         // A crawler hitting the interstitial and the card never bumps hits.
         send(&st, get(&format!("/{}", l.name))).await;
@@ -1178,6 +1209,7 @@ mod tests {
                 private: false,
                 delete_token: None,
             },
+            &db::EMPTY_OCCUPANCY,
         )
         .await
         .unwrap();
@@ -1190,9 +1222,13 @@ mod tests {
         let st = test_state().await;
         // аpple.com with a Cyrillic 'а' — a homograph attack.
         let host = idna::domain_to_ascii("аpple.com").unwrap();
-        let l = db::insert_link(&st.pool, redirect(&format!("https://{host}/login"), None))
-            .await
-            .unwrap();
+        let l = db::insert_link(
+            &st.pool,
+            redirect(&format!("https://{host}/login"), None),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
         let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("Lookalike domain"));

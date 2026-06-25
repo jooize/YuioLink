@@ -712,6 +712,7 @@
         const linkWordEl = document.getElementById("link-word");
         const metaEl = document.getElementById("link-expiry");
         const panel = document.getElementById("link-panel");
+        const resultNoteEl = document.getElementById("result-note");
         const ttlCustomValue = document.getElementById("ttl-custom-value");
 
         // Field-level problems (not a number, below 1, not whole) are left to the
@@ -830,6 +831,7 @@
             if (linkWordEl) linkWordEl.replaceChildren(nameSpans(url.split("#")[0].split("/").pop()));
             renderUrlInto(linkEl, url);
             buildMeta(metaEl, kind, expiresIso, uses);
+            if (resultNoteEl) resultNoteEl.hidden = true; // reset; create path re-shows if crowded
             panel.hidden = false;
             // Focus the panel (it precedes the form in the DOM) so ⌘C copies the link
             // (the quiet-copy handler) and the next Tab lands on the input — with no
@@ -885,6 +887,12 @@
                 const url = data.url + fragment;
                 currentResultUrl = url;
                 showReady(url, kind, data.expires_at, uses);
+                // A public link is normally one word; more means the short tiers are
+                // crowded right now — say so, since the name is longer than expected.
+                if (resultNoteEl && !priv && !uses && data.words > 1) {
+                    resultNoteEl.textContent = `Short names are in high demand right now, so this link uses ${data.words} words.`;
+                    resultNoteEl.hidden = false;
+                }
                 // Keep the name + delete token so the history row can offer a real
                 // server delete (token is undefined if the backend didn't send one).
                 addHistory({ url, name: data.name, kind, uses, expires: data.expires_at, token: data.delete_token, created: Date.now() });

@@ -207,6 +207,10 @@ textarea.form-control {
     min-height: 46px;
     max-height: 40vh;
     line-height: 1.45;
+    /* Vertically centre the text when the field is taller than its content (a
+       single line at min-height). Some engines, notably Windows Edge, otherwise
+       top-align it; supported engines centre, the rest are unaffected. */
+    align-content: center;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     word-break: break-word;
@@ -624,10 +628,17 @@ textarea.form-control {
 }
 
 /* R4: the link name is already the giant hero above, so keep it quiet here — the
-   whole sub-URL reads as one calm address instead of re-accenting the name. */
+   whole sub-URL reads as one calm gray address instead of re-accenting the name. */
 .result-url .u-name {
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     font-weight: 400;
+}
+
+/* Override the per-word accent/purple inside the URL: the address stays gray (the
+   coloured hero already carries the name), with only the host/name a touch clearer. */
+.result-url .nw-0,
+.result-url .nw-1 {
+    color: inherit;
 }
 
 /* Shoutkey name words, alternating colour so a multi-word name reads as separate
@@ -659,6 +670,15 @@ textarea.form-control {
 
 .result-meta {
     font-size: 12.5px;
+    color: var(--text-secondary);
+}
+
+/* Shown when a public link got more than one word because the short tiers are
+   crowded — explains why the name is longer than the usual single word. */
+.result-note {
+    margin: 8px 0 0;
+    font-size: 12.5px;
+    line-height: 1.4;
     color: var(--text-secondary);
 }
 
@@ -1249,12 +1269,18 @@ textarea.form-control {
 }
 
 .history-url .u-host {
-    color: var(--text);
+    color: var(--text-secondary);
 }
 
 .history-url .u-name {
-    color: var(--accent);
-    font-weight: 600;
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+/* Match the result: keep the name gray in the URL, not accent-highlighted. */
+.history-url .nw-0,
+.history-url .nw-1 {
+    color: inherit;
 }
 
 /* Line 2: kind pill + expiry, in the UI font (mockup A). */

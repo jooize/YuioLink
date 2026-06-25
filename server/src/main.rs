@@ -8,6 +8,7 @@ mod views;
 mod web;
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use tokio::net::TcpListener;
@@ -38,14 +39,25 @@ async fn main() -> anyhow::Result<()> {
 
     let pool = db::connect(&config.db_path).await?;
 
+    // Live name count per word-tier. The create path reads it to give a public
+    // link the shortest name still available; the reaper refreshes it each sweep.
+    // Seed it once before serving so the first creates see real occupancy.
+    let occupancy: Arc<[AtomicU64; 4]> = Arc::new(std::array::from_fn(|_| AtomicU64::new(0)));
+    if let Ok(counts) = db::live_counts_by_words(&pool).await {
+        for (slot, n) in occupancy.iter().zip(counts) {
+            slot.store(n, Ordering::Relaxed);
+        }
+    }
+
     let state = AppState {
         pool: pool.clone(),
         base_url: Arc::from(config.base_url.as_str()),
         max_ttl_secs: config.max_ttl_secs,
         secret: config.secret.clone(),
+        occupancy: occupancy.clone(),
     };
 
-    spawn_reaper(pool, config.reap_interval_secs);
+    spawn_reaper(pool, config.reap_interval_secs, occupancy);
 
     let app = web::router(state).layer(TraceLayer::new_for_http());
 
@@ -56,8 +68,9 @@ async fn main() -> anyhow::Result<()> {
 }
 
 /// Periodically delete expired rows, recycling their names back into the
-/// namespace. A failed sweep is logged and retried on the next tick.
-fn spawn_reaper(pool: sqlx::SqlitePool, interval_secs: u64) {
+/// namespace, then refresh the per-tier occupancy the create path reads. A failed
+/// sweep is logged and retried on the next tick.
+fn spawn_reaper(pool: sqlx::SqlitePool, interval_secs: u64, occupancy: Arc<[AtomicU64; 4]>) {
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(Duration::from_secs(interval_secs));
         loop {
@@ -66,6 +79,14 @@ fn spawn_reaper(pool: sqlx::SqlitePool, interval_secs: u64) {
                 Ok(n) if n > 0 => tracing::info!(reaped = n, "recycled expired links"),
                 Ok(_) => {}
                 Err(e) => tracing::error!(error = %e, "reaper sweep failed"),
+            }
+            match db::live_counts_by_words(&pool).await {
+                Ok(counts) => {
+                    for (slot, n) in occupancy.iter().zip(counts) {
+                        slot.store(n, Ordering::Relaxed);
+                    }
+                }
+                Err(e) => tracing::error!(error = %e, "occupancy refresh failed"),
             }
         }
     });

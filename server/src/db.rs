@@ -46,10 +46,21 @@ pub struct NewLink<'a> {
     pub delete_token: Option<&'a str>,
 }
 
-/// The result of creating a link: its generated name and computed expiry.
+/// Live name counts per word-tier: `[0]` = live 1-word names, `[1]` = 2-word, and
+/// so on up to four words. Feeds the public allocation policy
+/// ([`yuiolink_core::words_for`]); refreshed by the reaper.
+pub type Occupancy = [u64; 4];
+
+/// An empty namespace (every tier free) — public links get the shortest name.
+/// Handy at first startup and in tests.
+pub const EMPTY_OCCUPANCY: Occupancy = [0; 4];
+
+/// The result of creating a link: its generated name, computed expiry, and the
+/// word count of the name actually issued (after any collision growth).
 pub struct InsertedLink {
     pub name: String,
     pub expires_at: String,
+    pub words: usize,
 }
 
 pub async fn connect(db_path: &str) -> anyhow::Result<SqlitePool> {
@@ -117,22 +128,28 @@ pub async fn consume_link(
         .await
 }
 
-/// Insert a link under a freshly generated name. The word count starts from the
-/// link's use-type (a public link gets one word; a limited link gets four for
-/// entropy) and grows by one after every `COLLISION_GROW_AT` unique-name
-/// collisions, so a crowded namespace still resolves quickly.
-pub async fn insert_link(pool: &SqlitePool, link: NewLink<'_>) -> Result<InsertedLink, sqlx::Error> {
+/// Insert a link under a freshly generated name. The starting word count comes
+/// from the link's type and the current per-tier `occupancy`: private/single-use
+/// links always get four words; a public link gets the shortest tier still under
+/// its TTL band's occupancy ceiling (see [`yuiolink_core::words_for`]). It then
+/// grows by one after every `COLLISION_GROW_AT` unique-name collisions, so a tier
+/// that filled since the last occupancy refresh still resolves quickly.
+pub async fn insert_link(
+    pool: &SqlitePool,
+    link: NewLink<'_>,
+    occupancy: &Occupancy,
+) -> Result<InsertedLink, sqlx::Error> {
     /// Grow the name by a word after this many collisions in a row.
     const COLLISION_GROW_AT: u32 = 8;
 
-    let mut words = words_for(link.max_uses, link.private);
+    let mut words = words_for(link.max_uses, link.private, link.ttl_seconds, occupancy);
     let mut collisions: u32 = 0;
 
     loop {
         let name = generate_name(words);
         let result: Result<String, sqlx::Error> = sqlx::query_scalar(
-            "INSERT INTO links (name, kind, content, content_type, expires_at, max_uses, delete_token) \
-             VALUES (?, ?, ?, ?, datetime('now', '+' || ? || ' seconds'), ?, ?) \
+            "INSERT INTO links (name, kind, content, content_type, expires_at, max_uses, delete_token, words) \
+             VALUES (?, ?, ?, ?, datetime('now', '+' || ? || ' seconds'), ?, ?, ?) \
              RETURNING expires_at",
         )
         .bind(&name)
@@ -142,11 +159,12 @@ pub async fn insert_link(pool: &SqlitePool, link: NewLink<'_>) -> Result<Inserte
         .bind(link.ttl_seconds)
         .bind(link.max_uses)
         .bind(link.delete_token)
+        .bind(words as i64)
         .fetch_one(pool)
         .await;
 
         match result {
-            Ok(expires_at) => return Ok(InsertedLink { name, expires_at }),
+            Ok(expires_at) => return Ok(InsertedLink { name, expires_at, words }),
             Err(sqlx::Error::Database(db)) if db.is_unique_violation() => {
                 collisions += 1;
                 if collisions.is_multiple_of(COLLISION_GROW_AT) {
@@ -156,6 +174,21 @@ pub async fn insert_link(pool: &SqlitePool, link: NewLink<'_>) -> Result<Inserte
             Err(e) => return Err(e),
         }
     }
+}
+
+/// Count live names grouped by word-tier, for the occupancy-driven public policy.
+/// Names longer than four words (which only the collision valve ever produces) are
+/// folded away — the policy never starts above four. Run periodically by the reaper.
+pub async fn live_counts_by_words(pool: &SqlitePool) -> Result<Occupancy, sqlx::Error> {
+    let sql = format!("SELECT words, COUNT(*) FROM links WHERE {LIVE_PREDICATE} GROUP BY words");
+    let rows: Vec<(i64, i64)> = sqlx::query_as(&sql).fetch_all(pool).await?;
+    let mut occ = EMPTY_OCCUPANCY;
+    for (words, n) in rows {
+        if (1..=occ.len() as i64).contains(&words) {
+            occ[words as usize - 1] = n.max(0) as u64;
+        }
+    }
+    Ok(occ)
 }
 
 /// Withdraw a link by name, but only when `token` matches the secret stored at
@@ -227,7 +260,7 @@ mod tests {
     #[tokio::test]
     async fn preview_reads_without_consuming() {
         let pool = test_pool().await;
-        let l = insert_link(&pool, redirect("https://example.com", None)).await.unwrap();
+        let l = insert_link(&pool, redirect("https://example.com", None), &EMPTY_OCCUPANCY).await.unwrap();
         // Reading twice must not move the hit counter.
         assert!(get_link_live(&pool, &l.name).await.unwrap().is_some());
         let d = get_link_live(&pool, &l.name).await.unwrap().unwrap();
@@ -237,7 +270,7 @@ mod tests {
     #[tokio::test]
     async fn one_time_consume_then_tombstone() {
         let pool = test_pool().await;
-        let l = insert_link(&pool, redirect("https://example.com", Some(1))).await.unwrap();
+        let l = insert_link(&pool, redirect("https://example.com", Some(1)), &EMPTY_OCCUPANCY).await.unwrap();
 
         // First consume succeeds and counts the hit.
         let d = consume_link(&pool, &l.name).await.unwrap().unwrap();
@@ -253,7 +286,7 @@ mod tests {
     #[tokio::test]
     async fn withdraw_tombstones_keeps_name_reserved() {
         let pool = test_pool().await;
-        let l = insert_link(&pool, redirect("https://example.com", None)).await.unwrap();
+        let l = insert_link(&pool, redirect("https://example.com", None), &EMPTY_OCCUPANCY).await.unwrap();
 
         // Wrong token does nothing (fail closed).
         assert!(!delete_link(&pool, &l.name, "nope").await.unwrap());
@@ -270,7 +303,7 @@ mod tests {
     #[tokio::test]
     async fn expired_is_gone_to_both_readers_and_reaps() {
         let pool = test_pool().await;
-        let l = insert_link(&pool, redirect("https://example.com", None)).await.unwrap();
+        let l = insert_link(&pool, redirect("https://example.com", None), &EMPTY_OCCUPANCY).await.unwrap();
         expire_now(&pool, &l.name).await;
 
         // Expired reads as missing everywhere (the 404, not the 410, case).
@@ -286,12 +319,26 @@ mod tests {
     async fn private_unlimited_link_gets_a_long_name() {
         let pool = test_pool().await;
         // A public unlimited link is one lowercase word (no case boundary).
-        let public = insert_link(&pool, redirect("https://example.com/a", None)).await.unwrap();
+        let public = insert_link(&pool, redirect("https://example.com/a", None), &EMPTY_OCCUPANCY).await.unwrap();
         assert!(!public.name.chars().any(|c| c.is_ascii_uppercase()), "{}", public.name);
         // A private unlimited link is four words, so alternating-case adds uppercase.
         let mut nl = redirect("https://example.com/b", None);
         nl.private = true;
-        let private = insert_link(&pool, nl).await.unwrap();
+        let private = insert_link(&pool, nl, &EMPTY_OCCUPANCY).await.unwrap();
         assert!(private.name.chars().any(|c| c.is_ascii_uppercase()), "{}", private.name);
+    }
+
+    #[tokio::test]
+    async fn public_name_lengthens_when_the_short_tier_is_crowded() {
+        let pool = test_pool().await;
+        // Pretend the 1-word tier is ~50% full. A 7-day public link (40% ceiling)
+        // must yield to two words; the recorded `words` reflects the real name.
+        let cap1 = yuiolink_core::WORD_COUNT as u64;
+        let crowded: Occupancy = [cap1 / 2, 0, 0, 0];
+        let mut nl = redirect("https://example.com", None);
+        nl.ttl_seconds = 604800; // 7 days
+        let l = insert_link(&pool, nl, &crowded).await.unwrap();
+        assert_eq!(l.words, 2, "name was {}", l.name);
+        assert!(l.name.chars().any(|c| c.is_ascii_uppercase()), "{}", l.name);
     }
 }

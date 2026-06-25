@@ -7,9 +7,10 @@ use url::Url;
 
 use crate::words::{WORD_COUNT, words};
 
-/// Words in a public (unlimited) name. A public link guards nothing — there is
-/// no view to burn and no secrecy promised — so it gets a single wieldy word and
-/// grows by one only when names run short (see [`words_for_uses`]).
+/// Smallest public-name length: a single wieldy word. A public link guards
+/// nothing — no view to burn, no secrecy promised — so while the 1-word namespace
+/// is uncrowded it gets just one word, lengthening only as the short tiers fill
+/// (see [`public_words_for`]).
 pub const PUBLIC_WORDS: usize = 1;
 
 /// Words in a limited (single-use) name. The whole value of a limited link is its
@@ -39,17 +40,71 @@ impl Kind {
     }
 }
 
-/// Number of words a fresh name needs. A name must be unguessable
-/// ([`LIMITED_WORDS`]) when EITHER the link is limited — a guesser could burn its
-/// single view — OR the creator asked for a private reusable link. An ordinary
-/// public link has nothing to protect, so it gets one wieldy [`PUBLIC_WORDS`] word
-/// (grown on collision at insert time as a capacity valve). TTL never drives name
-/// length.
-pub fn words_for(max_uses: Option<i64>, private: bool) -> usize {
+/// Largest word count the public-link policy will *start* a name at; past this,
+/// the insert-time grow-on-collision valve takes over. Reaching here means every
+/// tier up to four words is over its occupancy ceiling — which needs ~21 billion
+/// live three-word links, so in practice public names top out at three.
+pub const MAX_PUBLIC_WORDS: usize = LIMITED_WORDS;
+
+/// TTL bands (seconds) for the public allocation ladder. A shorter-lived link
+/// frees its name again fast, so it gets priority on the scarce short tiers; a
+/// longer-lived link yields to a longer name sooner. See `docs/NAMESPACES.md`.
+const SHORT_TTL_SECS: i64 = 60 * 60; // <= 1 hour
+const MEDIUM_TTL_SECS: i64 = 2 * 24 * 60 * 60; // <= 2 days
+
+/// Occupancy ceiling (percent of a tier's capacity) at or above which a public
+/// link of the given TTL escalates to the next, longer tier. Short TTLs tolerate a
+/// fuller tier (higher ceiling) because they recycle their names quickly.
+fn occupancy_ceiling_pct(ttl_seconds: i64) -> u128 {
+    if ttl_seconds <= SHORT_TTL_SECS {
+        90
+    } else if ttl_seconds <= MEDIUM_TTL_SECS {
+        60
+    } else {
+        40
+    }
+}
+
+/// Capacity of the `words`-word tier: `WORD_COUNT.pow(words)`. In `u128` so the
+/// four-word tier (~1.5e14) and the `* 100` occupancy comparison never overflow.
+pub fn tier_capacity(words: usize) -> u128 {
+    (0..words).fold(1u128, |acc, _| acc * WORD_COUNT as u128)
+}
+
+/// Starting word count for a **public** link, from its TTL and the current live
+/// name count per tier (`live_per_tier[k - 1]` = live `k`-word names). Returns the
+/// shortest tier whose occupancy is under this TTL band's ceiling, so short names
+/// stay available and short-lived links get first claim on them. Escalates up to
+/// [`MAX_PUBLIC_WORDS`]; the insert-time collision valve covers the rest.
+pub fn public_words_for(ttl_seconds: i64, live_per_tier: &[u64]) -> usize {
+    let ceiling = occupancy_ceiling_pct(ttl_seconds);
+    for words in PUBLIC_WORDS..MAX_PUBLIC_WORDS {
+        let live = u128::from(live_per_tier.get(words - 1).copied().unwrap_or(0));
+        // live / capacity < ceiling / 100  <=>  live * 100 < capacity * ceiling
+        if live * 100 < tier_capacity(words) * ceiling {
+            return words;
+        }
+    }
+    MAX_PUBLIC_WORDS
+}
+
+/// Number of words a fresh name needs.
+///
+/// A name must be unguessable ([`LIMITED_WORDS`]) when the link is **private** or
+/// **single-use** — a guesser could otherwise discover it or burn its one view, so
+/// the name itself has to be the secret. An ordinary **public** link guards
+/// nothing, so its length is chosen purely for *availability*: the shortest tier
+/// not over-subscribed for the link's TTL ([`public_words_for`]).
+pub fn words_for(
+    max_uses: Option<i64>,
+    private: bool,
+    ttl_seconds: i64,
+    live_per_tier: &[u64],
+) -> usize {
     if private || max_uses.is_some() {
         LIMITED_WORDS
     } else {
-        PUBLIC_WORDS
+        public_words_for(ttl_seconds, live_per_tier)
     }
 }
 
@@ -233,11 +288,39 @@ mod tests {
     }
 
     #[test]
-    fn words_for_keys_off_privacy_and_use_type() {
-        assert_eq!(words_for(None, false), PUBLIC_WORDS); // public: wieldy 1-word
-        assert_eq!(words_for(None, true), LIMITED_WORDS); // private reusable: unguessable
-        assert_eq!(words_for(Some(1), false), LIMITED_WORDS); // single-use: always unguessable
-        assert_eq!(words_for(Some(5), true), LIMITED_WORDS);
+    fn words_for_forces_four_for_private_and_single_use() {
+        let empty = [0u64; 4];
+        let ttl = 3600;
+        // Public + uncrowded namespace -> one wieldy word.
+        assert_eq!(words_for(None, false, ttl, &empty), PUBLIC_WORDS);
+        // Private reusable, or single-use, must stand on its own as a secret.
+        assert_eq!(words_for(None, true, ttl, &empty), LIMITED_WORDS);
+        assert_eq!(words_for(Some(1), false, ttl, &empty), LIMITED_WORDS);
+        assert_eq!(words_for(Some(5), true, ttl, &empty), LIMITED_WORDS);
+    }
+
+    #[test]
+    fn public_words_grow_with_occupancy_and_ttl() {
+        let cap1 = tier_capacity(1) as u64; // the 1-word namespace size
+        let empty = [0u64; 4];
+
+        // Uncrowded: every TTL band gets a single word.
+        assert_eq!(public_words_for(600, &empty), 1);
+        assert_eq!(public_words_for(604800, &empty), 1);
+
+        // 1-word tier ~50% full: a 7-day link (40% ceiling) yields to two words,
+        // but a <=1h link (90% ceiling) keeps its single word.
+        let half = [cap1 / 2, 0, 0, 0];
+        assert_eq!(public_words_for(604800, &half), 2);
+        assert_eq!(public_words_for(600, &half), 1);
+
+        // ~95% full: even a short-lived link steps up to two words.
+        let nearly = [cap1 * 95 / 100, 0, 0, 0];
+        assert_eq!(public_words_for(600, &nearly), 2);
+
+        // Absurd: tiers 1-3 all jammed -> a public link reaches four words.
+        let jammed = [u64::MAX, u64::MAX, u64::MAX, 0];
+        assert_eq!(public_words_for(604800, &jammed), MAX_PUBLIC_WORDS);
     }
 
     #[test]
