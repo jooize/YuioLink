@@ -245,8 +245,8 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                 // One description line shows for the selected type (CSS :has, so it
                 // works without JavaScript).
                 small.picker-note.for-public { "Convenient link with 1–3 words by shortest available. Not private!" }
-                small.picker-note.for-private { "Private link with 4 words. (Unguessable in 48 bits namespace.)" }
-                small.picker-note.for-once { "Single-use link with 4 words. (Unguessable in 48 bits namespace.)" }
+                small.picker-note.for-private { "Private link with 4 words. (Unguessable in a 47-bit namespace.)" }
+                small.picker-note.for-once { "Single-use link with 4 words. (Unguessable in a 47-bit namespace.)" }
             }
 
             fieldset.picker {
