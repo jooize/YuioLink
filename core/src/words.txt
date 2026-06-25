@@ -1406,7 +1406,6 @@ hair
 half
 halo
 halt
-halves
 hamlet
 hammer
 hamper
