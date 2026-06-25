@@ -1,0 +1,11 @@
+[Unit]
+Description=Fetch and install the latest YuioLink release from GitHub
+Documentation=https://github.com/jooize/YuioLink
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# On-demand only (no [Install]/timer): trigger with `systemctl start yuiolink-update`.
+# Runs as root: it writes /usr/local/bin/yuiolink-server and restarts the service.
+Type=oneshot
+ExecStart=/usr/local/bin/yuiolink-update

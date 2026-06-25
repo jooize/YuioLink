@@ -1,0 +1,40 @@
+name: Release
+
+# Build the linux/amd64 server binary natively (no emulation) and attach it, with
+# its SHA-256, to the GitHub release for the pushed tag. The droplet's
+# `yuiolink-update` then pulls and verifies it. Binaries are release assets only --
+# they never enter the git repository.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # required to create/upload release assets
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the linux/amd64 binary via the repo Dockerfile
+        run: |
+          docker buildx build --platform linux/amd64 -f Dockerfile -o type=local,dest=out .
+          # A single-platform buildx export has no per-arch subdirectory.
+          src="out/usr/local/bin/yuiolink-server"
+          [ -f "$src" ] || src="out/linux_amd64/usr/local/bin/yuiolink-server"
+          install -m0755 "$src" yuiolink-server-linux-amd64
+
+      - name: Checksum
+        run: sha256sum yuiolink-server-linux-amd64 | tee yuiolink-server-linux-amd64.sha256
+
+      - name: Publish the binary to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes \
+            yuiolink-server-linux-amd64 yuiolink-server-linux-amd64.sha256 \
+          || gh release upload "$GITHUB_REF_NAME" \
+            yuiolink-server-linux-amd64 yuiolink-server-linux-amd64.sha256 --clobber
