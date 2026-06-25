@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YuioLink — Expiry / Limit / Privacy control layouts</title>
+<style>
+:root {
+    --accent: #007aff; --accent-press: #0066d6;
+    --switch-on: #34c759; --switch-off: rgba(120,120,128,0.32);
+    --result: #10b981; --warn: #c77a00; --danger: #d70015;
+    --text-kind: #127c70; --purple: #af52de;
+    --bg-1: #e7e8ec; --bg-2: #f6f7f9;
+    --glow-1: rgba(0,122,255,0.20); --glow-2: rgba(255,64,129,0.14);
+    --text: #1d1d1f; --text-secondary: rgba(60,60,67,0.6); --text-tertiary: rgba(60,60,67,0.4);
+    --card-bg: rgba(255,255,255,0.58); --card-border: rgba(255,255,255,0.7);
+    --card-highlight: rgba(255,255,255,0.9);
+    --card-shadow: 0 24px 70px -22px rgba(20,24,40,0.42), 0 8px 22px -14px rgba(20,24,40,0.28);
+    --field-bg: rgba(255,255,255,0.72); --field-border: rgba(0,0,0,0.1);
+    --separator: rgba(0,0,0,0.08);
+    --radius-window: 28px; --radius-control: 12px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+}
+@media (prefers-color-scheme: dark) {
+:root {
+    --accent: #0a84ff; --accent-press: #0a6fd6; --switch-off: rgba(120,120,128,0.5);
+    --result: #34d399; --warn: #ffd60a; --danger: #ff453a; --text-kind: #0affe4; --purple: #bf5af2;
+    --bg-1: #121214; --bg-2: #202024; --glow-1: rgba(10,132,255,0.22); --glow-2: rgba(191,90,242,0.18);
+    --text: #f5f5f7; --text-secondary: rgba(235,235,245,0.6); --text-tertiary: rgba(235,235,245,0.35);
+    --card-bg: rgba(40,40,44,0.55); --card-border: rgba(255,255,255,0.12); --card-highlight: rgba(255,255,255,0.1);
+    --card-shadow: 0 28px 80px -24px rgba(0,0,0,0.7), 0 10px 26px -16px rgba(0,0,0,0.6);
+    --field-bg: rgba(255,255,255,0.06); --field-border: rgba(255,255,255,0.12); --separator: rgba(255,255,255,0.1);
+}
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0; font-family: var(--font); color: var(--text);
+    background: radial-gradient(1200px 800px at 12% -8%, var(--glow-1), transparent 60%),
+        radial-gradient(1000px 700px at 110% 10%, var(--glow-2), transparent 55%),
+        linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    background-attachment: fixed; min-height: 100vh; padding: 40px 20px 96px; line-height: 1.5;
+}
+.page-head { max-width: 1040px; margin: 0 auto 30px; }
+.page-head h1 { font-size: 25px; margin: 0 0 6px; letter-spacing: -0.02em; }
+.page-head p { margin: 6px 0; color: var(--text-secondary); max-width: 74ch; font-size: 14.5px; }
+.page-head code { font-family: var(--font-mono); font-size: 12.5px; }
+
+.grid { max-width: 1040px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 30px; align-items: start; }
+.mock > h2 { font-size: 15px; margin: 0 0 4px; display: flex; gap: 8px; align-items: center; }
+.tag { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2px 7px; border-radius: 999px; }
+.tag.rec { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+.tag.alt { background: color-mix(in srgb, var(--purple) 20%, transparent); color: var(--purple); }
+.mock > .note { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 12px; min-height: 34px; }
+
+.window { background: var(--card-bg); border: .5px solid var(--card-border); border-radius: var(--radius-window);
+    box-shadow: var(--card-shadow); backdrop-filter: blur(40px) saturate(160%); -webkit-backdrop-filter: blur(40px) saturate(160%);
+    padding: 22px; position: relative; overflow: hidden; }
+.window::before { content: ""; position: absolute; inset: 0 0 auto; height: 1px; background: var(--card-highlight); opacity: .6; }
+.masthead { font-size: 19px; font-weight: 700; margin: 0 0 12px; letter-spacing: -.01em; }
+textarea.field { width: 100%; font-family: var(--font); font-size: 15px; color: var(--text);
+    background: var(--field-bg); border: 1.5px solid var(--purple); border-radius: 14px; padding: 12px 14px; resize: none; }
+.field::placeholder { color: var(--text-tertiary); }
+.btn { width: 100%; border: 0; border-radius: var(--radius-control); padding: 12px; font: 600 15px var(--font); color: #fff; background: var(--accent); cursor: pointer; margin-top: 10px; }
+
+.legend { font-size: 12.5px; font-weight: 600; color: var(--accent); margin: 16px 0 7px; }
+.segmented { display: flex; gap: 2px; padding: 3px; background: var(--switch-off); border-radius: var(--radius-control); }
+.seg { flex: 1; text-align: center; padding: 8px 6px; font-size: 13px; font-weight: 500; border-radius: calc(var(--radius-control) - 3px); cursor: pointer; user-select: none; transition: background .15s; white-space: nowrap; }
+.seg.on { background: var(--card-highlight); box-shadow: 0 1px 2px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.3); }
+.seg small { display: block; font-size: 10px; font-weight: 400; color: var(--text-secondary); margin-top: 1px; }
+.inf { font-size: 16px; }
+
+/* live preview strip shared by several variants */
+.shape { margin-top: 12px; padding: 11px 13px; border-radius: 14px; background: var(--field-bg); border: .5px solid var(--field-border); }
+.shape .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-tertiary); }
+.shape .url { font-family: var(--font-mono); font-size: 14px; margin-top: 4px; word-break: break-all; }
+.shape .verdict { font-size: 12px; margin-top: 6px; }
+.verdict.ok { color: var(--result); } .verdict.warn { color: var(--warn); }
+.dim { color: var(--text-tertiary); }
+.nw-0 { color: var(--accent); font-weight: 600; } .nw-1 { color: var(--purple); font-weight: 600; }
+
+/* Variant 2: sentence builder */
+.sentence { font-size: 16px; line-height: 2.1; margin-top: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 11px; margin: 0 1px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); font-weight: 600; cursor: pointer; border: .5px solid color-mix(in srgb, var(--accent) 24%, transparent); }
+.pill::after { content: "▾"; font-size: 10px; opacity: .7; }
+.pill.t { background: color-mix(in srgb, var(--purple) 13%, transparent); color: var(--purple); border-color: color-mix(in srgb, var(--purple) 26%, transparent); }
+
+/* Variant 3: type cards */
+.tcards { display: grid; gap: 9px; margin-top: 8px; }
+.tcard { display: grid; grid-template-columns: 20px 1fr; gap: 10px; padding: 12px 13px; border-radius: 14px; border: 1.5px solid var(--field-border); background: var(--field-bg); cursor: pointer; }
+.tcard.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.tcard .radio { width: 17px; height: 17px; border-radius: 50%; border: 2px solid var(--text-tertiary); margin-top: 2px; position: relative; }
+.tcard.on .radio { border-color: var(--accent); }
+.tcard.on .radio::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--accent); }
+.tcard .h { font-size: 13.5px; font-weight: 600; }
+.tcard .ex { font-family: var(--font-mono); font-size: 12px; margin-top: 3px; }
+.tcard .d { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
+
+/* Variant 4: presets */
+.presets { display: grid; gap: 9px; margin-top: 8px; }
+.preset { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 13px 14px; border-radius: 14px; border: 1.5px solid var(--field-border); background: var(--field-bg); cursor: pointer; }
+.preset.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.preset .h { font-size: 14px; font-weight: 600; }
+.preset .d { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
+.preset .pic { font-size: 22px; }
+.adv { margin-top: 10px; font-size: 12.5px; color: var(--accent); cursor: pointer; }
+
+.recs { max-width: 1040px; margin: 38px auto 0; background: var(--card-bg); border: .5px solid var(--card-border); border-radius: 18px; padding: 22px 26px; backdrop-filter: blur(20px); }
+.recs h2 { font-size: 16px; margin: 0 0 10px; } .recs li { margin: 7px 0; font-size: 13.5px; } .recs b { font-weight: 650; }
+.axes { max-width: 1040px; margin: 0 auto 26px; background: var(--card-bg); border: .5px solid var(--card-border); border-radius: 16px; padding: 16px 20px; backdrop-filter: blur(20px); font-size: 13px; }
+.axes b { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+    <h1>Expiry · Limit · Privacy — control layouts</h1>
+    <p>Four ways to set the three knobs on the create form. Key realisation from the namespace work: <b>Limit and Privacy collapse into one choice</b>, because the valid combinations are only three — a short guessable name can't be a one-time link (a guesser would burn it), so "short + one-time" doesn't exist. That leaves a clean 1-D scale.</p>
+</div>
+
+<div class="axes">
+    The three real options (each also picks an <b>expiry</b>, 1 min – 7 days):<br>
+    • <span class="nw-0">Public</span> — reusable · <b>1 word</b> (<code class="dim">yuio.link/</code><span class="nw-0">mango</span>) · short, guessable. Convenient, not private.<br>
+    • <span class="nw-1">Private</span> — reusable · <b>4 words</b> (<span class="nw-0">runny</span><span class="nw-1">DUSK</span><span class="nw-0">outlet</span><span class="nw-1">DELUGE</span>) · unguessable. Only those you send it to can find it.<br>
+    • <span class="nw-1">One-time</span> — single-use · <b>4 words</b> · unguessable, opens once.
+</div>
+
+<div class="grid">
+
+    <!-- 1: two segmented rows -->
+    <section class="mock">
+        <h2>1. Two rows + live preview <span class="tag rec">Recommended</span></h2>
+        <p class="note">Closest to today. One row for Expiry, one for Type. A live strip shows the resulting link and a privacy verdict so the abstract choice becomes concrete.</p>
+        <div class="window">
+            <div class="masthead">YuioLink</div>
+            <textarea class="field" rows="2">https://example.com/welcome</textarea>
+            <div class="legend">Expires in</div>
+            <div class="segmented" id="exp1">
+                <div class="seg">10 min</div><div class="seg on">1 hour</div><div class="seg">7 days</div><div class="seg">Custom</div>
+            </div>
+            <div class="legend">Type</div>
+            <div class="segmented" id="type1">
+                <div class="seg on" data-t="public">Public</div>
+                <div class="seg" data-t="private">Private</div>
+                <div class="seg" data-t="once">One-time</div>
+            </div>
+            <div class="shape" id="shape1"><span class="lbl">Your link</span><div class="url" id="u1"></div><div class="verdict" id="v1"></div></div>
+            <button class="btn">Create Redirect Link</button>
+        </div>
+    </section>
+
+    <!-- 2: sentence -->
+    <section class="mock">
+        <h2>2. Plain-language sentence <span class="tag alt">Friendly</span></h2>
+        <p class="note">The settings read as a sentence; each underlined word is a tap-to-change pill. Lowest jargon, very approachable — fewer affordances on screen, so custom expiry needs a popover.</p>
+        <div class="window">
+            <div class="masthead">YuioLink</div>
+            <textarea class="field" rows="2">https://example.com/welcome</textarea>
+            <div class="sentence">
+                This link is
+                <span class="pill t" id="p-type">Public</span>
+                and expires in
+                <span class="pill" id="p-exp">1 hour</span>.
+            </div>
+            <div class="shape"><span class="lbl">Your link</span><div class="url" id="u2"></div><div class="verdict" id="v2"></div></div>
+            <button class="btn">Create Redirect Link</button>
+        </div>
+    </section>
+
+    <!-- 3: type cards + expiry chips -->
+    <section class="mock">
+        <h2>3. Type cards + expiry chips</h2>
+        <p class="note">Type as three self-describing cards (each shows its real name shape), expiry as compact chips above. Most explicit/teachable; tallest.</p>
+        <div class="window">
+            <div class="masthead">YuioLink</div>
+            <textarea class="field" rows="2">https://example.com/welcome</textarea>
+            <div class="legend">Expires in</div>
+            <div class="segmented"><div class="seg">10m</div><div class="seg on">1h</div><div class="seg">1d</div><div class="seg">7d</div></div>
+            <div class="tcards" id="tcards">
+                <label class="tcard on" data-t="public"><span class="radio"></span><span><span class="h">Public</span><div class="ex"><span class="dim">yuio.link/</span><span class="nw-0">mango</span></div><div class="d">Reusable. Short, but guessable.</div></span></label>
+                <label class="tcard" data-t="private"><span class="radio"></span><span><span class="h">Private</span><div class="ex"><span class="dim">yuio.link/</span><span class="nw-0">runny</span><span class="nw-1">DUSK</span><span class="nw-0">outlet</span><span class="nw-1">DELUGE</span></div><div class="d">Reusable. Unguessable name.</div></span></label>
+                <label class="tcard" data-t="once"><span class="radio"></span><span><span class="h">One-time</span><div class="ex"><span class="dim">yuio.link/</span><span class="nw-0">cloak</span><span class="nw-1">PAPER</span><span class="nw-0">rib</span><span class="nw-1">BROWSE</span></div><div class="d">Opens once, then gone.</div></span></label>
+            </div>
+            <button class="btn">Create Redirect Link</button>
+        </div>
+    </section>
+
+    <!-- 4: presets -->
+    <section class="mock">
+        <h2>4. Presets + Advanced</h2>
+        <p class="note">Three one-tap presets cover the common cases; "Advanced" reveals the individual Expiry/Type controls for everything else. Fastest for the 90% case.</p>
+        <div class="window">
+            <div class="masthead">YuioLink</div>
+            <textarea class="field" rows="2">https://example.com/welcome</textarea>
+            <div class="presets" id="presets">
+                <label class="preset on"><span><span class="h">Quick link</span><div class="d">Public · 1 hour</div></span><span class="pic">🔗</span></label>
+                <label class="preset"><span><span class="h">Private link</span><div class="d">Unguessable · reusable · 1 day</div></span><span class="pic">🔒</span></label>
+                <label class="preset"><span><span class="h">One-time secret</span><div class="d">Opens once · 10 min</div></span><span class="pic">💥</span></label>
+            </div>
+            <div class="adv">Advanced — set expiry &amp; type yourself ▾</div>
+            <button class="btn">Create Redirect Link</button>
+        </div>
+    </section>
+
+</div>
+
+<div class="recs">
+    <h2>Recommendations</h2>
+    <ol>
+        <li><b>Ship #1 (two rows + live preview).</b> Smallest change from today, keyboard/no-JS friendly, and the live name+verdict turns the entropy story into something you can see. The "Type" row replaces the old "Limit views to".</li>
+        <li><b>Steal the preview strip for any variant.</b> Seeing <code>mango</code> vs <span class="nw-0">runny</span><span class="nw-1">DUSK</span>… is what makes Public-vs-Private click.</li>
+        <li><b>#4 (presets) is the best "first 5 seconds" UX</b> if we want to optimise for newcomers — pair it with #1 behind "Advanced". Good later, more build now.</li>
+        <li><b>#2 (sentence) is the friendliest</b> but hides custom expiry; nice for a marketing-y landing, harder to keep accessible.</li>
+        <li>Either way: rename the legend from "Limit views to" → <b>"Type"</b> (or "Privacy"), and drop the standalone ∞/Once control.</li>
+    </ol>
+</div>
+
+<script>
+const PUB = ["mango","pilot","quartz","cedar","ember"];
+const ONCE = [["runny","DUSK","outlet","DELUGE"],["cloak","PAPER","rib","BROWSE"],["jiffy","EAST","share","SADLY"]];
+const pick = (a) => a[Math.floor(a.length * ((Date.now() % 997) / 997))];
+const nameHTML = (words) => words.map((w,i)=>`<span class="nw-${i%2}">${w}</span>`).join("");
+
+function preview(type, uEl, vEl) {
+    if (type === "public") {
+        uEl.innerHTML = `<span class="dim">yuio.link/</span>${nameHTML([pick(PUB)])}`;
+        vEl.className = "verdict warn"; vEl.textContent = "• Short & handy, but guessable — convenient, not private.";
+    } else if (type === "private") {
+        uEl.innerHTML = `<span class="dim">yuio.link/</span>${nameHTML(pick(ONCE))}`;
+        vEl.className = "verdict ok"; vEl.textContent = "✓ Unguessable. Reusable — only people you send it to can find it.";
+    } else {
+        uEl.innerHTML = `<span class="dim">yuio.link/</span>${nameHTML(pick(ONCE))}`;
+        vEl.className = "verdict ok"; vEl.textContent = "✓ Opens once. Unguessable name guards the single view.";
+    }
+}
+// Variant 1
+const t1 = document.getElementById("type1");
+t1.addEventListener("click", (e) => { const s = e.target.closest(".seg"); if(!s) return;
+    [...t1.children].forEach(x=>x.classList.toggle("on", x===s)); preview(s.dataset.t, u1, v1); });
+document.querySelectorAll(".segmented").forEach(g => g.addEventListener("click", e => {
+    const s = e.target.closest(".seg"); if (s && !s.dataset.t) [...g.children].forEach(x=>x.classList.toggle("on", x===s)); }));
+preview("public", u1, v1);
+// Variant 2 sentence cycling
+const TYPES = ["Public","Private","One-time"]; let ti = 0;
+const pType = document.getElementById("p-type");
+pType.addEventListener("click", () => { ti = (ti+1)%3; pType.firstChild.textContent = TYPES[ti];
+    preview(TYPES[ti].toLowerCase().replace("-time",""), u2, v2); });
+preview("public", u2, v2);
+// Variant 3 cards
+const tc = document.getElementById("tcards");
+tc.addEventListener("click", e => { const c = e.target.closest(".tcard"); if(!c) return;
+    [...tc.children].forEach(x=>x.classList.toggle("on", x===c)); });
+// Variant 4 presets
+const pr = document.getElementById("presets");
+pr.addEventListener("click", e => { const c = e.target.closest(".preset"); if(!c) return;
+    [...pr.children].forEach(x=>x.classList.toggle("on", x===c)); });
+</script>
+</body>
+</html>
