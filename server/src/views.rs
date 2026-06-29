@@ -16,8 +16,8 @@ fn document(body: Markup, scripts: Markup) -> Markup {
 }
 
 /// As [`document`], but with extra `<head>` markup (e.g. OG tags). The masthead
-/// `<h1>` links home so every page has a way back to create another link (the
-/// per-page "Back to YuioLink" footer link is gone).
+/// `<h1>` is plain text, not a home link — clicking it on the create page would
+/// discard whatever the user had typed, so it is no longer a navigation target.
 fn document_full(title: &str, head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
     html! {
         (DOCTYPE)
@@ -33,7 +33,7 @@ fn document_full(title: &str, head_extra: Markup, body: Markup, scripts: Markup)
             body {
                 main.app-window {
                     header {
-                        h1 { a href="/" { "YuioLink" } }
+                        h1 { "YuioLink" }
                     }
                     (body)
                 }
