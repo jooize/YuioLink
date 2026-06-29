@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YuioLink — history row (current design)</title>
+<style>
+/* Variables + rules mirror server/static/app.css so these rows render as the live app.
+   Dark vars are duplicated under [data-theme=dark] so the toolbar can force a theme. */
+:root {
+    --accent: #007aff;
+    --switch-on: #34c759;
+    --warn: #c77a00;
+    --danger: #d70015;
+    --text-kind: #127c70;
+    --purple: #af52de;
+    --bg-1: #e7e8ec;
+    --bg-2: #f6f7f9;
+    --glow-1: rgba(0, 122, 255, 0.20);
+    --glow-2: rgba(255, 64, 129, 0.14);
+    --text: #1d1d1f;
+    --text-secondary: rgba(60, 60, 67, 0.6);
+    --text-tertiary: rgba(60, 60, 67, 0.4);
+    --card-bg: rgba(255, 255, 255, 0.58);
+    --card-border: rgba(255, 255, 255, 0.7);
+    --card-highlight: rgba(255, 255, 255, 0.9);
+    --card-shadow: 0 24px 70px -22px rgba(20, 24, 40, 0.42), 0 8px 22px -14px rgba(20, 24, 40, 0.28);
+    --field-bg: rgba(255, 255, 255, 0.72);
+    --field-border: rgba(0, 0, 0, 0.1);
+    --separator: rgba(0, 0, 0, 0.08);
+    --radius-window: 28px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, system-ui, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Monaco, "Cascadia Code", monospace;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --accent: #0a84ff; --warn: #ffd60a; --danger: #ff453a; --text-kind: #0affe4; --purple: #bf5af2;
+        --bg-1: #121214; --bg-2: #202024; --glow-1: rgba(10,132,255,0.22); --glow-2: rgba(191,90,242,0.18);
+        --text: #f5f5f7; --text-secondary: rgba(235,235,245,0.6); --text-tertiary: rgba(235,235,245,0.35);
+        --card-bg: rgba(40,40,44,0.55); --card-border: rgba(255,255,255,0.12); --card-highlight: rgba(255,255,255,0.1);
+        --card-shadow: 0 28px 80px -24px rgba(0,0,0,0.7), 0 10px 26px -16px rgba(0,0,0,0.6);
+        --field-bg: rgba(255,255,255,0.06); --field-border: rgba(255,255,255,0.12); --separator: rgba(255,255,255,0.1);
+    }
+}
+:root[data-theme="dark"] {
+    --accent: #0a84ff; --warn: #ffd60a; --danger: #ff453a; --text-kind: #0affe4; --purple: #bf5af2;
+    --bg-1: #121214; --bg-2: #202024; --glow-1: rgba(10,132,255,0.22); --glow-2: rgba(191,90,242,0.18);
+    --text: #f5f5f7; --text-secondary: rgba(235,235,245,0.6); --text-tertiary: rgba(235,235,245,0.35);
+    --card-bg: rgba(40,40,44,0.55); --card-border: rgba(255,255,255,0.12); --card-highlight: rgba(255,255,255,0.1);
+    --card-shadow: 0 28px 80px -24px rgba(0,0,0,0.7), 0 10px 26px -16px rgba(0,0,0,0.6);
+    --field-bg: rgba(255,255,255,0.06); --field-border: rgba(255,255,255,0.12); --separator: rgba(255,255,255,0.1);
+}
+
+* { box-sizing: border-box; }
+html {
+    min-height: 100%;
+    background-color: var(--bg-1);
+    background-image:
+        radial-gradient(1100px 760px at 12% 6%, var(--glow-1), transparent 60%),
+        radial-gradient(1000px 720px at 88% 96%, var(--glow-2), transparent 58%),
+        linear-gradient(155deg, var(--bg-2), var(--bg-1));
+    background-attachment: fixed;
+}
+body { margin: 0; min-height: 100dvh; padding: 28px 18px 56px; font-family: var(--font); color: var(--text); -webkit-font-smoothing: antialiased; }
+
+.page-head { max-width: 1000px; margin: 0 auto 22px; display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.page-head h1 { font-size: 18px; margin: 0 0 6px; }
+.page-head p { margin: 0; font-size: 13px; color: var(--text-secondary); max-width: 640px; line-height: 1.5; }
+.page-head code { font-family: var(--font-mono); font-size: 0.9em; }
+.theme-toggle { display: inline-flex; gap: 4px; background: var(--field-bg); border: 0.5px solid var(--field-border); border-radius: 9px; padding: 3px; }
+.theme-toggle button { font: inherit; font-size: 12px; font-weight: 600; color: var(--text-secondary); background: none; border: 0; border-radius: 7px; padding: 5px 11px; cursor: pointer; }
+.theme-toggle button.active { background: var(--card-bg); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.18); }
+
+.grid { max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 22px; }
+.variant-label { margin: 0 4px 9px; }
+.variant-label b { font-size: 13.5px; }
+.variant-label span { font-size: 12px; color: var(--text-secondary); margin-left: 8px; }
+
+.app-window {
+    width: 100%; background: var(--card-bg);
+    -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%);
+    border: 0.5px solid var(--card-border); border-radius: var(--radius-window);
+    box-shadow: var(--card-shadow), inset 0 1px 0 var(--card-highlight); padding: 20px 22px 22px;
+}
+.history-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 0 8px; }
+.history-toggle { display: inline-flex; align-items: center; }
+.history-chevron { display: inline-block; margin-right: 6px; color: var(--text-tertiary); transform: rotate(90deg); }
+.history-title { font-size: 12.5px; font-weight: 600; color: var(--accent); }
+
+.history-list { list-style: none; margin: 0; padding: 0; background: var(--field-bg); border: 0.5px solid var(--field-border); border-radius: 12px; overflow: hidden; }
+.history-item { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-height: 56px; padding: 10px 14px 6px; border-bottom: 0.5px solid var(--separator); }
+.history-item:last-child { border-bottom: 0; }
+
+.kind-word { flex: none; font-weight: 600; }
+.kind-word.redirect { color: var(--accent); }
+.kind-word.text { color: var(--text-kind); }
+
+.history-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.history-actions { flex: none; display: flex; align-items: center; gap: 12px; }
+.history-l1 { display: flex; align-items: center; gap: 6px; min-width: 0; }
+
+.history-url { flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: 14px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Prominence climbs toward the name. */
+.history-url .u-scheme, .history-url .u-frag { color: var(--text-tertiary); }
+.history-url .u-host, .history-url .u-sep { color: color-mix(in srgb, var(--text) 80%, transparent); }
+.history-url .u-name { color: var(--text); font-weight: 600; }
+.history-url .nw-0 { color: var(--text); }
+.history-url .nw-1 { color: var(--text); }
+
+.history-meta { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-secondary); white-space: nowrap; }
+.countdown { color: var(--switch-on); font-weight: 600; }
+.countdown.expiring-soon { color: var(--warn); font-weight: 600; }
+.history-show { flex: none; font-family: inherit; font-size: 13px; font-weight: 500; color: var(--purple); background: none; border: 0; padding: 6px 2px; cursor: pointer; }
+.history-copy { flex: none; font-family: inherit; font-size: 13px; font-weight: 500; color: var(--accent); background: none; border: 0; padding: 6px 2px; cursor: pointer; }
+.history-remove { flex: none; font-family: inherit; font-size: 13px; font-weight: 500; color: var(--text-secondary); background: none; border: 0; padding: 6px 2px; cursor: pointer; }
+
+/* The Remove… confirm: a solid (opaque) menu over the row, with its own Cancel ✕. */
+.history-confirm { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 13px; background: var(--bg-2); border: 0.5px solid var(--separator); border-radius: 10px; box-shadow: 0 2px 10px -4px rgba(0,0,0,0.35); }
+.history-confirm-label { flex: 1; min-width: 0; font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.history-confirm-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.history-confirm-server, .history-confirm-forget { font-family: inherit; font-size: 12px; font-weight: 600; border-radius: 999px; border: 0.5px solid transparent; padding: 5px 11px; cursor: pointer; white-space: nowrap; }
+.history-confirm-server { color: var(--danger); background: color-mix(in srgb, var(--danger) 13%, transparent); border-color: color-mix(in srgb, var(--danger) 24%, transparent); }
+.history-confirm-forget { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); border-color: color-mix(in srgb, var(--warn) 26%, transparent); }
+.history-confirm-cancel { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-left: 2px; font-size: 14px; line-height: 1; color: var(--text-secondary); background: color-mix(in srgb, var(--text) 8%, transparent); border: 0; border-radius: 999px; cursor: pointer; }
+.history-confirm-cancel:hover { color: var(--text); background: color-mix(in srgb, var(--text) 15%, transparent); }
+</style>
+</head>
+<body>
+<div class="page-head">
+    <div>
+        <h1>History row — current design</h1>
+        <p>Prominence climbs toward the name: <code>https://</code> faintest, <code>yuio.link/</code> a step up,
+        the <b>name loudest</b> — both words full-strength, told apart by <b>weight + case</b> (not by dimming one).
+        The URL is the row's headline (14px), with the meta + actions tucked just beneath it and little padding at
+        the bottom edge. Panel B shows the <b>Remove… menu open</b>: a solid (opaque) prompt with its own Cancel ✕
+        — Remove… only opens it, never toggles it shut.</p>
+    </div>
+    <div class="theme-toggle" id="theme">
+        <button data-theme-set="auto" class="active">Auto</button>
+        <button data-theme-set="light">Light</button>
+        <button data-theme-set="dark">Dark</button>
+    </div>
+</div>
+
+<div class="grid">
+    <section>
+        <div class="variant-label"><b>A — Resting</b><span>the list as it sits</span></div>
+        <div class="app-window">
+            <div class="history-head"><span class="history-toggle"><span class="history-chevron">&rsaquo;</span><span class="history-title">History</span></span></div>
+            <ul class="history-list" data-menu="-1"></ul>
+        </div>
+    </section>
+    <section>
+        <div class="variant-label"><b>B — Remove… menu open</b><span>top row</span></div>
+        <div class="app-window">
+            <div class="history-head"><span class="history-toggle"><span class="history-chevron">&rsaquo;</span><span class="history-title">History</span></span></div>
+            <ul class="history-list" data-menu="0"></ul>
+        </div>
+    </section>
+</div>
+
+<script>
+const ROWS = [
+    { words: [["runny", "nw-0"], ["DUSK", "nw-1"]], kind: ["redirect", "Redirect"], time: "2 days left", level: "", uses: "" },
+    { words: [["arise", "nw-0"]],                   kind: ["redirect", "Redirect"], time: "5 hours left", level: "", uses: "" },
+    { words: [["woven", "nw-0"], ["KILO", "nw-1"]], kind: ["text", "Text"],         time: "1 day left",   level: "", uses: "once" },
+    { words: [["quiet", "nw-0"], ["MOSS", "nw-1"]], kind: ["redirect", "Redirect"], time: "4 minutes left", level: "expiring-soon", uses: "" },
+];
+
+function rowHTML(r, menuOpen) {
+    const name = r.words.map(([w, c]) => `<span class="nw ${c}">${w}</span>`).join("");
+    const uses = r.uses ? ` &middot; ${r.uses}` : "";
+    const confirm = menuOpen ? `
+      <div class="history-confirm">
+        <span class="history-confirm-label">Remove this link?</span>
+        <div class="history-confirm-actions">
+          <button class="history-confirm-forget" type="button">Forget Link</button>
+          <button class="history-confirm-server" type="button">Delete Link</button>
+          <button class="history-confirm-cancel" type="button" aria-label="Cancel" title="Cancel">&#10005;</button>
+        </div>
+      </div>` : "";
+    return `<li class="history-item">
+      <div class="history-l1">
+        <code class="history-url"><span class="u-scheme">https://</span><span class="u-host">yuio.link</span><span class="u-sep">/</span><span class="u-name">${name}</span></code>
+        <span class="history-check" aria-hidden="true"></span>
+      </div>
+      <div class="history-foot">
+        <small class="history-meta"><span class="kind-word ${r.kind[0]}">${r.kind[1]}</span> &middot; <span class="countdown ${r.level}">${r.time}</span>${uses}</small>
+        <div class="history-actions">
+          <button class="history-show" type="button">Show</button>
+          <button class="history-copy" type="button">Copy</button>
+          <button class="history-remove" type="button">Remove&hellip;</button>
+        </div>
+      </div>${confirm}
+    </li>`;
+}
+
+document.querySelectorAll(".history-list").forEach(ul => {
+    const menu = Number(ul.dataset.menu);
+    ul.innerHTML = ROWS.map((r, i) => rowHTML(r, i === menu)).join("");
+});
+
+const themeBar = document.getElementById("theme");
+themeBar.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    const set = btn.dataset.themeSet;
+    if (set === "auto") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = set;
+    themeBar.querySelectorAll("button").forEach(b => b.classList.toggle("active", b === btn));
+});
+</script>
+</body>
+</html>

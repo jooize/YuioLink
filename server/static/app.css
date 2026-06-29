@@ -229,7 +229,9 @@ textarea.form-control {
 }
 
 .picker > legend {
-    padding: 0;
+    /* The text label sits a touch in from its control below (the segmented buttons /
+       input run to the content edge; the caption is indented to read as a heading). */
+    padding: 0 0 0 8px;
     margin: 0 0 7px;
     font-size: 12.5px;
     font-weight: 600;
@@ -345,7 +347,7 @@ textarea.form-control {
 .picker-note {
     display: block;
     margin-top: 7px;
-    padding-left: 8px;
+    padding-left: 8px;   /* same label indent as the legend, in from its segmented control */
     font-size: 12px;
     line-height: 1.4;
     color: var(--text-secondary);
@@ -627,19 +629,16 @@ textarea.form-control {
     color: var(--text-secondary);
 }
 
-/* R4: the link name is already the giant hero above, so keep it quiet here — the
-   whole sub-URL reads as one calm gray address instead of re-accenting the name. */
+/* The giant hero above already carries the name, so the sub-URL stays quiet: every
+   name word is the same dim grey as the scheme — no bold, no per-word tone — so
+   nothing here competes with the hero. Only the domain lifts a step (see .u-host) to
+   gently mark "yuio.link". */
 .result-url .u-name {
-    color: var(--text-secondary);
+    color: var(--text-tertiary);
     font-weight: 400;
 }
-
-/* Override the per-word accent/purple inside the URL: the address stays gray (the
-   coloured hero already carries the name), with only the host/name a touch clearer. */
 .result-url .nw-0,
-.result-url .nw-1 {
-    color: inherit;
-}
+.result-url .nw-1 { color: inherit; }
 
 /* Shoutkey name words, alternating colour so a multi-word name reads as separate
    words (the result hero, the URL name, history rows, and the interstitial). The
@@ -1096,6 +1095,9 @@ textarea.form-control {
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 10px;
+    /* Local History / Clear All sit a touch in from the list panel, the same label
+       indent the form captions get over their controls. */
+    padding: 0 8px;
 }
 
 /* Collapse toggle: chevron + title; rotates and hides the list when collapsed. */
@@ -1148,10 +1150,12 @@ textarea.form-control {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 5px;
+    gap: 3px;
     /* A uniform row height so a one-line tombstone matches a two-line live row. */
     min-height: 56px;
-    padding: 11px 13px;
+    /* The URL is the row's headline: a touch of room above it, then the meta/actions
+       tuck in just beneath with little padding to spare at the bottom edge. */
+    padding: 10px 14px 6px;
     border-bottom: 0.5px solid var(--separator);
 }
 
@@ -1236,7 +1240,8 @@ textarea.form-control {
     flex: 1 1 auto;
     min-width: 0;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: 14px;
+    line-height: 1.35;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1262,26 +1267,27 @@ textarea.form-control {
     opacity: 1;
 }
 
+/* Prominence climbs toward the name: the scheme is faintest, "yuio.link/" sits one
+   step up, and the link name is the loudest part of the row. */
 .history-url .u-scheme,
-.history-url .u-sep,
 .history-url .u-frag {
     color: var(--text-tertiary);
 }
 
-.history-url .u-host {
-    color: var(--text-secondary);
+.history-url .u-host,
+.history-url .u-sep {
+    /* A strong grey — clearly above the faint scheme, clearly below the black name —
+       so scheme < domain < name reads as three distinct steps. */
+    color: color-mix(in srgb, var(--text) 80%, transparent);
 }
 
-.history-url .u-name {
-    color: var(--text-secondary);
-    font-weight: 400;
-}
-
-/* Match the result: keep the name gray in the URL, not accent-highlighted. */
-.history-url .nw-0,
-.history-url .nw-1 {
-    color: inherit;
-}
+/* The name is the point of the row, so it runs bold at full strength to outshine the
+   host. It stays greyscale (never accent/purple — that's the result hero's job); the
+   alternating case alone separates the words — uniform weight reads cleaner than a
+   mixed-weight split. */
+.history-url .u-name { color: var(--text); font-weight: 600; }
+.history-url .nw-0 { color: var(--text); }
+.history-url .nw-1 { color: var(--text); }
 
 /* Line 2: kind pill + expiry, in the UI font (mockup A). */
 .history-meta {
@@ -1291,6 +1297,24 @@ textarea.form-control {
     font-size: 11.5px;
     color: var(--text-secondary);
     white-space: nowrap;
+}
+
+/* Show: opens the link in a new tab. An on-brand purple, distinct from Copy's accent
+   blue, sitting to the left of Copy. */
+.history-show {
+    flex: none;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--purple);
+    background: none;
+    border: 0;
+    padding: 6px 2px;
+    cursor: pointer;
+}
+
+.history-show:hover {
+    text-decoration: underline;
 }
 
 .history-copy {
@@ -1314,12 +1338,9 @@ textarea.form-control {
     text-decoration: none;
 }
 
-/* Per-item Remove…: a quiet text button beside Copy that toggles the confirm
-   overlay. It sits above the overlay (z-index) so clicking it again closes the
-   prompt (there is no separate cancel). */
+/* Per-item Remove…: a quiet text button beside Copy that opens the confirm overlay.
+   The overlay covers the whole row and carries its own Cancel, so this is open-only. */
 .history-remove {
-    position: relative;
-    z-index: 2;
     flex: none;
     font-family: inherit;
     font-size: 13px;
@@ -1340,18 +1361,17 @@ textarea.form-control {
 .history-confirm {
     position: absolute;
     inset: 0;
-    z-index: 1;
+    z-index: 2;
     display: flex;
     align-items: center;
     gap: 8px;
-    /* Extra right padding clears the × column so the actions never slide under it. */
-    padding: 0 38px 0 12px;
-    /* Near-opaque so the row underneath does not bleed through (--field-bg is only
-       6% in dark mode); the blur still softens the edge. */
-    background: color-mix(in srgb, var(--bg-2) 93%, transparent);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    padding: 0 10px 0 13px;
+    /* A solid menu panel over the row — fully opaque so nothing bleeds through, lifted
+       with a hairline border and a soft shadow so it reads as a prompt, not the row. */
+    background: var(--bg-2);
+    border: 0.5px solid var(--separator);
     border-radius: 10px;
+    box-shadow: 0 2px 10px -4px rgba(0, 0, 0, 0.35);
 }
 
 .history-confirm-label {
@@ -1406,6 +1426,30 @@ textarea.form-control {
     color: var(--warn);
     background: color-mix(in srgb, var(--warn) 14%, transparent);
     border-color: color-mix(in srgb, var(--warn) 26%, transparent);
+}
+
+/* Cancel (✕): closes the prompt — the only way out now that Remove… is open-only. A
+   round, quiet icon button sitting after the destructive actions at the right edge. */
+.history-confirm-cancel {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-left: 2px;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.history-confirm-cancel:hover {
+    color: var(--text);
+    background: color-mix(in srgb, var(--text) 15%, transparent);
 }
 
 /* Spinner shown in the confirm overlay while the server is contacted. */

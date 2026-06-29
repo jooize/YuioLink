@@ -494,6 +494,12 @@
 
             const actions = document.createElement("div");
             actions.className = "history-actions";
+            const show = document.createElement("button");
+            show.className = "history-show";
+            show.type = "button";
+            show.textContent = "Show";
+            show.title = "Open this link in a new tab";
+            show.addEventListener("click", () => window.open(it.url, "_blank", "noopener,noreferrer"));
             const copy = document.createElement("button");
             copy.className = "history-copy";
             copy.type = "button";
@@ -503,12 +509,10 @@
             remove.className = "history-remove";
             remove.type = "button";
             remove.textContent = "Remove…";
-            // Toggles the confirm prompt drawn over the row (it sits above the overlay).
-            remove.addEventListener("click", () => {
-                if (li.classList.contains("confirming")) closeConfirm(li);
-                else openConfirm(li, it);
-            });
-            actions.append(copy, remove);
+            // Opens the confirm prompt over the row — not a toggle; the prompt carries
+            // its own Cancel. openConfirm closes any other row's prompt first.
+            remove.addEventListener("click", () => openConfirm(li, it));
+            actions.append(show, copy, remove);
             foot.append(meta, actions);
 
             li.append(l1, foot);
@@ -697,7 +701,17 @@
             actions.append(server);
         }
 
-        // No cancel button — the row's × toggles the prompt shut, so it never moves.
+        // Cancel (×) is the only way out now that Remove… is open-only; it sits at the
+        // right end, after the destructive buttons.
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "history-confirm-cancel";
+        cancel.textContent = "✕";
+        cancel.title = "Cancel";
+        cancel.setAttribute("aria-label", "Cancel");
+        cancel.addEventListener("click", () => closeConfirm(li));
+        actions.append(cancel);
+
         overlay.append(label, actions);
         li.append(overlay);
     };
