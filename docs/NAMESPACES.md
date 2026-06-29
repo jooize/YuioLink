@@ -2,13 +2,13 @@
 
 Every link name is one or more EFF-short words in alternating case (`braveOTTER`).
 Names are case-insensitive; the casing is only a visual word boundary. The word
-list is `core/src/words.txt` — **3,517** curated words (≤6 characters, "anyone can
+list is `core/src/words.txt` — **3,516** curated words (≤6 characters, "anyone can
 use this": no slurs, brands, clinical, or hard-to-spell words). All tiers draw from
-the whole list, so the `k`-word namespace is `3517^k`.
+the whole list, so the `k`-word namespace is `3516^k`.
 
 | Words | Namespace | Entropy |
 |------:|----------:|--------:|
-| 1 | 3,517 | 11.8 bits |
+| 1 | 3,516 | 11.8 bits |
 | 2 | 12.4 M | 23.6 bits |
 | 3 | 43.5 B | 35.3 bits |
 | 4 | 153 T | 47.1 bits |
@@ -56,4 +56,4 @@ grow-on-collision valve still resolves any tier that filled in the meantime.
 - **1-word namespace squatting** is bounded by short TTLs (names churn back fast),
   the occupancy ladder (heavy creation just lengthens everyone's names, never denies
   one), and — when needed — a **create-path** rate limit (fast 429, never a delay).
-  Resolution is never rate-limited: a 3,517-name tier can't be hidden anyway.
+  Resolution is never rate-limited: a 3,516-name tier can't be hidden anyway.

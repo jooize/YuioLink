@@ -2115,7 +2115,6 @@ pear
 pebble
 pecan
 pellet
-pelt
 pelvis
 pen
 pencil

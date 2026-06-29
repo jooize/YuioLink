@@ -1,4 +1,4 @@
-//! The YuioLink curated wordlist — 3517 short (<=6 letter), memorable,
+//! The YuioLink curated wordlist — 3516 short (<=6 letter), memorable,
 //! easy-to-type, broadly inoffensive words used to build the "shoutkey" link
 //! names (e.g. `braveOTTER`).
 //!
@@ -24,7 +24,7 @@ use std::sync::OnceLock;
 const WORDS_RAW: &str = include_str!("words.txt");
 
 /// Number of words in the list.
-pub const WORD_COUNT: usize = 3517;
+pub const WORD_COUNT: usize = 3516;
 
 /// The word list, split once and cached.
 pub fn words() -> &'static [&'static str] {
