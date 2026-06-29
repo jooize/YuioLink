@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Link type — E + shared details</title>
+<style>
+/* ---- Tokens lifted from server/static/app.css ---- */
+:root {
+    --accent: #007aff;
+    --switch-on: #34c759;
+    --warn: #c77a00;
+    --danger: #d70015;
+    --purple: #af52de;
+    --bg-1: #e7e8ec;
+    --bg-2: #f6f7f9;
+    --glow-1: rgba(0, 122, 255, 0.20);
+    --glow-2: rgba(255, 64, 129, 0.14);
+    --text: #1d1d1f;
+    --text-secondary: rgba(60, 60, 67, 0.6);
+    --card-bg: rgba(255, 255, 255, 0.58);
+    --card-border: rgba(255, 255, 255, 0.7);
+    --card-highlight: rgba(255, 255, 255, 0.9);
+    --card-shadow: 0 24px 70px -22px rgba(20, 24, 40, 0.42), 0 8px 22px -14px rgba(20, 24, 40, 0.28);
+    --switch-off: rgba(120, 120, 128, 0.32);
+    --separator: rgba(0, 0, 0, 0.08);
+    --radius-window: 28px;
+    --radius-control: 12px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, system-ui, sans-serif;
+    --c-public: #b8730a;
+    --c-private: #1a8f3c;
+    --c-once: #8b2fc9;
+}
+@media (prefers-color-scheme: dark) { :root { color-scheme: dark; } }
+.dark-tokens {
+    --accent: #0a84ff;
+    --switch-on: #34c759;
+    --warn: #ffd60a;
+    --danger: #ff453a;
+    --purple: #bf5af2;
+    --bg-1: #121214;
+    --bg-2: #202024;
+    --glow-1: rgba(10, 132, 255, 0.22);
+    --glow-2: rgba(191, 90, 242, 0.18);
+    --text: #f5f5f7;
+    --text-secondary: rgba(235, 235, 245, 0.6);
+    --card-bg: rgba(40, 40, 44, 0.55);
+    --card-border: rgba(255, 255, 255, 0.12);
+    --card-highlight: rgba(255, 255, 255, 0.1);
+    --card-shadow: 0 28px 80px -24px rgba(0, 0, 0, 0.7), 0 10px 26px -16px rgba(0, 0, 0, 0.6);
+    --switch-off: rgba(120, 120, 128, 0.5);
+    --separator: rgba(255, 255, 255, 0.1);
+    --c-public: #ffd60a;
+    --c-private: #30d158;
+    --c-once: #bf5af2;
+}
+
+* { box-sizing: border-box; }
+html {
+    min-height: 100%;
+    background-color: var(--bg-1);
+    background-image:
+        radial-gradient(1100px 760px at 12% 6%, var(--glow-1), transparent 60%),
+        radial-gradient(1000px 720px at 88% 96%, var(--glow-2), transparent 58%),
+        linear-gradient(155deg, var(--bg-2), var(--bg-1));
+    background-attachment: fixed;
+}
+body { margin: 0; font-family: var(--font); color: var(--text); -webkit-font-smoothing: antialiased; padding: 40px 18px 80px; }
+.page-head { max-width: 1040px; margin: 0 auto 22px; }
+.page-head h1 { font-size: 22px; margin: 0 0 6px; }
+.page-head p { margin: 0; color: var(--text-secondary); font-size: 14px; line-height: 1.5; max-width: 68ch; }
+.legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 14px 0 0; font-size: 13px; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; color: var(--text-secondary); }
+.legend i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+
+.toolbar { max-width: 1040px; margin: 18px auto 22px; display: flex; gap: 8px; }
+.toolbar button { font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--separator); background: var(--card-bg); color: var(--text); cursor: pointer; }
+.toolbar button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+.grid { max-width: 1040px; margin: 0 auto; display: grid; gap: 22px; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); }
+.card { background: var(--card-bg); -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%); border: 1px solid var(--card-border); border-radius: var(--radius-window); box-shadow: var(--card-shadow); padding: 22px; }
+.card > h2 { font-size: 15px; margin: 0 0 3px; }
+.card > .rationale { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 16px; line-height: 1.45; }
+
+/* ---- Real segmented control ---- */
+.segmented { display: flex; gap: 2px; padding: 3px; background: var(--switch-off); border-radius: var(--radius-control); }
+.seg-radio { position: absolute; opacity: 0; width: 0; height: 0; }
+.seg-label { flex: 1; min-width: 0; text-align: center; padding: 8px 6px; font-size: 13.5px; font-weight: 500; color: var(--text); border-radius: calc(var(--radius-control) - 3px); cursor: pointer; user-select: none; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background .15s ease, box-shadow .15s ease, color .15s ease; }
+.seg-radio:checked + .seg-label { background: var(--card-highlight); box-shadow: 0 1px 2px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.3); }
+.dark-tokens .seg-radio:checked + .seg-label { background: rgba(120,120,128,.55); }
+
+/* Colored dot on each label (persistent key) */
+.dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dot); flex: 0 0 auto; }
+.t-public  { --dot: var(--c-public); }
+.t-private { --dot: var(--c-private); }
+.t-once    { --dot: var(--c-once); }
+
+/* One <details>, shared open-state. Per-type fragments hidden, the active one revealed.
+   revert => span returns to inline, div returns to block. */
+.for-public, .for-private, .for-once { display: none; }
+.tp:has(.r-public:checked) .for-public,
+.tp:has(.r-private:checked) .for-private,
+.tp:has(.r-once:checked) .for-once { display: revert; }
+
+/* Active type sets the tint for the whole note. */
+.tp:has(.r-public:checked)  .note { --tint: var(--c-public); color: var(--tint); }
+.tp:has(.r-private:checked) .note { --tint: var(--c-private); color: var(--tint); }
+.tp:has(.r-once:checked)    .note { --tint: var(--c-once); color: var(--tint); }
+
+.note { margin-top: 9px; }
+.note > summary {
+    list-style: none; cursor: pointer;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+    padding-left: 8px; font-size: 12px; line-height: 1.4;
+}
+.note > summary::-webkit-details-marker { display: none; }
+.note > summary:focus-visible { outline: 2px solid color-mix(in srgb, var(--tint) 60%, transparent); outline-offset: 3px; border-radius: 6px; }
+.summary-txt { flex: 1 1 auto; min-width: 0; }
+.summary-toggle { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; white-space: nowrap; }
+.chev { transition: transform .18s ease; }
+.note[open] .chev { transform: rotate(180deg); }
+
+.details-body {
+    margin: 9px 0 2px; padding: 10px 12px;
+    border-left: 2px solid var(--tint);
+    background: color-mix(in srgb, var(--tint) 8%, transparent);
+    border-radius: 0 8px 8px 0;
+    color: var(--text-secondary); font-size: 12px; line-height: 1.5;
+}
+.details-body a { color: var(--tint); text-decoration: underline; text-underline-offset: 2px; font-weight: 600; white-space: nowrap; }
+.draft { font-style: italic; }
+.warn-red { color: var(--danger); }
+</style>
+</head>
+<body>
+<div class="page-head">
+    <h1>Link type — E with one shared, expandable details</h1>
+    <p>A single native <code>&lt;details&gt;</code> per picker: expanding it on one type keeps it expanded when you switch types (and collapsing collapses for all) — no JS. Chevron points down when closed, rotates up when open. Body copy is <span class="draft">draft</span>. Try switching type while expanded.</p>
+    <div class="legend">
+        <span><i style="background:var(--c-public)"></i> Public — privacy caution</span>
+        <span><i style="background:var(--c-private)"></i> Private — secure</span>
+        <span><i style="background:var(--c-once)"></i> One-Time — single-use</span>
+    </div>
+</div>
+
+<div class="toolbar">
+    <button id="t-auto" aria-pressed="true">Auto</button>
+    <button id="t-light" aria-pressed="false">Light</button>
+    <button id="t-dark" aria-pressed="false">Dark</button>
+</div>
+
+<div class="grid" id="grid">
+    <!-- Interactive: starts on Public, collapsed -->
+    <section class="card">
+        <h2>Interactive — switch type while open</h2>
+        <p class="rationale">Starts on Public, collapsed. Expand it, then switch type: the panel stays open and swaps content. Toggle label is "Privacy" on Public, "Security" on Private/One-Time.</p>
+        <div class="picker tp">
+            <div class="segmented">
+                <input class="seg-radio r-public" type="radio" name="a" id="a-pub" checked>
+                <label class="seg-label t-public dot" for="a-pub">Public</label>
+                <input class="seg-radio r-private" type="radio" name="a" id="a-pri">
+                <label class="seg-label t-private dot" for="a-pri">Private</label>
+                <input class="seg-radio r-once" type="radio" name="a" id="a-one">
+                <label class="seg-label t-once dot" for="a-one">One-Time</label>
+            </div>
+            <details class="note">
+                <summary>
+                    <span class="summary-txt">
+                        <span class="for-public">Convenient link with 1–3 words by shortest available. <span class="warn-red">Not private!</span></span>
+                        <span class="for-private">Private link with 4 words (in 47-bit namespace).</span>
+                        <span class="for-once">Single-use link with 4 words (in 47-bit namespace).</span>
+                    </span>
+                    <span class="summary-toggle">
+                        <span class="for-public">Privacy</span>
+                        <span class="for-private">Security</span>
+                        <span class="for-once">Security</span>
+                        <svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </span>
+                </summary>
+                <div class="details-body for-public draft">Public names are short words from a public wordlist, so anyone can run the whole list and turn up every public link. Ideal for convenience and easy sharing — never for anything secret. <a href="/wordlist">Browse the wordlist →</a></div>
+                <div class="details-body for-private draft">Four random words from a 3,516-word list — about 47 bits, and nothing indexes them. Finding one means guessing the exact name; even a botnet hammering attempts can't cover a meaningful slice of that space before the link expires (7 days max). The safety is the math, not a promise.</div>
+                <div class="details-body for-once draft">A single-use link: four random words (~47 bits), unindexed and unguessable within its short life — and it's gone the moment it's first opened. One reader, one view; best for a secret meant to disappear once read.</div>
+            </details>
+        </div>
+    </section>
+
+    <!-- Preview: Private, expanded -->
+    <section class="card">
+        <h2>Expanded preview — Private</h2>
+        <p class="rationale">Same control, preselected on Private and open, so you can see the green "Security" panel without clicking.</p>
+        <div class="picker tp">
+            <div class="segmented">
+                <input class="seg-radio r-public" type="radio" name="b" id="b-pub">
+                <label class="seg-label t-public dot" for="b-pub">Public</label>
+                <input class="seg-radio r-private" type="radio" name="b" id="b-pri" checked>
+                <label class="seg-label t-private dot" for="b-pri">Private</label>
+                <input class="seg-radio r-once" type="radio" name="b" id="b-one">
+                <label class="seg-label t-once dot" for="b-one">One-Time</label>
+            </div>
+            <details class="note" open>
+                <summary>
+                    <span class="summary-txt">
+                        <span class="for-public">Convenient link with 1–3 words by shortest available. <span class="warn-red">Not private!</span></span>
+                        <span class="for-private">Private link with 4 words (in 47-bit namespace).</span>
+                        <span class="for-once">Single-use link with 4 words (in 47-bit namespace).</span>
+                    </span>
+                    <span class="summary-toggle">
+                        <span class="for-public">Privacy</span>
+                        <span class="for-private">Security</span>
+                        <span class="for-once">Security</span>
+                        <svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </span>
+                </summary>
+                <div class="details-body for-public draft">Public names are short words from a public wordlist, so anyone can run the whole list and turn up every public link. Ideal for convenience and easy sharing — never for anything secret. <a href="/wordlist">Browse the wordlist →</a></div>
+                <div class="details-body for-private draft">Four random words from a 3,516-word list — about 47 bits, and nothing indexes them. Finding one means guessing the exact name; even a botnet hammering attempts can't cover a meaningful slice of that space before the link expires (7 days max). The safety is the math, not a promise.</div>
+                <div class="details-body for-once draft">A single-use link: four random words (~47 bits), unindexed and unguessable within its short life — and it's gone the moment it's first opened. One reader, one view; best for a secret meant to disappear once read.</div>
+            </details>
+        </div>
+    </section>
+</div>
+
+<script>
+const btns = { auto: t_auto, light: t_light, dark: t_dark };
+const mq = window.matchMedia('(prefers-color-scheme: dark)');
+function apply(mode) {
+    const dark = mode === 'dark' || (mode === 'auto' && mq.matches);
+    document.querySelectorAll('.card').forEach(c => c.classList.toggle('dark-tokens', dark));
+    for (const k in btns) btns[k].setAttribute('aria-pressed', String(k === mode));
+}
+btns.auto.onclick = () => apply('auto');
+btns.light.onclick = () => apply('light');
+btns.dark.onclick = () => apply('dark');
+mq.addEventListener('change', () => { if (btns.auto.getAttribute('aria-pressed') === 'true') apply('auto'); });
+apply('auto');
+</script>
+</body>
+</html>
