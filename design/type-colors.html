@@ -129,7 +129,7 @@ body { margin: 0; font-family: var(--font); color: var(--text); -webkit-font-smo
 }
 .details-body a { color: var(--tint); text-decoration: underline; text-underline-offset: 2px; font-weight: 600; white-space: nowrap; }
 .draft { font-style: italic; }
-.warn-red { color: var(--danger); }
+.warn-red { color: var(--danger); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -177,8 +177,8 @@ body { margin: 0; font-family: var(--font); color: var(--text); -webkit-font-smo
                         <svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </span>
                 </summary>
-                <div class="details-body for-public draft">Public names are short words from a public wordlist, so anyone can run the whole list and turn up every public link. Ideal for convenience and easy sharing — never for anything secret. <a href="/wordlist">Browse the wordlist →</a></div>
-                <div class="details-body for-private draft">Four random words from a 3,516-word list — about 47 bits, and nothing indexes them. Finding one means guessing the exact name; even a botnet hammering attempts can't cover a meaningful slice of that space before the link expires (7 days max). The safety is the math, not a promise.</div>
+                <div class="details-body for-public draft">Public names are short words from a public wordlist, so anyone can run the whole list and turn up every public link. <strong>Ideal for convenience and easy sharing</strong> — never for anything secret. <a href="/wordlist.txt">Browse the wordlist →</a></div>
+                <div class="details-body for-private draft">Four random words from a 3,516-word list — about 47 bits, and nothing indexes them. Finding one means guessing the exact name; even a botnet hammering attempts can't cover a meaningful slice of that space before the link expires (7 days max). Guesswork is the protection — not encryption. Beyond that it comes down to trust: that our hosting holds, and that the link reaches only who you intend.</div>
                 <div class="details-body for-once draft">A single-use link: four random words (~47 bits), unindexed and unguessable within its short life — and it's gone the moment it's first opened. One reader, one view; best for a secret meant to disappear once read.</div>
             </details>
         </div>
@@ -211,8 +211,8 @@ body { margin: 0; font-family: var(--font); color: var(--text); -webkit-font-smo
                         <svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </span>
                 </summary>
-                <div class="details-body for-public draft">Public names are short words from a public wordlist, so anyone can run the whole list and turn up every public link. Ideal for convenience and easy sharing — never for anything secret. <a href="/wordlist">Browse the wordlist →</a></div>
-                <div class="details-body for-private draft">Four random words from a 3,516-word list — about 47 bits, and nothing indexes them. Finding one means guessing the exact name; even a botnet hammering attempts can't cover a meaningful slice of that space before the link expires (7 days max). The safety is the math, not a promise.</div>
+                <div class="details-body for-public draft">Public names are short words from a public wordlist, so anyone can run the whole list and turn up every public link. <strong>Ideal for convenience and easy sharing</strong> — never for anything secret. <a href="/wordlist.txt">Browse the wordlist →</a></div>
+                <div class="details-body for-private draft">Four random words from a 3,516-word list — about 47 bits, and nothing indexes them. Finding one means guessing the exact name; even a botnet hammering attempts can't cover a meaningful slice of that space before the link expires (7 days max). Guesswork is the protection — not encryption. Beyond that it comes down to trust: that our hosting holds, and that the link reaches only who you intend.</div>
                 <div class="details-body for-once draft">A single-use link: four random words (~47 bits), unindexed and unguessable within its short life — and it's gone the moment it's first opened. One reader, one view; best for a secret meant to disappear once read.</div>
             </details>
         </div>
