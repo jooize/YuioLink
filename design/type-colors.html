@@ -128,6 +128,8 @@ body { margin: 0; font-family: var(--font); color: var(--text); -webkit-font-smo
     color: var(--text-secondary); font-size: 12px; line-height: 1.5;
 }
 .details-body a { color: var(--tint); text-decoration: underline; text-underline-offset: 2px; font-weight: 600; white-space: nowrap; }
+.details-body p { margin: 0 0 8px; }
+.details-body p:last-child { margin-bottom: 0; }
 .draft { font-style: italic; }
 .warn-red { color: var(--danger); font-weight: 700; }
 </style>
@@ -186,8 +188,8 @@ body { margin: 0; font-family: var(--font); color: var(--text); -webkit-font-smo
 
     <!-- Preview: Private, expanded -->
     <section class="card">
-        <h2>Expanded preview — Private</h2>
-        <p class="rationale">Same control, preselected on Private and open, so you can see the green "Security" panel without clicking.</p>
+        <h2>Current — Private copy (compact)</h2>
+        <p class="rationale">The committed version: one tight paragraph. Private preselected and open. Compare with the alternative below.</p>
         <div class="picker tp">
             <div class="segmented">
                 <input class="seg-radio r-public" type="radio" name="b" id="b-pub">
@@ -213,6 +215,43 @@ body { margin: 0; font-family: var(--font); color: var(--text); -webkit-font-smo
                 </summary>
                 <div class="details-body for-public draft">Public names are short words from a public wordlist, so anyone can run the whole list and turn up every public link. <strong>Ideal for convenience and easy sharing</strong> — never for anything secret. <a href="/wordlist.txt">Browse the wordlist →</a></div>
                 <div class="details-body for-private draft">Four random words from a 3,516-word list — about 47 bits, and nothing indexes them. Finding one means guessing the exact name, and even a botnet firing a million guesses a second would cover only about 0.4% of that space in a link's maximum 7-day life. <strong>Guesswork is the protection — not encryption.</strong> Beyond that it comes down to trust: that our hosting holds, and that the link reaches only the people you intend.</div>
+                <div class="details-body for-once draft">Same security as Private, but <strong>deleted from the server when revealed</strong>. Recipients first open the link, then have a choice to reveal its contents, which is when the one time is spent. Even if the link is opened multiple times before reveal, only one can reveal its destination or contents.</div>
+            </details>
+        </div>
+    </section>
+
+    <!-- Alternative: Private, two-paragraph "improbability" framing -->
+    <section class="card">
+        <h2>Alternative — Private copy (improbability framing)</h2>
+        <p class="rationale">Two short paragraphs: lead with "protected by improbability," then the honest caveat. Private preselected and open. Same numbers, more narrative.</p>
+        <div class="picker tp">
+            <div class="segmented">
+                <input class="seg-radio r-public" type="radio" name="c" id="c-pub">
+                <label class="seg-label t-public dot" for="c-pub">Public</label>
+                <input class="seg-radio r-private" type="radio" name="c" id="c-pri" checked>
+                <label class="seg-label t-private dot" for="c-pri">Private</label>
+                <input class="seg-radio r-once" type="radio" name="c" id="c-one">
+                <label class="seg-label t-once dot" for="c-one">One-Time</label>
+            </div>
+            <details class="note" open>
+                <summary>
+                    <span class="summary-txt">
+                        <span class="for-public">Convenient link with 1–3 words by shortest available. <span class="warn-red">Not private!</span></span>
+                        <span class="for-private">Private link with 4 words (in 47-bit namespace).</span>
+                        <span class="for-once">Single-use link with 4 words (in 47-bit namespace).</span>
+                    </span>
+                    <span class="summary-toggle">
+                        <span class="for-public">Privacy</span>
+                        <span class="for-private">Security</span>
+                        <span class="for-once">Security</span>
+                        <svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </span>
+                </summary>
+                <div class="details-body for-public draft">Public names are short words from a public wordlist, so anyone can run the whole list and turn up every public link. <strong>Ideal for convenience and easy sharing</strong> — never for anything secret. <a href="/wordlist.txt">Browse the wordlist →</a></div>
+                <div class="details-body for-private draft">
+                    <p>Your link's name — and the content behind it — is protected by sheer improbability: to reach it, an attacker has to guess your exact four-word name within its lifetime, and nothing indexes it to narrow the search. There are about 153 trillion combinations (~47 bits), so even a botnet firing a million guesses a second covers only ~0.4% of them before the 7-day maximum runs out.</p>
+                    <p>That's <strong>guesswork protecting it, not encryption</strong> — so it also relies on us keeping the hosting secure, and on the link reaching only the people you intend. The name is hard to guess, not sealed.</p>
+                </div>
                 <div class="details-body for-once draft">Same security as Private, but <strong>deleted from the server when revealed</strong>. Recipients first open the link, then have a choice to reveal its contents, which is when the one time is spent. Even if the link is opened multiple times before reveal, only one can reveal its destination or contents.</div>
             </details>
         </div>
