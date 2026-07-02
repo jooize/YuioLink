@@ -116,7 +116,9 @@ fn fit_domain(domain: &str) -> String {
 /// Escape the three characters that would break SVG/XML text content. The domain
 /// can be attacker-influenced, so this is a real (small) XSS/inject guard.
 fn xml_escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 #[cfg(test)]

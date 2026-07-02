@@ -102,9 +102,8 @@ pub async fn get_link_any(
     pool: &SqlitePool,
     name: &str,
 ) -> Result<Option<LinkDetail>, sqlx::Error> {
-    let sql = format!(
-        "SELECT {LINK_COLUMNS} FROM links WHERE name = ? AND expires_at > datetime('now')"
-    );
+    let sql =
+        format!("SELECT {LINK_COLUMNS} FROM links WHERE name = ? AND expires_at > datetime('now')");
     sqlx::query_as::<_, LinkDetail>(&sql)
         .bind(name)
         .fetch_optional(pool)
@@ -164,7 +163,13 @@ pub async fn insert_link(
         .await;
 
         match result {
-            Ok(expires_at) => return Ok(InsertedLink { name, expires_at, words }),
+            Ok(expires_at) => {
+                return Ok(InsertedLink {
+                    name,
+                    expires_at,
+                    words,
+                });
+            }
             Err(sqlx::Error::Database(db)) if db.is_unique_violation() => {
                 collisions += 1;
                 if collisions.is_multiple_of(COLLISION_GROW_AT) {
@@ -233,7 +238,9 @@ mod tests {
         for suffix in ["", "-wal", "-shm"] {
             let _ = std::fs::remove_file(format!("{}{suffix}", path.display()));
         }
-        connect(path.to_str().unwrap()).await.expect("connect test db")
+        connect(path.to_str().unwrap())
+            .await
+            .expect("connect test db")
     }
 
     fn redirect(content: &str, max_uses: Option<i64>) -> NewLink<'_> {
@@ -260,7 +267,13 @@ mod tests {
     #[tokio::test]
     async fn preview_reads_without_consuming() {
         let pool = test_pool().await;
-        let l = insert_link(&pool, redirect("https://example.com", None), &EMPTY_OCCUPANCY).await.unwrap();
+        let l = insert_link(
+            &pool,
+            redirect("https://example.com", None),
+            &EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
         // Reading twice must not move the hit counter.
         assert!(get_link_live(&pool, &l.name).await.unwrap().is_some());
         let d = get_link_live(&pool, &l.name).await.unwrap().unwrap();
@@ -270,7 +283,13 @@ mod tests {
     #[tokio::test]
     async fn one_time_consume_then_tombstone() {
         let pool = test_pool().await;
-        let l = insert_link(&pool, redirect("https://example.com", Some(1)), &EMPTY_OCCUPANCY).await.unwrap();
+        let l = insert_link(
+            &pool,
+            redirect("https://example.com", Some(1)),
+            &EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
 
         // First consume succeeds and counts the hit.
         let d = consume_link(&pool, &l.name).await.unwrap().unwrap();
@@ -286,7 +305,13 @@ mod tests {
     #[tokio::test]
     async fn withdraw_tombstones_keeps_name_reserved() {
         let pool = test_pool().await;
-        let l = insert_link(&pool, redirect("https://example.com", None), &EMPTY_OCCUPANCY).await.unwrap();
+        let l = insert_link(
+            &pool,
+            redirect("https://example.com", None),
+            &EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
 
         // Wrong token does nothing (fail closed).
         assert!(!delete_link(&pool, &l.name, "nope").await.unwrap());
@@ -303,7 +328,13 @@ mod tests {
     #[tokio::test]
     async fn expired_is_gone_to_both_readers_and_reaps() {
         let pool = test_pool().await;
-        let l = insert_link(&pool, redirect("https://example.com", None), &EMPTY_OCCUPANCY).await.unwrap();
+        let l = insert_link(
+            &pool,
+            redirect("https://example.com", None),
+            &EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
         expire_now(&pool, &l.name).await;
 
         // Expired reads as missing everywhere (the 404, not the 410, case).
@@ -319,13 +350,27 @@ mod tests {
     async fn private_unlimited_link_gets_a_long_name() {
         let pool = test_pool().await;
         // A public unlimited link is one lowercase word (no case boundary).
-        let public = insert_link(&pool, redirect("https://example.com/a", None), &EMPTY_OCCUPANCY).await.unwrap();
-        assert!(!public.name.chars().any(|c| c.is_ascii_uppercase()), "{}", public.name);
+        let public = insert_link(
+            &pool,
+            redirect("https://example.com/a", None),
+            &EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+        assert!(
+            !public.name.chars().any(|c| c.is_ascii_uppercase()),
+            "{}",
+            public.name
+        );
         // A private unlimited link is four words, so alternating-case adds uppercase.
         let mut nl = redirect("https://example.com/b", None);
         nl.private = true;
         let private = insert_link(&pool, nl, &EMPTY_OCCUPANCY).await.unwrap();
-        assert!(private.name.chars().any(|c| c.is_ascii_uppercase()), "{}", private.name);
+        assert!(
+            private.name.chars().any(|c| c.is_ascii_uppercase()),
+            "{}",
+            private.name
+        );
     }
 
     #[tokio::test]

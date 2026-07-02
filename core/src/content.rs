@@ -76,14 +76,23 @@ mod tests {
     #[test]
     fn known_aliases_parse() {
         assert_eq!("md".parse::<ContentType>().unwrap(), ContentType::Markdown);
-        assert_eq!("JS".parse::<ContentType>().unwrap(), ContentType::JavaScript);
+        assert_eq!(
+            "JS".parse::<ContentType>().unwrap(),
+            ContentType::JavaScript
+        );
         assert_eq!("c#".parse::<ContentType>().unwrap(), ContentType::CSharp);
     }
 
     #[test]
     fn unknown_falls_back_to_plaintext() {
-        assert_eq!(ContentType::parse_or_default("ruby"), ContentType::PlainText);
-        assert_eq!(ContentType::parse_or_default("<script>"), ContentType::PlainText);
+        assert_eq!(
+            ContentType::parse_or_default("ruby"),
+            ContentType::PlainText
+        );
+        assert_eq!(
+            ContentType::parse_or_default("<script>"),
+            ContentType::PlainText
+        );
     }
 
     #[test]

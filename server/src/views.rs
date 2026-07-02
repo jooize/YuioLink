@@ -45,7 +45,12 @@ fn document_full(title: &str, head_extra: Markup, body: Markup, scripts: Markup)
 
 /// The link name — the last path segment, minus any `#fragment` — shown as the hero.
 fn link_name(url: &str) -> &str {
-    url.split('#').next().unwrap_or(url).rsplit('/').next().unwrap_or(url)
+    url.split('#')
+        .next()
+        .unwrap_or(url)
+        .rsplit('/')
+        .next()
+        .unwrap_or(url)
 }
 
 /// Split a shoutkey name into its alternating-case words: `runnyDUSK` -> `runny`,
@@ -126,7 +131,9 @@ fn parse_sqlite_utc(s: &str) -> Option<i64> {
 
 /// Seconds from now until `expires_at` (negative if already past).
 fn seconds_until(expires_at: &str) -> i64 {
-    parse_sqlite_utc(expires_at).map(|e| e - now_unix()).unwrap_or(0)
+    parse_sqlite_utc(expires_at)
+        .map(|e| e - now_unix())
+        .unwrap_or(0)
 }
 
 /// A coarse, friendly relative expiry like `6 days`, `5 hours`, `48 min`. The
@@ -487,7 +494,11 @@ fn consume_form(action: &str, btn_class: &str, label: &str) -> Markup {
 }
 
 fn badge_text(one_time: bool) -> &'static str {
-    if one_time { "Opens Once" } else { "Limited Use" }
+    if one_time {
+        "Opens Once"
+    } else {
+        "Limited Use"
+    }
 }
 
 fn continue_label(url: &UrlView) -> String {
