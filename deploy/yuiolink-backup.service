@@ -1,0 +1,8 @@
+[Unit]
+Description=Snapshot the YuioLink database
+Documentation=https://github.com/jooize/YuioLink
+
+[Service]
+# Runs as root: it writes /var/lib/yuiolink/backups and chowns to yuiolink.
+Type=oneshot
+ExecStart=/usr/local/bin/yuiolink-backup

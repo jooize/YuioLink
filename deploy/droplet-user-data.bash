@@ -18,7 +18,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y \
     ufw fail2ban unattended-upgrades \
-    curl gnupg openssl ca-certificates \
+    curl gnupg openssl ca-certificates sqlite3 \
     debian-keyring debian-archive-keyring apt-transport-https
 
 # --- 2. Firewall FIRST (allow SSH before enabling, or you lock yourself out) -
@@ -111,6 +111,24 @@ yuio.link {
 CADDY
 systemctl reload caddy 2>/dev/null || systemctl restart caddy || true
 
+# --- 9. Update + backup tooling (the scripts live in this repo, deploy/) -----
+# Pull-based: yuiolink-update fetches the latest GitHub release binary, verifies
+# its SHA-256, installs, restarts, and health-checks (rolling back on failure).
+# yuiolink-backup snapshots the SQLite database nightly and before every update.
+raw="https://raw.githubusercontent.com/jooize/YuioLink/main/deploy"
+curl -fsSL "${raw}/yuiolink-update.bash" -o /usr/local/bin/yuiolink-update
+curl -fsSL "${raw}/yuiolink-backup.bash" -o /usr/local/bin/yuiolink-backup
+chmod 0755 /usr/local/bin/yuiolink-update /usr/local/bin/yuiolink-backup
+curl -fsSL "${raw}/yuiolink-update.service" -o /etc/systemd/system/yuiolink-update.service
+curl -fsSL "${raw}/yuiolink-backup.service" -o /etc/systemd/system/yuiolink-backup.service
+curl -fsSL "${raw}/yuiolink-backup.timer" -o /etc/systemd/system/yuiolink-backup.timer
+systemctl daemon-reload
+systemctl enable --now yuiolink-backup.timer
+
+# --- 10. Install the current release (leaves the box serving if one exists) --
+/usr/local/bin/yuiolink-update \
+    || echo "[yuiolink-init] release install failed; run yuiolink-update manually"
+
 echo "[yuiolink-init] done $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-echo "[yuiolink-init] next: point DNS at this IP, scp the binary to"
-echo "[yuiolink-init]       /usr/local/bin/yuiolink-server, then: systemctl start yuiolink"
+echo "[yuiolink-init] next: point DNS at this IP. Deploys: tag a release, then"
+echo "[yuiolink-init]       systemctl start yuiolink-update (nightly DB backups are on)"

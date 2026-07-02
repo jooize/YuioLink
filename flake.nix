@@ -1,5 +1,5 @@
 {
-  description = "YuioLink - redirect links and host text, with client-side encryption";
+  description = "YuioLink - wieldy ephemeral links: every link expires";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -40,7 +40,8 @@
         # `nix build` -> the YuioLink binaries (server/cli, as crates land).
         packages.default = rustPlatform.buildRustPackage {
           pname = "yuiolink";
-          version = "0.1.0";
+          # Single source of truth: the workspace version in Cargo.toml.
+          version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
           inherit src;
           cargoLock.lockFile = ./Cargo.lock;
 

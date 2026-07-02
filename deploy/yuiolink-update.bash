@@ -16,7 +16,10 @@ ASSET="yuiolink-server-linux-amd64"
 DEST="/usr/local/bin/yuiolink-server"
 STATE="/var/lib/yuiolink/installed-release"
 SERVICE="yuiolink"
-HEALTH_URL="http://127.0.0.1:8080/"
+# /healthz touches the database, so a failed migration reads as unhealthy --
+# probing / would only prove the process is up.
+HEALTH_URL="http://127.0.0.1:8080/healthz"
+BACKUP="/usr/local/bin/yuiolink-backup"
 
 DRY_RUN=0
 FORCE=0
@@ -97,11 +100,25 @@ fi
 log "SHA-256 verified."
 
 # --- back up, swap, restart, health-check, roll back on failure ----------------
+# Snapshot the database first: migrations run forward-only on startup, so the
+# binary rollback below cannot undo a schema change. Fail closed -- no snapshot,
+# no update (unless there is no database yet, which yuiolink-backup treats as ok).
+if [[ -x "${BACKUP}" ]]; then
+    run "${BACKUP}" || die "pre-update database backup failed -- refusing to update" 3
+else
+    log "warning: ${BACKUP} not installed; updating without a database snapshot"
+fi
+
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 backup="${DEST}.${stamp}.bak"
 if [[ -e "${DEST}" ]]; then
     run cp -a -- "${DEST}" "${backup}"
 fi
+# Keep only the newest three binary backups; they otherwise accumulate forever.
+# shellcheck disable=SC2012 -- our own <dest>.<UTC-stamp>.bak names: no spaces/newlines
+ls -1t -- "${DEST}".*.bak 2>/dev/null | tail -n +4 | while IFS= read -r old; do
+    run rm -f -- "${old}"
+done
 run install -m0755 -o root -g root -- "${work}/${ASSET}" "${DEST}"
 run systemctl restart "${SERVICE}"
 
@@ -125,5 +142,7 @@ else
         install -m0755 -- "${backup}" "${DEST}"
         systemctl restart "${SERVICE}"
     fi
+    printf '%s\n' "note: the database was NOT rolled back; if the new release migrated the" >&2
+    printf '%s\n' "schema, restore the newest snapshot from /var/lib/yuiolink/backups/" >&2
     die "rolled back after a failed health check" 3
 fi

@@ -4,7 +4,11 @@ target
 .agents-cargo
 .direnv
 repo-archive
+legacy-server-backup
 deploy
+design
+docs
+tools
 node_modules
 .git
 .tmp
