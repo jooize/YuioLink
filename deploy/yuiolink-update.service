@@ -5,7 +5,10 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-# On-demand only (no [Install]/timer): trigger with `systemctl start yuiolink-update`.
-# Runs as root: it writes /usr/local/bin/yuiolink-server and restarts the service.
+# Triggered every 10 minutes by yuiolink-update.timer; also runnable on demand
+# with `systemctl start yuiolink-update`. Runs as root: it writes
+# /usr/local/bin/yuiolink-server and restarts the service. A no-op when the
+# latest release is already installed, so the frequent polling costs nothing
+# beyond one GitHub API call.
 Type=oneshot
 ExecStart=/usr/local/bin/yuiolink-update

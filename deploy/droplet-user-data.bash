@@ -114,21 +114,26 @@ systemctl reload caddy 2>/dev/null || systemctl restart caddy || true
 # --- 9. Update + backup tooling (the scripts live in this repo, deploy/) -----
 # Pull-based: yuiolink-update fetches the latest GitHub release binary, verifies
 # its SHA-256, installs, restarts, and health-checks (rolling back on failure).
-# yuiolink-backup snapshots the SQLite database nightly and before every update.
+# It is a no-op when already on the latest tag, so yuiolink-update.timer polls
+# it every 10 minutes for auto-deploy: tag a release and it is live within 10
+# minutes, unattended. yuiolink-backup snapshots the SQLite database nightly
+# and before every update.
 raw="https://raw.githubusercontent.com/jooize/YuioLink/main/deploy"
 curl -fsSL "${raw}/yuiolink-update.bash" -o /usr/local/bin/yuiolink-update
 curl -fsSL "${raw}/yuiolink-backup.bash" -o /usr/local/bin/yuiolink-backup
 chmod 0755 /usr/local/bin/yuiolink-update /usr/local/bin/yuiolink-backup
 curl -fsSL "${raw}/yuiolink-update.service" -o /etc/systemd/system/yuiolink-update.service
+curl -fsSL "${raw}/yuiolink-update.timer" -o /etc/systemd/system/yuiolink-update.timer
 curl -fsSL "${raw}/yuiolink-backup.service" -o /etc/systemd/system/yuiolink-backup.service
 curl -fsSL "${raw}/yuiolink-backup.timer" -o /etc/systemd/system/yuiolink-backup.timer
 systemctl daemon-reload
 systemctl enable --now yuiolink-backup.timer
+systemctl enable --now yuiolink-update.timer
 
 # --- 10. Install the current release (leaves the box serving if one exists) --
 /usr/local/bin/yuiolink-update \
     || echo "[yuiolink-init] release install failed; run yuiolink-update manually"
 
 echo "[yuiolink-init] done $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-echo "[yuiolink-init] next: point DNS at this IP. Deploys: tag a release, then"
-echo "[yuiolink-init]       systemctl start yuiolink-update (nightly DB backups are on)"
+echo "[yuiolink-init] next: point DNS at this IP. Deploys: tag a release and"
+echo "[yuiolink-init]       it auto-installs within 10 minutes (yuiolink-update.timer)."

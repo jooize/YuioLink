@@ -1,0 +1,13 @@
+[Unit]
+Description=Poll GitHub for a new YuioLink release every 10 minutes
+
+[Timer]
+# Relative to boot and to the unit's own last activation, not wall-clock, so it
+# does not line up with everyone else's :00/:10 polling GitHub at once.
+OnBootSec=2min
+OnUnitActiveSec=10min
+RandomizedDelaySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
