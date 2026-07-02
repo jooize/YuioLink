@@ -2,6 +2,7 @@ mod card;
 mod config;
 mod db;
 mod error;
+mod ratelimit;
 mod token;
 mod urlview;
 mod views;
@@ -55,6 +56,7 @@ async fn main() -> anyhow::Result<()> {
         max_ttl_secs: config.max_ttl_secs,
         secret: config.secret.clone(),
         occupancy: occupancy.clone(),
+        limiter: Arc::new(ratelimit::RateLimiter::new()),
     };
 
     spawn_reaper(pool, config.reap_interval_secs, occupancy);

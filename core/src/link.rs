@@ -123,17 +123,21 @@ fn alternating_case(parts: &[&str]) -> String {
     out
 }
 
-/// Pick a uniformly random word index in `[0, WORD_COUNT)` from the OS CSPRNG,
-/// using rejection sampling to avoid modulo bias.
-fn pick_index() -> usize {
-    // 1296 < 2^16; reject the tail so every index is equally likely.
-    let max_unbiased = (u16::MAX as u32 + 1) / WORD_COUNT as u32 * WORD_COUNT as u32;
+/// Pick a uniformly random index in `[0, count)` from the OS CSPRNG, using
+/// rejection sampling to avoid modulo bias. Bounded by the caller's actual list
+/// length (not the `WORD_COUNT` const), so the two can never drift apart into an
+/// out-of-bounds index.
+fn pick_index(count: usize) -> usize {
+    debug_assert!(count > 0 && count <= u16::MAX as usize + 1);
+    let count = count as u32;
+    // Reject the tail of the u16 range so every index is equally likely.
+    let max_unbiased = (u16::MAX as u32 + 1) / count * count;
     let mut buf = [0u8; 2];
     loop {
         OsRng.fill_bytes(&mut buf);
         let v = u16::from_le_bytes(buf) as u32;
         if v < max_unbiased {
-            return (v % WORD_COUNT as u32) as usize;
+            return (v % count) as usize;
         }
     }
 }
@@ -142,7 +146,9 @@ fn pick_index() -> usize {
 /// display form. The words come from the OS CSPRNG, so names are unguessable.
 pub fn generate_name(words_count: usize) -> String {
     let list = words();
-    let picked: Vec<&str> = (0..words_count.max(1)).map(|_| list[pick_index()]).collect();
+    let picked: Vec<&str> = (0..words_count.max(1))
+        .map(|_| list[pick_index(list.len())])
+        .collect();
     alternating_case(&picked)
 }
 
@@ -236,7 +242,10 @@ pub enum UriError {
 pub fn validate_redirect(uri: &str, allowed_schemes: &[&str]) -> Result<String, UriError> {
     let parsed = Url::parse(uri).map_err(|_| UriError::Invalid)?;
     let scheme = parsed.scheme();
-    if allowed_schemes.iter().any(|s| s.eq_ignore_ascii_case(scheme)) {
+    if allowed_schemes
+        .iter()
+        .any(|s| s.eq_ignore_ascii_case(scheme))
+    {
         Ok(parsed.into())
     } else {
         Err(UriError::SchemeNotAllowed(scheme.to_string()))
@@ -275,7 +284,7 @@ mod tests {
 
     #[test]
     fn names_are_distinct() {
-        // Two-word names: 3518^2 ≈ 12.4M, so 1000 draws collide vanishingly rarely.
+        // Two-word names: 3516^2 ≈ 12.4M, so 1000 draws collide vanishingly rarely.
         let set: HashSet<String> = (0..1000).map(|_| generate_name(2)).collect();
         assert!(set.len() > 990);
     }
@@ -377,6 +386,9 @@ mod tests {
         // valid Location header value and never panics the redirect handler.
         let canonical = validate_redirect("https://åäö.se", DEFAULT_ALLOWED_SCHEMES).unwrap();
         assert!(canonical.is_ascii(), "must be ASCII: {canonical:?}");
-        assert!(canonical.contains("xn--"), "host should be punycode: {canonical:?}");
+        assert!(
+            canonical.contains("xn--"),
+            "host should be punycode: {canonical:?}"
+        );
     }
 }

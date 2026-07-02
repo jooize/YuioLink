@@ -29,6 +29,7 @@ use yuiolink_core::{
 
 use crate::config::{DEFAULT_TTL_SECS, MIN_TTL_SECS};
 use crate::db::{self, LinkDetail, NewLink};
+use crate::ratelimit::RateLimiter;
 use crate::views::{self, Interstitial, RevealedTarget, RevealedView, Target};
 use crate::{card, error::AppError, token, urlview};
 
@@ -46,6 +47,25 @@ pub struct AppState {
     /// Live name count per word-tier (1..=4 words), refreshed by the reaper. The
     /// create path reads it to choose the shortest available public name.
     pub occupancy: Arc<[AtomicU64; 4]>,
+    /// Create-path rate limiter (per client IP). Creation only — resolution is
+    /// never limited (see [`crate::ratelimit`]).
+    pub limiter: Arc<RateLimiter>,
+}
+
+/// The message every over-limit create surface answers 429 with.
+const RATE_LIMIT_MSG: &str = "You are creating links too quickly. Wait a moment and try again.";
+
+/// Key a client for rate limiting. Behind the reverse proxy every TCP peer is
+/// localhost, so the client is the *last* `X-Forwarded-For` entry — the one our
+/// own proxy appended (earlier entries are attacker-controllable). No header
+/// (tests, direct local hits) falls back to one shared bucket — fail closed.
+fn client_key(headers: &HeaderMap) -> String {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.rsplit(',').next())
+        .map(|ip| ip.trim().to_string())
+        .unwrap_or_default()
 }
 
 /// A point-in-time copy of the per-tier occupancy for one create.
@@ -66,6 +86,7 @@ fn now_unix() -> i64 {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/", get(index).post(form_create))
+        .route("/healthz", get(healthz))
         .route("/static/app.css", get(app_css))
         .route("/static/app.js", get(app_js))
         .route("/static/text.js", get(text_js))
@@ -90,6 +111,18 @@ fn api_routes() -> Router<AppState> {
 
 async fn not_found_fallback() -> AppError {
     AppError::NotFound
+}
+
+/// `GET /healthz` — deploy/update health probe. Touches the database so a failed
+/// migration or unreadable file reads as unhealthy, not merely "process is up".
+async fn healthz(State(state): State<AppState>) -> Response {
+    match sqlx::query_scalar::<_, i64>("SELECT 1")
+        .fetch_one(&state.pool)
+        .await
+    {
+        Ok(_) => (StatusCode::OK, "ok\n").into_response(),
+        Err(e) => AppError::internal(e).into_response(),
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -120,7 +153,9 @@ async fn create_link(
     use CreateError::BadRequest;
 
     if raw_content.trim().is_empty() {
-        return Err(BadRequest("Enter a link to redirect, or some text to share.".into()));
+        return Err(BadRequest(
+            "Enter a link to redirect, or some text to share.".into(),
+        ));
     }
 
     let kind = match kind_choice {
@@ -141,11 +176,16 @@ async fn create_link(
                 .map_err(|e| BadRequest(e.to_string()))?;
             (canonical, None)
         }
-        Kind::Text => (raw_content.to_string(), Some(ContentType::PlainText.as_str())),
+        Kind::Text => (
+            raw_content.to_string(),
+            Some(ContentType::PlainText.as_str()),
+        ),
     };
 
     if content.len() > MAX_CONTENT_BYTES {
-        return Err(BadRequest("That is too large to share (the limit is 64 KB).".into()));
+        return Err(BadRequest(
+            "That is too large to share (the limit is 64 KB).".into(),
+        ));
     }
     check_ttl(ttl_seconds, state.max_ttl_secs).map_err(BadRequest)?;
     // A link is either unlimited (no limit) or single-use. Storage keeps a general
@@ -194,14 +234,26 @@ pub async fn index(State(state): State<AppState>) -> Html<String> {
 /// gets a server-rendered result page. (With JS, `app.js` instead intercepts the
 /// submit and uses the JSON API for an in-place result.) Always unencrypted: the
 /// browser cannot seal without JS.
-pub async fn form_create(State(state): State<AppState>, Form(form): Form<FormCreate>) -> Response {
+pub async fn form_create(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<FormCreate>,
+) -> Response {
+    if !state.limiter.allow(&client_key(&headers)) {
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Html(views::error_page(429, RATE_LIMIT_MSG).into_string()),
+        )
+            .into_response();
+    }
     // Expiry: a preset ("600"/"3600"/"604800") or "custom" (a number + unit).
     let ttl_seconds = match form.ttl_seconds.as_deref() {
-        Some("custom") => match parse_custom_ttl(form.ttl_custom.as_deref(), form.ttl_unit.as_deref())
-        {
-            Ok(secs) => secs,
-            Err(msg) => return form_error(msg),
-        },
+        Some("custom") => {
+            match parse_custom_ttl(form.ttl_custom.as_deref(), form.ttl_unit.as_deref()) {
+                Ok(secs) => secs,
+                Err(msg) => return form_error(msg),
+            }
+        }
         Some(s) => s.parse::<i64>().unwrap_or(DEFAULT_TTL_SECS),
         None => DEFAULT_TTL_SECS,
     };
@@ -217,7 +269,17 @@ pub async fn form_create(State(state): State<AppState>, Form(form): Form<FormCre
     // No kind field: the server detects it (a URL is a redirect, else text).
     // No-JS form: no token issued (nowhere to keep it), so these links are not
     // API-deletable — fail closed.
-    match create_link(&state, None, &form.content, ttl_seconds, max_uses, private, None).await {
+    match create_link(
+        &state,
+        None,
+        &form.content,
+        ttl_seconds,
+        max_uses,
+        private,
+        None,
+    )
+    .await
+    {
         Ok(inserted) => {
             let url = format!("{}{}", state.base_url, inserted.name);
             let kind_label = match detect_kind(&form.content) {
@@ -403,7 +465,11 @@ pub async fn reveal(State(state): State<AppState>, Path(name): Path<String>) -> 
             // than the URL, so the revealed page has a clean address and the token
             // never lands in browser history, referrers, or server logs. `Secure`
             // only when actually served over HTTPS, so local http dev still works.
-            let secure = if state.base_url.starts_with("https") { "; Secure" } else { "" };
+            let secure = if state.base_url.starts_with("https") {
+                "; Secure"
+            } else {
+                ""
+            };
             let cookie = format!(
                 "yl_reveal={t}; Path=/{}; Max-Age={}; HttpOnly; SameSite=Lax{secure}",
                 d.name,
@@ -448,7 +514,10 @@ async fn revealed_view(state: &AppState, name: &str) -> Response {
                 base_host,
                 name: &d.name,
                 expires_at: &d.expires_at,
-                target: RevealedTarget::Redirect { url: &url, href: &d.content },
+                target: RevealedTarget::Redirect {
+                    url: &url,
+                    href: &d.content,
+                },
             })
         }
         "text" => views::revealed_page(RevealedView {
@@ -478,16 +547,26 @@ pub async fn card_image(State(state): State<AppState>, Path(name): Path<String>)
     } else {
         "Ephemeral redirect"
     };
+    let domain = url.card_domain();
     let foot = format!(
         "expires {} · may change after",
         views::format_card_date(&d.expires_at)
     );
 
-    match card::render_png(&card::Card {
-        kicker,
-        domain: &url.card_domain(),
-        foot: &foot,
-    }) {
+    // Rasterizing is synchronous CPU work; keep it off the async workers so a
+    // burst of crawler card fetches cannot stall every other request.
+    let png = tokio::task::spawn_blocking(move || {
+        card::render_png(&card::Card {
+            kicker,
+            domain: &domain,
+            foot: &foot,
+        })
+    })
+    .await
+    .ok()
+    .flatten();
+
+    match png {
         Some(png) => (
             [
                 (header::CONTENT_TYPE, "image/png"),
@@ -518,6 +597,10 @@ pub async fn create_plain(
     headers: HeaderMap,
     body: String,
 ) -> Response {
+    if !state.limiter.allow(&client_key(&headers)) {
+        return (StatusCode::TOO_MANY_REQUESTS, format!("{RATE_LIMIT_MSG}\n")).into_response();
+    }
+
     let parsed = parse_plain_body(&body);
 
     if parsed.content.trim().is_empty() {
@@ -532,7 +615,11 @@ pub async fn create_plain(
         Some(s) => match parse_duration(s) {
             Some(secs) => secs,
             None => {
-                return (StatusCode::BAD_REQUEST, "That expiry is not valid. Try a value like 10m, 2h, or 3d.\n").into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    "That expiry is not valid. Try a value like 10m, 2h, or 3d.\n",
+                )
+                    .into_response();
             }
         },
         None => DEFAULT_TTL_SECS,
@@ -542,7 +629,10 @@ pub async fn create_plain(
         Some(s) => match s.trim().parse::<i64>() {
             Ok(n) => Some(n),
             Err(_) => {
-                return (StatusCode::BAD_REQUEST, "The view limit must be a whole number above zero.\n")
+                return (
+                    StatusCode::BAD_REQUEST,
+                    "The view limit must be a whole number above zero.\n",
+                )
                     .into_response();
             }
         },
@@ -550,7 +640,16 @@ pub async fn create_plain(
     };
 
     // Auto-detect kind (None).
-    let inserted = match create_link(&state, None, parsed.content, ttl_seconds, max_uses, false, None).await
+    let inserted = match create_link(
+        &state,
+        None,
+        parsed.content,
+        ttl_seconds,
+        max_uses,
+        false,
+        None,
+    )
+    .await
     {
         Ok(inserted) => inserted,
         Err(CreateError::BadRequest(msg)) => {
@@ -640,15 +739,23 @@ fn parse_duration(s: &str) -> Option<i64> {
         .parse::<i64>()
         .ok()
         .filter(|&n| n >= 0)
-        .map(|n| n * mult)
+        // checked_mul: an absurd count must read as invalid, not wrap around
+        // into some accidental in-range TTL.
+        .and_then(|n| n.checked_mul(mult))
 }
 
 /// Reject a TTL outside `[MIN_TTL_SECS, max_ttl]`, phrased for humans in days/hours.
 fn check_ttl(ttl_seconds: i64, max_ttl: i64) -> Result<(), String> {
     if ttl_seconds < MIN_TTL_SECS {
-        Err(format!("Links must last at least {}.", views::humanize_duration(MIN_TTL_SECS)))
+        Err(format!(
+            "Links must last at least {}.",
+            views::humanize_duration(MIN_TTL_SECS)
+        ))
     } else if ttl_seconds > max_ttl {
-        Err(format!("Links can last at most {}.", views::humanize_duration(max_ttl)))
+        Err(format!(
+            "Links can last at most {}.",
+            views::humanize_duration(max_ttl)
+        ))
     } else {
         Ok(())
     }
@@ -727,10 +834,12 @@ pub struct ApiLink {
     pub name: String,
     pub kind: String,
     pub url: String,
-    /// The destination, for redirect links.
+    /// The destination, for redirect links. Absent for limited (single-use)
+    /// links, whose payload is only disclosed by spending the use.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
-    /// The body for Text links. Reading it here does not count against `max_uses`.
+    /// The body for Text links. Reading it here does not count against
+    /// `max_uses` — which is exactly why it is absent for limited links.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
     pub hits: i64,
@@ -743,6 +852,7 @@ pub struct ApiLink {
 pub enum ApiError {
     NotFound,
     BadRequest(String),
+    TooManyRequests,
     Internal,
 }
 
@@ -760,6 +870,9 @@ impl IntoResponse for ApiError {
         let (status, message) = match self {
             ApiError::NotFound => (StatusCode::NOT_FOUND, "not found".to_string()),
             ApiError::BadRequest(m) => (StatusCode::BAD_REQUEST, m),
+            ApiError::TooManyRequests => {
+                (StatusCode::TOO_MANY_REQUESTS, RATE_LIMIT_MSG.to_string())
+            }
             ApiError::Internal => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "internal error".to_string(),
@@ -774,10 +887,16 @@ impl IntoResponse for ApiError {
 /// for an in-place result (and the one a third-party client targets).
 pub async fn api_create_link(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<CreateRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
+    if !state.limiter.allow(&client_key(&headers)) {
+        return Err(ApiError::TooManyRequests);
+    }
     if req.content.len() > MAX_CONTENT_BYTES {
-        return Err(ApiError::BadRequest("That is too large to share (the limit is 64 KB).".into()));
+        return Err(ApiError::BadRequest(
+            "That is too large to share (the limit is 64 KB).".into(),
+        ));
     }
 
     let ttl_seconds = req.ttl_seconds.unwrap_or(DEFAULT_TTL_SECS);
@@ -829,10 +948,12 @@ pub async fn api_delete_link(
     headers: HeaderMap,
 ) -> Result<StatusCode, ApiError> {
     let token = bearer_token(&headers).ok_or(ApiError::NotFound)?;
-    let deleted = db::delete_link(&state.pool, &name, token).await.map_err(|e| {
-        tracing::error!(error = %e, "failed to delete link");
-        ApiError::Internal
-    })?;
+    let deleted = db::delete_link(&state.pool, &name, token)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "failed to delete link");
+            ApiError::Internal
+        })?;
     if deleted {
         Ok(StatusCode::NO_CONTENT)
     } else {
@@ -841,8 +962,12 @@ pub async fn api_delete_link(
 }
 
 /// `GET /api/v1/links/:name` — read a link (the REST "expand"). Safe and
-/// idempotent: it does NOT count a hit or consume `max_uses`. The destination is
-/// omitted for encrypted links; Text bodies are returned verbatim.
+/// idempotent: it does NOT count a hit or consume `max_uses`. Because of that, a
+/// **limited** (single-use) link answers with metadata only — returning its
+/// destination or body here would let anyone who learns the name read a one-time
+/// link repeatedly without spending the use, silently defeating the
+/// burn-after-read tamper evidence the reveal flow exists to provide. Consuming
+/// stays exclusive to `POST /:name/reveal`.
 pub async fn api_get_link(
     State(state): State<AppState>,
     Path(name): Path<String>,
@@ -855,9 +980,10 @@ pub async fn api_get_link(
         })?
         .ok_or(ApiError::NotFound)?;
 
-    let (target, content) = match d.kind.as_str() {
-        "redirect" => (Some(d.content.clone()), None),
-        "text" => (None, Some(d.content.clone())),
+    let (target, content) = match (d.kind.as_str(), d.max_uses.is_some()) {
+        (_, true) => (None, None),
+        ("redirect", false) => (Some(d.content.clone()), None),
+        ("text", false) => (None, Some(d.content.clone())),
         _ => (None, None),
     };
 
@@ -882,7 +1008,13 @@ macro_rules! static_asset {
     ($name:ident, $file:literal, $mime:literal) => {
         pub async fn $name() -> impl IntoResponse {
             (
-                [(header::CONTENT_TYPE, $mime)],
+                [
+                    (header::CONTENT_TYPE, $mime),
+                    // Embedded assets change only on deploy; an hour of client
+                    // caching (same policy as card.png) beats re-fetching the
+                    // full CSS/JS on every visit.
+                    (header::CACHE_CONTROL, "public, max-age=3600"),
+                ],
                 include_str!(concat!("../static/", $file)),
             )
         }
@@ -934,6 +1066,23 @@ mod tests {
         assert_eq!(parse_duration("3d"), Some(259200));
         assert_eq!(parse_duration("nope"), None);
         assert_eq!(parse_duration(""), None);
+        // Overflow must read as invalid, not wrap into an accidental TTL.
+        assert_eq!(parse_duration("99999999999999999d"), None);
+        assert_eq!(parse_duration("-1h"), None);
+    }
+
+    #[test]
+    fn parse_custom_ttl_bounds_and_units() {
+        assert_eq!(parse_custom_ttl(Some("5"), Some("m")), Ok(300));
+        assert_eq!(parse_custom_ttl(Some("2"), Some("h")), Ok(7200));
+        assert_eq!(parse_custom_ttl(Some("3"), Some("d")), Ok(259200));
+        assert!(parse_custom_ttl(None, Some("m")).is_err());
+        assert!(parse_custom_ttl(Some("x"), Some("m")).is_err());
+        // Saturates instead of overflowing; check_ttl rejects it afterwards.
+        assert_eq!(
+            parse_custom_ttl(Some(&i64::MAX.to_string()), Some("d")),
+            Ok(i64::MAX)
+        );
     }
 
     // ----------------------------------------------------------------------
@@ -959,7 +1108,10 @@ mod tests {
             base_url: Arc::from("http://yuio.test/"),
             max_ttl_secs: 604800,
             secret: Arc::from(b"test-secret".as_slice()),
-            occupancy: Arc::new(std::array::from_fn(|_| std::sync::atomic::AtomicU64::new(0))),
+            occupancy: Arc::new(std::array::from_fn(|_| {
+                std::sync::atomic::AtomicU64::new(0)
+            })),
+            limiter: Arc::new(RateLimiter::new()),
         }
     }
 
@@ -988,23 +1140,40 @@ mod tests {
     }
 
     fn post(uri: &str) -> Request<Body> {
-        Request::builder().method("POST").uri(uri).body(Body::empty()).unwrap()
+        Request::builder()
+            .method("POST")
+            .uri(uri)
+            .body(Body::empty())
+            .unwrap()
     }
 
     async fn hits(state: &AppState, name: &str) -> i64 {
-        db::get_link_any(&state.pool, name).await.unwrap().unwrap().hits
+        db::get_link_any(&state.pool, name)
+            .await
+            .unwrap()
+            .unwrap()
+            .hits
     }
 
     #[tokio::test]
     async fn unlimited_redirect_previews_then_consumes() {
         let st = test_state().await;
-        let l = db::insert_link(&st.pool, redirect("https://example.com/x", None), &db::EMPTY_OCCUPANCY).await.unwrap();
+        let l = db::insert_link(
+            &st.pool,
+            redirect("https://example.com/x", None),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
 
         // GET previews: 200 interstitial, no hit, full URL + amber Continue. A
         // crawler doing exactly this can never spend a use.
         let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
         assert_eq!(s, StatusCode::OK);
-        assert!(body.contains("Continue to example.com"), "interstitial body: {body}");
+        assert!(
+            body.contains("Continue to example.com"),
+            "interstitial body: {body}"
+        );
         assert_eq!(hits(&st, &l.name).await, 0);
 
         // POST /go consumes: 303 straight to the destination, hit counted.
@@ -1029,7 +1198,10 @@ mod tests {
         let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("Reveal Destination"));
-        assert!(!body.contains("zzz-gated-path"), "path must be gated: {body}");
+        assert!(
+            !body.contains("zzz-gated-path"),
+            "path must be gated: {body}"
+        );
         assert_eq!(hits(&st, &l.name).await, 0);
 
         // POST /reveal consumes once and 303s to the clean /:name URL, with the
@@ -1084,7 +1256,10 @@ mod tests {
             .unwrap();
         let (s, _, body) = send(&st, forged).await;
         assert_eq!(s, StatusCode::OK);
-        assert!(!body.contains("zzz-gated"), "forged cookie must not reveal: {body}");
+        assert!(
+            !body.contains("zzz-gated"),
+            "forged cookie must not reveal: {body}"
+        );
         assert_eq!(hits(&st, &l.name).await, 0);
     }
 
@@ -1115,7 +1290,13 @@ mod tests {
     #[tokio::test]
     async fn trailing_plus_and_any_case_resolve_to_canonical_preview() {
         let st = test_state().await;
-        let l = db::insert_link(&st.pool, redirect("https://example.com/x", None), &db::EMPTY_OCCUPANCY).await.unwrap();
+        let l = db::insert_link(
+            &st.pool,
+            redirect("https://example.com/x", None),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
 
         // A trailing "+" is accepted and behaves like the bare name (no use spent).
         let (s, _, body) = send(&st, get(&format!("/{}+", l.name))).await;
@@ -1162,9 +1343,107 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn api_read_of_limited_link_omits_payload_and_spends_nothing() {
+        let st = test_state().await;
+        let l = db::insert_link(
+            &st.pool,
+            redirect("https://secret.example.com/zzz-gated-path", Some(1)),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+
+        // The REST read must not disclose a one-time link's destination: doing so
+        // would let anyone who knows the name read it repeatedly without spending
+        // the use, defeating the burn-after-read tamper evidence.
+        let (s, _, body) = send(&st, get(&format!("/api/v1/links/{}", l.name))).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(
+            !body.contains("zzz-gated-path"),
+            "payload must be gated: {body}"
+        );
+        assert!(
+            body.contains(r#""max_uses":1"#),
+            "metadata still served: {body}"
+        );
+        assert_eq!(hits(&st, &l.name).await, 0);
+
+        // An unlimited link still returns its target (the REST "expand").
+        let u = db::insert_link(
+            &st.pool,
+            redirect("https://example.com/open", None),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+        let (s, _, body) = send(&st, get(&format!("/api/v1/links/{}", u.name))).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(body.contains("https://example.com/open"));
+    }
+
+    #[tokio::test]
+    async fn api_rejects_oversized_content() {
+        let st = test_state().await;
+        let big = "x".repeat(MAX_CONTENT_BYTES + 1);
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/v1/links")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"kind":"text","content":"{big}"}}"#
+            )))
+            .unwrap();
+        let (s, _, _) = send(&st, req).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn create_is_rate_limited_per_client() {
+        let st = test_state().await;
+        let create = |ip: &str| {
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/links")
+                .header("content-type", "application/json")
+                .header("x-forwarded-for", ip)
+                .body(Body::from(
+                    r#"{"kind":"redirect","content":"https://example.com"}"#.to_string(),
+                ))
+                .unwrap()
+        };
+        // The burst passes, the next create is a fast 429.
+        for _ in 0..10 {
+            let (s, _, _) = send(&st, create("203.0.113.7")).await;
+            assert_eq!(s, StatusCode::CREATED);
+        }
+        let (s, _, body) = send(&st, create("203.0.113.7")).await;
+        assert_eq!(s, StatusCode::TOO_MANY_REQUESTS);
+        assert!(body.contains("too quickly"), "{body}");
+        // A different client is unaffected; resolution is never limited.
+        let (s, _, _) = send(&st, create("198.51.100.9")).await;
+        assert_eq!(s, StatusCode::CREATED);
+    }
+
+    #[tokio::test]
     async fn withdraw_via_api_then_gone() {
         let st = test_state().await;
-        let l = db::insert_link(&st.pool, redirect("https://example.com", None), &db::EMPTY_OCCUPANCY).await.unwrap();
+        let l = db::insert_link(
+            &st.pool,
+            redirect("https://example.com", None),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+
+        // A wrong (or missing) token reads as 404 — the endpoint reveals nothing.
+        let bad = Request::builder()
+            .method("DELETE")
+            .uri(format!("/api/v1/links/{}", l.name))
+            .header("authorization", "Bearer wrong")
+            .body(Body::empty())
+            .unwrap();
+        let (s, _, _) = send(&st, bad).await;
+        assert_eq!(s, StatusCode::NOT_FOUND);
 
         let req = Request::builder()
             .method("DELETE")
@@ -1183,7 +1462,13 @@ mod tests {
     #[tokio::test]
     async fn card_png_renders_and_spends_no_use() {
         let st = test_state().await;
-        let l = db::insert_link(&st.pool, redirect("https://example.com/blog", None), &db::EMPTY_OCCUPANCY).await.unwrap();
+        let l = db::insert_link(
+            &st.pool,
+            redirect("https://example.com/blog", None),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
 
         // A crawler hitting the interstitial and the card never bumps hits.
         send(&st, get(&format!("/{}", l.name))).await;
