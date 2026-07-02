@@ -396,10 +396,12 @@
         const linkCount = shown.filter((it) => !it.tombstone).length; // tombstones are not links
 
         // Split pill: left = status (and a link to the list), right = persistence toggle.
+        // Both ship hidden (blank pills without JS); un-hide once filled.
         const status = document.getElementById("storage-status");
         if (status) {
             status.textContent = linkCount > 0 ? `History · ${linkCount} ${linkCount === 1 ? "Link" : "Links"} ›` : "No Links Yet";
             status.dataset.has = n > 0 ? "1" : "";
+            status.hidden = false;
         }
         const toggle = document.getElementById("storage-toggle");
         if (toggle) {
@@ -417,6 +419,7 @@
             }
             toggle.classList.toggle("on", persistEnabled);
             toggle.setAttribute("aria-checked", persistEnabled ? "true" : "false");
+            toggle.hidden = false;
         }
         const warn = document.getElementById("storage-warning");
         if (warn) warn.hidden = !(warnArmed && !persistEnabled && n > 0);
@@ -719,7 +722,6 @@
     const initCreate = () => {
         const content = document.getElementById("content");
         const form = document.getElementById("create-form");
-        const encrypt = document.getElementById("encrypt"); // null when encryption is off
         const submitBtn = document.getElementById("submit");
         const clearBtn = document.getElementById("clear");
         const linkEl = document.getElementById("link-element");
@@ -874,20 +876,12 @@
             // create would otherwise flash the label pointlessly.
             const creatingLabel = setTimeout(() => { submitBtn.textContent = "Creating…"; }, 150);
             try {
-                let bodyContent = payload;
-                let fragment = "";
-                if (encrypt?.checked) {
-                    const key = YuioCrypto.generateKey();
-                    bodyContent = await YuioCrypto.seal(payload, key);
-                    fragment = `#${YuioCrypto.keyToFragment(key)}`;
-                }
                 const resp = await fetch(`${API_BASE}/api/v1/links`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         kind,
-                        content: bodyContent,
-                        encrypted: !!encrypt?.checked,
+                        content: payload,
                         ttl_seconds: ttl,
                         max_uses: uses,
                         private: priv,
@@ -898,7 +892,7 @@
                     throw new Error(err.error || "Request failed");
                 }
                 const data = await resp.json();
-                const url = data.url + fragment;
+                const url = data.url;
                 currentResultUrl = url;
                 showReady(url, kind, data.expires_at, uses);
                 // A public link is normally one word; more means the short tiers are
@@ -932,12 +926,16 @@
             createLink();
         });
 
-        clearBtn?.addEventListener("click", () => {
-            content.value = "";
-            autosize();
-            updateSubmitLabel();
-            content.focus();
-        });
+        // Clear ships hidden (dead without JS); reveal it as it gets its handler.
+        if (clearBtn) {
+            clearBtn.hidden = false;
+            clearBtn.addEventListener("click", () => {
+                content.value = "";
+                autosize();
+                updateSubmitLabel();
+                content.focus();
+            });
+        }
 
         setupResultCopy(linkEl);
         enableQuietCopy(panel, linkEl);

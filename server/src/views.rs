@@ -219,9 +219,11 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
 
         // Split storage pill (top): left shows the status (and links to the list),
         // right is the local-persistence toggle in its own colour. app.js fills both.
+        // Both start hidden: they are blank coloured pills until app.js fills
+        // them (renderHistory un-hides), so the no-JS page never shows them empty.
         div.storage-pill {
-            a.storage-status #storage-status href="#history" {}
-            button.storage-toggle #storage-toggle type="button" {}
+            a.storage-status #storage-status href="#history" hidden {}
+            button.storage-toggle #storage-toggle type="button" hidden {}
         }
         // Shown by app.js when the user turns local history off while links exist.
         p.storage-warning #storage-warning hidden {
@@ -233,30 +235,85 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
         (result_output(None, html! {}, None))
 
         form #create-form method="post" action="/" {
+            label.visually-hidden for="content" { "Link or text to share" }
             textarea #content.form-control name="content" rows="1"
                 autocomplete="off" autocapitalize="off" spellcheck="false"
                 placeholder="Paste a link to redirect, or type text to share" autofocus {}
 
             div.split-btn {
                 button #submit.btn.split-primary type="submit" { "Create Link" }
-                button #clear.btn.split-clear type="button" { "Clear" }
+                // Dead without JS; app.js un-hides it when it wires the handler.
+                button #clear.btn.split-clear type="button" hidden { "Clear" }
             }
             p.form-error #form-error role="alert" hidden {}
 
-            div.picker.type-picker {
+            fieldset.picker.type-picker {
+                legend.visually-hidden { "Link Type" }
                 div.segmented {
                     input.seg-radio #type-public type="radio" name="link_type" value="public" checked;
-                    label.seg-label for="type-public" { "Public Link" }
+                    label.seg-label.dot.t-public for="type-public" { "Public" }
                     input.seg-radio #type-private type="radio" name="link_type" value="private";
-                    label.seg-label for="type-private" { "Private Link" }
+                    label.seg-label.dot.t-private for="type-private" { "Private" }
                     input.seg-radio #type-once type="radio" name="link_type" value="once";
-                    label.seg-label for="type-once" { "One-Time Link" }
+                    label.seg-label.dot.t-once for="type-once" { "One-Time" }
                 }
-                // One description line shows for the selected type (CSS :has, so it
-                // works without JavaScript).
-                small.picker-note.for-public { "Convenient link with 1–3 words by shortest available. Not private!" }
-                small.picker-note.for-private { "Private link with 4 words. (Unguessable in a 47-bit namespace.)" }
-                small.picker-note.for-once { "Single-use link with 4 words. (Unguessable in a 47-bit namespace.)" }
+                // One shared native disclosure under the picker. Only the selected
+                // type's fragments show (CSS :has, so it works without JavaScript),
+                // and the open state carries across type switches. The toggle word
+                // is "Privacy" on Public, "Security" on Private/One-Time.
+                details.note {
+                    summary {
+                        span.summary-txt {
+                            span.for-public {
+                                "Convenient link with 1–3 words by shortest available. "
+                                span.warn-red { "Not private!" }
+                            }
+                            span.for-private { "Private link with 4 words (in 47-bit namespace)." }
+                            span.for-once { "Single-use link with 4 words (in 47-bit namespace)." }
+                        }
+                        span.summary-toggle {
+                            span.for-public { "Privacy" }
+                            span.for-private { "Security" }
+                            span.for-once { "Security" }
+                            svg.chev width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" {
+                                path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor"
+                                    stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" {}
+                            }
+                        }
+                    }
+                    div.details-body.for-public {
+                        "Public names are short words from a public wordlist, so anyone can "
+                        "run the whole list and turn up every public link. "
+                        strong { "Ideal for convenience and easy sharing" }
+                        " — never for anything secret. "
+                        a href="/wordlist.txt" { "Browse the wordlist →" }
+                    }
+                    div.details-body.for-private {
+                        p {
+                            "Your link's name — and the content behind it — is protected by "
+                            "sheer improbability: to reach it, an attacker has to guess your "
+                            "exact four-word name within its lifetime, and nothing indexes it "
+                            "to narrow the search. There are about 153 trillion combinations "
+                            "(~47 bits), so even a botnet firing a million guesses a second "
+                            "covers only ~0.4% of them before the 7-day maximum runs out."
+                        }
+                        p {
+                            "That's "
+                            strong { "guesswork protecting it, not encryption" }
+                            " — so it also relies on us keeping the hosting secure, and on "
+                            "the link reaching only the people you intend. The name is hard "
+                            "to guess, not sealed."
+                        }
+                    }
+                    div.details-body.for-once {
+                        "Same security as Private, but "
+                        strong { "deleted from the server when revealed" }
+                        ". Recipients first open the link, then have a choice to reveal its "
+                        "contents, which is when the one time is spent. Even if the link is "
+                        "opened multiple times before reveal, only one can reveal its "
+                        "destination or contents."
+                    }
+                }
             }
 
             fieldset.picker {
@@ -273,7 +330,8 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                 }
                 div.custom-field #ttl-custom-field {
                     input #ttl-custom-value.custom-num name="ttl_custom" type="number"
-                        min="1" step="1" inputmode="numeric" placeholder="5";
+                        min="1" step="1" inputmode="numeric" placeholder="5"
+                        aria-label="Custom expiry amount";
                     div.segmented.unit-segmented {
                         input.seg-radio #ttl-unit-m type="radio" name="ttl_unit" value="m" checked;
                         label.seg-label for="ttl-unit-m" { "minutes" }
@@ -476,6 +534,14 @@ fn text_snippet_block(i: &Interstitial, one_time: bool) -> Markup {
         (consume_form(&format!("/{}/reveal", i.name), REVEAL_BTN, "Reveal Text"))
         div.pv-badge-wrap { span.pv-badge { (badge_text(one_time)) } }
         p.pv-meta { "Expires in " (humanize_expires_in(i.expires_at)) }
+        @if one_time {
+            span.pv-caution.single { "If this page says the link is gone (410), someone already opened it." }
+        } @else {
+            span.pv-caution {
+                "YuioLinks expire and are reused, so this name can carry different text later. "
+                strong { "Revealing spends one view." }
+            }
+        }
     }
 }
 
@@ -627,7 +693,8 @@ pub fn revealed_page(r: RevealedView) -> Markup {
             let body = html! {
                 p.pv-revealed { "One view used." }
                 pre.text-body #text-body { (text) }
-                button.btn.btn-block #copy-text type="button" { "Copy" }
+                // Dead without JS; text.js un-hides it when it wires the handler.
+                button.btn.btn-block #copy-text type="button" hidden { "Copy" }
             };
             document(body, html! { script src="/static/text.js" {} })
         }
@@ -640,7 +707,8 @@ pub fn revealed_page(r: RevealedView) -> Markup {
 pub fn text_view_page(text: &str) -> Markup {
     let body = html! {
         pre.text-body #text-body { (text) }
-        button.btn.btn-block #copy-text type="button" { "Copy" }
+        // Dead without JS; text.js un-hides it when it wires the handler.
+        button.btn.btn-block #copy-text type="button" hidden { "Copy" }
     };
     document(body, html! { script src="/static/text.js" {} })
 }

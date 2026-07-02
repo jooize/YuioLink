@@ -90,6 +90,7 @@ pub fn router(state: AppState) -> Router {
         .route("/static/app.css", get(app_css))
         .route("/static/app.js", get(app_js))
         .route("/static/text.js", get(text_js))
+        .route("/wordlist.txt", get(wordlist_txt))
         .nest("/api/v1", api_routes())
         .route("/create", post(create_plain))
         .route("/:name", get(resolve))
@@ -1024,6 +1025,19 @@ macro_rules! static_asset {
 static_asset!(app_css, "app.css", "text/css; charset=utf-8");
 static_asset!(app_js, "app.js", "text/javascript; charset=utf-8");
 static_asset!(text_js, "text.js", "text/javascript; charset=utf-8");
+
+/// `GET /wordlist.txt` — the curated wordlist behind every link name, one word
+/// per line. The create page's Public note links here so "anyone can run the
+/// whole list" is verifiable, not just asserted.
+pub async fn wordlist_txt() -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "text/plain; charset=utf-8"),
+            (header::CACHE_CONTROL, "public, max-age=3600"),
+        ],
+        yuiolink_core::words().join("\n") + "\n",
+    )
+}
 
 #[cfg(test)]
 mod tests {

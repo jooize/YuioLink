@@ -15,6 +15,7 @@ crawlers and prefetchers can never spend a use.
 | `/:name/reveal` | POST | Consume a **limited** link (redirect or Text): hits+1, set the path-scoped `yl_reveal` HMAC cookie (~10 min), 303 back to `/:name`, which renders the revealed view. Refresh/back re-renders without re-consuming. |
 | `/:name/card.png` | GET | The og:image share card (redirects only). Spends no use; `Cache-Control: max-age=3600`. |
 | `/healthz` | GET | Deploy/update health probe. Touches the database, so a failed migration reads as unhealthy. |
+| `/wordlist.txt` | GET | The curated 3,516-word name list as plain text (linked from the landing page's Privacy/Security disclosure — the namespace is public by design). |
 | `/static/app.css`, `/static/app.js`, `/static/text.js` | GET | Embedded assets; `Cache-Control: public, max-age=3600`. |
 
 ## Terminal convenience

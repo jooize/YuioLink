@@ -16,6 +16,12 @@
     /* Vibrant purple — the standout border on the create input. */
     --purple: #af52de;
 
+    /* Per-type colour key for the link-type picker: Public amber (caution),
+       Private green (secure), One-Time purple (single-use). */
+    --c-public: #b8730a;
+    --c-private: #1a8f3c;
+    --c-once: #8b2fc9;
+
     --bg-1: #e7e8ec;
     --bg-2: #f6f7f9;
     --glow-1: rgba(0, 122, 255, 0.20);
@@ -52,6 +58,9 @@
         --danger: #ff453a;
         --text-kind: #0affe4;
         --purple: #bf5af2;
+        --c-public: #ffd60a;
+        --c-private: #30d158;
+        --c-once: #bf5af2;
 
         --bg-1: #121214;
         --bg-2: #202024;
@@ -95,6 +104,19 @@ html {
    (a class selector would otherwise override the UA `[hidden]` style). */
 [hidden] {
     display: none !important;
+}
+
+/* Present for assistive tech, invisible on screen (labels, the type legend). */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
 
 body {
@@ -284,12 +306,6 @@ textarea.form-control {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
-/* The infinity chip (Limit: unlimited) reads a touch larger than the digits. */
-.infinity {
-    font-size: 17px;
-    line-height: 1;
-}
-
 /* "Custom" reveal: hidden until its segment is picked. CSS `:has()` drives the
    no-JS path; app.js also focuses the field when Custom is chosen. */
 .custom-field {
@@ -343,22 +359,131 @@ textarea.form-control {
     color: var(--text-secondary);
 }
 
-/* Explanatory note under a picker (e.g. the per-type line on the Type picker). */
-.picker-note {
-    display: block;
-    margin-top: 7px;
-    padding-left: 8px;   /* same label indent as the legend, in from its segmented control */
-    font-size: 12px;
-    line-height: 1.4;
-    color: var(--text-secondary);
+/* Per-type colour key: a small dot on each type label (persistent, so the key
+   reads even for the unselected types). */
+.dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 }
 
-/* The Type picker has no legend and sits above Expiry; show only the description
-   line for the checked type. :has drives it, so it works without JavaScript. */
-.type-picker .picker-note { display: none; }
+.dot::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--dot);
+    flex: 0 0 auto;
+}
+
+.t-public { --dot: var(--c-public); }
+.t-private { --dot: var(--c-private); }
+.t-once { --dot: var(--c-once); }
+
+/* The Type picker's legend is visually hidden; below the segments sits one shared
+   <details> disclosure. Only the selected type's fragments (summary line, toggle
+   word, body) show — :has drives it, so it works without JavaScript — and the
+   open state carries across type switches. `revert` restores span/div display. */
+.type-picker .for-public,
+.type-picker .for-private,
+.type-picker .for-once { display: none; }
 .type-picker:has(#type-public:checked) .for-public,
 .type-picker:has(#type-private:checked) .for-private,
-.type-picker:has(#type-once:checked) .for-once { display: block; }
+.type-picker:has(#type-once:checked) .for-once { display: revert; }
+
+/* The selected type tints the whole note: summary text, chevron, body accents. */
+.type-picker:has(#type-public:checked) .note { --tint: var(--c-public); color: var(--tint); }
+.type-picker:has(#type-private:checked) .note { --tint: var(--c-private); color: var(--tint); }
+.type-picker:has(#type-once:checked) .note { --tint: var(--c-once); color: var(--tint); }
+
+.note {
+    margin-top: 9px;
+}
+
+.note > summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding-left: 8px;   /* same label indent as the legends, in from the segmented control */
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.note > summary::-webkit-details-marker {
+    display: none;
+}
+
+.note > summary:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--tint) 60%, transparent);
+    outline-offset: 3px;
+    border-radius: 6px;
+}
+
+.summary-txt {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* "Privacy" / "Security" with the chevron — the expand affordance. */
+.summary-toggle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.chev {
+    transition: transform 0.18s ease;
+}
+
+.note[open] .chev {
+    transform: rotate(180deg);
+}
+
+.details-body {
+    margin: 9px 0 2px;
+    padding: 10px 12px;
+    border-left: 2px solid var(--tint);
+    background: color-mix(in srgb, var(--tint) 8%, transparent);
+    border-radius: 0 8px 8px 0;
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.details-body a {
+    color: var(--tint);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Neutralize the centered `main p` default inside the note body. */
+.details-body p {
+    margin: 0 0 8px;
+    max-width: none;
+    text-align: left;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+.details-body p:last-child {
+    margin-bottom: 0;
+}
+
+/* "Not private!" on the Public summary line. */
+.warn-red {
+    color: var(--danger);
+    font-weight: 700;
+}
 
 /* Keep each of the three type labels on a single line. */
 .type-picker .seg-label { white-space: nowrap; }
@@ -373,80 +498,6 @@ textarea.form-control {
     font-weight: 600;
     line-height: 1.4;
     color: var(--danger);
-}
-
-/* macOS-style switch row */
-.switch-row {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 12px 4px;
-    cursor: pointer;
-    user-select: none;
-}
-
-.switch-label {
-    flex: 1;
-    min-width: 0;
-}
-
-.switch-label strong {
-    display: block;
-    font-size: 15px;
-    font-weight: 500;
-}
-
-.switch-label small {
-    display: block;
-    margin-top: 2px;
-    font-size: 12.5px;
-    line-height: 1.35;
-    color: var(--text-secondary);
-}
-
-.switch {
-    position: relative;
-    flex: none;
-}
-
-.switch input {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.switch-track {
-    display: block;
-    width: 45px;
-    height: 27px;
-    border-radius: 14px;
-    background: var(--switch-off);
-    transition: background 0.25s ease;
-}
-
-.switch-thumb {
-    position: absolute;
-    top: 2.5px;
-    left: 2.5px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08), 0 2px 5px rgba(0, 0, 0, 0.3);
-    transition: transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1);
-}
-
-.switch input:checked + .switch-track {
-    background: var(--switch-on);
-}
-
-.switch input:checked + .switch-track .switch-thumb {
-    transform: translateX(18px);
-}
-
-.switch input:focus-visible + .switch-track {
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 /* Buttons */
@@ -522,6 +573,12 @@ textarea.form-control {
     filter: brightness(1.05);
 }
 
+/* Clear ships hidden (dead without JS, app.js un-hides it); while it is, the
+   primary button is alone and gets its full rounding back. */
+.split-btn:has(.split-clear[hidden]) .split-primary {
+    border-radius: var(--radius-control);
+}
+
 /* Result panel — a semantic <output> holding the created/previewed link. */
 .result {
     display: block;
@@ -538,10 +595,6 @@ textarea.form-control {
     opacity: 0.5;
 }
 
-/* The created-link result (the landing/result page #link-panel) drops the green
-   box; direction C presents the URL in a read-only-style field with Copy docked
-   on the right, the meta and any note beneath. (The preview page keeps the plain
-   .result box above.) */
 /* The created-link result drops the green box: the URL is the hero (coloured),
    centred, with its meta and a Copy pill beneath and an optional note last. The
    preview page keeps the plain .result box above. */
@@ -556,16 +609,6 @@ textarea.form-control {
     text-align: center;
 }
 
-
-.result-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: color-mix(in srgb, var(--switch-on) 60%, var(--text));
-    margin-bottom: 11px;
-}
 
 /* The link name as the giant hero (direction R4): the memorable word, big and in
    the accent colour, centred and selectable. */
@@ -583,8 +626,10 @@ textarea.form-control {
     user-select: text;
 }
 
-/* The full URL beneath the hero word: small and quiet — dim scheme, standout host
-   — rendered in parts by app.js. Wraps so the whole link stays visible/copyable. */
+/* The full URL beneath the hero word: small but legible — dim scheme, standout
+   host — rendered in parts by app.js. Wraps so the whole link stays visible and
+   copyable. Full text colour: this IS the created link, and on the no-JS result
+   page it renders as plain text with no spans, so the base colour must carry it. */
 .result-url {
     display: block;
     margin-top: 0;
@@ -592,7 +637,7 @@ textarea.form-control {
     font-size: 15px;
     line-height: 1.4;
     word-break: break-all;
-    color: var(--text-tertiary);
+    color: var(--text);
     user-select: text;
 }
 
@@ -622,19 +667,19 @@ textarea.form-control {
 .result-url .u-scheme,
 .result-url .u-sep,
 .result-url .u-frag {
-    color: var(--text-tertiary);
-}
-
-.result-url .u-host {
     color: var(--text-secondary);
 }
 
+.result-url .u-host {
+    color: var(--text);
+}
+
 /* The giant hero above already carries the name, so the sub-URL stays quiet: every
-   name word is the same dim grey as the scheme — no bold, no per-word tone — so
-   nothing here competes with the hero. Only the domain lifts a step (see .u-host) to
-   gently mark "yuio.link". */
+   name word is the same secondary grey as the scheme — no bold, no per-word tone —
+   so nothing here competes with the hero. Only the domain lifts a step (see
+   .u-host) to gently mark "yuio.link". */
 .result-url .u-name {
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     font-weight: 400;
 }
 .result-url .nw-0,
@@ -758,16 +803,6 @@ textarea.form-control {
    Buttons by ACTION: blue (default .btn) = Reveal (you stay on YuioLink);
    amber (.btn--go, dark text) = Continue (you leave to the external site).
    ========================================================================== */
-
-/* Masthead links home; keep it the heading colour, not link-blue. */
-.app-window header h1 a {
-    color: inherit;
-    text-decoration: none;
-}
-
-.app-window header h1 a:hover {
-    opacity: 0.7;
-}
 
 /* "yuio.link/<name>" source line. */
 .pv-from {
@@ -970,7 +1005,7 @@ textarea.form-control {
     text-align: center;
     font-size: 11.5px;
     line-height: 1.6;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     margin-top: 20px;
     padding-top: 15px;
     border-top: 0.5px solid var(--separator);
