@@ -18,7 +18,7 @@
 
     /* Per-type colour key for the link-type picker: Public amber (caution),
        Private green (secure), One-Time purple (single-use). */
-    --c-public: #b8730a;
+    --c-public: #c9820f;
     --c-private: #1a8f3c;
     --c-once: #8b2fc9;
 
@@ -170,6 +170,24 @@ header h1 {
     font-size: clamp(28px, 8vw, 38px);
     font-weight: 600;
     letter-spacing: -0.022em;
+}
+
+/* Top-left way back out, on pages reached only by following a link (the
+   revealed view) rather than by typing the address. */
+main p.back-link {
+    margin: -8px 0 18px;
+    max-width: none;
+    text-align: left;
+    font-size: 12.5px;
+}
+
+main p.back-link a {
+    color: var(--text-secondary);
+}
+
+main p.back-link a:hover {
+    color: var(--text);
+    text-decoration: underline;
 }
 
 /* Default paragraph: centered secondary text (tagline, status, info lines). */
@@ -392,7 +410,9 @@ textarea.form-control {
 .type-picker:has(#type-private:checked) .for-private,
 .type-picker:has(#type-once:checked) .for-once { display: revert; }
 
-/* The selected type tints the whole note: summary text, chevron, body accents. */
+/* The selected type tints the summary text and body accents (border, link).
+   The toggle word stays a fixed accent color regardless of type (it's a
+   control, not a status) — its own rule below overrides this inherited color. */
 .type-picker:has(#type-public:checked) .note { --tint: var(--c-public); color: var(--tint); }
 .type-picker:has(#type-private:checked) .note { --tint: var(--c-private); color: var(--tint); }
 .type-picker:has(#type-once:checked) .note { --tint: var(--c-once); color: var(--tint); }
@@ -428,13 +448,15 @@ textarea.form-control {
     min-width: 0;
 }
 
-/* "Privacy" / "Security" with the chevron — the expand affordance. */
+/* "Security" with the chevron — the expand affordance. Fixed accent color
+   regardless of type, so it reads as a control rather than a status. */
 .summary-toggle {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     gap: 4px;
     font-weight: 600;
+    color: var(--accent);
     white-space: nowrap;
 }
 
@@ -481,7 +503,7 @@ textarea.form-control {
 
 /* "Not private!" on the Public summary line. */
 .warn-red {
-    color: var(--danger);
+    color: var(--warn);
     font-weight: 700;
 }
 
@@ -984,13 +1006,14 @@ textarea.form-control {
     margin-top: 9px;
 }
 
-/* "One view used." with a leading green check. Kept to one line (no wrap). */
+/* The delete-on-reveal notice, with a leading green check: the content really is
+   gone now, so it wraps instead of forcing one line at small widths. */
 .pv-revealed {
     text-align: center;
     font-size: 11.5px;
     color: var(--text-secondary);
     margin-top: 11px;
-    white-space: nowrap;
+    line-height: 1.4;
 }
 
 .pv-revealed::before {

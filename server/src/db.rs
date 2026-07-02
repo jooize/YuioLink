@@ -95,8 +95,7 @@ pub async fn get_link_live(
 
 /// Read a still-reserved row regardless of whether it is live: it must only be
 /// unexpired. This is the tombstone reader — it returns links that are
-/// use-exhausted or creator-withdrawn (so the resolver can answer 410 Gone, and
-/// the revealed view can still read content after the final use was spent),
+/// use-exhausted or creator-withdrawn (so the resolver can answer 410 Gone),
 /// while expired/recycled/unknown names read as `None` (the resolver's 404).
 pub async fn get_link_any(
     pool: &SqlitePool,
@@ -108,6 +107,35 @@ pub async fn get_link_any(
         .bind(name)
         .fetch_optional(pool)
         .await
+}
+
+/// Read a one-time link's content and blank it out in the same transaction, so
+/// it is read exactly once: the first call (right after `POST /:name/reveal`)
+/// returns the real content; a refresh, back-button, or second visit within the
+/// reveal token's window finds `content = ''` and reads as `None`, at which
+/// point the caller falls back to the ordinary tombstone (410 Gone). Scoped to
+/// unexpired rows only — an already-redacted, expired row still reads `None`.
+pub async fn reveal_and_redact(
+    pool: &SqlitePool,
+    name: &str,
+) -> Result<Option<LinkDetail>, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let sql = format!(
+        "SELECT {LINK_COLUMNS} FROM links \
+         WHERE name = ? AND expires_at > datetime('now') AND content != ''"
+    );
+    let row: Option<LinkDetail> = sqlx::query_as(&sql)
+        .bind(name)
+        .fetch_optional(&mut *tx)
+        .await?;
+    if row.is_some() {
+        sqlx::query("UPDATE links SET content = '' WHERE name = ?")
+            .bind(name)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(row)
 }
 
 /// Atomically count a hit and return the link, but only while it is still live.

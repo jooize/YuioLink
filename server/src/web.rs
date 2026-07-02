@@ -351,7 +351,8 @@ pub async fn resolve(
     let name = name.strip_suffix('+').map(str::to_string).unwrap_or(name);
     // A visitor carrying a valid reveal capability (the `yl_reveal` cookie set when
     // they POSTed /:name/reveal) sees the revealed view right here at the clean
-    // `/:name` URL — refresh/back safe, reading even a now-tombstoned row.
+    // `/:name` URL. That view redacts the content from the server on this first
+    // render, so a second visit within the token's window reads as 410 Gone.
     if let Some(token) = reveal_cookie(&headers)
         && token::verify(&state.secret, &token, now_unix())
             .is_some_and(|n| n.eq_ignore_ascii_case(&name))
@@ -450,8 +451,9 @@ pub async fn go(State(state): State<AppState>, Path(name): Path<String>) -> Resp
 }
 
 /// `POST /:name/reveal` — consume a **limited** link (redirect or Text), then 303
-/// to its token-gated revealed view. The use is spent here; the revealed GET only
-/// re-renders, so refresh/back is safe.
+/// to its token-gated revealed view. The use is spent here; the destination or
+/// content itself is deleted from the server when the revealed GET actually
+/// renders it, so refresh/back after that first render reads as 410 Gone.
 pub async fn reveal(State(state): State<AppState>, Path(name): Path<String>) -> Response {
     match db::get_link_live(&state.pool, &name).await {
         Ok(Some(d)) if d.max_uses.is_some() => {}
@@ -497,14 +499,15 @@ fn reveal_cookie(headers: &HeaderMap) -> Option<String> {
         .map(|(_, v)| v.trim().to_string())
 }
 
-/// Render the revealed view for `name`, reading even a now-tombstoned row. The
-/// caller (`resolve`) has already verified the `yl_reveal` capability, so this
-/// re-renders without consuming — served at the clean `/:name` URL on a revealer's
-/// revisit, refresh, or back-button.
+/// Render the revealed view for `name`, deleting its content from the server as
+/// part of this same read. The caller (`resolve`) has already verified the
+/// `yl_reveal` capability; this is the one render that actually shows the
+/// destination or content, so a repeat visit (refresh, back-button, or a second
+/// tab with the same cookie) finds it already redacted and reads as 410 Gone.
 async fn revealed_view(state: &AppState, name: &str) -> Response {
-    let d = match db::get_link_any(&state.pool, name).await {
+    let d = match db::reveal_and_redact(&state.pool, name).await {
         Ok(Some(d)) => d,
-        Ok(None) => return AppError::NotFound.into_response(),
+        Ok(None) => return tombstone_or_missing(state, name).await,
         Err(e) => return AppError::internal(e).into_response(),
     };
     let base_host = views::host_from_base(&state.base_url);
@@ -1229,8 +1232,9 @@ mod tests {
         let cookie = set_cookie.split(';').next().unwrap().to_string();
         assert_eq!(hits(&st, &l.name).await, 1);
 
-        // The revealed GET (carrying the cookie) shows the full URL and does NOT
-        // consume again.
+        // The revealed GET (carrying the cookie) shows the full URL and, in doing
+        // so, deletes it from the server: it does NOT count a second hit, but a
+        // repeat visit with the same cookie now finds the content already gone.
         let revealed_get = |c: &str| {
             Request::builder()
                 .uri(loc.as_str())
@@ -1241,7 +1245,11 @@ mod tests {
         let (s, _, body) = send(&st, revealed_get(&cookie)).await;
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("zzz-gated-path"), "revealed body: {body}");
-        send(&st, revealed_get(&cookie)).await; // re-render is safe
+        assert_eq!(hits(&st, &l.name).await, 1);
+
+        let (s, _, body) = send(&st, revealed_get(&cookie)).await;
+        assert_eq!(s, StatusCode::GONE, "second render with the same cookie");
+        assert!(!body.contains("zzz-gated-path"));
         assert_eq!(hits(&st, &l.name).await, 1);
 
         // Without the cookie the link is spent: 410 Gone, content not shown.

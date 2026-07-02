@@ -260,21 +260,19 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                 // One shared native disclosure under the picker. Only the selected
                 // type's fragments show (CSS :has, so it works without JavaScript),
                 // and the open state carries across type switches. The toggle word
-                // is "Privacy" on Public, "Security" on Private/One-Time.
+                // is "Security" for all three types.
                 details.note {
                     summary {
                         span.summary-txt {
                             span.for-public {
-                                "Convenient link with 1–3 words by shortest available. "
-                                span.warn-red { "Not private!" }
+                                "Convenient link with 1–3 words. "
+                                span.warn-red { "Not secret!" }
                             }
-                            span.for-private { "Private link with 4 words (in 47-bit namespace)." }
-                            span.for-once { "Single-use link with 4 words (in 47-bit namespace)." }
+                            span.for-private { "Private link with 4 words." }
+                            span.for-once { "Single-use link with 4 words." }
                         }
                         span.summary-toggle {
-                            span.for-public { "Privacy" }
-                            span.for-private { "Security" }
-                            span.for-once { "Security" }
+                            "Security"
                             svg.chev width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" {
                                 path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor"
                                     stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" {}
@@ -289,29 +287,18 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                         a href="/wordlist.txt" { "Browse the wordlist →" }
                     }
                     div.details-body.for-private {
-                        p {
-                            "Your link's name — and the content behind it — is protected by "
-                            "sheer improbability: to reach it, an attacker has to guess your "
-                            "exact four-word name within its lifetime, and nothing indexes it "
-                            "to narrow the search. There are about 153 trillion combinations "
-                            "(~47 bits), so even a botnet firing a million guesses a second "
-                            "covers only ~0.4% of them before the 7-day maximum runs out."
-                        }
-                        p {
-                            "That's "
-                            strong { "guesswork protecting it, not encryption" }
-                            " — so it also relies on us keeping the hosting secure, and on "
-                            "the link reaching only the people you intend. The name is hard "
-                            "to guess, not sealed."
-                        }
+                        "Link name is generated in a 47-bit namespace (about 153 trillion "
+                        "possibilities), and its destination or content stays on the server "
+                        "only until the link expires. Even a botnet guessing a million names "
+                        "a second could check only ~0.4% of that space within the 7-day "
+                        "maximum lifetime."
                     }
                     div.details-body.for-once {
-                        "Same security as Private, but "
-                        strong { "deleted from the server when revealed" }
-                        ". Recipients first open the link, then have a choice to reveal its "
-                        "contents, which is when the one time is spent. Even if the link is "
-                        "opened multiple times before reveal, only one can reveal its "
-                        "destination or contents."
+                        strong { "Deleted from the server when revealed" }
+                        ", and with the same security as Private links. Recipients first open "
+                        "the link to a preview, then have a choice to reveal its destination "
+                        "or content. The reveal deletes destination and content from the "
+                        "server."
                     }
                 }
             }
@@ -673,17 +660,21 @@ pub struct RevealedView<'a> {
     pub target: RevealedTarget<'a>,
 }
 
-/// The token-gated revealed page: re-renderable without consuming again.
+/// The token-gated revealed page. This is a one-time render: the destination or
+/// content was just deleted from the server (see `db::reveal_and_redact`), so a
+/// refresh or revisit won't show it again — the page says so up front.
 pub fn revealed_page(r: RevealedView) -> Markup {
+    let back = html! { p.back-link { a href="/" { "← Create New Link" } } };
     match r.target {
         RevealedTarget::Redirect { url, href } => {
             let body = html! {
+                (back)
                 (from_line(r.base_host, r.name))
                 span.pv-arrow aria-hidden="true" { "↓" }
                 (render_url(url))
                 @if let Some(w) = idn_warning(url) { (idn_panel(w)) }
                 a class=(GO_BTN) href=(href) rel="noopener noreferrer" { (continue_label(url)) }
-                p.pv-revealed { "One view used." }
+                p.pv-revealed { "Deleted from the server on this view — refreshing won't bring it back." }
                 p.pv-meta { "Expires in " (humanize_expires_in(r.expires_at)) }
                 span.pv-caution.single { strong { "Always check the destination." } }
             };
@@ -691,7 +682,8 @@ pub fn revealed_page(r: RevealedView) -> Markup {
         }
         RevealedTarget::Text(text) => {
             let body = html! {
-                p.pv-revealed { "One view used." }
+                (back)
+                p.pv-revealed { "Deleted from the server on this view — refreshing won't bring it back." }
                 pre.text-body #text-body { (text) }
                 // Dead without JS; text.js un-hides it when it wires the handler.
                 button.btn.btn-block #copy-text type="button" hidden { "Copy" }

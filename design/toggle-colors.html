@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Type-picker note — color options, full page in context</title>
+<style>
+/* ============================================================
+   Tokens copied verbatim from server/static/app.css, so this mockup
+   renders correctly standalone (no dependency on the live stylesheet,
+   which a sandboxed preview can't fetch as a sibling file).
+   ============================================================ */
+:root {
+    --window-width: 480px;
+    --accent: #007aff; --accent-hover: #2b90ff; --accent-press: #0066d6;
+    --switch-on: #34c759; --switch-off: rgba(120, 120, 128, 0.32);
+    --result: #10b981; --warn: #c77a00; --danger: #d70015;
+    --text-kind: #127c70; --purple: #af52de;
+    --c-public: #b8730a; --c-private: #1a8f3c; --c-once: #8b2fc9;
+    --bg-1: #e7e8ec; --bg-2: #f6f7f9;
+    --glow-1: rgba(0, 122, 255, 0.20); --glow-2: rgba(255, 64, 129, 0.14);
+    --text: #1d1d1f; --text-secondary: rgba(60, 60, 67, 0.6); --text-tertiary: rgba(60, 60, 67, 0.4);
+    --card-bg: rgba(255, 255, 255, 0.58); --card-border: rgba(255, 255, 255, 0.7); --card-highlight: rgba(255, 255, 255, 0.9);
+    --card-shadow: 0 24px 70px -22px rgba(20, 24, 40, 0.42), 0 8px 22px -14px rgba(20, 24, 40, 0.28);
+    --field-bg: rgba(255, 255, 255, 0.72); --field-border: rgba(0, 0, 0, 0.1); --separator: rgba(0, 0, 0, 0.08);
+    --radius-window: 28px; --radius-control: 12px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, system-ui, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Monaco, "Cascadia Code", monospace;
+}
+/* Dark tokens, kept as a CLASS (not a media query) so cards can be forced
+   light/dark independent of the viewer's OS setting, for side-by-side compare. */
+.force-dark {
+    --accent: #0a84ff; --accent-hover: #3d9bff; --accent-press: #0a6fd6;
+    --switch-off: rgba(120, 120, 128, 0.5); --result: #34d399;
+    --warn: #ffd60a; --danger: #ff453a; --text-kind: #0affe4; --purple: #bf5af2;
+    --c-public: #ffd60a; --c-private: #30d158; --c-once: #bf5af2;
+    --bg-1: #121214; --bg-2: #202024;
+    --glow-1: rgba(10, 132, 255, 0.22); --glow-2: rgba(191, 90, 242, 0.18);
+    --text: #f5f5f7; --text-secondary: rgba(235, 235, 245, 0.6); --text-tertiary: rgba(235, 235, 245, 0.35);
+    --card-bg: rgba(40, 40, 44, 0.55); --card-border: rgba(255, 255, 255, 0.12); --card-highlight: rgba(255, 255, 255, 0.1);
+    --card-shadow: 0 28px 80px -24px rgba(0, 0, 0, 0.7), 0 10px 26px -16px rgba(0, 0, 0, 0.6);
+    --field-bg: rgba(255, 255, 255, 0.06); --field-border: rgba(255, 255, 255, 0.12); --separator: rgba(255, 255, 255, 0.1);
+    background-color: var(--bg-1);
+    background-image:
+        radial-gradient(1100px 760px at 12% 6%, var(--glow-1), transparent 60%),
+        radial-gradient(1000px 720px at 88% 96%, var(--glow-2), transparent 58%),
+        linear-gradient(155deg, var(--bg-2), var(--bg-1));
+    padding: 18px; border-radius: 20px;
+}
+
+* { box-sizing: border-box; }
+html, body {
+    min-height: 100%;
+    background-color: var(--bg-1);
+    background-image:
+        radial-gradient(1100px 760px at 12% 6%, var(--glow-1), transparent 60%),
+        radial-gradient(1000px 720px at 88% 96%, var(--glow-2), transparent 58%),
+        linear-gradient(155deg, var(--bg-2), var(--bg-1));
+    background-attachment: fixed;
+}
+body { margin: 0; font-family: var(--font); color: var(--text); -webkit-font-smoothing: antialiased; padding: 32px 18px 90px; }
+[hidden] { display: none !important; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---- Real app-window chrome ---- */
+.app-window {
+    width: min(100%, var(--window-width));
+    background: var(--card-bg);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    backdrop-filter: blur(40px) saturate(180%);
+    border: 0.5px solid var(--card-border);
+    border-radius: var(--radius-window);
+    box-shadow: var(--card-shadow), inset 0 1px 0 var(--card-highlight);
+    padding: clamp(28px, 6vw, 40px) clamp(20px, 5vw, 30px) clamp(20px, 5vw, 30px);
+    color: var(--text);
+}
+.app-window > header { text-align: center; }
+.app-window header h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.022em; }
+.app-window > p { margin: 14px auto 0; max-width: 32ch; text-align: center; font-size: 15px; line-height: 1.45; color: var(--text-secondary); }
+.app-window form { margin: 24px 0 0; }
+
+.form-control {
+    width: 100%; padding: 12px 14px; font-family: inherit; font-size: 16px; color: var(--text);
+    background: var(--field-bg); border: 1.5px solid var(--purple); border-radius: var(--radius-control);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04); -webkit-appearance: none; appearance: none;
+}
+.form-control::placeholder { color: var(--text-tertiary); }
+textarea.form-control { display: block; resize: none; min-height: 46px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    font-family: inherit; font-size: 16px; font-weight: 600; letter-spacing: -0.01em;
+    color: #fff; background: linear-gradient(180deg, var(--accent-hover), var(--accent));
+    border: none; border-radius: var(--radius-control); padding: 12px 18px; min-height: 46px;
+    cursor: pointer; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.split-btn { display: flex; gap: 2px; margin-top: 18px; }
+.split-btn .btn { margin-top: 0; }
+.split-primary { flex: 1; border-radius: var(--radius-control); }
+
+.picker { margin: 16px 0 0; padding: 0; border: 0; min-width: 0; }
+.picker > legend { padding: 0 0 0 8px; margin: 0 0 7px; font-size: 12.5px; font-weight: 600; color: var(--accent); }
+
+.segmented { display: flex; gap: 2px; padding: 3px; background: var(--switch-off); border-radius: var(--radius-control); }
+.seg-radio { position: absolute; opacity: 0; width: 0; height: 0; }
+.seg-label { flex: 1; min-width: 0; text-align: center; padding: 8px 6px; font-size: 13.5px; font-weight: 500; color: var(--text); border-radius: calc(var(--radius-control) - 3px); cursor: pointer; user-select: none; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.seg-radio:checked + .seg-label { background: var(--card-highlight); box-shadow: 0 1px 2px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.3); }
+.force-dark .seg-radio:checked + .seg-label { background: rgba(120, 120, 128, 0.55); }
+
+.dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dot); flex: 0 0 auto; display: inline-block; }
+.t-public { --dot: var(--c-public); }
+.t-private { --dot: var(--c-private); }
+.t-once { --dot: var(--c-once); }
+
+/* Type picker: only the checked type's fragments show; the open <details> state
+   is shared and carries across type switches — exactly the shipped :has() trick. */
+.type-picker .for-public, .type-picker .for-private, .type-picker .for-once { display: none; }
+.type-picker:has(.seg-radio[value="public"]:checked) .for-public,
+.type-picker:has(.seg-radio[value="private"]:checked) .for-private,
+.type-picker:has(.seg-radio[value="once"]:checked) .for-once { display: revert; }
+.type-picker:has(.seg-radio[value="public"]:checked) .note { --tint: var(--c-public); }
+.type-picker:has(.seg-radio[value="private"]:checked) .note { --tint: var(--c-private); }
+.type-picker:has(.seg-radio[value="once"]:checked) .note { --tint: var(--c-once); }
+
+.note { margin-top: 9px; }
+.note > summary { list-style: none; cursor: pointer; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding-left: 8px; font-size: 12px; line-height: 1.4; }
+.note > summary::-webkit-details-marker { display: none; }
+.summary-txt { flex: 1 1 auto; min-width: 0; }
+.summary-toggle { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; white-space: nowrap; }
+.chev { transition: transform .18s ease; }
+.note[open] .chev { transform: rotate(180deg); }
+.details-body { margin: 9px 0 2px; padding: 10px 12px; border-left: 2px solid var(--tint); background: color-mix(in srgb, var(--tint) 8%, transparent); border-radius: 0 8px 8px 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.details-body a { color: var(--tint); text-decoration: underline; text-underline-offset: 2px; font-weight: 600; }
+.details-body p { margin: 0 0 8px; }
+.details-body p:last-child { margin-bottom: 0; }
+.type-picker .seg-label { white-space: nowrap; }
+
+main > footer, .app-window > footer {
+    margin: 22px 0 0; padding-top: 18px; border-top: 0.5px solid var(--separator);
+    text-align: center; font-size: 12.5px; color: var(--text-secondary);
+}
+
+/* ============================================================
+   DECIDED — applied to every card below, matches the shipped code now.
+   1) Summary text (the "Convenient link…" / "Private link…" line) no
+      longer inherits the per-type --tint; it reads as normal body text.
+   2) "by shortest available" removed from the Public line.
+   3) "Not private!" -> "Not secret!", recolored from --danger red to
+      --warn (amber in light mode, true yellow #ffd60a in dark mode).
+   4) Toggle word is always "Security" (no more "Privacy" on Public).
+   5) Toggle word color is fixed accent blue, regardless of type.
+   ============================================================ */
+.type-picker .summary-txt { color: var(--text); }
+.warn-red { color: var(--warn) !important; font-weight: 700; }
+
+/* ============================================================
+   Reference — the other colors considered for the toggle word before
+   settling on accent blue. Kept so the comparison is still visible.
+   ============================================================ */
+.opt-neutral  .summary-toggle { color: var(--text); }
+.opt-tint     .summary-toggle { color: var(--tint); }               /* current shipped behavior */
+.opt-accent   .summary-toggle { color: var(--accent); }
+.opt-muted    .summary-toggle { color: var(--text-secondary); font-weight: 700; }
+.opt-warn     .summary-toggle { color: var(--warn); }
+
+/* ---- Page chrome for this comparison doc (not part of the app) ---- */
+.page-head { max-width: 1200px; margin: 0 auto 20px; }
+.page-head h1 { font-size: 21px; margin: 0 0 8px; color: var(--text); }
+.page-head p { margin: 0 0 6px; color: var(--text-secondary); font-size: 13.5px; line-height: 1.5; max-width: 74ch; text-align: left; }
+.page-head code { font-family: var(--font-mono); font-size: 12px; background: rgba(127,127,127,.16); padding: 1px 5px; border-radius: 5px; }
+
+.panel {
+    position: sticky; top: 0; z-index: 10;
+    max-width: 1200px; margin: 0 auto 26px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+    padding: 12px 16px;
+    background: var(--card-bg);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    backdrop-filter: blur(30px) saturate(180%);
+    border: 0.5px solid var(--card-border);
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+    font-size: 13px;
+}
+.panel strong { font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--text-secondary); font-weight: 700; }
+.panel .group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.panel button {
+    font: inherit; font-size: 12.5px; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--separator); background: var(--field-bg); color: var(--text);
+    cursor: pointer;
+}
+.panel button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.panel .spacer { flex: 1 1 auto; }
+
+.section-label { max-width: 1200px; margin: 34px auto 14px; font-size: 14px; font-weight: 700; padding-left: 4px; color: var(--text); }
+.section-note { max-width: 1200px; margin: -8px auto 14px; padding-left: 4px; font-size: 12.5px; color: var(--text-secondary); }
+
+.grid { max-width: 1200px; margin: 0 auto; display: grid; gap: 26px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; }
+.demo { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.demo-label { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); text-align: center; }
+.demo-label b { color: var(--text); }
+
+.grid .app-window { padding: 22px 18px 18px; }
+.grid header h1 { font-size: 24px; }
+
+.theme-flip { font: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--separator); background: var(--field-bg); color: var(--text); cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+    <h1>Type-picker note — recolor options, shown in full page context</h1>
+    <p>Every card below is the real create-link page, restyled with the same tokens as <code>server/static/app.css</code> (copied inline here so the mockup renders standalone). This reflects what's now shipped: the summary line (<code>.summary-txt</code>) is normal text color instead of tinted by type, "by shortest available" is gone from the Public line, "Not private!" is now "Not secret!" in <code>--warn</code> instead of <code>--danger</code>, and the toggle word is always "Security" in a fixed accent blue.</p>
+    <p>The panel below drives one live, clickable copy so you can flip the toggle-word color for reference; the gallery underneath shows all five colors considered, side by side (each preset to Public + expanded).</p>
+</div>
+
+<div class="panel" id="panel">
+    <strong>Toggle-word color</strong>
+    <div class="group" id="opt-group">
+        <button data-opt="opt-neutral" aria-pressed="true">Neutral (matches text)</button>
+        <button data-opt="opt-tint">Tinted (current, per-type)</button>
+        <button data-opt="opt-accent">Accent blue</button>
+        <button data-opt="opt-muted">Muted secondary</button>
+        <button data-opt="opt-warn">Warn yellow</button>
+    </div>
+    <div class="spacer"></div>
+    <strong>Theme</strong>
+    <div class="group" id="theme-group">
+        <button data-theme="light" aria-pressed="true">Light</button>
+        <button data-theme="dark">Dark</button>
+    </div>
+</div>
+
+<div class="section-label">Live — click a Type chip below, then try the options above</div>
+<div class="section-note">This copy is fully interactive: the type picker and the disclosure work exactly as CSS-driven as the shipped page (no JS needed for that part — the JS here only swaps which color-option class is applied).</div>
+<div class="grid" style="grid-template-columns: minmax(300px, 480px); justify-content: center;">
+    <div class="demo">
+        <main class="app-window opt-neutral" id="live-window">
+            <header><h1>YuioLink</h1></header>
+            <p>Wieldy Ephemeral Link</p>
+            <form>
+                <label class="visually-hidden" for="live-content">Link or text to share</label>
+                <textarea id="live-content" class="form-control" rows="1" placeholder="Paste a link to redirect, or type text to share"></textarea>
+                <div class="split-btn">
+                    <button class="btn split-primary" type="button">Create Link</button>
+                </div>
+                <fieldset class="picker type-picker">
+                    <legend class="visually-hidden">Link Type</legend>
+                    <div class="segmented">
+                        <input class="seg-radio" id="type-public" type="radio" name="live-type" value="public" checked>
+                        <label class="seg-label dot t-public" for="type-public">Public</label>
+                        <input class="seg-radio" id="type-private" type="radio" name="live-type" value="private">
+                        <label class="seg-label dot t-private" for="type-private">Private</label>
+                        <input class="seg-radio" id="type-once" type="radio" name="live-type" value="once">
+                        <label class="seg-label dot t-once" for="type-once">One-Time</label>
+                    </div>
+                    <details class="note" open>
+                        <summary>
+                            <span class="summary-txt">
+                                <span class="for-public">Convenient link with 1–3 words. <span class="warn-red">Not secret!</span></span>
+                                <span class="for-private">Private link with 4 words (in 47-bit namespace).</span>
+                                <span class="for-once">Single-use link with 4 words (in 47-bit namespace).</span>
+                            </span>
+                            <span class="summary-toggle">
+                                Security
+                                <svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </span>
+                        </summary>
+                        <div class="details-body for-public">Public names are short words from a public wordlist, so anyone can run the whole list and turn up every public link. <strong>Ideal for convenience and easy sharing</strong> — never for anything secret. <a href="#">Browse the wordlist →</a></div>
+                        <div class="details-body for-private">Your link's name — and the content behind it — is protected by sheer improbability: to reach it, an attacker has to guess your exact four-word name within its lifetime, and nothing indexes it to narrow the search. That's <strong>guesswork protecting it, not encryption</strong>.</div>
+                        <div class="details-body for-once">Same security as Private, but <strong>deleted from the server when revealed</strong>.</div>
+                    </details>
+                </fieldset>
+                <fieldset class="picker">
+                    <legend>Expires after</legend>
+                    <div class="segmented">
+                        <input class="seg-radio" id="live-ttl-1" type="radio" name="live-ttl">
+                        <label class="seg-label" for="live-ttl-1">10 minutes</label>
+                        <input class="seg-radio" id="live-ttl-2" type="radio" name="live-ttl" checked>
+                        <label class="seg-label" for="live-ttl-2">1 hour</label>
+                        <input class="seg-radio" id="live-ttl-3" type="radio" name="live-ttl">
+                        <label class="seg-label" for="live-ttl-3">7 days</label>
+                    </div>
+                </fieldset>
+            </form>
+            <footer>A project by <a href="#">jooize</a> · <a href="#">Source on GitHub</a></footer>
+        </main>
+        <div class="demo-label" id="live-caption"><b>Neutral</b> — toggle word matches body text color, just bold</div>
+    </div>
+</div>
+
+<div class="section-label">Gallery — all five options, side by side</div>
+<div class="section-note">Each preset to Public, expanded. Use "View in dark" per card to eyeball contrast in both themes.</div>
+<div class="grid" id="gallery"></div>
+
+<script>
+const OPTIONS = [
+    { cls: 'opt-neutral', label: 'Neutral', desc: 'toggle word matches body text color, just bold' },
+    { cls: 'opt-tint',    label: 'Tinted (old)', desc: 'toggle word colored by the selected type (amber/green/purple) — the pre-decision behavior' },
+    { cls: 'opt-accent',  label: 'Accent blue — decided', desc: 'toggle word always the app’s accent blue, regardless of type — this is what shipped' },
+    { cls: 'opt-muted',   label: 'Muted secondary', desc: 'toggle word in the secondary text color, bold to still stand out' },
+    { cls: 'opt-warn',    label: 'Warn yellow', desc: 'toggle word matches the "Not secret!" warn color' },
+];
+
+function cardHTML(opt, i) {
+    return `
+        <div class="demo">
+            <main class="app-window ${opt.cls}">
+                <header><h1>YuioLink</h1></header>
+                <p>Wieldy Ephemeral Link</p>
+                <form>
+                    <label class="visually-hidden">Link or text to share</label>
+                    <textarea class="form-control" rows="1" placeholder="Paste a link to redirect, or type text to share"></textarea>
+                    <div class="split-btn">
+                        <button class="btn split-primary" type="button">Create Link</button>
+                    </div>
+                    <fieldset class="picker type-picker">
+                        <legend class="visually-hidden">Link Type</legend>
+                        <div class="segmented">
+                            <input class="seg-radio" id="g${i}-type-public" type="radio" name="g${i}-type" value="public" checked>
+                            <label class="seg-label dot t-public" for="g${i}-type-public">Public</label>
+                            <input class="seg-radio" id="g${i}-type-private" type="radio" name="g${i}-type" value="private">
+                            <label class="seg-label dot t-private" for="g${i}-type-private">Private</label>
+                            <input class="seg-radio" id="g${i}-type-once" type="radio" name="g${i}-type" value="once">
+                            <label class="seg-label dot t-once" for="g${i}-type-once">One-Time</label>
+                        </div>
+                        <details class="note" open>
+                            <summary>
+                                <span class="summary-txt">
+                                    <span class="for-public">Convenient link with 1–3 words. <span class="warn-red">Not secret!</span></span>
+                                    <span class="for-private">Private link with 4 words (in 47-bit namespace).</span>
+                                    <span class="for-once">Single-use link with 4 words (in 47-bit namespace).</span>
+                                </span>
+                                <span class="summary-toggle">
+                                    Security
+                                    <svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </span>
+                            </summary>
+                            <div class="details-body for-public">Public names are short words from a public wordlist, so anyone can run the whole list and turn up every public link. <strong>Ideal for convenience and easy sharing</strong> — never for anything secret. <a href="#">Browse the wordlist →</a></div>
+                            <div class="details-body for-private">Your link's name — and the content behind it — is protected by sheer improbability: to reach it, an attacker has to guess your exact four-word name within its lifetime, and nothing indexes it to narrow the search. That's <strong>guesswork protecting it, not encryption</strong>.</div>
+                            <div class="details-body for-once">Same security as Private, but <strong>deleted from the server when revealed</strong>.</div>
+                        </details>
+                    </fieldset>
+                    <fieldset class="picker">
+                        <legend>Expires after</legend>
+                        <div class="segmented">
+                            <input class="seg-radio" id="g${i}-ttl-1" type="radio" name="g${i}-ttl">
+                            <label class="seg-label" for="g${i}-ttl-1">10 minutes</label>
+                            <input class="seg-radio" id="g${i}-ttl-2" type="radio" name="g${i}-ttl" checked>
+                            <label class="seg-label" for="g${i}-ttl-2">1 hour</label>
+                            <input class="seg-radio" id="g${i}-ttl-3" type="radio" name="g${i}-ttl">
+                            <label class="seg-label" for="g${i}-ttl-3">7 days</label>
+                        </div>
+                    </fieldset>
+                </form>
+                <footer>A project by <a href="#">jooize</a> · <a href="#">Source on GitHub</a></footer>
+            </main>
+            <div class="demo-label"><b>${opt.label}</b> — ${opt.desc}</div>
+            <button type="button" class="theme-flip" data-dark="false">View in dark</button>
+        </div>`;
+}
+
+document.getElementById('gallery').innerHTML = OPTIONS.map(cardHTML).join('');
+
+document.querySelectorAll('.theme-flip').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const win = btn.parentElement.querySelector('.app-window');
+        const nowDark = btn.dataset.dark === 'true';
+        win.classList.toggle('force-dark', !nowDark);
+        btn.dataset.dark = String(!nowDark);
+        btn.textContent = nowDark ? 'View in dark' : 'View in light';
+    });
+});
+
+const liveWindow = document.getElementById('live-window');
+const liveCaption = document.getElementById('live-caption');
+document.getElementById('opt-group').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-opt]');
+    if (!btn) return;
+    document.querySelectorAll('#opt-group button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+    OPTIONS.forEach(o => liveWindow.classList.remove(o.cls));
+    liveWindow.classList.add(btn.dataset.opt);
+    const opt = OPTIONS.find(o => o.cls === btn.dataset.opt);
+    liveCaption.innerHTML = `<b>${opt.label}</b> — ${opt.desc}`;
+});
+document.getElementById('theme-group').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-theme]');
+    if (!btn) return;
+    document.querySelectorAll('#theme-group button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+    liveWindow.classList.toggle('force-dark', btn.dataset.theme === 'dark');
+});
+</script>
+</body>
+</html>
