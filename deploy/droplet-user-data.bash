@@ -41,6 +41,16 @@ systemctl enable --now unattended-upgrades || true
 systemctl enable --now fail2ban || true
 apt-get upgrade -y
 
+# A patched kernel/libc only takes effect after a reboot; unattended-upgrades
+# leaves /run/reboot-required and otherwise waits forever for a human to act
+# on it. Auto-reboot at 04:00 UTC (low-traffic) when one is actually needed --
+# yuiolink and caddy are both `enable`d, so they come back up on their own.
+cat > /etc/apt/apt.conf.d/52yuiolink-auto-reboot <<'CONF'
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+Unattended-Upgrade::Automatic-Reboot-Time "04:00";
+CONF
+
 # --- 5. Caddy (auto-HTTPS reverse proxy), from its official apt repo ---------
 curl -fsSL 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
     | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
