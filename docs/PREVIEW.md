@@ -1,8 +1,10 @@
-# Link preview, trust model, and share cards — implementation plan
+# Link preview, trust model, and share cards
 
-Status: **designed, not yet built** (2026-06-23). Visual reference:
-`design/preview-and-cards.html`. Background/decisions: see the `preview-and-trust-design`
-and `encryption-threat-model` auto-memories. This document is the spec to implement from.
+Status: **implemented** (built 2026-06-23, doc updated 2026-07-02 to match the code).
+Visual reference: `design/preview-and-cards.html`. Route reference: `docs/ROUTES.md`.
+The one design change since the original spec: the reveal capability travels in a
+short-lived **cookie** (`yl_reveal`), not a `?t=<token>` URL — there is no `/revealed`
+route; the revealed view renders at the clean `/:name` (see §3).
 
 ## Goal
 
@@ -41,10 +43,11 @@ POST /:name/go         -> consume (hits+1) -> 303 to the destination
 Limited / one-time redirect (two steps — the full URL is gated behind a use):
 ```
 GET  /:name            -> interstitial: DOMAIN ONLY + blue "Reveal Destination"
-POST /:name/reveal     -> consume (hits+1) -> 303 to GET /:name/revealed?t=<token>
-GET  /:name/revealed?t -> verify token -> full URL + amber "Continue to <domain>"
-                          ("Continue" is a plain link to the destination; going is free,
-                          the use was already spent at reveal)
+POST /:name/reveal     -> consume (hits+1) -> Set-Cookie: yl_reveal=<HMAC token>
+                          -> 303 back to GET /:name
+GET  /:name            -> valid yl_reveal cookie -> revealed view: full URL + amber
+                          "Continue to <domain>" ("Continue" is a plain link to the
+                          destination; going is free, the use was already spent at reveal)
 ```
 
 Unlimited text (no interstitial):
@@ -55,7 +58,7 @@ GET  /:name            -> render the text immediately (inert <pre>); counts a hi
 Limited / one-time text:
 ```
 GET  /:name            -> interstitial: "A text snippet" + blue "Reveal Text"
-POST /:name/reveal     -> consume -> 303 to GET /:name/revealed?t=<token> -> renders the text
+POST /:name/reveal     -> consume -> reveal cookie -> 303 to GET /:name -> renders the text
 ```
 
 Why reveal must consume: domain-only for a limited link means the **exact destination is
@@ -106,34 +109,37 @@ HTTP semantics for `GET /:name` (and the POST consume endpoints):
 
 ---
 
-## 3. Routes (`server/src/main.rs`)
+## 3. Routes (`server/src/web.rs`)
 
-Replace the current `/:name` handling:
+As built (full list with semantics: `docs/ROUTES.md`):
 ```
-.route("/:name", get(web::resolve))                 // -> interstitial / immediate text / 410 / 404
-.route("/:name/go", post(web::go))                  // unlimited redirect: consume + 303
-.route("/:name/reveal", post(web::reveal))          // limited redirect/text: consume + 303 to revealed
-.route("/:name/revealed", get(web::revealed))       // token-gated revealed view
+.route("/:name", get(web::resolve))          // -> interstitial / immediate text / revealed view / 410 / 404
+.route("/:name/go", post(web::go))           // unlimited redirect: consume + 303 to the destination
+.route("/:name/reveal", post(web::reveal))   // limited redirect/text: consume + reveal cookie + 303 to /:name
+.route("/:name/card.png", get(web::card_image)) // og:image share card, spends no use
 ```
-- **Drop the old `+` preview convention** (`name.strip_suffix('+')` in `resolve`). `GET /:name`
-  is now the preview.
-- API under `/api/v1`: read still does not consume. **Remove the open `CorsLayer`** (decided
-  2026-06-23) so the API is **same-origin** — the "host your own browser frontend" rationale
-  died with encryption. See Open Question on gating limited destinations (CORS does not solve
-  it for non-browser clients).
+- There is **no `/revealed` route**. `resolve` checks for a valid `yl_reveal` cookie first
+  and renders the revealed view at the clean `/:name` URL — refresh/back safe, no token in
+  browser history, referrers, or server logs.
+- A trailing `+` on a name is **accepted and ignored** (the bit.ly preview habit): every
+  link already previews, so `/:name+` behaves exactly like `/:name`.
+- API under `/api/v1` is **same-origin** (no `CorsLayer` — decided 2026-06-23; the "host
+  your own browser frontend" rationale died with encryption). The REST read does not
+  consume a use, and — since 2026-07-02 — does not return a limited link's destination or
+  body at all (see §9).
 
-### Revealed-view token
+### Reveal capability (cookie)
 
-`POST /:name/reveal` consumes one use, then mints a signed, short-TTL token and 303s to
-`GET /:name/revealed?t=<token>`. The token authorises **re-rendering without re-consuming**
-(so refresh/back is safe). Recommended: stateless **HMAC** token = `base64(name | exp) .
-hmac_sha256(secret, name | exp)`, TTL ~10 min. `revealed` verifies the token, then reads the
-row via `get_link_any` (the tombstone row still holds the content) and renders:
-- redirect -> full URL + amber "Continue to <domain>" (plain link to the destination)
-- text -> the text in an inert `<pre>`
+`POST /:name/reveal` consumes one use, mints a stateless HMAC token
+(`base64(name | exp) . hmac_sha256(secret, name | exp)`, TTL ~10 min; `server/src/token.rs`),
+and sets it as a path-scoped cookie: `yl_reveal=<token>; Path=/<name>; Max-Age=600;
+HttpOnly; SameSite=Lax` (+ `Secure` when served over HTTPS), then 303s back to `/:name`.
+The token authorises **re-rendering without re-consuming** (refresh/back safe): `resolve`
+verifies it and reads the row via `get_link_any` (a tombstone row still holds the content).
 
-Add an HMAC secret to config (`YUIOLINK_SECRET`, random per-process default if unset; note
-that an unset/rotating secret invalidates outstanding reveal tokens, which is acceptable).
+The HMAC secret is `YUIOLINK_SECRET` (config.rs); unset means a random per-process secret,
+which invalidates outstanding reveal cookies on restart — acceptable for dev, set it in
+production.
 
 ---
 
@@ -232,19 +238,26 @@ Remove `crypto.js` / `redirect.js` references (encryption gone); keep `text.js` 
 
 ---
 
-## 9. Open questions / decisions to confirm during build
+## 9. Decisions (updated as they land)
 
-- **API limited-destination leak — DECIDED (2026-06-23): accept it.** `GET
-  /api/v1/links/:name` returns the full destination without consuming, including for limited
-  links. That is fine; the API is not gated. Abuse is handled by **rate limiting**, added
-  **later** (see Deferred), not by gating destinations.
-- **HMAC secret lifecycle** for reveal tokens (persisted vs per-process random).
-- **og:image rasterisation** dependency weight (`resvg`) and PNG caching strategy.
-- **Hits semantics**: a hit is counted at `go` (unlimited) or at `reveal` (limited). One use
-  per access either way — document it in user-facing copy if needed.
+- **API limited-destination leak — REVERSED (2026-07-02): gate it.** The 2026-06-23
+  decision was to accept that `GET /api/v1/links/:name` returned a limited link's full
+  destination without consuming, relying on future rate limiting. That was wrong: rate
+  limiting bounds *volume*, but interception takes a *single* silent read — anyone who
+  learned a 4-word name could read a one-time link's destination without spending the use,
+  while the legitimate recipient still saw it live, contradicting the promised "410 means
+  someone already opened it" tamper evidence. The API now returns **metadata only** for
+  limited links; disclosing the payload stays exclusive to `POST /:name/reveal`.
+- **HMAC secret lifecycle** — persisted on the droplet (`/etc/yuiolink/yuiolink.env`);
+  per-process random fallback for dev.
+- **og:image rasterisation** — `resvg` with `default-features=false, features=["text"]`,
+  vendored fonts, rendered on `spawn_blocking`, `Cache-Control: max-age=3600`.
+- **Hits semantics** — a hit is counted at `go` (unlimited) or at `reveal` (limited). One
+  use per access either way.
 
-## 10. Deferred (post-launch)
+## 10. Post-launch items (status)
 
-- **Rate limiting on `/api/v1`** — the chosen mitigation for API abuse (since the API is not
-  gated and stays publicly callable by non-browser clients). Add before any public launch;
-  out of scope for this build.
+- **Rate limiting** — BUILT (2026-07-02): per-client token bucket on the **create path
+  only** (form, `/create`, API create; burst 10, one create per 6 s, fast 429). Resolution
+  is never limited or slowed. Volumetric protection remains the upstream CDN's job (still
+  pending).
