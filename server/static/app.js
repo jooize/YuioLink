@@ -531,7 +531,12 @@
         const expired = document.getElementById("history-clear-expired");
         const all = document.getElementById("history-clear");
         if (opener) opener.hidden = clearMenuOpen;
-        if (expired) expired.hidden = !clearMenuOpen || !memHistory.some(isExpired);
+        // Both options always show while open; Expired goes inert (not hidden)
+        // when nothing has expired, so the pair keeps its shape.
+        if (expired) {
+            expired.hidden = !clearMenuOpen;
+            expired.disabled = !memHistory.some(isExpired);
+        }
         if (all) all.hidden = !clearMenuOpen;
     };
     const setClearMenu = (open) => {
@@ -751,7 +756,6 @@
             21600, 43200, 86400, 172800, 259200, 432000, 604800];
         const ttlSlider = document.getElementById("ttl-slider");
         const ttlReadout = document.getElementById("ttl-readout");
-        const ttlTicks = document.getElementById("ttl-ticks");
         const ttlCustomField = document.getElementById("ttl-custom-field");
         const fmtTtl = (secs) => {
             if (secs < 3600) { const m = Math.round(secs / 60); return `${m} minute${m === 1 ? "" : "s"}`; }
@@ -778,11 +782,10 @@
         };
         const setupTtl = () => {
             if (!ttlSlider || !ttlReadout) return;
-            // JS path: readout + slider take over; the exact field folds away
-            // behind a readout tap (a filled exact field beats the slider).
-            ttlSlider.hidden = false;
+            // The slider and ticks work without JS (ttl_stop posts natively);
+            // JS adds the live readout and folds the exact field away behind a
+            // readout tap (a filled exact field beats the slider).
             ttlReadout.hidden = false;
-            if (ttlTicks) ttlTicks.hidden = false;
             ttlCustomField.hidden = true;
             ttlSlider.addEventListener("input", () => {
                 ttlCustomValue.value = ""; // the slider takes back over
@@ -792,6 +795,13 @@
                 ttlCustomField.hidden = !ttlCustomField.hidden;
                 if (!ttlCustomField.hidden) ttlCustomValue.focus();
             });
+            // The labeled landmarks jump straight to their stop.
+            for (const tick of document.querySelectorAll(".ttl-tick"))
+                tick.addEventListener("click", () => {
+                    ttlSlider.value = tick.dataset.stop;
+                    ttlCustomValue.value = "";
+                    updateTtlReadout();
+                });
             ttlCustomValue.addEventListener("input", updateTtlReadout);
             for (const r of document.querySelectorAll('input[name="ttl_unit"]'))
                 r.addEventListener("change", updateTtlReadout);

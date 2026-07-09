@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wordlist sound-alikes — review</title>
+<style>
+    :root {
+        --accent: #007aff;
+        --danger: #d70015;
+        --ok: #1a8f3c;
+        --warn: #c77a00;
+        --text: #1d1d1f;
+        --text-secondary: rgba(60, 60, 67, 0.6);
+        --text-tertiary: rgba(60, 60, 67, 0.4);
+        --card: rgba(255, 255, 255, 0.8);
+        --sep: rgba(0, 0, 0, 0.08);
+        --bg-1: #e7e8ec;
+        --bg-2: #f6f7f9;
+        --chip: rgba(0, 0, 0, 0.05);
+        --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+        --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --accent: #0a84ff;
+            --danger: #ff453a;
+            --ok: #30d158;
+            --warn: #ffd60a;
+            --text: #f5f5f7;
+            --text-secondary: rgba(235, 235, 245, 0.6);
+            --text-tertiary: rgba(235, 235, 245, 0.35);
+            --card: rgba(40, 40, 44, 0.9);
+            --sep: rgba(255, 255, 255, 0.1);
+            --bg-1: #121214;
+            --bg-2: #202024;
+            --chip: rgba(255, 255, 255, 0.08);
+        }
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        padding: 34px 16px 130px;
+        font-family: var(--font);
+        color: var(--text);
+        background: linear-gradient(155deg, var(--bg-2), var(--bg-1)) fixed;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .sub { font-size: 13px; color: var(--text-secondary); margin: 0 0 18px; max-width: 56ch; text-align: center; line-height: 1.5; }
+    h2 { font-size: 13px; color: var(--accent); margin: 22px 0 8px; width: min(100%, 560px); }
+    h2 small { color: var(--text-secondary); font-weight: 500; }
+    .grp {
+        width: min(100%, 560px);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: var(--card);
+        border: 0.5px solid var(--sep);
+        border-radius: 12px;
+        margin-bottom: 6px;
+        flex-wrap: wrap;
+    }
+    .grp .words { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+    .w {
+        font-family: var(--mono);
+        font-size: 14px;
+        font-weight: 600;
+        padding: 5px 12px;
+        border-radius: 999px;
+        border: 1.5px solid var(--ok);
+        color: var(--ok);
+        background: none;
+        cursor: pointer;
+    }
+    .w.drop {
+        border-color: var(--danger);
+        color: var(--danger);
+        text-decoration: line-through;
+        opacity: 0.8;
+    }
+    .grp .all {
+        font-family: var(--font);
+        font-size: 11.5px;
+        color: var(--text-secondary);
+        background: var(--chip);
+        border: 0;
+        border-radius: 999px;
+        padding: 5px 10px;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .grp .all:hover { color: var(--text); }
+    .bar {
+        position: fixed;
+        left: 0; right: 0; bottom: 0;
+        padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+        background: var(--card);
+        -webkit-backdrop-filter: blur(20px);
+        backdrop-filter: blur(20px);
+        border-top: 0.5px solid var(--sep);
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        font-size: 13px;
+    }
+    .bar b { font-variant-numeric: tabular-nums; }
+    .bar .bits.low { color: var(--danger); font-weight: 700; }
+    .bar .bits.ok { color: var(--ok); font-weight: 700; }
+    .bar button {
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: #fff;
+        background: var(--accent);
+        border: 0;
+        border-radius: 10px;
+        padding: 8px 16px;
+        cursor: pointer;
+    }
+    #out {
+        width: min(100%, 560px);
+        margin-top: 14px;
+        font-family: var(--mono);
+        font-size: 12px;
+        min-height: 120px;
+        border-radius: 10px;
+        border: 0.5px solid var(--sep);
+        background: var(--card);
+        color: var(--text);
+        padding: 10px;
+        display: none;
+    }
+    #out.show { display: block; }
+</style>
+</head>
+<body>
+<h1>Wordlist sound-alikes</h1>
+<p class="sub">Every word starts green (kept). Tap a word to toggle dropping it, or "drop all" to
+kill a whole group — since a spoken name that survives with a sound-alike spelling still can't be
+written down reliably, dropping both is often right. The bar tracks the 4-word entropy: it must
+stay at or above 47.00 bits (3445 words) to keep the marketed claim.</p>
+<div id="groups"></div>
+<div class="bar">
+    <span>Dropped <b id="ndrop">0</b></span>
+    <span>Kept <b id="nkeep">3516</b></span>
+    <span class="bits ok" id="bits">47.12 bits</span>
+    <button id="export">Export dropped list</button>
+</div>
+<textarea id="out" readonly spellcheck="false" placeholder="dropped words appear here"></textarea>
+<script>
+    const TOTAL = 3516;
+    const SECTIONS = [
+        ["Identical pronunciation", "impossible to spell from speech", [
+            ["hole","whole"],["pair","pear"],["peace","piece"],["right","write"],
+            ["shone","shown"],["wear","where"],["carat","carrot"],["cannon","canon"],
+            ["put","putt"],["lilly","lily"]
+        ]],
+        ["Near-identical", "final-consonant voicing, flapped t/d, or stress — mace/maze class", [
+            ["mace","maze"],["bus","buzz"],["dose","doze"],["coral","corral"],
+            ["coma","comma"],["moral","morale"],["later","latter","ladder"],
+            ["medal","metal"],["caddy","catty"],["rabid","rapid"],["cod","cot"],
+            ["grid","grit"],["squad","squat"],["tweed","tweet"],["skid","skit"],
+            ["kid","kit"],["mud","mutt"],["wad","what"],["lend","lent"],
+            ["spend","spent"],["extend","extent"],["errand","errant"],
+            ["ascend","ascent","accent"],["leaf","leave"],["safe","save"],
+            ["life","live"],["strife","strive"],["duck","dug"],["muck","mug"],
+            ["chuck","chug"],["dock","dog"],["clock","clog"],["smock","smog"],
+            ["robe","rope"],["swab","swap"],["cub","cup"],
+            ["backed","bagged","baked"],["angle","ankle"],["cold","colt","gold"],
+            ["wand","want"]
+        ]],
+        ["Borderline", "audibly distinct to a careful ear — judge for yourself", [
+            ["diner","dinner"],["super","supper"],["booth","both"],
+            ["barely","barley"],["icky","icy"],["thumb","thump"],
+            ["field","filled"],["bok","book"],["salon","saloon"],
+            ["thing","think"],["wing","wink"],["ring","rink"],
+            ["bling","blink"],["cling","clink"],["hung","hunk"],
+            ["dent","tent"],["down","town"],["bath","path"],
+            ["batch","patch"],["fan","van"],["fault","vault"],
+            ["ferry","very"],["coke","cook"],["salt","slate"]
+        ]]
+    ];
+    const dropped = new Set();
+    const root = document.getElementById("groups");
+    for (const [title, note, groups] of SECTIONS) {
+        const h = document.createElement("h2");
+        h.innerHTML = `${title} <small>· ${note} · ${groups.length} groups</small>`;
+        root.append(h);
+        for (const g of groups) {
+            const row = document.createElement("div");
+            row.className = "grp";
+            const words = document.createElement("div");
+            words.className = "words";
+            const btns = [];
+            for (const w of g) {
+                const b = document.createElement("button");
+                b.className = "w";
+                b.textContent = w;
+                b.addEventListener("click", () => {
+                    b.classList.toggle("drop");
+                    b.classList.contains("drop") ? dropped.add(w) : dropped.delete(w);
+                    refresh();
+                });
+                btns.push(b);
+                words.append(b);
+            }
+            const all = document.createElement("button");
+            all.className = "all";
+            all.textContent = "drop all";
+            all.addEventListener("click", () => {
+                const anyKept = btns.some((b) => !b.classList.contains("drop"));
+                for (const b of btns) {
+                    b.classList.toggle("drop", anyKept);
+                    anyKept ? dropped.add(b.textContent) : dropped.delete(b.textContent);
+                }
+                all.textContent = anyKept ? "keep all" : "drop all";
+                refresh();
+            });
+            row.append(words, all);
+            root.append(row);
+        }
+    }
+    const refresh = () => {
+        const kept = TOTAL - dropped.size;
+        document.getElementById("ndrop").textContent = dropped.size;
+        document.getElementById("nkeep").textContent = kept;
+        const bits = 4 * Math.log2(kept);
+        const el = document.getElementById("bits");
+        el.textContent = bits.toFixed(2) + " bits";
+        el.className = "bits " + (bits >= 47 ? "ok" : "low");
+        const out = document.getElementById("out");
+        if (out.classList.contains("show")) out.value = [...dropped].sort().join("\n");
+    };
+    document.getElementById("export").addEventListener("click", () => {
+        const out = document.getElementById("out");
+        out.classList.add("show");
+        out.value = [...dropped].sort().join("\n");
+        out.scrollIntoView({ behavior: "smooth" });
+        out.select();
+    });
+</script>
+</body>
+</html>

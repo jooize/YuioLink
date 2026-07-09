@@ -33,13 +33,7 @@ fn document_full(title: &str, head_extra: Markup, body: Markup, scripts: Markup)
             body {
                 main.app-window {
                     header {
-                        h1 {
-                            "YuioLink"
-                            // Invisible but selectable: dragging from the title into
-                            // the tagline copies "YuioLink — Wieldy Ephemeral Link"
-                            // (the tagline itself is select-none to avoid doubling).
-                            span.select-only aria-hidden="true" { " — Wieldy Ephemeral Link" }
-                        }
+                        h1 { "YuioLink" }
                     }
                     (body)
                 }
@@ -221,7 +215,10 @@ fn result_output(url: Option<&str>, meta: Markup, note: Option<&str>) -> Markup 
 /// detection, keyboard shortcuts, an in-place result, and copy.
 pub fn index_page(max_ttl_secs: i64) -> Markup {
     let body = html! {
-        p.tagline { "Wieldy Ephemeral Link" }
+        // The invisible " — " rides along when a selection sweeps from the h1
+        // into the tagline, so the copy reads "YuioLink — Wieldy Ephemeral Link".
+        span.select-only aria-hidden="true" { " — " }
+        p { "Wieldy Ephemeral Link" }
 
         // Split storage pill (top): left shows the status (and links to the list),
         // right is the local-persistence toggle in its own colour. app.js fills both.
@@ -303,7 +300,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                         "153 trillion possibilities — and nothing lists or indexes it, so "
                         "reaching the link means guessing its exact name within its "
                         "lifetime. "
-                        strong { "The name is the secret" }
+                        strong.nowrap { "The name is the secret" }
                         ", and it exists only until the link expires."
                     }
                     div.details-body.for-once {
@@ -317,17 +314,25 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             }
 
             fieldset.picker #ttl-picker {
-                legend { "Expires After" }
+                legend { "Expiry" }
                 // JS path (app.js un-hides and drives these): a big readout over a
                 // stepped slider whose 17 stops are sensible durations from 1 minute
                 // to 7 days. Tapping the readout opens the exact field below.
                 button.ttl-readout #ttl-readout type="button" hidden
                     title="Set an exact expiry" {}
+                // The slider and its ticks work without JavaScript too (the index
+                // posts as ttl_stop); only the live readout needs app.js.
                 input.ttl-slider #ttl-slider type="range" name="ttl_stop"
-                    min="0" max="16" step="1" value="7" hidden
+                    min="0" max="16" step="1" value="7"
                     aria-label="Expires after";
-                div.ttl-ticks #ttl-ticks hidden aria-hidden="true" {
-                    span { "1m" } span { "10m" } span { "1h" } span { "1d" } span { "7d" }
+                // Labeled landmarks under the track, each a shortcut to its stop
+                // (app.js wires the clicks; without it they are inert labels).
+                div.ttl-ticks #ttl-ticks {
+                    button.ttl-tick type="button" data-stop="0" { "1 min" }
+                    button.ttl-tick type="button" data-stop="3" { "10 min" }
+                    button.ttl-tick type="button" data-stop="7" { "1 hour" }
+                    button.ttl-tick type="button" data-stop="12" { "1 day" }
+                    button.ttl-tick type="button" data-stop="16" { "7 days" }
                 }
                 // Exact expiry: the whole control without JavaScript; with it, the
                 // escape hatch behind a readout tap. Left empty, the slider governs.

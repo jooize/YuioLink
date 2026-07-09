@@ -119,22 +119,15 @@ html {
     white-space: nowrap;
 }
 
-/* Invisible but selectable: dragging from the h1 into the tagline copies
-   "YuioLink — Wieldy Ephemeral Link". Zero-sized (not display:none, which
-   browsers exclude from the copied text) so it never affects layout. */
+/* Invisible but selectable: a selection sweeping across it picks the text up
+   (used for the " — " between the h1 and the tagline). Zero-sized rather than
+   display:none, which browsers exclude from the copied text. */
 .select-only {
     display: inline-block;
     width: 0;
     height: 0;
     overflow: hidden;
     color: transparent;
-}
-
-/* The visible tagline is select-none so a cross-selection doesn't copy the
-   phrase twice (the hidden span in the h1 already carries it). */
-.tagline {
-    user-select: none;
-    -webkit-user-select: none;
 }
 
 body {
@@ -436,28 +429,59 @@ textarea.form-control {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
-/* Landmark labels under the slider, positioned at their stops (half-thumb
-   inset so each label centres under the thumb at that stop). */
-.ttl-ticks {
-    position: relative;
-    height: 15px;
-    margin: 1px 12px 0;
-    font-size: 10.5px;
-    color: var(--text-tertiary);
+/* The expiry legend sits centred over its control, unlike the other captions. */
+#ttl-picker > legend {
+    width: 100%;
+    padding: 0;
+    text-align: center;
 }
 
-.ttl-ticks span {
+/* Landmark labels under the slider, positioned at their stops (half-thumb
+   inset so each label centres under the thumb at that stop). Each is a
+   clickable shortcut with a notch mark tying it to the track above. */
+.ttl-ticks {
+    position: relative;
+    height: 30px;
+    margin: -3px 12px 8px;
+    font-size: 11.5px;
+}
+
+.ttl-tick {
     position: absolute;
     transform: translateX(-50%);
     white-space: nowrap;
+    padding: 10px 4px 2px;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    font-size: inherit;
+    color: var(--text-secondary);
+    cursor: pointer;
 }
 
-/* Stops 0, 3, 7, 12, 16 of 16: 1m, 10m, 1h, 1d, 7d. */
-.ttl-ticks span:nth-child(1) { left: 0; }
-.ttl-ticks span:nth-child(2) { left: 18.75%; }
-.ttl-ticks span:nth-child(3) { left: 43.75%; }
-.ttl-ticks span:nth-child(4) { left: 75%; }
-.ttl-ticks span:nth-child(5) { left: 100%; }
+.ttl-tick:hover {
+    color: var(--text);
+}
+
+/* The notch: a small vertical mark above the label, at the stop's position. */
+.ttl-tick::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 50%;
+    width: 2px;
+    height: 6px;
+    border-radius: 1px;
+    background: var(--text-tertiary);
+    transform: translateX(-50%);
+}
+
+/* Stops 0, 3, 7, 12, 16 of 16: 1 min, 10 min, 1 hour, 1 day, 7 days. */
+.ttl-tick:nth-child(1) { left: 0; }
+.ttl-tick:nth-child(2) { left: 18.75%; }
+.ttl-tick:nth-child(3) { left: 43.75%; }
+.ttl-tick:nth-child(4) { left: 75%; }
+.ttl-tick:nth-child(5) { left: 100%; }
 
 .custom-num {
     flex: 1;
@@ -601,6 +625,11 @@ textarea.form-control {
     color: var(--text-secondary);
     font-size: 12px;
     line-height: 1.5;
+}
+
+/* Short bold phrases that read wrong when broken mid-line. */
+.details-body .nowrap {
+    white-space: nowrap;
 }
 
 .details-body a {
@@ -1724,6 +1753,17 @@ textarea.form-control {
 .history-clear-open:hover {
     color: var(--text);
     text-decoration: underline;
+}
+
+/* Nothing expired: Clear Expired stays visible but inert, so the pair keeps
+   its shape while the menu is open. */
+.history-clear-expired:disabled {
+    color: var(--text-tertiary);
+    cursor: default;
+}
+
+.history-clear-expired:disabled:hover {
+    text-decoration: none;
 }
 
 /* Clear All wipes the whole local list -> red (destructive). */
