@@ -188,7 +188,12 @@
             const dead = text === "expired";
             panel.classList.toggle("expired", dead);
             const copyBtn = panel.querySelector(".result-copy");
-            if (copyBtn) copyBtn.disabled = dead;
+            if (copyBtn) {
+                // An anchor has no `disabled`: drop the href (no target to copy)
+                // and grey it via the class instead.
+                copyBtn.classList.toggle("disabled", dead);
+                if (dead) copyBtn.removeAttribute("href");
+            }
         }
     };
     // Build "<Kind> · <green time left><uses>" into `metaEl` (no innerHTML): the kind
@@ -267,7 +272,12 @@
         const btn = document.getElementById("copy-result");
         if (btn) {
             btn.hidden = false;
-            btn.addEventListener("click", () => copyToClipboard(linkEl.textContent.trim(), btn, () => flashClass(linkEl, "copied")));
+            // A real link to the URL (right-click -> Copy Link); left click copies.
+            btn.href = linkEl.textContent.trim();
+            btn.addEventListener("click", (event) => {
+                event.preventDefault();
+                copyToClipboard(linkEl.textContent.trim(), btn, () => flashClass(linkEl, "copied"));
+            });
         }
     };
 
@@ -511,17 +521,23 @@
 
             const actions = document.createElement("div");
             actions.className = "history-actions";
-            const copy = document.createElement("button");
+            // Copy and Preview are real links to the URL, so right-click offers
+            // Copy Link / Open in New Tab; a left click on Copy copies instead.
+            const copy = document.createElement("a");
             copy.className = "history-copy";
-            copy.type = "button";
+            copy.href = it.url;
             copy.textContent = "Copy";
-            copy.addEventListener("click", () => copyToClipboard(it.url, copy, () => flashClass(check, "show")));
-            const show = document.createElement("button");
+            copy.addEventListener("click", (event) => {
+                event.preventDefault();
+                copyToClipboard(it.url, copy, () => flashClass(check, "show"));
+            });
+            const show = document.createElement("a");
             show.className = "history-show";
-            show.type = "button";
+            show.href = it.url;
+            show.target = "_blank";
+            show.rel = "noopener noreferrer";
             show.textContent = "Preview";
             show.title = "Open this link's preview in a new tab";
-            show.addEventListener("click", () => window.open(it.url, "_blank", "noopener,noreferrer"));
             const remove = document.createElement("button");
             remove.className = "history-remove";
             remove.type = "button";
@@ -919,6 +935,8 @@
         const showReady = (url, kind, expiresIso, uses) => {
             if (linkWordEl) linkWordEl.replaceChildren(nameSpans(url.split("#")[0].split("/").pop()));
             renderUrlInto(linkEl, url);
+            const copyBtn = document.getElementById("copy-result");
+            if (copyBtn) { copyBtn.href = url; copyBtn.classList.remove("disabled"); }
             buildMeta(metaEl, kind, expiresIso, uses);
             if (resultNoteEl) resultNoteEl.hidden = true; // reset; create path re-shows if crowded
             panel.hidden = false;

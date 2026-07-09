@@ -203,7 +203,9 @@ fn result_output(url: Option<&str>, meta: Markup, note: Option<&str>) -> Markup 
             div.result-foot {
                 small.result-meta #link-expiry { (meta) }
                 div.result-actions {
-                    button.result-copy #copy-result type="button" hidden { "Copy" }
+                    // A real link to the created URL (right-click gives Copy Link);
+                    // app.js fills the href and turns a left click into a copy.
+                    a.result-copy #copy-result hidden { "Copy" }
                 }
             }
         }

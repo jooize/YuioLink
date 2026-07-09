@@ -921,8 +921,11 @@ textarea.form-control {
     gap: 9px;
 }
 
-/* Copy pill beneath the URL. */
+/* Copy pill beneath the URL — an anchor to the created URL styled as a button,
+   so the context menu offers Copy Link while a left click copies via JS. */
 .result-copy {
+    display: inline-block;
+    text-decoration: none;
     font-family: inherit;
     font-size: 13.5px;
     font-weight: 600;
@@ -946,8 +949,13 @@ textarea.form-control {
     border-color: color-mix(in srgb, var(--switch-on) 30%, transparent);
 }
 
-/* Expired link: nothing to copy — the button goes inert and neutral. */
-.result-copy:disabled {
+/* Expired link: nothing to copy — the pill goes inert and neutral. */
+.result-copy.disabled {
+    pointer-events: none;
+}
+
+.result-copy:disabled,
+.result-copy.disabled {
     color: var(--text-tertiary);
     background: color-mix(in srgb, var(--text) 8%, transparent);
     border-color: var(--separator);
@@ -1513,6 +1521,7 @@ textarea.form-control {
    blue, sitting to the left of Copy. */
 .history-show {
     flex: none;
+    text-decoration: none;
     font-family: inherit;
     font-size: 13px;
     font-weight: 500;
@@ -1529,6 +1538,7 @@ textarea.form-control {
 
 .history-copy {
     flex: none;
+    text-decoration: none;
     font-family: inherit;
     font-size: 13px;
     font-weight: 500;
