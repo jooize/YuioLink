@@ -225,11 +225,6 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             a.storage-status #storage-status href="#history" hidden {}
             button.storage-toggle #storage-toggle type="button" hidden {}
         }
-        // Shown by app.js when the user turns local history off while links exist.
-        p.storage-warning #storage-warning hidden {
-            "Local history is off — these links will be gone when you close this page."
-        }
-
         // The created link (latest), shown above the input. app.js fills it in place;
         // the no-JS path reloads to a result page.
         (result_output(None, html! {}, None))
@@ -372,6 +367,11 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                     button.history-clear #history-clear type="button" hidden { "Clear All" }
                     button.history-clear-expired #history-clear-expired type="button" hidden { "Clear Expired" }
                 }
+            }
+            // Shown by app.js when the user turns local history off while links
+            // exist — right under the switch that did it.
+            p.storage-warning #storage-warning hidden {
+                "Local history is off — these links will be gone when you close this page."
             }
             div.history-body {
                 ul.history-list #history-list {}

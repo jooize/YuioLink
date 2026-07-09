@@ -12,7 +12,7 @@
     /* "Text" kind word — a cyan/teal. Darker on the light glass so it stays legible:
        this hits ~4.8:1 on the card, meeting WCAG AA for 11.5px text
        (the dark theme uses the bright #0affe4 on its dark card). */
-    --text-kind: #127c70;
+    --text-kind: #00838f;
     /* Vibrant purple — the standout border on the create input. */
     --purple: #af52de;
     /* The alternate name-word colour, paired with the accent: a deep navy so a
@@ -898,9 +898,10 @@ textarea.form-control {
     color: var(--text-secondary);
 }
 
-/* Time left reads green (alive) by default, then warns as the deadline nears. */
+/* Time left reads green (alive) by default, then warns as the deadline nears.
+   Mixed a step toward the text colour so it sits quieter than the switch green. */
 .countdown {
-    color: var(--switch-on);
+    color: color-mix(in srgb, var(--switch-on) 82%, var(--text));
     font-weight: 600;
 }
 
@@ -1280,10 +1281,11 @@ textarea.form-control {
     transform: translateX(12px);
 }
 
-/* Caution line under the pill when history was turned off with links still present. */
+/* Caution line under the history head when saving was turned off with links still
+   present — it appears right where the switch was flipped. Indented like the head. */
 .storage-warning {
-    margin: 9px auto 0;
-    max-width: 34ch;
+    margin: -4px 0 10px;
+    padding: 0 8px;
     font-size: 12px;
     line-height: 1.4;
     color: var(--warn);
@@ -1494,7 +1496,8 @@ textarea.form-control {
    mixed-weight split. */
 .history-url .u-name { color: var(--text); font-weight: 600; }
 .history-url .nw-0 { color: var(--text); }
-.history-url .nw-1 { color: var(--word-alt); }
+/* In the dense list the alternation stays monochrome: text/grey/text/grey. */
+.history-url .nw-1 { color: var(--text-secondary); }
 
 /* Line 2: kind pill + expiry, in the UI font (mockup A). */
 .history-meta {
