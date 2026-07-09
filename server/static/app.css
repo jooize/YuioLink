@@ -628,7 +628,12 @@ textarea.form-control {
     white-space: nowrap;
 }
 
+/* An action line, not part of the sentence — block so it starts its own line
+   regardless of the platform's font metrics (Safari broke here already; Edge
+   pulled it up onto the prose line). */
 .details-body a {
+    display: block;
+    width: fit-content;
     color: var(--tint);
     text-decoration: underline;
     text-underline-offset: 2px;
