@@ -515,7 +515,7 @@
             // Opens the confirm prompt over the row — not a toggle; the prompt carries
             // its own Cancel. openConfirm closes any other row's prompt first.
             remove.addEventListener("click", () => openConfirm(li, it));
-            actions.append(copy, show, remove);
+            actions.append(show, copy, remove);
             foot.append(meta, actions);
 
             li.append(l1, foot);
@@ -745,13 +745,57 @@
         const resultNoteEl = document.getElementById("result-note");
         const ttlCustomValue = document.getElementById("ttl-custom-value");
 
-        // Field-level problems (not a number, below 1, not whole) are left to the
-        // number input's native validation — no hand-rolled checks. The Specify box is
-        // only meaningful while its segment is selected, so disable it otherwise:
-        // a disabled control is skipped by native validation and not submitted, which
-        // keeps a stale hidden value from silently blocking the form.
-        const syncCustomEnabled = () => {
-            ttlCustomValue.disabled = checkedValue("ttl_seconds", "3600") !== "custom";
+        // --- Expires After: stepped slider + tappable readout ---
+        // The stop ladder; must match TTL_STOPS in web.rs and the slider's range.
+        const TTL_STOPS = [60, 120, 300, 600, 900, 1800, 2700, 3600, 7200, 10800,
+            21600, 43200, 86400, 172800, 259200, 432000, 604800];
+        const ttlSlider = document.getElementById("ttl-slider");
+        const ttlReadout = document.getElementById("ttl-readout");
+        const ttlTicks = document.getElementById("ttl-ticks");
+        const ttlCustomField = document.getElementById("ttl-custom-field");
+        const fmtTtl = (secs) => {
+            if (secs < 3600) { const m = Math.round(secs / 60); return `${m} minute${m === 1 ? "" : "s"}`; }
+            if (secs < 86400) {
+                const h = Math.floor(secs / 3600), m = Math.round((secs % 3600) / 60);
+                return `${h} hour${h === 1 ? "" : "s"}${m ? ` ${m} min` : ""}`;
+            }
+            const d = Math.floor(secs / 86400), h = Math.round((secs % 86400) / 3600);
+            return `${d} day${d === 1 ? "" : "s"}${h ? ` ${h} h` : ""}`;
+        };
+        // The concrete deadline under the duration, so "what is set" is unambiguous.
+        const deadlineLabel = (secs) => {
+            const t = new Date(Date.now() + secs * 1000);
+            const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+            const hm = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
+            return `≈ deleted ${days[t.getDay()]} ${hm}`;
+        };
+        const updateTtlReadout = () => {
+            if (!ttlReadout) return;
+            const secs = ttlSeconds();
+            const small = document.createElement("small");
+            small.textContent = deadlineLabel(secs);
+            ttlReadout.replaceChildren(document.createTextNode(fmtTtl(secs)), small);
+        };
+        const setupTtl = () => {
+            if (!ttlSlider || !ttlReadout) return;
+            // JS path: readout + slider take over; the exact field folds away
+            // behind a readout tap (a filled exact field beats the slider).
+            ttlSlider.hidden = false;
+            ttlReadout.hidden = false;
+            if (ttlTicks) ttlTicks.hidden = false;
+            ttlCustomField.hidden = true;
+            ttlSlider.addEventListener("input", () => {
+                ttlCustomValue.value = ""; // the slider takes back over
+                updateTtlReadout();
+            });
+            ttlReadout.addEventListener("click", () => {
+                ttlCustomField.hidden = !ttlCustomField.hidden;
+                if (!ttlCustomField.hidden) ttlCustomValue.focus();
+            });
+            ttlCustomValue.addEventListener("input", updateTtlReadout);
+            for (const r of document.querySelectorAll('input[name="ttl_unit"]'))
+                r.addEventListener("change", updateTtlReadout);
+            updateTtlReadout();
         };
 
         // Whole-form errors (a failed request, a server rejection) shown on the page
@@ -775,15 +819,14 @@
             document.querySelector(`input[name="${name}"]:checked`)?.value ?? fallback;
 
         const ttlSeconds = () => {
-            const v = checkedValue("ttl_seconds", "3600");
-            if (v === "custom") {
-                // An empty Specify box accepts the default (5); a typed value is used
-                // as-is (the input's native min/step already barred 0 and fractions).
-                const raw = ttlCustomValue.value.trim();
-                const n = raw === "" ? 5 : Number.parseInt(raw, 10);
-                return (Number.isNaN(n) ? 5 : n) * (UNIT_SECS[checkedValue("ttl_unit", "m")] ?? 60);
+            // A filled exact field beats the slider (matching the server's form
+            // precedence); otherwise the slider's stop governs.
+            const raw = ttlCustomValue.value.trim();
+            if (raw !== "") {
+                const n = Number.parseInt(raw, 10);
+                if (!Number.isNaN(n)) return n * (UNIT_SECS[checkedValue("ttl_unit", "h")] ?? 3600);
             }
-            return Number.parseInt(v, 10);
+            return TTL_STOPS[+(ttlSlider?.value ?? 7)] ?? 3600;
         };
         // One control picks the type: public (reusable, short, guessable), private
         // (reusable, long unguessable name), or once (single-use, long name).
@@ -827,14 +870,6 @@
             content.classList.remove("submitted"); // editing re-activates the field
             if (currentResultUrl) panel.classList.toggle("stale", content.value !== resultSourceValue);
         });
-
-        // Switching the expiry segment toggles whether its Specify box is validated,
-        // and picking "Specify" focuses the field.
-        for (const r of document.querySelectorAll('input[name="ttl_seconds"]'))
-            r.addEventListener("change", () => {
-                syncCustomEnabled();
-                if (document.getElementById("ttl-custom")?.checked) ttlCustomValue.focus();
-            });
 
         // Redirect: Enter submits (Shift-Enter inserts a newline). Text: Enter = newline,
         // Cmd/Ctrl-Enter submits. Holding Option forces Text, so a URL then behaves like
@@ -1000,7 +1035,7 @@
 
         autosize();
         updateSubmitLabel();
-        syncCustomEnabled();
+        setupTtl();
         renderHistory();
         applyHistoryOpen(); // open by default on load (or the remembered state)
         content.focus();

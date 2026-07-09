@@ -33,7 +33,13 @@ fn document_full(title: &str, head_extra: Markup, body: Markup, scripts: Markup)
             body {
                 main.app-window {
                     header {
-                        h1 { "YuioLink" }
+                        h1 {
+                            "YuioLink"
+                            // Invisible but selectable: dragging from the title into
+                            // the tagline copies "YuioLink — Wieldy Ephemeral Link"
+                            // (the tagline itself is select-none to avoid doubling).
+                            span.select-only aria-hidden="true" { " — Wieldy Ephemeral Link" }
+                        }
                     }
                     (body)
                 }
@@ -215,7 +221,7 @@ fn result_output(url: Option<&str>, meta: Markup, note: Option<&str>) -> Markup 
 /// detection, keyboard shortcuts, an in-place result, and copy.
 pub fn index_page(max_ttl_secs: i64) -> Markup {
     let body = html! {
-        p { "Wieldy Ephemeral Link" }
+        p.tagline { "Wieldy Ephemeral Link" }
 
         // Split storage pill (top): left shows the status (and links to the list),
         // right is the local-persistence toggle in its own colour. app.js fills both.
@@ -293,40 +299,46 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                         a href="/wordlist.txt" { "Browse the wordlist →" }
                     }
                     div.details-body.for-private {
-                        "Link name is generated in a 47-bit namespace (about 153 trillion "
-                        "possibilities), and its destination or content stays on the server "
-                        "only until the link expires."
+                        "Link name is four random words from a 47-bit namespace — about "
+                        "153 trillion possibilities — and nothing lists or indexes it, so "
+                        "reaching the link means guessing its exact name within its "
+                        "lifetime. "
+                        strong { "The name is the secret" }
+                        ", and it exists only until the link expires."
                     }
                     div.details-body.for-once {
                         strong { "Deleted from the server when revealed" }
                         ", and with the same security as Private links. Recipients first open "
                         "the link to a preview, then have a choice to reveal its destination "
-                        "or content. The reveal deletes destination and content from the "
-                        "server."
+                        "or content. The reveal immediately deletes destination and "
+                        "content from the server."
                     }
                 }
             }
 
-            fieldset.picker {
+            fieldset.picker #ttl-picker {
                 legend { "Expires After" }
-                div.segmented {
-                    input.seg-radio #ttl-600 type="radio" name="ttl_seconds" value="600";
-                    label.seg-label for="ttl-600" { "10 minutes" }
-                    input.seg-radio #ttl-3600 type="radio" name="ttl_seconds" value="3600" checked;
-                    label.seg-label for="ttl-3600" { "1 hour" }
-                    input.seg-radio #ttl-604800 type="radio" name="ttl_seconds" value="604800";
-                    label.seg-label for="ttl-604800" { "7 days" }
-                    input.seg-radio #ttl-custom type="radio" name="ttl_seconds" value="custom";
-                    label.seg-label for="ttl-custom" { "Specify" }
+                // JS path (app.js un-hides and drives these): a big readout over a
+                // stepped slider whose 17 stops are sensible durations from 1 minute
+                // to 7 days. Tapping the readout opens the exact field below.
+                button.ttl-readout #ttl-readout type="button" hidden
+                    title="Set an exact expiry" {}
+                input.ttl-slider #ttl-slider type="range" name="ttl_stop"
+                    min="0" max="16" step="1" value="7" hidden
+                    aria-label="Expires after";
+                div.ttl-ticks #ttl-ticks hidden aria-hidden="true" {
+                    span { "1m" } span { "10m" } span { "1h" } span { "1d" } span { "7d" }
                 }
+                // Exact expiry: the whole control without JavaScript; with it, the
+                // escape hatch behind a readout tap. Left empty, the slider governs.
                 div.custom-field #ttl-custom-field {
                     input #ttl-custom-value.custom-num name="ttl_custom" type="number"
-                        min="1" step="1" inputmode="numeric" placeholder="5"
+                        min="1" step="1" inputmode="numeric" placeholder="1"
                         aria-label="Custom expiry amount";
                     div.segmented.unit-segmented {
-                        input.seg-radio #ttl-unit-m type="radio" name="ttl_unit" value="m" checked;
+                        input.seg-radio #ttl-unit-m type="radio" name="ttl_unit" value="m";
                         label.seg-label for="ttl-unit-m" { "minutes" }
-                        input.seg-radio #ttl-unit-h type="radio" name="ttl_unit" value="h";
+                        input.seg-radio #ttl-unit-h type="radio" name="ttl_unit" value="h" checked;
                         label.seg-label for="ttl-unit-h" { "hours" }
                         input.seg-radio #ttl-unit-d type="radio" name="ttl_unit" value="d";
                         label.seg-label for="ttl-unit-d" { "days" }
@@ -349,8 +361,10 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                     // "Clear…" folds the two destructive actions away until asked for;
                     // app.js toggles it open to reveal Clear Expired / Clear All.
                     button.history-clear-open #history-clear-open type="button" { "Clear…" }
-                    button.history-clear-expired #history-clear-expired type="button" hidden { "Clear Expired" }
+                    // Clear All sits leftmost so it never lands where "Clear…" was —
+                    // the spot under the pointer belongs to the safe green action.
                     button.history-clear #history-clear type="button" hidden { "Clear All" }
+                    button.history-clear-expired #history-clear-expired type="button" hidden { "Clear Expired" }
                 }
             }
             div.history-body {
@@ -443,7 +457,13 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
             Target::TextSnippet => (text_snippet_block(&i, one_time)),
         }
     };
-    document_full("YuioLink", interstitial_head(&i, one_time), body, html! {})
+    // noindex: link pages must never end up in a search index — a public link
+    // being crawlable would defeat "nothing indexes the name" for everyone.
+    let head = html! {
+        meta name="robots" content="noindex, nofollow";
+        (interstitial_head(&i, one_time))
+    };
+    document_full("YuioLink", head, body, html! {})
 }
 
 /// `<head>` Open Graph / theme-color tags so a shared link unfurls trustworthily.

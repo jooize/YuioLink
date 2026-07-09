@@ -91,6 +91,7 @@ pub fn router(state: AppState) -> Router {
         .route("/static/app.js", get(app_js))
         .route("/static/text.js", get(text_js))
         .route("/wordlist.txt", get(wordlist_txt))
+        .route("/robots.txt", get(robots_txt))
         .nest("/api/v1", api_routes())
         .route("/create", post(create_plain))
         .route("/:name", get(resolve))
@@ -247,16 +248,24 @@ pub async fn form_create(
         )
             .into_response();
     }
-    // Expiry: a preset ("600"/"3600"/"604800") or "custom" (a number + unit).
-    let ttl_seconds = match form.ttl_seconds.as_deref() {
-        Some("custom") => {
-            match parse_custom_ttl(form.ttl_custom.as_deref(), form.ttl_unit.as_deref()) {
-                Ok(secs) => secs,
-                Err(msg) => return form_error(msg),
-            }
+    // Expiry: a filled exact field (number + unit) beats the slider stop; the
+    // slider posts an index into TTL_STOPS. Legacy preset values still parse.
+    let has_custom = form
+        .ttl_custom
+        .as_deref()
+        .is_some_and(|s| !s.trim().is_empty());
+    let ttl_seconds = if has_custom || form.ttl_seconds.as_deref() == Some("custom") {
+        match parse_custom_ttl(form.ttl_custom.as_deref(), form.ttl_unit.as_deref()) {
+            Ok(secs) => secs,
+            Err(msg) => return form_error(msg),
         }
-        Some(s) => s.parse::<i64>().unwrap_or(DEFAULT_TTL_SECS),
-        None => DEFAULT_TTL_SECS,
+    } else if let Some(i) = form.ttl_stop.as_deref().and_then(|s| s.parse::<usize>().ok()) {
+        TTL_STOPS.get(i).copied().unwrap_or(DEFAULT_TTL_SECS)
+    } else {
+        match form.ttl_seconds.as_deref() {
+            Some(s) => s.parse::<i64>().unwrap_or(DEFAULT_TTL_SECS),
+            None => DEFAULT_TTL_SECS,
+        }
     };
 
     // One control picks the link's type: public (short, guessable, reusable),
@@ -308,6 +317,14 @@ pub async fn form_create(
             .into_response(),
     }
 }
+
+/// The expiry slider's stop ladder — fine steps in the minutes range, coarser
+/// through hours and days. Index 7 (1 hour) is the form's default; must match
+/// `TTL_STOPS` in `app.js` and the slider's `min`/`max` in `views.rs`.
+const TTL_STOPS: [i64; 17] = [
+    60, 120, 300, 600, 900, 1800, 2700, 3600, 7200, 10800, 21600, 43200, 86400, 172800, 259200,
+    432000, 604800,
+];
 
 /// Parse the no-JS "Custom" expiry (a number plus a minutes/hours/days unit) into
 /// seconds. The accepted range is enforced afterward by [`check_ttl`].
@@ -782,9 +799,12 @@ fn normalize_target(s: &str) -> String {
 #[derive(Deserialize)]
 pub struct FormCreate {
     pub content: String,
-    /// Expiry preset (`600`/`3600`/`604800`) or the sentinel `custom`.
+    /// Legacy expiry preset (`600`/`3600`/`604800`) or the sentinel `custom`.
     #[serde(default)]
     pub ttl_seconds: Option<String>,
+    /// Expiry slider stop — an index into [`TTL_STOPS`].
+    #[serde(default)]
+    pub ttl_stop: Option<String>,
     /// Custom-expiry amount (with [`Self::ttl_unit`]), used when `ttl_seconds` is `custom`.
     #[serde(default)]
     pub ttl_custom: Option<String>,
@@ -1028,6 +1048,21 @@ macro_rules! static_asset {
 static_asset!(app_css, "app.css", "text/css; charset=utf-8");
 static_asset!(app_js, "app.js", "text/javascript; charset=utf-8");
 static_asset!(text_js, "text.js", "text/javascript; charset=utf-8");
+
+/// `GET /robots.txt` — allow crawling the landing page, static assets, and the
+/// wordlist, but bar every link page: a crawled public link would end up in a
+/// search index, defeating "nothing indexes the name" for everyone. The link
+/// pages also carry a noindex meta as a belt-and-braces for crawlers that got
+/// a URL from elsewhere.
+pub async fn robots_txt() -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "text/plain; charset=utf-8"),
+            (header::CACHE_CONTROL, "public, max-age=3600"),
+        ],
+        "User-agent: *\nAllow: /$\nAllow: /static/\nAllow: /wordlist.txt\nDisallow: /\n",
+    )
+}
 
 /// `GET /wordlist.txt` — the curated wordlist behind every link name, one word
 /// per line. The create page's Public note links here so "anyone can run the
