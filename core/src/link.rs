@@ -284,7 +284,7 @@ mod tests {
 
     #[test]
     fn names_are_distinct() {
-        // Two-word names: 3516^2 ≈ 12.4M, so 1000 draws collide vanishingly rarely.
+        // Two-word names: 3456^2 ≈ 11.9M, so 1000 draws collide vanishingly rarely.
         let set: HashSet<String> = (0..1000).map(|_| generate_name(2)).collect();
         assert!(set.len() > 990);
     }

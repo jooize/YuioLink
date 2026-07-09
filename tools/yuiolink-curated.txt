@@ -143,8 +143,6 @@ arrow
 arson
 art
 artist
-ascend
-ascent
 ashen
 ashes
 aside
@@ -305,7 +303,6 @@ body
 bogged
 bogus
 boil
-bok
 bolt
 bomb
 bonded
@@ -399,21 +396,18 @@ bunt
 burden
 burger
 burst
-bus
 busboy
 bush
 bust
 busy
 butter
 buyer
-buzz
 cabana
 cabbie
 cabin
 cable
 cache
 cactus
-caddy
 cadet
 cage
 cake
@@ -433,18 +427,15 @@ candy
 cane
 canine
 canned
-cannon
 cannot
 canoe
 canola
-canon
 canopy
 canvas
 canyon
 cape
 capped
 car
-carat
 carbon
 card
 caress
@@ -452,7 +443,6 @@ cargo
 caring
 carol
 carpet
-carrot
 carry
 cart
 cartel
@@ -471,7 +461,6 @@ catchy
 catnap
 catnip
 cattle
-catty
 caucus
 caught
 cause
@@ -604,14 +593,12 @@ collar
 collie
 colony
 color
-colt
 column
 coma
 come
 comfy
 comic
 coming
-comma
 common
 compel
 comply
@@ -626,7 +613,6 @@ copier
 coping
 copper
 copy
-coral
 core
 cork
 corn
@@ -634,7 +620,6 @@ cornea
 corned
 corner
 corny
-corral
 corset
 cortex
 cosmic
@@ -878,7 +863,6 @@ doozy
 dork
 dorsal
 dosage
-dose
 dot
 dotted
 double
@@ -886,7 +870,6 @@ douche
 dove
 down
 dowry
-doze
 drab
 draft
 dragon
@@ -1032,8 +1015,6 @@ erase
 erased
 eraser
 erode
-errand
-errant
 error
 erupt
 escape
@@ -1066,8 +1047,6 @@ expel
 expert
 expire
 expose
-extend
-extent
 extra
 eye
 fable
@@ -1470,7 +1449,6 @@ hire
 hobby
 hockey
 hold
-hole
 hollow
 home
 honey
@@ -1628,7 +1606,6 @@ kept
 kettle
 key
 kick
-kid
 kidney
 kilt
 kimono
@@ -1638,7 +1615,6 @@ kindly
 king
 kiss
 kisser
-kit
 kite
 kitten
 kitty
@@ -1693,7 +1669,6 @@ lawn
 layer
 lazy
 leader
-leaf
 learn
 leave
 left
@@ -1703,10 +1678,8 @@ legal
 legend
 legged
 lemon
-lend
 length
 lens
-lent
 lesser
 lesson
 letter
@@ -1722,8 +1695,6 @@ like
 likely
 liking
 lilac
-lilly
-lily
 limb
 limes
 limit
@@ -1772,7 +1743,6 @@ lusty
 luxury
 lying
 lyric
-mace
 mad
 magic
 magma
@@ -1829,11 +1799,9 @@ matron
 matter
 maybe
 mayday
-maze
 meadow
 mean
 meat
-medal
 media
 melody
 melt
@@ -1845,7 +1813,6 @@ merge
 merit
 merry
 mesh
-metal
 method
 middle
 milk
@@ -1877,7 +1844,6 @@ mooing
 moon
 mop
 moral
-morale
 more
 morse
 mosaic
@@ -1898,7 +1864,6 @@ mower
 mowing
 much
 muck
-mud
 muffin
 mug
 mulch
@@ -1922,7 +1887,6 @@ musty
 mutate
 mute
 mutiny
-mutt
 mutual
 muzzle
 myself
@@ -2067,7 +2031,6 @@ pagan
 page
 pager
 paging
-pair
 palace
 palm
 panama
@@ -2109,9 +2072,7 @@ pawing
 payday
 payer
 paying
-peace
 peanut
-pear
 pebble
 pecan
 pellet
@@ -2143,7 +2104,6 @@ photo
 phrase
 piano
 picnic
-piece
 pig
 pigeon
 pill
@@ -2277,8 +2237,6 @@ purse
 push
 pusher
 pushy
-put
-putt
 puzzle
 python
 quack
@@ -2298,7 +2256,6 @@ quiz
 quota
 quote
 rabbit
-rabid
 race
 racing
 racism
@@ -2330,7 +2287,6 @@ ranger
 rank
 ranked
 rant
-rapid
 rare
 rarity
 rascal
@@ -2443,7 +2399,6 @@ ridge
 riding
 rifle
 rift
-right
 rigid
 rigor
 rind
@@ -2462,7 +2417,6 @@ rival
 river
 road
 roast
-robe
 robin
 robot
 robust
@@ -2656,7 +2610,6 @@ shirt
 shiver
 shock
 shoe
-shone
 shoot
 shop
 shore
@@ -2665,7 +2618,6 @@ shorty
 shout
 shove
 shower
-shown
 showy
 shred
 shriek
@@ -2717,7 +2669,6 @@ sketch
 skew
 skewer
 ski
-skid
 skier
 skiing
 skill
@@ -2725,7 +2676,6 @@ skin
 skinny
 skip
 skirt
-skit
 skull
 sky
 slab
@@ -2774,7 +2724,6 @@ smile
 smirk
 smite
 smith
-smock
 smog
 smoke
 smoked
@@ -2827,8 +2776,6 @@ specks
 speech
 speed
 spell
-spend
-spent
 spew
 sphere
 spice
@@ -3206,8 +3153,6 @@ tutor
 tutu
 tux
 tweak
-tweed
-tweet
 twelve
 twenty
 twice
@@ -3360,7 +3305,6 @@ voting
 vowed
 vowel
 voyage
-wad
 wafer
 waffle
 wage
@@ -3393,7 +3337,6 @@ wavy
 way
 wealth
 weapon
-wear
 weasel
 web
 weird
@@ -3406,11 +3349,9 @@ what
 wheat
 wheel
 when
-where
 whiff
 whiny
 whip
-whole
 whoop
 why
 wick
@@ -3474,7 +3415,6 @@ wreath
 wreck
 wrench
 wrist
-write
 wrong
 xerox
 yahoo

@@ -215,9 +215,6 @@ fn result_output(url: Option<&str>, meta: Markup, note: Option<&str>) -> Markup 
 /// detection, keyboard shortcuts, an in-place result, and copy.
 pub fn index_page(max_ttl_secs: i64) -> Markup {
     let body = html! {
-        // The invisible " — " rides along when a selection sweeps from the h1
-        // into the tagline, so the copy reads "YuioLink — Wieldy Ephemeral Link".
-        span.select-only aria-hidden="true" { " — " }
         p { "Wieldy Ephemeral Link" }
 
         // Split storage pill (top): left shows the status (and links to the list),

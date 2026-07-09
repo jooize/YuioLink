@@ -119,17 +119,6 @@ html {
     white-space: nowrap;
 }
 
-/* Invisible but selectable: a selection sweeping across it picks the text up
-   (used for the " — " between the h1 and the tagline). Zero-sized rather than
-   display:none, which browsers exclude from the copied text. */
-.select-only {
-    display: inline-block;
-    width: 0;
-    height: 0;
-    overflow: hidden;
-    color: transparent;
-}
-
 body {
     margin: 0;
     min-height: 100vh;
@@ -353,18 +342,20 @@ textarea.form-control {
 
 /* --- Expires After: readout + stepped slider (JS un-hides these) --- */
 
-/* The big live readout — also the tap target that opens the exact field. */
+/* The live readout — also the tap target that opens the exact field. It sits
+   on the legend's line, right-aligned: "Expiry ......... 1 day", with the
+   concrete deadline in a small line beneath the value. */
 .ttl-readout {
     display: block;
-    width: 100%;
-    margin: 2px 0 6px;
+    margin: -24px 0 10px auto;
     padding: 0;
     border: 0;
     background: none;
-    text-align: center;
+    text-align: right;
     font-family: var(--font-mono);
-    font-size: 21px;
+    font-size: 17px;
     font-weight: 700;
+    line-height: 1.1;
     letter-spacing: -0.01em;
     color: var(--text);
     cursor: pointer;
@@ -372,7 +363,7 @@ textarea.form-control {
 
 .ttl-readout small {
     display: block;
-    margin-top: 1px;
+    margin-top: 4px;
     font-family: var(--font);
     font-size: 11.5px;
     font-weight: 500;
@@ -429,12 +420,6 @@ textarea.form-control {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
-/* The expiry legend sits centred over its control, unlike the other captions. */
-#ttl-picker > legend {
-    width: 100%;
-    padding: 0;
-    text-align: center;
-}
 
 /* Landmark labels under the slider, positioned at their stops (half-thumb
    inset so each label centres under the thumb at that stop). Each is a

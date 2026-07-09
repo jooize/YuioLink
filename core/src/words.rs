@@ -1,4 +1,4 @@
-//! The YuioLink curated wordlist — 3516 short (<=6 letter), memorable,
+//! The YuioLink curated wordlist — 3456 short (<=6 letter), memorable,
 //! easy-to-type, broadly inoffensive words used to build the "shoutkey" link
 //! names (e.g. `braveOTTER`).
 //!
@@ -14,7 +14,11 @@
 //! brands/trademarks, slurs and adult/clinical terms, and hard-to-spell entries.
 //! The curation lens was "anyone can use this": short, memorable, concrete,
 //! unsurprising words. The canonical source of truth is
-//! `tools/yuiolink-curated.txt`, copied here as `words.txt`.
+//! `tools/yuiolink-curated.txt`, copied here as `words.txt`. A hand-reviewed
+//! 2026-07-09 pass (see `design/wordlist-soundalikes.html`) dropped 60
+//! sound-alikes — homophones and near-homophones like mace/maze — removing
+//! BOTH words of a confusable pair, since a name that survives with a
+//! sound-alike spelling still cannot be written down reliably from speech.
 //!
 //! Note: the list contains one hyphenated entry, `yo-yo`; it is kept as-is.
 
@@ -24,7 +28,7 @@ use std::sync::OnceLock;
 const WORDS_RAW: &str = include_str!("words.txt");
 
 /// Number of words in the list.
-pub const WORD_COUNT: usize = 3516;
+pub const WORD_COUNT: usize = 3456;
 
 /// The word list, split once and cached.
 pub fn words() -> &'static [&'static str] {
