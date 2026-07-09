@@ -359,6 +359,10 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                     span.history-chevron aria-hidden="true" { "›" }
                     span.history-title { "Local History" }
                 }
+                // The localStorage opt-in, right beside the heading: a bare HIG
+                // switch (state by colour + knob position; app.js drives it).
+                button.history-persist #history-persist type="button" hidden
+                    title="Save history on this device" {}
                 div.history-head-actions {
                     // "Clear…" folds the two destructive actions away until asked for;
                     // app.js toggles it open to reveal Clear Expired / Clear All.

@@ -427,8 +427,22 @@
         const section = document.getElementById("history");
         const listEl = document.getElementById("history-list");
         if (!section || !listEl) return;
-        const title = document.querySelector(".history-title");
-        if (title) title.textContent = persistEnabled ? "Local History" : "Local History (Not Saved)";
+        // The save-on-this-device switch beside the heading mirrors the top toggle:
+        // state shown by the switch itself, so the title never grows a suffix.
+        const hp = document.getElementById("history-persist");
+        if (hp) {
+            if (!hp.querySelector(".storage-switch")) {
+                const sw = document.createElement("span");
+                sw.className = "storage-switch";
+                sw.setAttribute("aria-hidden", "true");
+                hp.replaceChildren(sw);
+                hp.setAttribute("role", "switch");
+                hp.setAttribute("aria-label", "Save history on this device");
+            }
+            hp.classList.toggle("on", persistEnabled);
+            hp.setAttribute("aria-checked", persistEnabled ? "true" : "false");
+            hp.hidden = false;
+        }
 
         listEl.replaceChildren();
         if (n === 0) { section.hidden = true; return; }
@@ -1011,12 +1025,16 @@
             section.scrollIntoView({ behavior: "smooth", block: "start" });
             history.replaceState(null, "", location.pathname + location.search);
         });
-        document.getElementById("storage-toggle")?.addEventListener("click", () => {
+        // The top toggle and the switch beside the History heading are the same
+        // control in two places; both flip the localStorage opt-in.
+        const flipPersist = () => {
             const turningOff = persistEnabled;
             setPersist(!persistEnabled);
             warnArmed = turningOff; // only warn when actively switching saving off
             renderHistory();
-        });
+        };
+        document.getElementById("storage-toggle")?.addEventListener("click", flipPersist);
+        document.getElementById("history-persist")?.addEventListener("click", flipPersist);
 
         document.getElementById("history-clear-open")?.addEventListener("click", () => {
             setClearMenu(true);

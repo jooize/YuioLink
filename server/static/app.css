@@ -15,6 +15,9 @@
     --text-kind: #127c70;
     /* Vibrant purple — the standout border on the create input. */
     --purple: #af52de;
+    /* The alternate name-word colour, paired with the accent: a deep navy so a
+       multi-word name reads as blue/navy/blue/navy — two blues, no purple. */
+    --word-alt: #003e8f;
 
     /* Per-type colour key for the link-type picker: Public amber (caution),
        Private green (secure), One-Time purple (single-use). */
@@ -58,6 +61,8 @@
         --danger: #ff453a;
         --text-kind: #0affe4;
         --purple: #bf5af2;
+        /* Dark inverts the pairing: the alt word goes pale, the accent stays mid. */
+        --word-alt: #99c5ff;
         --c-public: #ffd400;
         --c-private: #30d158;
         --c-once: #bf5af2;
@@ -856,7 +861,7 @@ textarea.form-control {
    words (the result hero, the URL name, history rows, and the interstitial). The
    explicit per-word colour overrides whatever the surrounding context paints. */
 .nw-0 { color: var(--accent); }
-.nw-1 { color: var(--purple); }
+.nw-1 { color: var(--word-alt); }
 
 /* The preview page uses a plainer inline code (no box). Must exclude the result
    hero word — this selector (0,2,1) otherwise outweighs `.result-word` (0,1,0) and
@@ -1295,7 +1300,6 @@ textarea.form-control {
 .history-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
     margin-bottom: 10px;
     /* Local History / Clear All sit a touch in from the list panel, the same label
@@ -1490,7 +1494,7 @@ textarea.form-control {
    mixed-weight split. */
 .history-url .u-name { color: var(--text); font-weight: 600; }
 .history-url .nw-0 { color: var(--text); }
-.history-url .nw-1 { color: var(--text); }
+.history-url .nw-1 { color: var(--word-alt); }
 
 /* Line 2: kind pill + expiry, in the UI font (mockup A). */
 .history-meta {
@@ -1727,6 +1731,30 @@ textarea.form-control {
     display: flex;
     align-items: center;
     gap: 14px;
+    margin-left: auto; /* heading + switch left, the Clear actions hug the right */
+}
+
+/* The save-on-this-device switch beside the heading — the same HIG switch as the
+   top toggle, but bare on the card (a neutral track instead of the purple chip). */
+.history-persist {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+.history-persist .storage-switch {
+    background: var(--switch-off);
+}
+
+.history-persist.on .storage-switch {
+    background: var(--switch-on);
+}
+
+.history-persist.on .storage-switch::before {
+    transform: translateX(12px);
 }
 
 /* "Clear…" opener: quiet secondary text; the destructive options only appear
