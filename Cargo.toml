@@ -6,7 +6,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.5.1"
 edition = "2024"
 license = "MIT"
 authors = ["jooize"]
@@ -49,7 +49,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Server
 tokio = { version = "1", features = ["full"] }
-axum = "0.7"
+axum = "0.8"
 tower-http = { version = "0.6", features = ["trace", "cors"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] }
 maud = "0.26"

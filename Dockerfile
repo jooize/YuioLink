@@ -1,6 +1,6 @@
 # Build the server, then ship just the static binary on a slim runtime.
 # SQLite is bundled into the binary (sqlx), so the runtime image needs no extras.
-FROM rust:1-bookworm AS build
+FROM rust:1-trixie AS build
 WORKDIR /src
 # Resolve and download the crate graph against the manifests alone, so a
 # source-only change reuses this layer instead of re-fetching every dependency.
@@ -16,7 +16,7 @@ COPY core ./core
 COPY server ./server
 RUN cargo build --release --locked -p yuiolink-server
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 RUN useradd --create-home --uid 10001 app && mkdir -p /data && chown app:app /data
 COPY --from=build /src/target/release/yuiolink-server /usr/local/bin/yuiolink-server
 USER app

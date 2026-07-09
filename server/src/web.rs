@@ -94,10 +94,10 @@ pub fn router(state: AppState) -> Router {
         .route("/robots.txt", get(robots_txt))
         .nest("/api/v1", api_routes())
         .route("/create", post(create_plain))
-        .route("/:name", get(resolve))
-        .route("/:name/go", post(go))
-        .route("/:name/reveal", post(reveal))
-        .route("/:name/card.png", get(card_image))
+        .route("/{name}", get(resolve))
+        .route("/{name}/go", post(go))
+        .route("/{name}/reveal", post(reveal))
+        .route("/{name}/card.png", get(card_image))
         .fallback(not_found_fallback)
         .with_state(state)
 }
@@ -108,7 +108,7 @@ pub fn router(state: AppState) -> Router {
 fn api_routes() -> Router<AppState> {
     Router::new()
         .route("/links", post(api_create_link))
-        .route("/links/:name", get(api_get_link).delete(api_delete_link))
+        .route("/links/{name}", get(api_get_link).delete(api_delete_link))
 }
 
 async fn not_found_fallback() -> AppError {
