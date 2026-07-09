@@ -238,7 +238,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             label.visually-hidden for="content" { "Link or text to share" }
             textarea #content.form-control name="content" rows="1"
                 autocomplete="off" autocapitalize="off" spellcheck="false"
-                placeholder="Paste a link to redirect, or type text to share" autofocus {}
+                placeholder="Link or text to share" autofocus {}
 
             div.split-btn {
                 button #submit.btn.split-primary type="submit" { "Create Link" }
@@ -265,11 +265,17 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                     summary {
                         span.summary-txt {
                             span.for-public {
-                                "Convenient link with 1–3 words. "
-                                span.warn-red { "Not secret!" }
+                                "Convenient link with 1 to 3 words. "
+                                span.summary-sub { "Not private!" }
                             }
-                            span.for-private { "Private link with 4 words." }
-                            span.for-once { "Single-use link with 4 words." }
+                            span.for-private {
+                                "Private link with 4 words. "
+                                span.summary-sub { "47-bit namespace." }
+                            }
+                            span.for-once {
+                                "Single-use link with 4 words. "
+                                span.summary-sub { "47-bit namespace." }
+                            }
                         }
                         span.summary-toggle {
                             "Security"
@@ -289,9 +295,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                     div.details-body.for-private {
                         "Link name is generated in a 47-bit namespace (about 153 trillion "
                         "possibilities), and its destination or content stays on the server "
-                        "only until the link expires. Even a botnet guessing a million names "
-                        "a second could check only ~0.4% of that space within the 7-day "
-                        "maximum lifetime."
+                        "only until the link expires."
                     }
                     div.details-body.for-once {
                         strong { "Deleted from the server when revealed" }
@@ -304,7 +308,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             }
 
             fieldset.picker {
-                legend { "Expires after" }
+                legend { "Expires After" }
                 div.segmented {
                     input.seg-radio #ttl-600 type="radio" name="ttl_seconds" value="600";
                     label.seg-label for="ttl-600" { "10 minutes" }
@@ -342,8 +346,11 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                     span.history-title { "Local History" }
                 }
                 div.history-head-actions {
+                    // "Clear…" folds the two destructive actions away until asked for;
+                    // app.js toggles it open to reveal Clear Expired / Clear All.
+                    button.history-clear-open #history-clear-open type="button" { "Clear…" }
                     button.history-clear-expired #history-clear-expired type="button" hidden { "Clear Expired" }
-                    button.history-clear #history-clear type="button" { "Clear All" }
+                    button.history-clear #history-clear type="button" hidden { "Clear All" }
                 }
             }
             div.history-body {

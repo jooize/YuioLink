@@ -58,7 +58,7 @@
         --danger: #ff453a;
         --text-kind: #0affe4;
         --purple: #bf5af2;
-        --c-public: #ffd60a;
+        --c-public: #ffd400;
         --c-private: #30d158;
         --c-once: #bf5af2;
 
@@ -298,9 +298,15 @@ textarea.form-control {
 .seg-label {
     flex: 1;
     min-width: 0;
+    /* Flex-centered both ways: when one label wraps to two lines on a narrow
+       screen, the single-line neighbours stay vertically centred beside it. */
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-align: center;
     padding: 8px 6px;
     font-size: 13.5px;
+    line-height: 1.25;
     font-weight: 500;
     color: var(--text);
     border-radius: calc(var(--radius-control) - 3px);
@@ -501,9 +507,10 @@ textarea.form-control {
     margin-bottom: 0;
 }
 
-/* "Not private!" on the Public summary line. */
-.warn-red {
-    color: var(--warn);
+/* The grey-bold tail on each summary line ("Not private!", "47-bit namespace.") —
+   quiet next to the type-tinted lead, but weighted so it still registers. */
+.summary-sub {
+    color: var(--text-secondary);
     font-weight: 700;
 }
 
@@ -1584,6 +1591,23 @@ textarea.form-control {
     gap: 14px;
 }
 
+/* "Clear…" opener: quiet secondary text; the destructive options only appear
+   once it is pressed. */
+.history-clear-open {
+    font-family: inherit;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+
+.history-clear-open:hover {
+    color: var(--text);
+    text-decoration: underline;
+}
+
 /* Clear All wipes the whole local list -> red (destructive). */
 .history-clear {
     font-family: inherit;
@@ -1626,6 +1650,24 @@ code {
     font-weight: 700;
     letter-spacing: -0.03em;
     margin: 8px 0 0;
+}
+
+/* Narrow phones: the floating rounded window stops earning its keep — flatten it
+   into an edge-to-edge sheet (no radius, no side borders, tighter padding). */
+@media (max-width: 520px) {
+    body {
+        padding: 0;
+    }
+
+    .app-window {
+        width: 100%;
+        min-height: 100dvh;
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+        border-top: 0;
+        padding: calc(30px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {

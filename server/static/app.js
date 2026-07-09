@@ -497,17 +497,17 @@
 
             const actions = document.createElement("div");
             actions.className = "history-actions";
-            const show = document.createElement("button");
-            show.className = "history-show";
-            show.type = "button";
-            show.textContent = "Show";
-            show.title = "Open this link in a new tab";
-            show.addEventListener("click", () => window.open(it.url, "_blank", "noopener,noreferrer"));
             const copy = document.createElement("button");
             copy.className = "history-copy";
             copy.type = "button";
             copy.textContent = "Copy";
             copy.addEventListener("click", () => copyToClipboard(it.url, copy, () => flashClass(check, "show")));
+            const show = document.createElement("button");
+            show.className = "history-show";
+            show.type = "button";
+            show.textContent = "Preview";
+            show.title = "Open this link's preview in a new tab";
+            show.addEventListener("click", () => window.open(it.url, "_blank", "noopener,noreferrer"));
             const remove = document.createElement("button");
             remove.className = "history-remove";
             remove.type = "button";
@@ -515,14 +515,28 @@
             // Opens the confirm prompt over the row — not a toggle; the prompt carries
             // its own Cancel. openConfirm closes any other row's prompt first.
             remove.addEventListener("click", () => openConfirm(li, it));
-            actions.append(show, copy, remove);
+            actions.append(copy, show, remove);
             foot.append(meta, actions);
 
             li.append(l1, foot);
             listEl.append(li);
         }
-        const clearExpired = document.getElementById("history-clear-expired");
-        if (clearExpired) clearExpired.hidden = !memHistory.some(isExpired);
+        syncClearMenu();
+    };
+
+    // --- "Clear…" fold: the two destructive actions stay hidden until asked for ---
+    let clearMenuOpen = false;
+    const syncClearMenu = () => {
+        const opener = document.getElementById("history-clear-open");
+        const expired = document.getElementById("history-clear-expired");
+        const all = document.getElementById("history-clear");
+        if (opener) opener.hidden = clearMenuOpen;
+        if (expired) expired.hidden = !clearMenuOpen || !memHistory.some(isExpired);
+        if (all) all.hidden = !clearMenuOpen;
+    };
+    const setClearMenu = (open) => {
+        clearMenuOpen = open;
+        syncClearMenu();
     };
 
     // --- per-item removal: confirm over the row, then break-on-server or forget ---
@@ -959,11 +973,15 @@
             renderHistory();
         });
 
+        document.getElementById("history-clear-open")?.addEventListener("click", () => {
+            setClearMenu(true);
+        });
         document.getElementById("history-clear")?.addEventListener("click", () => {
             // Tombstone every row (don't just empty the list) so the clear propagates to
             // other tabs instead of being undone by their in-memory copies.
             memHistory = memHistory.map(clearedMarker);
             persistNow();
+            setClearMenu(false);
             renderHistory();
         });
         document.getElementById("history-toggle")?.addEventListener("click", () => {
@@ -972,7 +990,12 @@
         document.getElementById("history-clear-expired")?.addEventListener("click", () => {
             memHistory = memHistory.map((it) => (isExpired(it) ? clearedMarker(it) : it));
             persistNow();
+            setClearMenu(false);
             renderHistory();
+        });
+        // Any click outside the head actions folds the Clear menu back up.
+        document.addEventListener("click", (event) => {
+            if (clearMenuOpen && !event.target.closest(".history-head-actions")) setClearMenu(false);
         });
 
         autosize();

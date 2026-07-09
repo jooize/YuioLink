@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expires After — slider mockups</title>
+<style>
+    :root {
+        --accent: #007aff;
+        --purple: #af52de;
+        --text: #1d1d1f;
+        --text-secondary: rgba(60, 60, 67, 0.6);
+        --text-tertiary: rgba(60, 60, 67, 0.4);
+        --card-bg: rgba(255, 255, 255, 0.75);
+        --field-bg: rgba(255, 255, 255, 0.72);
+        --field-border: rgba(0, 0, 0, 0.1);
+        --separator: rgba(0, 0, 0, 0.08);
+        --switch-off: rgba(120, 120, 128, 0.32);
+        --card-highlight: rgba(255, 255, 255, 0.9);
+        --danger: #d70015;
+        --warn: #c77a00;
+        --result: #10b981;
+        --bg-1: #e7e8ec;
+        --bg-2: #f6f7f9;
+        --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, system-ui, sans-serif;
+        --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --accent: #0a84ff;
+            --purple: #bf5af2;
+            --text: #f5f5f7;
+            --text-secondary: rgba(235, 235, 245, 0.6);
+            --text-tertiary: rgba(235, 235, 245, 0.35);
+            --card-bg: rgba(40, 40, 44, 0.85);
+            --field-bg: rgba(255, 255, 255, 0.06);
+            --field-border: rgba(255, 255, 255, 0.12);
+            --separator: rgba(255, 255, 255, 0.1);
+            --switch-off: rgba(120, 120, 128, 0.5);
+            --card-highlight: rgba(120, 120, 128, 0.55);
+            --danger: #ff453a;
+            --warn: #ffd60a;
+            --result: #34d399;
+            --bg-1: #121214;
+            --bg-2: #202024;
+        }
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        padding: 40px 18px 60px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 26px;
+        font-family: var(--font);
+        color: var(--text);
+        background: linear-gradient(155deg, var(--bg-2), var(--bg-1)) fixed;
+        min-height: 100vh;
+    }
+    h1 { font-size: 22px; margin: 0; }
+    h2 { font-size: 14px; margin: 0 0 2px; color: var(--accent); }
+    .hint { max-width: 52ch; text-align: center; font-size: 13px; color: var(--text-secondary); margin: 0; }
+    .card {
+        width: min(100%, 440px);
+        background: var(--card-bg);
+        border: 0.5px solid var(--separator);
+        border-radius: 20px;
+        padding: 20px 22px 22px;
+        box-shadow: 0 12px 40px -18px rgba(20, 24, 40, 0.4);
+    }
+    .card > p { margin: 0 0 14px; font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); }
+    .legend { font-size: 12.5px; font-weight: 600; color: var(--accent); padding-left: 4px; margin-bottom: 8px; }
+
+    /* Big live readout — "what is set", unmissable. */
+    .readout {
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        margin: 4px 0 10px;
+    }
+    .readout small { display: block; font-family: var(--font); font-size: 11.5px; font-weight: 500; color: var(--text-secondary); margin-top: 2px; }
+
+    input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 28px;
+        background: none;
+        margin: 0;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+        height: 6px;
+        border-radius: 999px;
+        background: var(--switch-off);
+    }
+    input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 24px;
+        height: 24px;
+        margin-top: -9px;
+        border-radius: 50%;
+        background: #fff;
+        border: 0.5px solid rgba(0,0,0,0.12);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        cursor: pointer;
+    }
+    input[type="range"]::-moz-range-track { height: 6px; border-radius: 999px; background: var(--switch-off); }
+    input[type="range"]::-moz-range-thumb { width: 23px; height: 23px; border-radius: 50%; background: #fff; border: 0.5px solid rgba(0,0,0,0.12); box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: pointer; }
+
+    .ticks {
+        position: relative;
+        height: 16px;
+        margin: 2px 12px 0; /* half-thumb inset so labels line up with thumb centers */
+        font-size: 10.5px;
+        color: var(--text-tertiary);
+    }
+    .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+
+    .segmented { display: flex; gap: 2px; padding: 3px; background: var(--switch-off); border-radius: 12px; }
+    .segmented label {
+        flex: 1;
+        display: flex; align-items: center; justify-content: center;
+        padding: 7px 6px; font-size: 13px; font-weight: 500;
+        border-radius: 9px; cursor: pointer; user-select: none; text-align: center;
+    }
+    .segmented input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .segmented input:checked + label { background: var(--card-highlight); box-shadow: 0 1px 2px rgba(0,0,0,0.18); }
+
+    /* --- Clear button colour alts --- */
+    .clear-row {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 4px; border-bottom: 0.5px solid var(--separator);
+        font-size: 12.5px;
+    }
+    .clear-row:last-child { border-bottom: 0; }
+    .clear-row .name { color: var(--text-secondary); }
+    .clear-row .btns { display: flex; gap: 14px; }
+    .clear-row button { font-family: inherit; font-size: 12.5px; background: none; border: 0; padding: 0; cursor: pointer; }
+    .clear-row button:hover { text-decoration: underline; }
+    .c-grey { color: var(--text-secondary); }
+    .c-red { color: var(--danger); }
+    .c-amber { color: var(--warn); }
+    .c-green { color: var(--result); }
+    .c-accent { color: var(--accent); }
+    .pill-red {
+        color: var(--danger);
+        background: color-mix(in srgb, var(--danger) 12%, transparent);
+        border: 0.5px solid color-mix(in srgb, var(--danger) 24%, transparent) !important;
+        border-radius: 999px; padding: 4px 11px !important;
+    }
+    .pill-grey {
+        color: var(--text-secondary);
+        background: color-mix(in srgb, var(--text) 8%, transparent);
+        border: 0.5px solid var(--separator) !important;
+        border-radius: 999px; padding: 4px 11px !important;
+    }
+</style>
+</head>
+<body>
+<h1>Expires After — slider mockups</h1>
+<p class="hint">All four are live — drag them. Each shows a big readout of what is set, fine steps in the minutes range, coarser through hours and days.</p>
+
+<!-- A -->
+<section class="card">
+    <h2>A · Stepped stops</h2>
+    <p>The slider moves through a fixed ladder of sensible durations (1&thinsp;m … 7&thinsp;d). Every position is a value a human would pick — nothing like "43 minutes" can happen. Most predictable; least precise.</p>
+    <div class="legend">Expires After</div>
+    <div class="readout" id="ro-a">1 hour<small>≈ deleted Thu 14:32</small></div>
+    <input type="range" id="sl-a" min="0" max="16" step="1" value="8">
+    <div class="ticks" id="tk-a"></div>
+</section>
+
+<!-- B -->
+<section class="card">
+    <h2>B · Logarithmic with magnetic detents</h2>
+    <p>Continuous log scale from 1 minute to 7 days — half the track is under an hour, so the low range is roomy. The thumb snaps to the old presets (10&thinsp;m, 1&thinsp;h, 1&thinsp;d, 7&thinsp;d) when it lands near one; between detents it rounds to friendly steps (1&thinsp;m under an hour, 15&thinsp;m under a day, 1&thinsp;h beyond).</p>
+    <div class="legend">Expires After</div>
+    <div class="readout" id="ro-b">1 hour<small>&nbsp;</small></div>
+    <input type="range" id="sl-b" min="0" max="1000" step="1" value="500">
+    <div class="ticks" id="tk-b"></div>
+</section>
+
+<!-- C -->
+<section class="card">
+    <h2>C · Band picker + fine slider</h2>
+    <p>Coarse choice first (Minutes / Hours / Days), then one slider whose whole width covers just that band — so minutes get 1-minute precision, hours 1-hour, days 1-day. Two controls, but each is dead simple, and it maps 1:1 onto the existing Specify field.</p>
+    <div class="legend">Expires After</div>
+    <div class="segmented" id="bands-c">
+        <input type="radio" name="band" id="band-m" value="m"><label for="band-m">Minutes</label>
+        <input type="radio" name="band" id="band-h" value="h" checked><label for="band-h">Hours</label>
+        <input type="radio" name="band" id="band-d" value="d"><label for="band-d">Days</label>
+    </div>
+    <div class="readout" id="ro-c" style="margin-top: 14px;">1 hour<small>&nbsp;</small></div>
+    <input type="range" id="sl-c" min="1" max="23" step="1" value="1">
+    <div class="ticks" id="tk-c"></div>
+</section>
+
+<!-- D -->
+<section class="card">
+    <h2>D · Log slider + tappable exact value</h2>
+    <p>Same log track as B, but the readout is a button: tap it and it becomes a number-plus-unit field for an exact value (the current Specify path, demoted to an escape hatch). The slider covers 99% of picks; typing covers the rest.</p>
+    <div class="legend">Expires After</div>
+    <div class="readout"><button id="ro-d" style="font: inherit; color: inherit; background: none; border: 0; border-bottom: 1.5px dashed var(--text-tertiary); cursor: pointer; padding: 0 2px;">1 hour</button><small>tap the value to type it exactly</small></div>
+    <input type="range" id="sl-d" min="0" max="1000" step="1" value="500">
+    <div class="ticks" id="tk-d"></div>
+</section>
+
+<!-- Clear colours -->
+<section class="card">
+    <h2>Clear… colours</h2>
+    <p>The folded state shows a lone grey "Clear…"; these are options for the pair it reveals. Hover each.</p>
+    <div class="clear-row"><span class="name">1 · current (green / red)</span><span class="btns"><button class="c-green">Clear Expired</button><button class="c-red">Clear All</button></span></div>
+    <div class="clear-row"><span class="name">2 · severity only (grey / red)</span><span class="btns"><button class="c-grey">Clear Expired</button><button class="c-red">Clear All</button></span></div>
+    <div class="clear-row"><span class="name">3 · caution ladder (amber / red)</span><span class="btns"><button class="c-amber">Clear Expired</button><button class="c-red">Clear All</button></span></div>
+    <div class="clear-row"><span class="name">4 · both destructive (red / red)</span><span class="btns"><button class="c-red">Clear Expired</button><button class="c-red">Clear All</button></span></div>
+    <div class="clear-row"><span class="name">5 · confirm-style pills</span><span class="btns"><button class="pill-grey">Clear Expired</button><button class="pill-red">Clear All</button></span></div>
+</section>
+
+<script>
+    const MIN = 60, HOUR = 3600, DAY = 86400;
+    const fmt = (s) => {
+        if (s < HOUR) { const m = Math.round(s / MIN); return m + (m === 1 ? " minute" : " minutes"); }
+        if (s < DAY) {
+            const h = Math.floor(s / HOUR), m = Math.round((s % HOUR) / MIN);
+            return h + (h === 1 ? " hour" : " hours") + (m ? " " + m + " min" : "");
+        }
+        const d = Math.floor(s / DAY), h = Math.round((s % DAY) / HOUR);
+        return d + (d === 1 ? " day" : " days") + (h ? " " + h + " h" : "");
+    };
+    const deadline = (s) => {
+        const t = new Date(Date.now() + s * 1000);
+        const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+        return "≈ deleted " + days[t.getDay()] + " " + String(t.getHours()).padStart(2,"0") + ":" + String(t.getMinutes()).padStart(2,"0");
+    };
+    const setReadout = (el, s) => {
+        el.innerHTML = fmt(s) + "<small>" + deadline(s) + "</small>";
+    };
+    const ticks = (el, entries) => { // entries: [fraction, label]
+        el.innerHTML = entries.map(([f, l]) => `<span style="left:${f * 100}%">${l}</span>`).join("");
+    };
+
+    /* A — stepped stops */
+    const STOPS = [MIN, 2*MIN, 5*MIN, 10*MIN, 15*MIN, 30*MIN, 45*MIN, HOUR, 2*HOUR, 3*HOUR, 6*HOUR, 12*HOUR, DAY, 2*DAY, 3*DAY, 5*DAY, 7*DAY];
+    const slA = document.getElementById("sl-a"), roA = document.getElementById("ro-a");
+    slA.max = STOPS.length - 1;
+    slA.value = STOPS.indexOf(HOUR);
+    ticks(document.getElementById("tk-a"), [[0, "1m"], [3/16, "10m"], [7/16, "1h"], [12/16, "1d"], [1, "7d"]]);
+    const updA = () => setReadout(roA, STOPS[+slA.value]);
+    slA.addEventListener("input", updA); updA();
+
+    /* B & D — logarithmic with detents + friendly rounding */
+    const LO = Math.log(MIN), HI = Math.log(7 * DAY);
+    const toSecs = (p) => Math.exp(LO + (HI - LO) * p / 1000);
+    const toPos = (s) => Math.round(1000 * (Math.log(s) - LO) / (HI - LO));
+    const DETENTS = [10*MIN, HOUR, DAY, 7*DAY];
+    const friendly = (raw) => {
+        for (const d of DETENTS) if (Math.abs(toPos(raw) - toPos(d)) < 18) return d; // magnetic snap
+        if (raw < HOUR) return Math.max(MIN, Math.round(raw / MIN) * MIN);
+        if (raw < DAY) return Math.round(raw / (15*MIN)) * 15*MIN;
+        return Math.round(raw / HOUR) * HOUR;
+    };
+    const logTicks = [[0, "1m"], [toPos(10*MIN)/1000, "10m"], [toPos(HOUR)/1000, "1h"], [toPos(12*HOUR)/1000, "12h"], [1, "7d"]];
+    for (const [sl, ro] of [["sl-b", "ro-b"], ["sl-d", "ro-d"]]) {
+        const slider = document.getElementById(sl), out = document.getElementById(ro);
+        ticks(document.getElementById("tk-" + sl.slice(-1)), logTicks);
+        slider.value = toPos(HOUR);
+        const upd = () => {
+            const s = friendly(toSecs(+slider.value));
+            if (out.tagName === "BUTTON") out.textContent = fmt(s);
+            else setReadout(out, s);
+        };
+        slider.addEventListener("input", upd); upd();
+    }
+    document.getElementById("ro-d").addEventListener("click", () => {
+        const v = prompt("Exact expiry (e.g. 90m, 36h, 4d):");
+        if (v) alert("In the real UI this swaps to the existing number + unit field, prefilled with " + v + ".");
+    });
+
+    /* C — band + fine slider */
+    const BANDS = {
+        m: { min: 1, max: 59, unit: MIN },
+        h: { min: 1, max: 23, unit: HOUR },
+        d: { min: 1, max: 7, unit: DAY },
+    };
+    const slC = document.getElementById("sl-c"), roC = document.getElementById("ro-c"), tkC = document.getElementById("tk-c");
+    const bandOf = () => BANDS[document.querySelector('#bands-c input:checked').value];
+    const applyBand = (keepEnds) => {
+        const b = bandOf();
+        slC.min = b.min; slC.max = b.max;
+        if (!keepEnds) slC.value = b.min;
+        const span = b.max - b.min;
+        const marks = b.unit === DAY ? [1,2,3,4,5,6,7] : b.unit === HOUR ? [1,6,12,18,23] : [1,15,30,45,59];
+        ticks(tkC, marks.map((m) => [(m - b.min) / span, m]));
+        updC();
+    };
+    const updC = () => setReadout(roC, +slC.value * bandOf().unit);
+    slC.addEventListener("input", updC);
+    document.getElementById("bands-c").addEventListener("change", () => applyBand(false));
+    applyBand(true);
+</script>
+</body>
+</html>
