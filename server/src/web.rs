@@ -259,7 +259,11 @@ pub async fn form_create(
             Ok(secs) => secs,
             Err(msg) => return form_error(msg),
         }
-    } else if let Some(i) = form.ttl_stop.as_deref().and_then(|s| s.parse::<usize>().ok()) {
+    } else if let Some(i) = form
+        .ttl_stop
+        .as_deref()
+        .and_then(|s| s.parse::<usize>().ok())
+    {
         TTL_STOPS.get(i).copied().unwrap_or(DEFAULT_TTL_SECS)
     } else {
         match form.ttl_seconds.as_deref() {
