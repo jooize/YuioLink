@@ -320,7 +320,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                 // The slider and its ticks work without JavaScript too (the index
                 // posts as ttl_stop); only the live readout needs app.js.
                 input.ttl-slider #ttl-slider type="range" name="ttl_stop"
-                    min="0" max="16" step="1" value="7"
+                    min="0" max="16" step="1" value="16"
                     aria-label="Expires after";
                 // Labeled landmarks under the track, each a shortcut to its stop
                 // (app.js wires the clicks; without it they are inert labels).

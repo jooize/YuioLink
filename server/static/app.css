@@ -343,31 +343,37 @@ textarea.form-control {
 /* --- Expires After: readout + stepped slider (JS un-hides these) --- */
 
 /* The live readout — also the tap target that opens the exact field. It sits
-   on the legend's line, right-aligned: "Expiry ......... 1 day", with the
-   concrete deadline in a small line beneath the value. */
+   on the legend's line: "Expiry" stays left, the duration is centred, and the
+   concrete deadline is pinned to the right edge (monospace, so its width never
+   changes as the day or time ticks over). */
 .ttl-readout {
     display: block;
-    margin: -24px 0 10px auto;
+    position: relative;
+    width: 100%;
+    margin: -24px 0 10px;
     padding: 0;
     border: 0;
     background: none;
-    text-align: right;
+    text-align: center;
     font-family: var(--font-mono);
     font-size: 17px;
     font-weight: 700;
-    line-height: 1.1;
+    line-height: 1.2;
     letter-spacing: -0.01em;
     color: var(--text);
     cursor: pointer;
 }
 
 .ttl-readout small {
-    display: block;
-    margin-top: 4px;
-    font-family: var(--font);
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--font-mono);
     font-size: 11.5px;
     font-weight: 500;
     color: var(--text-secondary);
+    white-space: nowrap;
 }
 
 .ttl-slider {
@@ -428,7 +434,7 @@ textarea.form-control {
     position: relative;
     height: 30px;
     margin: -3px 12px 8px;
-    font-size: 11.5px;
+    font-size: 13px;
 }
 
 .ttl-tick {

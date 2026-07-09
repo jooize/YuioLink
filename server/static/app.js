@@ -836,7 +836,7 @@
                 const n = Number.parseInt(raw, 10);
                 if (!Number.isNaN(n)) return n * (UNIT_SECS[checkedValue("ttl_unit", "h")] ?? 3600);
             }
-            return TTL_STOPS[+(ttlSlider?.value ?? 7)] ?? 3600;
+            return TTL_STOPS[+(ttlSlider?.value ?? 16)] ?? 604800;
         };
         // One control picks the type: public (reusable, short, guessable), private
         // (reusable, long unguessable name), or once (single-use, long name).
