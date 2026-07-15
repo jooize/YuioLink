@@ -2,7 +2,7 @@ openapi: "3.1.0"
 
 info:
   title: YuioLink API
-  version: "0.5.1"
+  version: "0.6.0"
   summary: Wieldy Ephemeral Links
   description: |
     Redirects and text snippets that always expire — never permanent.
