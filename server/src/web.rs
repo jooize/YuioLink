@@ -109,6 +109,7 @@ fn api_routes() -> Router<AppState> {
     Router::new()
         .route("/links", post(api_create_link))
         .route("/links/{name}", get(api_get_link).delete(api_delete_link))
+        .route("/openapi.yaml", get(openapi_yaml))
 }
 
 async fn not_found_fallback() -> AppError {
@@ -131,13 +132,37 @@ async fn healthz(State(state): State<AppState>) -> Response {
 // Shared creation logic
 // --------------------------------------------------------------------------
 
-/// Why a create attempt failed: a client mistake (400) or our fault (500).
+/// One thing wrong with one field of a create request. `field` names the JSON
+/// field of the canonical API (`content`, `kind`, `ttl_seconds`, `max_uses`);
+/// the other surfaces just show the messages.
+#[derive(Serialize)]
+pub struct FieldError {
+    pub field: &'static str,
+    pub message: String,
+}
+
+/// Join the messages of a batch of field errors into one human line/paragraph.
+fn join_messages(errors: &[FieldError], sep: &str) -> String {
+    errors
+        .iter()
+        .map(|e| e.message.as_str())
+        .collect::<Vec<_>>()
+        .join(sep)
+}
+
+/// Why a create attempt failed: client mistakes (400, all of them at once) or
+/// our fault (500).
 pub enum CreateError {
-    BadRequest(String),
+    BadRequest(Vec<FieldError>),
     Internal,
 }
 
 /// Validate the inputs and insert a link, shared by every creation surface.
+///
+/// Validation does not fail fast: every field is checked and all the errors come
+/// back together, so a caller fixes one round-trip, not one mistake per round-trip.
+/// `ttl_seconds` and `max_uses` arrive as `Result`s so a surface's own parse
+/// failure ("2x" is not a duration) joins the same batch as the field checks.
 ///
 /// `kind_choice` is the caller's explicit kind (`redirect`/`text`), or `auto`/
 /// `None` to detect it. Trimming follows the rule "trim only a bare URL" — text
@@ -147,61 +172,95 @@ async fn create_link(
     state: &AppState,
     kind_choice: Option<&str>,
     raw_content: &str,
-    ttl_seconds: i64,
-    max_uses: Option<i64>,
+    ttl_seconds: Result<i64, String>,
+    max_uses: Result<Option<i64>, String>,
     private: bool,
     delete_token: Option<&str>,
 ) -> Result<db::InsertedLink, CreateError> {
-    use CreateError::BadRequest;
+    let mut errors: Vec<FieldError> = Vec::new();
+    let mut fail = |field: &'static str, message: String| {
+        errors.push(FieldError { field, message });
+    };
 
-    if raw_content.trim().is_empty() {
-        return Err(BadRequest(
-            "Enter a link to redirect, or some text to share.".into(),
-        ));
-    }
-
+    // An unknown kind is its own error; detection still classifies the content so
+    // the remaining checks run against something sensible.
     let kind = match kind_choice {
         None | Some("") | Some("auto") => detect_kind(raw_content),
         Some("redirect") => Kind::Redirect,
         Some("text") => Kind::Text,
-        Some(_) => return Err(BadRequest("That is not a link type we recognize.".into())),
-    };
-
-    // Redirects are trimmed + normalized + scheme-checked; text is kept exactly as
-    // typed (newlines and all).
-    let (content, content_type): (String, Option<&str>) = match kind {
-        Kind::Redirect => {
-            let normalized = normalize_target(raw_content.trim());
-            // Store the canonical (ASCII / IDNA-encoded) form so it is a valid
-            // `Location` header value when the link resolves.
-            let canonical = validate_redirect(&normalized, DEFAULT_ALLOWED_SCHEMES)
-                .map_err(|e| BadRequest(e.to_string()))?;
-            (canonical, None)
+        Some(_) => {
+            fail("kind", "That is not a link type we recognize.".into());
+            detect_kind(raw_content)
         }
-        Kind::Text => (
-            raw_content.to_string(),
-            Some(ContentType::PlainText.as_str()),
-        ),
     };
 
-    if content.len() > MAX_CONTENT_BYTES {
-        return Err(BadRequest(
-            "That is too large to share (the limit is 64 KB).".into(),
-        ));
+    // Content: empty, else (for redirects) trimmed + normalized + scheme-checked —
+    // text is kept exactly as typed (newlines and all) — then the size cap. For a
+    // redirect the canonical (ASCII / IDNA-encoded) form is stored so it is a
+    // valid `Location` header value when the link resolves.
+    let mut validated: Option<(String, Option<&str>)> = None;
+    if raw_content.trim().is_empty() {
+        fail(
+            "content",
+            "Enter a link to redirect, or some text to share.".into(),
+        );
+    } else {
+        match kind {
+            Kind::Redirect => {
+                let normalized = normalize_target(raw_content.trim());
+                match validate_redirect(&normalized, DEFAULT_ALLOWED_SCHEMES) {
+                    Ok(canonical) => validated = Some((canonical, None)),
+                    Err(e) => fail("content", e.to_string()),
+                }
+            }
+            Kind::Text => {
+                validated = Some((
+                    raw_content.to_string(),
+                    Some(ContentType::PlainText.as_str()),
+                ));
+            }
+        }
     }
-    check_ttl(ttl_seconds, state.max_ttl_secs).map_err(BadRequest)?;
+    if validated
+        .as_ref()
+        .is_some_and(|(c, _)| c.len() > MAX_CONTENT_BYTES)
+    {
+        validated = None;
+        fail(
+            "content",
+            "That is too large to share (the limit is 64 KB).".into(),
+        );
+    }
+
+    if let Err(msg) = ttl_seconds
+        .as_ref()
+        .map_err(Clone::clone)
+        .and_then(|&t| check_ttl(t, state.max_ttl_secs))
+    {
+        fail("ttl_seconds", msg);
+    }
+
     // A link is either unlimited (no limit) or single-use. Storage keeps a general
     // remaining-uses counter, but creation only ever sets one view, so reject any
     // other count rather than silently coercing it (which would surprise a caller
     // who asked for, say, five and got a link that dies after one).
-    if let Some(n) = max_uses
-        && n != 1
-    {
-        return Err(BadRequest(
+    match &max_uses {
+        Ok(Some(n)) if *n != 1 => fail(
+            "max_uses",
             "A link is either unlimited or single-use: set the view limit to 1, or leave it off."
                 .into(),
-        ));
+        ),
+        Ok(_) => {}
+        Err(msg) => fail("max_uses", msg.clone()),
     }
+
+    if !errors.is_empty() {
+        return Err(CreateError::BadRequest(errors));
+    }
+    // No errors, so every piece validated: safe to unwrap the collected parts.
+    let (content, content_type) = validated.expect("validated content");
+    let ttl_seconds = ttl_seconds.expect("validated ttl");
+    let max_uses = max_uses.expect("validated max_uses");
 
     let occupancy = occupancy_snapshot(&state.occupancy);
     db::insert_link(
@@ -249,27 +308,27 @@ pub async fn form_create(
             .into_response();
     }
     // Expiry: a filled exact field (number + unit) beats the slider stop; the
-    // slider posts an index into TTL_STOPS. Legacy preset values still parse.
+    // slider posts an index into TTL_STOPS. Legacy preset values still parse. A
+    // parse failure is carried as an Err so it reports alongside the other
+    // fields' errors rather than pre-empting them.
     let has_custom = form
         .ttl_custom
         .as_deref()
         .is_some_and(|s| !s.trim().is_empty());
     let ttl_seconds = if has_custom || form.ttl_seconds.as_deref() == Some("custom") {
-        match parse_custom_ttl(form.ttl_custom.as_deref(), form.ttl_unit.as_deref()) {
-            Ok(secs) => secs,
-            Err(msg) => return form_error(msg),
-        }
+        parse_custom_ttl(form.ttl_custom.as_deref(), form.ttl_unit.as_deref())
+            .map_err(str::to_string)
     } else if let Some(i) = form
         .ttl_stop
         .as_deref()
         .and_then(|s| s.parse::<usize>().ok())
     {
-        TTL_STOPS.get(i).copied().unwrap_or(DEFAULT_TTL_SECS)
+        Ok(TTL_STOPS.get(i).copied().unwrap_or(DEFAULT_TTL_SECS))
     } else {
-        match form.ttl_seconds.as_deref() {
+        Ok(match form.ttl_seconds.as_deref() {
             Some(s) => s.parse::<i64>().unwrap_or(DEFAULT_TTL_SECS),
             None => DEFAULT_TTL_SECS,
-        }
+        })
     };
 
     // One control picks the link's type: public (short, guessable, reusable),
@@ -288,7 +347,7 @@ pub async fn form_create(
         None,
         &form.content,
         ttl_seconds,
-        max_uses,
+        Ok(max_uses),
         private,
         None,
     )
@@ -313,7 +372,7 @@ pub async fn form_create(
             )
             .into_response()
         }
-        Err(CreateError::BadRequest(msg)) => form_error(&msg),
+        Err(CreateError::BadRequest(errors)) => form_error(&errors),
         Err(CreateError::Internal) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Html(views::error_page(500, "Something went wrong.").into_string()),
@@ -347,10 +406,12 @@ fn parse_custom_ttl(value: Option<&str>, unit: Option<&str>) -> Result<i64, &'st
     Ok(n.saturating_mul(mult))
 }
 
-fn form_error(msg: &str) -> Response {
+/// The no-JS form's 400 page: every collected error, one line each.
+fn form_error(errors: &[FieldError]) -> Response {
+    let messages: Vec<&str> = errors.iter().map(|e| e.message.as_str()).collect();
     (
         StatusCode::BAD_REQUEST,
-        Html(views::error_page(400, msg).into_string()),
+        Html(views::error_page_list(400, &messages).into_string()),
     )
         .into_response()
 }
@@ -636,32 +697,22 @@ pub async fn create_plain(
             .into_response();
     }
 
+    // Parse failures become Errs that report together with the field checks —
+    // a bad ttl AND a bad url come back as two lines of one 400, not two round-trips.
     let ttl_seconds = match parsed.ttl {
-        Some(s) => match parse_duration(s) {
-            Some(secs) => secs,
-            None => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    "That expiry is not valid. Try a value like 10m, 2h, or 3d.\n",
-                )
-                    .into_response();
-            }
-        },
-        None => DEFAULT_TTL_SECS,
+        Some(s) => parse_duration(s).ok_or_else(|| {
+            "That expiry is not valid. Try a value like 10m, 2h, or 3d.".to_string()
+        }),
+        None => Ok(DEFAULT_TTL_SECS),
     };
 
     let max_uses = match parsed.uses {
-        Some(s) => match s.trim().parse::<i64>() {
-            Ok(n) => Some(n),
-            Err(_) => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    "The view limit must be a whole number above zero.\n",
-                )
-                    .into_response();
-            }
-        },
-        None => None,
+        Some(s) => s
+            .trim()
+            .parse::<i64>()
+            .map(Some)
+            .map_err(|_| "The view limit must be a whole number above zero.".to_string()),
+        None => Ok(None),
     };
 
     // Auto-detect kind (None).
@@ -677,8 +728,12 @@ pub async fn create_plain(
     .await
     {
         Ok(inserted) => inserted,
-        Err(CreateError::BadRequest(msg)) => {
-            return (StatusCode::BAD_REQUEST, format!("{msg}\n")).into_response();
+        Err(CreateError::BadRequest(errors)) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("{}\n", join_messages(&errors, "\n")),
+            )
+                .into_response();
         }
         Err(CreateError::Internal) => {
             return (StatusCode::INTERNAL_SERVER_ERROR, "internal error\n").into_response();
@@ -879,7 +934,7 @@ pub struct ApiLink {
 
 pub enum ApiError {
     NotFound,
-    BadRequest(String),
+    BadRequest(Vec<FieldError>),
     TooManyRequests,
     Internal,
 }
@@ -887,7 +942,7 @@ pub enum ApiError {
 impl From<CreateError> for ApiError {
     fn from(e: CreateError) -> Self {
         match e {
-            CreateError::BadRequest(m) => ApiError::BadRequest(m),
+            CreateError::BadRequest(errors) => ApiError::BadRequest(errors),
             CreateError::Internal => ApiError::Internal,
         }
     }
@@ -896,15 +951,18 @@ impl From<CreateError> for ApiError {
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
-            ApiError::NotFound => (StatusCode::NOT_FOUND, "not found".to_string()),
-            ApiError::BadRequest(m) => (StatusCode::BAD_REQUEST, m),
-            ApiError::TooManyRequests => {
-                (StatusCode::TOO_MANY_REQUESTS, RATE_LIMIT_MSG.to_string())
+            // A 400 reports every collected problem: `error` stays the one-string
+            // summary older clients read; `errors` carries the per-field breakdown.
+            ApiError::BadRequest(errors) => {
+                let body = serde_json::json!({
+                    "error": join_messages(&errors, " "),
+                    "errors": errors,
+                });
+                return (StatusCode::BAD_REQUEST, Json(body)).into_response();
             }
-            ApiError::Internal => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "internal error".to_string(),
-            ),
+            ApiError::NotFound => (StatusCode::NOT_FOUND, "not found"),
+            ApiError::TooManyRequests => (StatusCode::TOO_MANY_REQUESTS, RATE_LIMIT_MSG),
+            ApiError::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "internal error"),
         };
         (status, Json(serde_json::json!({ "error": message }))).into_response()
     }
@@ -921,11 +979,6 @@ pub async fn api_create_link(
     if !state.limiter.allow(&client_key(&headers)) {
         return Err(ApiError::TooManyRequests);
     }
-    if req.content.len() > MAX_CONTENT_BYTES {
-        return Err(ApiError::BadRequest(
-            "That is too large to share (the limit is 64 KB).".into(),
-        ));
-    }
 
     let ttl_seconds = req.ttl_seconds.unwrap_or(DEFAULT_TTL_SECS);
     let delete_token = yuiolink_core::generate_token();
@@ -933,8 +986,8 @@ pub async fn api_create_link(
         &state,
         Some(req.kind.as_str()),
         &req.content,
-        ttl_seconds,
-        req.max_uses,
+        Ok(ttl_seconds),
+        Ok(req.max_uses),
         req.private,
         Some(&delete_token),
     )
@@ -1052,6 +1105,20 @@ macro_rules! static_asset {
 static_asset!(app_css, "app.css", "text/css; charset=utf-8");
 static_asset!(app_js, "app.js", "text/javascript; charset=utf-8");
 static_asset!(text_js, "text.js", "text/javascript; charset=utf-8");
+
+/// `GET /api/v1/openapi.yaml` — the API description, embedded from
+/// `server/openapi.yaml` (inside the crate, so the container build context has
+/// it) so the served spec always matches the built binary.
+pub async fn openapi_yaml() -> impl IntoResponse {
+    (
+        [
+            // RFC 9512 media type for YAML.
+            (header::CONTENT_TYPE, "application/yaml"),
+            (header::CACHE_CONTROL, "public, max-age=3600"),
+        ],
+        include_str!("../openapi.yaml"),
+    )
+}
 
 /// `GET /robots.txt` — allow crawling the landing page, static assets, and the
 /// wordlist, but bar every link page: a crawled public link would end up in a
@@ -1440,6 +1507,34 @@ mod tests {
         let (s, _, body) = send(&st, get(&format!("/api/v1/links/{}", u.name))).await;
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("https://example.com/open"));
+    }
+
+    #[tokio::test]
+    async fn api_reports_every_validation_error_at_once() {
+        let st = test_state().await;
+        // Three things wrong in one request: an unknown kind, an over-long TTL,
+        // and a multi-use limit. All three must come back together.
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/v1/links")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"kind":"carrier-pigeon","content":"https://example.com","ttl_seconds":99999999,"max_uses":5}"#,
+            ))
+            .unwrap();
+        let (s, _, body) = send(&st, req).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        // The summary string survives for older clients…
+        assert!(v["error"].is_string());
+        // …and the breakdown names each offending field.
+        let fields: Vec<&str> = v["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["field"].as_str().unwrap())
+            .collect();
+        assert_eq!(fields, ["kind", "ttl_seconds", "max_uses"], "body: {body}");
     }
 
     #[tokio::test]

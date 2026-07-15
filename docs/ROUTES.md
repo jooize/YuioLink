@@ -31,6 +31,12 @@ crawlers and prefetchers can never spend a use.
 | `/api/v1/links` | POST | Create (JSON: `kind`, `content`, `ttl_seconds?`, `max_uses?` (only `1`), `private?`). `201 Created` + `Location` + a one-time `delete_token`. Rate-limited. |
 | `/api/v1/links/:name` | GET | Read without consuming. For a **limited** (single-use) link this returns **metadata only** — no `target`/`content` — because disclosing the payload without spending the use would defeat the burn-after-read tamper evidence. Unlimited links include their `target`/`content`. |
 | `/api/v1/links/:name` | DELETE | Withdraw, authorized by `Authorization: Bearer <delete_token>`. `204`; the name stays reserved as a 410 tombstone until expiry. Wrong/missing token or unknown name are both `404` (reveals nothing). |
+| `/api/v1/openapi.yaml` | GET | The OpenAPI 3.1 description (embedded from `server/openapi.yaml`, so the served spec matches the binary). |
+
+Validation does not fail fast: a `400` reports **every** offending field at
+once — `error` is the joined summary string, `errors` an array of
+`{ "field", "message" }`. The no-JS form and `/create` render the same batch
+as one message per line.
 
 ## Rate limiting
 

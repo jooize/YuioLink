@@ -1,0 +1,345 @@
+openapi: "3.1.0"
+
+info:
+  title: YuioLink API
+  version: "0.5.1"
+  summary: Wieldy Ephemeral Links
+  description: |
+    Redirects and text snippets that always expire — never permanent.
+
+    The canonical REST surface lives under `/api/v1` and is same-origin
+    (no CORS): it serves the site's own JavaScript and local tooling.
+    `POST /create` is a separate terminal convenience for `curl`.
+
+    Two things to know before integrating:
+
+    - **GET previews, POST consumes.** Reading a link via this API never
+      spends a use; a limited (single-use) link answers with metadata only,
+      because disclosing the payload without spending the use would defeat
+      its burn-after-read tamper evidence.
+    - **Validation reports everything at once.** A `400` carries an `errors`
+      array with one entry per offending field, alongside the joined `error`
+      summary string.
+  contact:
+    name: jooize
+    url: https://github.com/jooize/YuioLink
+
+servers:
+  - url: https://yuio.link
+
+tags:
+  - name: links
+    description: The canonical REST API under `/api/v1`.
+  - name: convenience
+    description: Terminal-friendly creation outside `/api/v1`.
+
+paths:
+  /api/v1/links:
+    post:
+      tags: [links]
+      operationId: createLink
+      summary: Create a link
+      description: |
+        Creates an ephemeral link. Rate-limited per client (burst 10, one
+        create per 6 s sustained). The response carries a one-time
+        `delete_token` — it is never stored server-side in retrievable form,
+        so keep it if you want to withdraw the link later.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRequest"
+      responses:
+        "201":
+          description: Created.
+          headers:
+            Location:
+              description: URL of the created resource under `/api/v1/links`.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/Internal"
+
+  /api/v1/links/{name}:
+    parameters:
+      - $ref: "#/components/parameters/name"
+    get:
+      tags: [links]
+      operationId: getLink
+      summary: Read a link without consuming it
+      description: |
+        Safe and idempotent: never counts a hit or spends a use. A **limited**
+        (single-use) link returns metadata only — no `target`/`content` —
+        since consuming stays exclusive to the site's reveal flow.
+      responses:
+        "200":
+          description: The link.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Link"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/Internal"
+    delete:
+      tags: [links]
+      operationId: deleteLink
+      summary: Withdraw a link
+      description: |
+        Authorized by the `delete_token` from creation, sent as
+        `Authorization: Bearer <token>`. Withdrawing tombstones the link (it
+        then resolves as `410 Gone`) and its name stays reserved until expiry,
+        so it cannot be silently repurposed. A wrong or missing token and an
+        unknown name both answer `404` — the endpoint reveals nothing about
+        which links exist.
+      security:
+        - deleteToken: []
+      responses:
+        "204":
+          description: Withdrawn.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/Internal"
+
+  /create:
+    post:
+      tags: [convenience]
+      operationId: createPlain
+      summary: Create a link from a terminal
+      description: |
+        `curl -d url=<url> [-d ttl=10m|2h|3d] [-d uses=1] https://yuio.link/create`
+        answers with just the short URL as plain text (JSON with
+        `Accept: application/json`). The kind is auto-detected;
+        `--data-binary @file` becomes a Text link, verbatim. Only *trailing*
+        `ttl=`/`uses=` pairs are treated as options, so a redirect target keeps
+        its own query string. Rate-limited; no `delete_token` is issued.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  description: |
+                    The content (the field name may also be `text=` or
+                    `content=`, or be omitted entirely).
+                ttl:
+                  type: string
+                  description: Lifetime, e.g. `600`, `10m`, `2h`, `3d`.
+                uses:
+                  type: integer
+                  description: View limit; only `1` (single-use) is accepted.
+      responses:
+        "200":
+          description: Created (this surface answers 200, not 201).
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: The short URL, newline-terminated.
+                example: |
+                  https://yuio.link/braveOTTER
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateResponse"
+        "400":
+          description: Validation failed; one message per line, all at once.
+          content:
+            text/plain:
+              schema:
+                type: string
+        "429":
+          description: Rate-limited.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  parameters:
+    name:
+      name: name
+      in: path
+      required: true
+      description: The link name (case-insensitive shoutkey words).
+      schema:
+        type: string
+        example: braveOTTER
+
+  securitySchemes:
+    deleteToken:
+      type: http
+      scheme: bearer
+      description: The one-time `delete_token` returned at creation.
+
+  responses:
+    ValidationError:
+      description: |
+        Validation failed. Every offending field is reported at once in
+        `errors`; `error` is the joined one-string summary.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: >-
+              That is not a link type we recognize. Links can last at most
+              7 days.
+            errors:
+              - field: kind
+                message: That is not a link type we recognize.
+              - field: ttl_seconds
+                message: Links can last at most 7 days.
+    NotFound:
+      description: No such live link (or, for DELETE, a wrong/missing token).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: Creating links too quickly for this client.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Internal:
+      description: Server-side failure.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    CreateRequest:
+      type: object
+      required: [kind, content]
+      properties:
+        kind:
+          type: string
+          enum: [redirect, text, auto]
+          description: >-
+            The link kind; `auto` (or empty) detects it — a URL becomes a
+            redirect, anything else text.
+        content:
+          type: string
+          maxLength: 65536
+          description: >-
+            The redirect target or the text body (stored verbatim, up to
+            64 KB). A bare domain gets `https://` prepended.
+        ttl_seconds:
+          type: integer
+          default: 86400
+          minimum: 60
+          maximum: 604800
+          description: >-
+            Lifetime in seconds. The maximum is server-configured;
+            7 days (604800) in production.
+        max_uses:
+          type: [integer, "null"]
+          enum: [1, null]
+          default: null
+          description: >-
+            `1` makes the link single-use (burn after one view); omitted or
+            null is unlimited within the TTL. Any other value is rejected.
+        private:
+          type: boolean
+          default: false
+          description: >-
+            Request a private (four-word, unguessable) name for an unlimited
+            link. Single-use links always get the long name.
+      additionalProperties: true
+
+    CreateResponse:
+      type: object
+      required: [name, url, expires_at, words]
+      properties:
+        name:
+          type: string
+          example: braveOTTER
+        url:
+          type: string
+          format: uri
+          example: https://yuio.link/braveOTTER
+        expires_at:
+          type: string
+          description: UTC, `YYYY-MM-DD HH:MM:SS`.
+          example: "2026-07-22 12:00:00"
+        words:
+          type: integer
+          description: >-
+            Word count of the issued name. A public link is normally one word;
+            more means the short tiers are crowded right now.
+        delete_token:
+          type: string
+          description: >-
+            One-time secret authorizing `DELETE`. Returned only here; absent
+            on the `/create` convenience surface.
+
+    Link:
+      type: object
+      required: [name, kind, url, hits, created_at, expires_at]
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [redirect, text]
+        url:
+          type: string
+          format: uri
+        target:
+          type: string
+          format: uri
+          description: >-
+            The destination, for unlimited redirects. Absent for limited
+            (single-use) links, whose payload is only disclosed by spending
+            the use.
+        content:
+          type: string
+          description: The body, for unlimited Text links. Absent when limited.
+        hits:
+          type: integer
+        max_uses:
+          type: [integer, "null"]
+        created_at:
+          type: string
+          description: UTC, `YYYY-MM-DD HH:MM:SS`.
+        expires_at:
+          type: string
+          description: UTC, `YYYY-MM-DD HH:MM:SS`.
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Human-readable summary (all messages joined).
+        errors:
+          type: array
+          description: Per-field breakdown; present on validation failures.
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+                description: >-
+                  The offending request field: `content`, `kind`,
+                  `ttl_seconds`, or `max_uses`.
+              message:
+                type: string
