@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YuioLink — Background Use Examples</title>
+</head>
+<body>
+<style>
+  :root {
+    --accent: #007aff;
+    --purple: #af52de;
+    --text: #1d1d1f;
+    --text-secondary: rgba(60, 60, 67, 0.6);
+    --text-tertiary: rgba(60, 60, 67, 0.4);
+    --bg-1: #e7e8ec;
+    --bg-2: #f6f7f9;
+    --glow-1: rgba(0, 122, 255, 0.20);
+    --glow-2: rgba(255, 64, 129, 0.14);
+    --card-bg: rgba(255, 255, 255, 0.58);
+    --card-border: rgba(255, 255, 255, 0.7);
+    --field-bg: rgba(255, 255, 255, 0.72);
+    /* The whisper: the background example-use lines. */
+    --whisper: rgba(60, 60, 67, 0.34);
+    --whisper-strong: rgba(60, 60, 67, 0.5);
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, system-ui, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --accent: #0a84ff;
+      --purple: #bf5af2;
+      --text: #f5f5f7;
+      --text-secondary: rgba(235, 235, 245, 0.6);
+      --text-tertiary: rgba(235, 235, 245, 0.35);
+      --bg-1: #121214;
+      --bg-2: #202024;
+      --glow-1: rgba(10, 132, 255, 0.22);
+      --glow-2: rgba(191, 90, 242, 0.18);
+      --card-bg: rgba(40, 40, 44, 0.55);
+      --card-border: rgba(255, 255, 255, 0.12);
+      --field-bg: rgba(255, 255, 255, 0.06);
+      --whisper: rgba(235, 235, 245, 0.28);
+      --whisper-strong: rgba(235, 235, 245, 0.42);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--font);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Each variant is one full-height stage reproducing the app background. */
+  .stage {
+    position: relative;
+    min-height: 92vh;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 64px 18px 48px;
+    background-color: var(--bg-1);
+    background-image:
+      radial-gradient(1100px 760px at 12% 6%, var(--glow-1), transparent 60%),
+      radial-gradient(1000px 720px at 88% 96%, var(--glow-2), transparent 58%),
+      linear-gradient(155deg, var(--bg-2), var(--bg-1));
+  }
+  .stage-label {
+    position: absolute;
+    top: 14px;
+    left: 18px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    z-index: 3;
+  }
+
+  /* A simplified stand-in for the real app window — enough to judge balance. */
+  .window {
+    position: relative;
+    z-index: 2;
+    width: min(100%, 480px);
+    background: var(--card-bg);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    backdrop-filter: blur(40px) saturate(180%);
+    border: 0.5px solid var(--card-border);
+    border-radius: 28px;
+    box-shadow: 0 24px 70px -22px rgba(20, 24, 40, 0.42);
+    padding: 44px 30px 30px;
+    text-align: center;
+  }
+  .window h1 { margin: 0; font-size: 34px; font-weight: 600; letter-spacing: -0.022em; }
+  .window .tag { margin: 12px 0 22px; font-size: 15px; color: var(--text-secondary); }
+  .window .input {
+    padding: 13px 14px;
+    text-align: left;
+    font-size: 16px;
+    color: var(--text-tertiary);
+    background: var(--field-bg);
+    border: 1.5px solid var(--purple);
+    border-radius: 12px;
+  }
+  .window .btn {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #2b90ff, #007aff);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  /* ---- the whispers ---- */
+  .whisper {
+    position: absolute;
+    z-index: 1;
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--whisper);
+    max-width: 21ch;
+    pointer-events: none;
+    user-select: none;
+  }
+  /* Hide them when the window fills the screen — they'd collide. */
+  @media (max-width: 1080px) { .whisper { display: none; } }
+
+  /* Variant A: two calm columns, left- and right-anchored, upright. */
+  .va .whisper { font-weight: 500; }
+  .va .w1 { left: 7vw;  top: 22%; }
+  .va .w2 { left: 7vw;  top: 42%; }
+  .va .w3 { left: 7vw;  top: 62%; }
+  .va .w4 { right: 7vw; top: 28%; text-align: right; }
+  .va .w5 { right: 7vw; top: 50%; text-align: right; }
+  .va .w6 { right: 7vw; top: 70%; text-align: right; }
+
+  /* Variant B: scattered and gently rotated, varied sizes — handwriting energy,
+     set in the system italic so it stays on-brand. */
+  .vb .whisper { font-style: italic; font-weight: 500; }
+  .vb .w1 { left: 6vw;  top: 18%; font-size: 19px; transform: rotate(-5deg); }
+  .vb .w2 { left: 11vw; top: 47%; font-size: 14px; transform: rotate(3deg); }
+  .vb .w3 { left: 7vw;  top: 70%; font-size: 16px; transform: rotate(-2deg); }
+  .vb .w4 { right: 8vw; top: 24%; font-size: 15px; transform: rotate(4deg); text-align: right; }
+  .vb .w5 { right: 12vw; top: 52%; font-size: 18px; transform: rotate(-3deg); text-align: right; }
+  .vb .w6 { right: 6vw; top: 74%; font-size: 14px; transform: rotate(2deg); text-align: right; }
+
+  /* Variant C: terminal echoes — mono, prefixed like commands, one column each
+     side, echoing the curl surface of the product. */
+  .vc .whisper { font-family: var(--font-mono); font-size: 12.5px; max-width: 30ch; }
+  .vc .whisper b { display: block; font-weight: 600; color: var(--whisper-strong); }
+  .vc .w1 { left: 5vw;  top: 24%; }
+  .vc .w2 { left: 5vw;  top: 46%; }
+  .vc .w3 { left: 5vw;  top: 68%; }
+  .vc .w4 { right: 5vw; top: 30%; text-align: right; }
+  .vc .w5 { right: 5vw; top: 54%; text-align: right; }
+  .vc .w6 { right: 5vw; top: 76%; text-align: right; }
+
+  .intro {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 40px 22px 8px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+  }
+  .intro h1 { font-size: 20px; color: var(--text); margin: 0 0 8px; }
+</style>
+
+<div class="intro">
+  <h1>Background use examples — three treatments</h1>
+  <p>Subtle "what is this for" phrases beside the glass window, visible only on wide
+  screens (hidden under 1080px, so phones and split-screens never see them collide).
+  All three use the same six phrases; they differ in voice and geometry.</p>
+</div>
+
+<section class="stage va">
+  <span class="stage-label">A · Calm columns</span>
+  <span class="whisper w1">Shout a link across the room</span>
+  <span class="whisper w2">Phone to computer, no account, no cable</span>
+  <span class="whisper w3">Read it aloud over the phone</span>
+  <span class="whisper w4">A Wi‑Fi password that burns after one look</span>
+  <span class="whisper w5">Paste an error log — gone by Friday</span>
+  <span class="whisper w6">On the projector, for the whole audience</span>
+  <div class="window">
+    <h1>YuioLink</h1>
+    <p class="tag">Wieldy Ephemeral Link</p>
+    <div class="input">Link or text to share</div>
+    <div class="btn">Create Link</div>
+  </div>
+</section>
+
+<section class="stage vb">
+  <span class="stage-label">B · Scattered whispers</span>
+  <span class="whisper w1">Shout a link across the room</span>
+  <span class="whisper w2">Phone to computer, no account, no cable</span>
+  <span class="whisper w3">Read it aloud over the phone</span>
+  <span class="whisper w4">A Wi‑Fi password that burns after one look</span>
+  <span class="whisper w5">Paste an error log — gone by Friday</span>
+  <span class="whisper w6">On the projector, for the whole audience</span>
+  <div class="window">
+    <h1>YuioLink</h1>
+    <p class="tag">Wieldy Ephemeral Link</p>
+    <div class="input">Link or text to share</div>
+    <div class="btn">Create Link</div>
+  </div>
+</section>
+
+<section class="stage vc">
+  <span class="stage-label">C · Terminal echoes</span>
+  <span class="whisper w1"><b>shout it across the room</b>yuio.link/braveOTTER</span>
+  <span class="whisper w2"><b>phone → computer</b>type it, don't sync it</span>
+  <span class="whisper w3"><b>read it over the phone</b>four words, case doesn't matter</span>
+  <span class="whisper w4"><b>burn after reading</b>one look, then it's gone</span>
+  <span class="whisper w5"><b>share an error log</b>expires before the weekend</span>
+  <span class="whisper w6"><b>put it on the projector</b>short enough to retype</span>
+  <div class="window">
+    <h1>YuioLink</h1>
+    <p class="tag">Wieldy Ephemeral Link</p>
+    <div class="input">Link or text to share</div>
+    <div class="btn">Create Link</div>
+  </div>
+</section>
+</body>
+</html>
