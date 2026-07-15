@@ -793,8 +793,28 @@
                 const h = Math.floor(secs / 3600), m = Math.round((secs % 3600) / 60);
                 return `${h} hour${h === 1 ? "" : "s"}${m ? ` ${m} min` : ""}`;
             }
-            const d = Math.floor(secs / 86400), h = Math.round((secs % 86400) / 3600);
-            return `${d} day${d === 1 ? "" : "s"}${h ? ` ${h} h` : ""}`;
+            // Valid values stop at 7 days; the larger units only ever show a
+            // struck-out over-limit fantasy, climbing weeks -> months -> years
+            // and finally scientific notation so it always fits the readout.
+            const days = secs / 86400;
+            if (days < 14) {
+                const d = Math.floor(days), h = Math.round((secs % 86400) / 3600);
+                return `${d} day${d === 1 ? "" : "s"}${h ? ` ${h} h` : ""}`;
+            }
+            if (days < 61) {
+                const w = Math.floor(days / 7), d = Math.round(days % 7);
+                return `${w} week${w === 1 ? "" : "s"}${d ? ` ${d} d` : ""}`;
+            }
+            if (days < 730) {
+                const mo = Math.floor(days / 30.44), d = Math.round(days % 30.44);
+                return `${mo} month${mo === 1 ? "" : "s"}${d ? ` ${d} d` : ""}`;
+            }
+            const y = days / 365.25;
+            if (y < 1e5) {
+                const yr = Math.floor(y), mo = Math.round((days - yr * 365.25) / 30.44);
+                return `${yr} year${yr === 1 ? "" : "s"}${mo ? ` ${mo} mo` : ""}`;
+            }
+            return `${y.toExponential(1)} years`;
         };
         // The concrete deadline under the duration, so "what is set" is unambiguous.
         const deadlineLabel = (secs) => {
@@ -858,6 +878,12 @@
                 updateTtlReadout();
             });
             ttlReadout.addEventListener("click", () => {
+                // Closing the exact field on an over-limit value settles it at
+                // the ceiling — tapping the number is accepting what it shows.
+                if (!ttlCustomField.hidden && ttlOverLimit()) {
+                    ttlCustomValue.value = ttlCustomValue.max;
+                    updateTtlReadout();
+                }
                 ttlCustomField.hidden = !ttlCustomField.hidden;
                 if (!ttlCustomField.hidden) ttlCustomValue.focus();
             });
