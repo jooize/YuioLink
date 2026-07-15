@@ -1091,10 +1091,10 @@ macro_rules! static_asset {
             (
                 [
                     (header::CONTENT_TYPE, $mime),
-                    // Embedded assets change only on deploy; an hour of client
-                    // caching (same policy as card.png) beats re-fetching the
-                    // full CSS/JS on every visit.
-                    (header::CACHE_CONTROL, "public, max-age=3600"),
+                    // Embedded assets change only on deploy; a day of client
+                    // caching beats re-fetching the full CSS/JS on every
+                    // visit, and a stale day after a deploy is acceptable.
+                    (header::CACHE_CONTROL, "public, max-age=86400"),
                 ],
                 include_str!(concat!("../static/", $file)),
             )
@@ -1114,7 +1114,7 @@ pub async fn openapi_yaml() -> impl IntoResponse {
         [
             // RFC 9512 media type for YAML.
             (header::CONTENT_TYPE, "application/yaml"),
-            (header::CACHE_CONTROL, "public, max-age=3600"),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
         ],
         include_str!("../openapi.yaml"),
     )
@@ -1129,7 +1129,7 @@ pub async fn robots_txt() -> impl IntoResponse {
     (
         [
             (header::CONTENT_TYPE, "text/plain; charset=utf-8"),
-            (header::CACHE_CONTROL, "public, max-age=3600"),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
         ],
         "User-agent: *\nAllow: /$\nAllow: /static/\nAllow: /wordlist.txt\nDisallow: /\n",
     )
@@ -1142,7 +1142,7 @@ pub async fn wordlist_txt() -> impl IntoResponse {
     (
         [
             (header::CONTENT_TYPE, "text/plain; charset=utf-8"),
-            (header::CACHE_CONTROL, "public, max-age=3600"),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
         ],
         yuiolink_core::words().join("\n") + "\n",
     )
