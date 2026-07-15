@@ -788,6 +788,7 @@
         const ttlReadout = document.getElementById("ttl-readout");
         const ttlCustomField = document.getElementById("ttl-custom-field");
         const fmtTtl = (secs) => {
+            if (!Number.isFinite(secs)) return "∞"; // an unparseable paste reads as forever
             if (secs < 3600) { const m = Math.round(secs / 60); return `${m} minute${m === 1 ? "" : "s"}`; }
             if (secs < 86400) {
                 const h = Math.floor(secs / 3600), m = Math.round((secs % 3600) / 60);
@@ -828,6 +829,11 @@
         // True when the exact field holds a value above the 7-day ceiling: the
         // field's synced `max` blocks submission, and the readout/hint show why.
         const ttlOverLimit = () => {
+            // A paste the number field can't parse (separators, stray text,
+            // digits past float range) leaves value="" but badInput=true;
+            // treat it as infinitely over rather than falling back to the
+            // slider, which would show a value the field visibly contradicts.
+            if (ttlCustomValue.validity.badInput) return true;
             const n = Number.parseInt(ttlCustomValue.value.trim(), 10);
             return !Number.isNaN(n) && n > Number(ttlCustomValue.max);
         };
@@ -838,7 +844,7 @@
             // field and hint flag the rejected value, and the native bubble (on
             // submit) speaks in the same words.
             const over = ttlOverLimit();
-            const secs = ttlSeconds();
+            const secs = ttlCustomValue.validity.badInput ? Infinity : ttlSeconds();
             // The duration in its own span so the wavy "you can specify this"
             // underline never runs under the deadline label.
             const dur = document.createElement("span");
