@@ -348,24 +348,19 @@ textarea.form-control {
 
 /* --- Expires After: readout + stepped slider (JS un-hides these) --- */
 
-/* The live readout — also the tap target that opens the exact field. One
-   sentence-shaped row under the legend: the duration on the left continues
-   "Expires after", the concrete deadline is pushed to the right edge. A
-   wrapping flex row, so a long duration drops the deadline to its own line
-   instead of colliding with it. */
+/* The live readout — also the tap target that opens the exact field. It sits
+   on the legend's line: "Expires after" stays left, the duration is centred,
+   and the concrete deadline is pinned to the right edge (monospace, so its
+   width never changes as the day or time ticks over). */
 .ttl-readout {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    column-gap: 8px;
-    row-gap: 2px;
+    display: block;
+    position: relative;
     width: 100%;
-    margin: 0 0 10px;
-    padding: 0 0 0 8px; /* the legend's heading indent */
-    box-sizing: border-box;
+    margin: -24px 0 10px;
+    padding: 0;
     border: 0;
     background: none;
-    text-align: left;
+    text-align: center;
     font-family: var(--font-mono);
     font-size: 17px;
     font-weight: 700;
@@ -389,7 +384,10 @@ textarea.form-control {
 }
 
 .ttl-readout small {
-    margin-left: auto;
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
     font-family: var(--font-mono);
     font-size: 11.5px;
     font-weight: 500;
@@ -397,21 +395,9 @@ textarea.form-control {
     white-space: nowrap;
 }
 
-/* Over-limit (exact field above the 7-day ceiling): the typed duration and its
-   implied deadline read as rejected — red and struck out — while the hint below
-   the field states the rule. Submission stays blocked by the field's max. */
-.ttl-readout.ttl-over .ttl-dur {
-    color: var(--danger);
-    text-decoration: line-through;
-    text-decoration-color: currentColor;
-    text-decoration-thickness: 1.5px;
-}
-
-.ttl-readout.ttl-over small {
-    color: color-mix(in srgb, var(--danger) 75%, var(--text-secondary));
-    text-decoration: line-through;
-}
-
+/* Over-limit (exact field above the 7-day ceiling): the readout shows the
+   ceiling itself, the field flags the rejected value, and the hint states the
+   rule. Submission stays blocked by the field's max. */
 .custom-field.over .custom-num {
     border-color: color-mix(in srgb, var(--danger) 70%, transparent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent);
