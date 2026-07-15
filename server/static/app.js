@@ -803,6 +803,14 @@
             const hm = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
             return `≈ deleted ${days[t.getDay()]} ${hm}`;
         };
+        const ttlHint = document.querySelector("#ttl-custom-field .custom-hint");
+        const ttlHintDefault = ttlHint?.textContent ?? "";
+        // True when the exact field holds a value above the 7-day ceiling: the
+        // field's synced `max` blocks submission, and the readout/hint show why.
+        const ttlOverLimit = () => {
+            const n = Number.parseInt(ttlCustomValue.value.trim(), 10);
+            return !Number.isNaN(n) && n > Number(ttlCustomValue.max);
+        };
         const updateTtlReadout = () => {
             if (!ttlReadout) return;
             const secs = ttlSeconds();
@@ -814,6 +822,23 @@
             const small = document.createElement("small");
             small.textContent = deadlineLabel(secs);
             ttlReadout.replaceChildren(dur, small);
+            // Over the ceiling: the typed duration and its would-be deadline are
+            // shown struck out, the hint states the rule, and the native bubble
+            // (if the user submits anyway) speaks in the same words.
+            const over = ttlOverLimit();
+            ttlReadout.classList.toggle("ttl-over", over);
+            ttlCustomField?.classList.toggle("over", over);
+            if (ttlHint) ttlHint.textContent = over ? `Longest is ${fmtTtl(MAX_TTL)}.` : ttlHintDefault;
+            ttlCustomValue.setCustomValidity(over ? `Links can last at most ${fmtTtl(MAX_TTL)}.` : "");
+        };
+        // The exact field's ceiling depends on the chosen unit (7 days = 168 hours
+        // = 10080 minutes), so keep its `max` in step with the unit. requestSubmit()
+        // then flags an over-limit value (e.g. 45 days) natively, before the POST,
+        // instead of the user learning the ceiling from a server error.
+        const MAX_TTL = TTL_STOPS[TTL_STOPS.length - 1];
+        const syncCustomMax = () => {
+            const unit = checkedValue("ttl_unit", "h");
+            ttlCustomValue.max = Math.floor(MAX_TTL / (UNIT_SECS[unit] ?? 3600));
         };
         const setupTtl = () => {
             if (!ttlSlider || !ttlReadout) return;
@@ -822,6 +847,7 @@
             // readout tap (a filled exact field beats the slider).
             ttlReadout.hidden = false;
             ttlCustomField.hidden = true;
+            syncCustomMax();
             ttlSlider.addEventListener("input", () => {
                 ttlCustomValue.value = ""; // the slider takes back over
                 updateTtlReadout();
@@ -839,7 +865,7 @@
                 });
             ttlCustomValue.addEventListener("input", updateTtlReadout);
             for (const r of document.querySelectorAll('input[name="ttl_unit"]'))
-                r.addEventListener("change", updateTtlReadout);
+                r.addEventListener("change", () => { syncCustomMax(); updateTtlReadout(); });
             updateTtlReadout();
         };
 

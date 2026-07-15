@@ -336,7 +336,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             }
 
             fieldset.picker #ttl-picker {
-                legend { "Expiry" }
+                legend { "Expires after" }
                 // JS path (app.js un-hides and drives these): a big readout over a
                 // stepped slider whose 17 stops are sensible durations from 1 minute
                 // to 7 days. Tapping the readout opens the exact field below.
@@ -370,7 +370,8 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                         input.seg-radio #ttl-unit-d type="radio" name="ttl_unit" value="d";
                         label.seg-label for="ttl-unit-d" { "days" }
                     }
-                    small.custom-hint { "Up to " (humanize_duration(max_ttl_secs)) }
+                    // role=status: screen readers announce the over-limit swap.
+                    small.custom-hint role="status" { "Up to " (humanize_duration(max_ttl_secs)) }
                 }
             }
 
@@ -410,7 +411,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
 
         footer {
             "A project by " a href="https://github.com/jooize" { "jooize" }
-            span.with-ai { ", with AI" }
+            span.with-ai { " (with AI)" }
             " · "
             a href="https://github.com/jooize/YuioLink" { "Source on GitHub" }
         }
