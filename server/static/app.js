@@ -834,34 +834,31 @@
         };
         const updateTtlReadout = () => {
             if (!ttlReadout) return;
-            // Two rejected states: over the ceiling (including digit strings
-            // past float range, shown as "Infinity years") — the typed duration
-            // struck out in red with no deletion time — and badInput (the field
-            // holds something that isn't a number at all), a plain error. Both
-            // flag the field and hint; the native bubble speaks on submit.
+            // Over the ceiling: the typed duration is shown struck out in red
+            // with no deletion time, the field and hint flag the value, and the
+            // native bubble speaks on submit. badInput counts too — the browser
+            // sets it for digit strings past ITS float range (~1e308), the same
+            // "too big" one step further, so it reads as Infinity years rather
+            // than a distinct error.
             const bad = ttlCustomValue.validity.badInput;
-            const over = !bad && ttlOverLimit();
-            const secs = ttlSeconds();
+            const over = bad || ttlOverLimit();
+            const secs = bad ? Infinity : ttlSeconds();
             // The duration in its own span so the wavy "you can specify this"
             // underline never runs under the deadline label.
             const dur = document.createElement("span");
             dur.className = "ttl-dur";
-            dur.textContent = bad ? "error" : fmtTtl(secs);
-            if (over || bad) {
+            dur.textContent = fmtTtl(secs);
+            if (over) {
                 ttlReadout.replaceChildren(dur);
             } else {
                 const small = document.createElement("small");
                 small.textContent = deadlineLabel(secs);
                 ttlReadout.replaceChildren(dur, small);
             }
-            ttlReadout.classList.toggle("ttl-over", over || bad);
-            ttlCustomField?.classList.toggle("over", over || bad);
-            if (ttlHint)
-                ttlHint.textContent = bad ? "Enter a number."
-                    : over ? `Longest is ${fmtTtl(MAX_TTL)}.` : ttlHintDefault;
-            // badInput needs no custom message: the browser's own "Enter a
-            // number" is the right words there.
-            ttlCustomValue.setCustomValidity(over ? `Links can last at most ${fmtTtl(MAX_TTL)}.` : "");
+            ttlReadout.classList.toggle("ttl-over", over);
+            ttlCustomField?.classList.toggle("over", over);
+            if (ttlHint) ttlHint.textContent = over ? `Longest is ${fmtTtl(MAX_TTL)}.` : ttlHintDefault;
+            ttlCustomValue.setCustomValidity(over && !bad ? `Links can last at most ${fmtTtl(MAX_TTL)}.` : "");
         };
         // The exact field's ceiling depends on the chosen unit (7 days = 168 hours
         // = 10080 minutes), so keep its `max` in step with the unit. requestSubmit()
