@@ -856,6 +856,10 @@
                 ttlReadout.replaceChildren(dur, small);
             }
             ttlReadout.classList.toggle("ttl-over", over);
+            // Striking out "45 days" corrects a plausible ask; striking out
+            // "3.2e+300 years" belabors it. Absurd magnitudes (scientific
+            // notation, Infinity) stay red but unstruck.
+            ttlReadout.classList.toggle("ttl-absurd", over && secs / 86400 / 365.25 >= 1e5);
             ttlCustomField?.classList.toggle("over", over);
             if (ttlHint) ttlHint.textContent = over ? `Longest is ${fmtTtl(MAX_TTL)}.` : ttlHintDefault;
             ttlCustomValue.setCustomValidity(over && !bad ? `Links can last at most ${fmtTtl(MAX_TTL)}.` : "");

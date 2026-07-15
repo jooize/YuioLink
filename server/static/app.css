@@ -405,6 +405,14 @@ textarea.form-control {
     text-decoration-thickness: 1.5px;
 }
 
+/* Absurd magnitudes (scientific notation, Infinity): red, but a strikethrough
+   would belabor the obvious — keep the wavy tap affordance instead. */
+.ttl-readout.ttl-over.ttl-absurd .ttl-dur {
+    text-decoration: underline wavy;
+    text-decoration-color: color-mix(in srgb, var(--danger) 50%, transparent);
+    text-decoration-thickness: 1px;
+}
+
 .custom-field.over .custom-num {
     border-color: color-mix(in srgb, var(--danger) 70%, transparent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent);
