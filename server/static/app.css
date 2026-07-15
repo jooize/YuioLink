@@ -395,9 +395,16 @@ textarea.form-control {
     white-space: nowrap;
 }
 
-/* Over-limit (exact field above the 7-day ceiling): the readout shows the
-   ceiling itself, the field flags the rejected value, and the hint states the
-   rule. Submission stays blocked by the field's max. */
+/* Over-limit (exact field above the 7-day ceiling): the typed duration reads
+   as rejected — red and struck out, its deletion time hidden — while the field
+   and hint state the rule. Submission stays blocked by the field's max. */
+.ttl-readout.ttl-over .ttl-dur {
+    color: var(--danger);
+    text-decoration: line-through;
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 1.5px;
+}
+
 .custom-field.over .custom-num {
     border-color: color-mix(in srgb, var(--danger) 70%, transparent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent);

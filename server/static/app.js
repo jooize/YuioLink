@@ -813,19 +813,25 @@
         };
         const updateTtlReadout = () => {
             if (!ttlReadout) return;
-            // Over the ceiling: the readout shows the ceiling itself (what the
-            // link would get), the field and hint flag the rejected value, and
-            // the native bubble (on submit) speaks in the same words.
+            // Over the ceiling: the typed duration is shown struck out in red
+            // with no deletion time (there is none — the value is invalid), the
+            // field and hint flag the rejected value, and the native bubble (on
+            // submit) speaks in the same words.
             const over = ttlOverLimit();
-            const secs = over ? MAX_TTL : ttlSeconds();
+            const secs = ttlSeconds();
             // The duration in its own span so the wavy "you can specify this"
             // underline never runs under the deadline label.
             const dur = document.createElement("span");
             dur.className = "ttl-dur";
             dur.textContent = fmtTtl(secs);
-            const small = document.createElement("small");
-            small.textContent = deadlineLabel(secs);
-            ttlReadout.replaceChildren(dur, small);
+            if (over) {
+                ttlReadout.replaceChildren(dur);
+            } else {
+                const small = document.createElement("small");
+                small.textContent = deadlineLabel(secs);
+                ttlReadout.replaceChildren(dur, small);
+            }
+            ttlReadout.classList.toggle("ttl-over", over);
             ttlCustomField?.classList.toggle("over", over);
             if (ttlHint) ttlHint.textContent = over ? `Longest is ${fmtTtl(MAX_TTL)}.` : ttlHintDefault;
             ttlCustomValue.setCustomValidity(over ? `Links can last at most ${fmtTtl(MAX_TTL)}.` : "");
