@@ -788,7 +788,7 @@
         const ttlReadout = document.getElementById("ttl-readout");
         const ttlCustomField = document.getElementById("ttl-custom-field");
         const fmtTtl = (secs) => {
-            if (!Number.isFinite(secs)) return "∞"; // an unparseable paste reads as forever
+            if (!Number.isFinite(secs)) return "Infinity years"; // digits past float range read as forever
             if (secs < 3600) { const m = Math.round(secs / 60); return `${m} minute${m === 1 ? "" : "s"}`; }
             if (secs < 86400) {
                 const h = Math.floor(secs / 3600), m = Math.round((secs % 3600) / 60);
@@ -829,37 +829,38 @@
         // True when the exact field holds a value above the 7-day ceiling: the
         // field's synced `max` blocks submission, and the readout/hint show why.
         const ttlOverLimit = () => {
-            // A paste the number field can't parse (separators, stray text,
-            // digits past float range) leaves value="" but badInput=true;
-            // treat it as infinitely over rather than falling back to the
-            // slider, which would show a value the field visibly contradicts.
-            if (ttlCustomValue.validity.badInput) return true;
             const n = Number.parseInt(ttlCustomValue.value.trim(), 10);
             return !Number.isNaN(n) && n > Number(ttlCustomValue.max);
         };
         const updateTtlReadout = () => {
             if (!ttlReadout) return;
-            // Over the ceiling: the typed duration is shown struck out in red
-            // with no deletion time (there is none — the value is invalid), the
-            // field and hint flag the rejected value, and the native bubble (on
-            // submit) speaks in the same words.
-            const over = ttlOverLimit();
-            const secs = ttlCustomValue.validity.badInput ? Infinity : ttlSeconds();
+            // Two rejected states: over the ceiling (including digit strings
+            // past float range, shown as "Infinity years") — the typed duration
+            // struck out in red with no deletion time — and badInput (the field
+            // holds something that isn't a number at all), a plain error. Both
+            // flag the field and hint; the native bubble speaks on submit.
+            const bad = ttlCustomValue.validity.badInput;
+            const over = !bad && ttlOverLimit();
+            const secs = ttlSeconds();
             // The duration in its own span so the wavy "you can specify this"
             // underline never runs under the deadline label.
             const dur = document.createElement("span");
             dur.className = "ttl-dur";
-            dur.textContent = fmtTtl(secs);
-            if (over) {
+            dur.textContent = bad ? "error" : fmtTtl(secs);
+            if (over || bad) {
                 ttlReadout.replaceChildren(dur);
             } else {
                 const small = document.createElement("small");
                 small.textContent = deadlineLabel(secs);
                 ttlReadout.replaceChildren(dur, small);
             }
-            ttlReadout.classList.toggle("ttl-over", over);
-            ttlCustomField?.classList.toggle("over", over);
-            if (ttlHint) ttlHint.textContent = over ? `Longest is ${fmtTtl(MAX_TTL)}.` : ttlHintDefault;
+            ttlReadout.classList.toggle("ttl-over", over || bad);
+            ttlCustomField?.classList.toggle("over", over || bad);
+            if (ttlHint)
+                ttlHint.textContent = bad ? "Enter a number."
+                    : over ? `Longest is ${fmtTtl(MAX_TTL)}.` : ttlHintDefault;
+            // badInput needs no custom message: the browser's own "Enter a
+            // number" is the right words there.
             ttlCustomValue.setCustomValidity(over ? `Links can last at most ${fmtTtl(MAX_TTL)}.` : "");
         };
         // The exact field's ceiling depends on the chosen unit (7 days = 168 hours
@@ -886,7 +887,7 @@
             ttlReadout.addEventListener("click", () => {
                 // Closing the exact field on an over-limit value settles it at
                 // the ceiling — tapping the number is accepting what it shows.
-                if (!ttlCustomField.hidden && ttlOverLimit()) {
+                if (!ttlCustomField.hidden && (ttlOverLimit() || ttlCustomValue.validity.badInput)) {
                     ttlCustomValue.value = ttlCustomValue.max;
                     updateTtlReadout();
                 }
