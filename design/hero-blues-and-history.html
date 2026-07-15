@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero blues, Text color, history header — mockups</title>
+<style>
+  :root {
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font); background: #d8dade; color: #1d1d1f; }
+  h2 { margin: 40px 24px 6px; font-size: 20px; }
+  p.note { margin: 0 24px 14px; font-size: 13px; color: #555; max-width: 720px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 0 24px 8px; max-width: 980px;
+          border-radius: 16px; overflow: hidden; border: 0.5px solid rgba(0,0,0,0.15); }
+  .panel { padding: 22px 24px; }
+  .panel.light { background: #f6f7f9; color: #1d1d1f; }
+  .panel.dark  { background: #1c1c20; color: #f5f5f7; }
+  .opt-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+               opacity: 0.55; margin-bottom: 10px; }
+  .hero { font-family: var(--font-mono); font-size: 28px; font-weight: 700; letter-spacing: -0.01em;
+          line-height: 1.15; margin-bottom: 2px; }
+  .sub { font-family: var(--font-mono); font-size: 13.5px; margin-top: 3px; }
+  .light .sub { color: rgba(60,60,67,0.6); } .dark .sub { color: rgba(235,235,245,0.6); }
+  .sub .host { font-weight: 500; } .light .sub .host { color: #1d1d1f; } .dark .sub .host { color: #f5f5f7; }
+
+  /* --- word color options --- */
+  .light .a  { color: #007aff; }  .dark .a  { color: #0a84ff; }   /* accent, unchanged */
+  /* 1 · darker blue */
+  .light .o1 { color: #0050b8; }  .dark .o1 { color: #5eb1ff; }
+  /* 2 · lighter / sky blue */
+  .light .o2 { color: #2894e0; }  .dark .o2 { color: #64d2ff; }
+  /* 3 · navy, strong step down */
+  .light .o3 { color: #003e8f; }  .dark .o3 { color: #99c5ff; }
+  /* 4 · same blue, faded tint (weight does the alternation) */
+  .light .o4 { color: rgba(0,122,255,0.55); } .dark .o4 { color: rgba(10,132,255,0.55); }
+  /* 5 · indigo (blue-violet, barely purple) */
+  .light .o5 { color: #4e54d8; }  .dark .o5 { color: #8e8eff; }
+
+  /* --- Text kind color options --- */
+  .kindrow { font-size: 13px; margin: 6px 0; color: rgba(60,60,67,0.6); }
+  .dark .kindrow { color: rgba(235,235,245,0.6); }
+  .kind { font-weight: 600; margin-right: 14px; }
+  .swatchname { display: inline-block; width: 130px; font-family: var(--font-mono); font-size: 11px; opacity: .55; }
+  .light .k-cur { color: #127c70; }  .dark .k-cur { color: #0affe4; }
+  .light .k-a { color: #0b7285; }
+  .light .k-b { color: #00838f; }
+  .light .k-c { color: #047d8f; }
+  .light .k-d { color: #9a6700; }
+
+  /* --- history header --- */
+  .hcard { border-radius: 14px; padding: 14px 16px; margin: 10px 0; }
+  .light .hcard { background: #fff; border: 0.5px solid rgba(0,0,0,0.1); }
+  .dark .hcard { background: #26262b; border: 0.5px solid rgba(255,255,255,0.08); }
+  .hrow { display: flex; align-items: center; gap: 8px; }
+  .htitle { font-size: 12.5px; font-weight: 600; }
+  .light .htitle { color: #007aff; } .dark .htitle { color: #0a84ff; }
+  .chev { font-size: 15px; opacity: .5; margin-right: 2px; }
+  .spacer { flex: 1; }
+  .clear { font-size: 12.5px; font-weight: 500; opacity: .65; }
+  .swlabel { font-size: 12px; }
+  .light .swlabel { color: rgba(60,60,67,0.6); } .dark .swlabel { color: rgba(235,235,245,0.6); }
+  .switch { width: 34px; height: 20px; border-radius: 999px; position: relative; flex: none; }
+  .switch::before { content: ""; position: absolute; top: 2px; width: 16px; height: 16px;
+                    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+  .switch.off { background: rgba(120,120,128,0.32); } .switch.off::before { left: 2px; }
+  .switch.on  { background: #34c759; } .switch.on::before { left: 16px; }
+  .pill { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 999px; }
+  .light .pill.yellow { background: rgba(199,122,0,0.14); color: #9a6700; }
+  .dark  .pill.yellow { background: rgba(255,214,10,0.16); color: #ffd60a; }
+  .light .pill.grey { background: rgba(120,120,128,0.14); color: rgba(60,60,67,0.65); }
+  .dark  .pill.grey { background: rgba(120,120,128,0.28); color: rgba(235,235,245,0.65); }
+  .suffix { font-weight: 500; opacity: .55; }
+  .variant-name { font-size: 11px; font-weight: 700; opacity: .5; text-transform: uppercase;
+                  letter-spacing: .05em; margin: 16px 0 4px; }
+</style>
+</head>
+<body>
+
+<h2>1 · Hero name words — second word as a blue, not purple</h2>
+<p class="note">The first word keeps the accent blue. Each option changes only the alternate word. Left = light mode, right = dark mode.</p>
+
+<div class="pair">
+  <div class="panel light">
+    <div class="opt-label">Option 1 — Darker blue (#0050B8)</div>
+    <div class="hero"><span class="a">glove</span><span class="o1">anchor</span><span class="a">rivet</span><span class="o1">stump</span></div>
+    <div class="sub"><span>https://</span><span class="host">yuio.link</span>/GLOVEanchorRIVETstump</div>
+  </div>
+  <div class="panel dark">
+    <div class="opt-label">Option 1 — lighter in dark (#5EB1FF)</div>
+    <div class="hero"><span class="a">glove</span><span class="o1">anchor</span><span class="a">rivet</span><span class="o1">stump</span></div>
+    <div class="sub"><span>https://</span><span class="host">yuio.link</span>/GLOVEanchorRIVETstump</div>
+  </div>
+</div>
+
+<div class="pair">
+  <div class="panel light">
+    <div class="opt-label">Option 2 — Sky blue (#2894E0)</div>
+    <div class="hero"><span class="a">glove</span><span class="o2">anchor</span><span class="a">rivet</span><span class="o2">stump</span></div>
+    <div class="sub"><span>https://</span><span class="host">yuio.link</span>/GLOVEanchorRIVETstump</div>
+  </div>
+  <div class="panel dark">
+    <div class="opt-label">Option 2 — iOS cyan (#64D2FF)</div>
+    <div class="hero"><span class="a">glove</span><span class="o2">anchor</span><span class="a">rivet</span><span class="o2">stump</span></div>
+    <div class="sub"><span>https://</span><span class="host">yuio.link</span>/GLOVEanchorRIVETstump</div>
+  </div>
+</div>
+
+<div class="pair">
+  <div class="panel light">
+    <div class="opt-label">Option 3 — Navy, strong contrast (#003E8F)</div>
+    <div class="hero"><span class="a">glove</span><span class="o3">anchor</span><span class="a">rivet</span><span class="o3">stump</span></div>
+    <div class="sub"><span>https://</span><span class="host">yuio.link</span>/GLOVEanchorRIVETstump</div>
+  </div>
+  <div class="panel dark">
+    <div class="opt-label">Option 3 — pale blue in dark (#99C5FF)</div>
+    <div class="hero"><span class="a">glove</span><span class="o3">anchor</span><span class="a">rivet</span><span class="o3">stump</span></div>
+    <div class="sub"><span>https://</span><span class="host">yuio.link</span>/GLOVEanchorRIVETstump</div>
+  </div>
+</div>
+
+<div class="pair">
+  <div class="panel light">
+    <div class="opt-label">Option 4 — Same blue at 55% (tint alternation)</div>
+    <div class="hero"><span class="a">glove</span><span class="o4">anchor</span><span class="a">rivet</span><span class="o4">stump</span></div>
+    <div class="sub"><span>https://</span><span class="host">yuio.link</span>/GLOVEanchorRIVETstump</div>
+  </div>
+  <div class="panel dark">
+    <div class="opt-label">Option 4 — same blue at 55%</div>
+    <div class="hero"><span class="a">glove</span><span class="o4">anchor</span><span class="a">rivet</span><span class="o4">stump</span></div>
+    <div class="sub"><span>https://</span><span class="host">yuio.link</span>/GLOVEanchorRIVETstump</div>
+  </div>
+</div>
+
+<div class="pair">
+  <div class="panel light">
+    <div class="opt-label">Option 5 — Indigo, blue-violet (#4E54D8)</div>
+    <div class="hero"><span class="a">glove</span><span class="o5">anchor</span><span class="a">rivet</span><span class="o5">stump</span></div>
+    <div class="sub"><span>https://</span><span class="host">yuio.link</span>/GLOVEanchorRIVETstump</div>
+  </div>
+  <div class="panel dark">
+    <div class="opt-label">Option 5 — indigo (#8E8EFF)</div>
+    <div class="hero"><span class="a">glove</span><span class="o5">anchor</span><span class="a">rivet</span><span class="o5">stump</span></div>
+    <div class="sub"><span>https://</span><span class="host">yuio.link</span>/GLOVEanchorRIVETstump</div>
+  </div>
+</div>
+
+<h2>2 · "Text" kind color in light mode</h2>
+<p class="note">Dark mode keeps its bright cyan (#0AFFE4). These are light-mode replacements for the current #127C70, shown on a meta line as in history rows.</p>
+
+<div class="pair">
+  <div class="panel light">
+    <div class="kindrow"><span class="swatchname">current #127C70</span><span class="kind k-cur">Text</span> · 6 days left</div>
+    <div class="kindrow"><span class="swatchname">A #0B7285</span><span class="kind k-a">Text</span> · 6 days left</div>
+    <div class="kindrow"><span class="swatchname">B #00838F</span><span class="kind k-b">Text</span> · 6 days left</div>
+    <div class="kindrow"><span class="swatchname">C #047D8F</span><span class="kind k-c">Text</span> · 6 days left</div>
+    <div class="kindrow"><span class="swatchname">D golden #9A6700</span><span class="kind k-d">Text</span> · 6 days left</div>
+  </div>
+  <div class="panel dark">
+    <div class="kindrow"><span class="swatchname">dark, unchanged</span><span class="kind k-cur">Text</span> · 6 days left</div>
+    <div class="kindrow" style="opacity:.5">A–C are cyan-family, so dark's #0AFFE4 stays the sibling.</div>
+    <div class="kindrow" style="opacity:.5">D (golden) would want a matching dark gold #FFD60A.</div>
+  </div>
+</div>
+
+<h2>3 · History header — switch beside the heading, no ugly parens</h2>
+<p class="note">Each card is the collapsed history section header. The switch is the localStorage opt-in ("save on this device"); shown in its off state, which is when the old "(Not Saved)" appeared.</p>
+
+<div class="pair">
+  <div class="panel light">
+    <div class="variant-name">Variant A — switch right after the heading, label between</div>
+    <div class="hcard"><div class="hrow">
+      <span class="chev">›</span><span class="htitle">Local History</span>
+      <span class="swlabel">Save on this device</span><span class="switch off"></span>
+      <span class="spacer"></span><span class="clear">Clear…</span>
+    </div></div>
+    <div class="variant-name">Variant B — parenthetical kept, but "(Session Only)"</div>
+    <div class="hcard"><div class="hrow">
+      <span class="chev">›</span><span class="htitle">Local History <span class="suffix">(Session Only)</span></span>
+      <span class="spacer"></span><span class="switch off"></span><span class="clear">Clear…</span>
+    </div></div>
+    <div class="variant-name">Variant C — yellow "Session only" pill + switch on the right</div>
+    <div class="hcard"><div class="hrow">
+      <span class="chev">›</span><span class="htitle">Local History</span>
+      <span class="pill yellow">Session only</span>
+      <span class="spacer"></span><span class="clear">Clear…</span><span class="switch off"></span>
+    </div></div>
+    <div class="variant-name">Variant D — quiet grey pill; switch labeled by the pill itself</div>
+    <div class="hcard"><div class="hrow">
+      <span class="chev">›</span><span class="htitle">Local History</span>
+      <span class="pill grey">Session only</span>
+      <span class="spacer"></span><span class="clear">Clear…</span><span class="switch off"></span>
+    </div></div>
+    <div class="variant-name">For contrast: variant C with saving ON (pill disappears)</div>
+    <div class="hcard"><div class="hrow">
+      <span class="chev">›</span><span class="htitle">Local History</span>
+      <span class="spacer"></span><span class="clear">Clear…</span><span class="switch on"></span>
+    </div></div>
+  </div>
+  <div class="panel dark">
+    <div class="variant-name">Variant A</div>
+    <div class="hcard"><div class="hrow">
+      <span class="chev">›</span><span class="htitle">Local History</span>
+      <span class="swlabel">Save on this device</span><span class="switch off"></span>
+      <span class="spacer"></span><span class="clear">Clear…</span>
+    </div></div>
+    <div class="variant-name">Variant B</div>
+    <div class="hcard"><div class="hrow">
+      <span class="chev">›</span><span class="htitle">Local History <span class="suffix">(Session Only)</span></span>
+      <span class="spacer"></span><span class="switch off"></span><span class="clear">Clear…</span>
+    </div></div>
+    <div class="variant-name">Variant C</div>
+    <div class="hcard"><div class="hrow">
+      <span class="chev">›</span><span class="htitle">Local History</span>
+      <span class="pill yellow">Session only</span>
+      <span class="spacer"></span><span class="clear">Clear…</span><span class="switch off"></span>
+    </div></div>
+    <div class="variant-name">Variant D</div>
+    <div class="hcard"><div class="hrow">
+      <span class="chev">›</span><span class="htitle">Local History</span>
+      <span class="pill grey">Session only</span>
+      <span class="spacer"></span><span class="clear">Clear…</span><span class="switch off"></span>
+    </div></div>
+    <div class="variant-name">Variant C, saving on</div>
+    <div class="hcard"><div class="hrow">
+      <span class="chev">›</span><span class="htitle">Local History</span>
+      <span class="spacer"></span><span class="clear">Clear…</span><span class="switch on"></span>
+    </div></div>
+  </div>
+</div>
+
+<div style="height:48px"></div>
+</body>
+</html>
