@@ -806,9 +806,14 @@
         const updateTtlReadout = () => {
             if (!ttlReadout) return;
             const secs = ttlSeconds();
+            // The duration in its own span so the wavy "you can specify this"
+            // underline never runs under the deadline label.
+            const dur = document.createElement("span");
+            dur.className = "ttl-dur";
+            dur.textContent = fmtTtl(secs);
             const small = document.createElement("small");
             small.textContent = deadlineLabel(secs);
-            ttlReadout.replaceChildren(document.createTextNode(fmtTtl(secs)), small);
+            ttlReadout.replaceChildren(dur, small);
         };
         const setupTtl = () => {
             if (!ttlSlider || !ttlReadout) return;
@@ -980,7 +985,12 @@
                 });
                 if (!resp.ok) {
                     const err = await resp.json().catch(() => ({}));
-                    throw new Error(err.error || "Request failed");
+                    // A 400 carries every field's problem at once; show each on
+                    // its own line (.form-error is white-space: pre-line).
+                    const msgs = Array.isArray(err.errors)
+                        ? err.errors.map((e) => e?.message).filter(Boolean)
+                        : [];
+                    throw new Error(msgs.length ? msgs.join("\n") : (err.error || "Request failed"));
                 }
                 const data = await resp.json();
                 const url = data.url;
@@ -1078,6 +1088,29 @@
         document.addEventListener("click", (event) => {
             if (clearMenuOpen && !event.target.closest(".history-head-actions")) setClearMenu(false);
         });
+
+        // Keyboard-shortcuts help: reveal the "?" corner button, name the modifier
+        // keys for this platform, and open the dialog on click or a bare "?".
+        const kbdHelp = document.getElementById("kbd-help");
+        const kbdDialog = document.getElementById("kbd-dialog");
+        if (kbdHelp && kbdDialog) {
+            const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+            for (const el of kbdDialog.querySelectorAll(".k-mod")) el.textContent = isMac ? "⌘" : "Ctrl";
+            for (const el of kbdDialog.querySelectorAll(".k-alt")) el.textContent = isMac ? "⌥ Option" : "Alt";
+            kbdHelp.hidden = false;
+            kbdHelp.addEventListener("click", () => kbdDialog.showModal());
+            // A click on the backdrop (the dialog element itself, not its content)
+            // closes it, alongside the native Esc.
+            kbdDialog.addEventListener("click", (event) => {
+                if (event.target === kbdDialog) kbdDialog.close();
+            });
+            window.addEventListener("keydown", (event) => {
+                if (event.key !== "?" || kbdDialog.open) return;
+                if (event.target.closest("input, textarea")) return; // typing, not asking
+                event.preventDefault();
+                kbdDialog.showModal();
+            });
+        }
 
         autosize();
         updateSubmitLabel();

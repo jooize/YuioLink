@@ -219,6 +219,34 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
     let body = html! {
         p { "Wieldy Ephemeral Link" }
 
+        // Keyboard-shortcuts help: a quiet "?" in the window corner opening a
+        // native <dialog>. The shortcuts only exist with JavaScript, so both ship
+        // hidden and app.js un-hides the button (and fills in ⌘/Ctrl per platform).
+        button.kbd-help #kbd-help type="button" hidden
+            aria-label="Keyboard shortcuts" title="Keyboard shortcuts" { "?" }
+        dialog.kbd-dialog #kbd-dialog aria-label="Keyboard shortcuts" {
+            h2 { "Keyboard Shortcuts" }
+            dl.kbd-list {
+                dt { kbd { "Enter" } }
+                dd { "Create the link (when the input is a link)" }
+                dt { kbd { "Shift" } " " kbd { "Enter" } }
+                dd { "Insert a new line" }
+                dt { kbd.k-mod { "⌘" } " " kbd { "Enter" } }
+                dd { "Create a Text link" }
+                dt { "Hold " kbd.k-alt { "⌥" } }
+                dd { "Share a link as text instead" }
+                dt { kbd.k-mod { "⌘" } " " kbd { "C" } }
+                dd { "Copy the link you just created" }
+                dt { kbd { "?" } }
+                dd { "Show this overview" }
+                dt { kbd { "Esc" } }
+                dd { "Close it again" }
+            }
+            form method="dialog" {
+                button.btn.btn-block type="submit" { "Done" }
+            }
+        }
+
         // Split storage pill (top): left shows the status (and links to the list),
         // right is the local-persistence toggle in its own colour. app.js fills both.
         // Both start hidden: they are blank coloured pills until app.js fills
@@ -381,7 +409,9 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
         }
 
         footer {
-            "A project by " a href="https://github.com/jooize" { "jooize" } " · "
+            "A project by " a href="https://github.com/jooize" { "jooize" }
+            span.with-ai { ", with AI" }
+            " · "
             a href="https://github.com/jooize/YuioLink" { "Source on GitHub" }
         }
     };
@@ -771,9 +801,17 @@ pub fn not_found_page() -> Markup {
 
 /// Generic terse error page (used for 400 on the no-JS form and 500).
 pub fn error_page(code: u16, message: &str) -> Markup {
+    error_page_list(code, &[message])
+}
+
+/// As [`error_page`], but with one line per message — the no-JS form reports
+/// every validation problem at once, not just the first.
+pub fn error_page_list(code: u16, messages: &[&str]) -> Markup {
     let body = html! {
         p.error-code { (code) }
-        p { (message) }
+        @for message in messages {
+            p { (message) }
+        }
         footer { a href="/" { "Back to YuioLink" } }
     };
     document(body, html! {})
