@@ -316,6 +316,9 @@
     let currentResultUrl = null;
     // Set when the user turns persistence off while links exist, to show the warning.
     let warnArmed = false;
+    // Which of the two switches did it ("pill" | "history") — the warning appears at
+    // that one, so the consequence lands where the user just clicked.
+    let warnAt = null;
 
     const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
     const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* full or blocked */ } };
@@ -431,8 +434,13 @@
             toggle.setAttribute("aria-checked", persistEnabled ? "true" : "false");
             toggle.hidden = false;
         }
-        const warn = document.getElementById("storage-warning");
-        if (warn) warn.hidden = !(warnArmed && !persistEnabled && n > 0);
+        // Only the warning belonging to the switch that was flipped is shown; the other
+        // stays hidden, so the message never appears in two places at once.
+        const warned = warnArmed && !persistEnabled && n > 0;
+        const warnPill = document.getElementById("storage-warning-pill");
+        if (warnPill) warnPill.hidden = !(warned && warnAt === "pill");
+        const warnHistory = document.getElementById("storage-warning-history");
+        if (warnHistory) warnHistory.hidden = !(warned && warnAt === "history");
 
         const section = document.getElementById("history");
         const listEl = document.getElementById("history-list");
@@ -1120,14 +1128,15 @@
         });
         // The top toggle and the switch beside the History heading are the same
         // control in two places; both flip the localStorage opt-in.
-        const flipPersist = () => {
+        const flipPersist = (where) => {
             const turningOff = persistEnabled;
             setPersist(!persistEnabled);
             warnArmed = turningOff; // only warn when actively switching saving off
+            warnAt = turningOff ? where : null;
             renderHistory();
         };
-        document.getElementById("storage-toggle")?.addEventListener("click", flipPersist);
-        document.getElementById("history-persist")?.addEventListener("click", flipPersist);
+        document.getElementById("storage-toggle")?.addEventListener("click", () => flipPersist("pill"));
+        document.getElementById("history-persist")?.addEventListener("click", () => flipPersist("history"));
 
         document.getElementById("history-clear-open")?.addEventListener("click", () => {
             setClearMenu(true);

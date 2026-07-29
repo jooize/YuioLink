@@ -255,6 +255,12 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             a.storage-status #storage-status href="#history" hidden {}
             button.storage-toggle #storage-toggle type="button" hidden {}
         }
+        // Twin of the warning under the History heading: app.js shows whichever one
+        // sits at the switch the user actually flipped, so the consequence appears
+        // where the action happened rather than always at the bottom of the page.
+        p.storage-warning.at-pill #storage-warning-pill hidden {
+            "Local history is off — these links will be gone when you close this page."
+        }
         // The created link (latest), shown above the input. app.js fills it in place;
         // the no-JS path reloads to a result page.
         (result_output(None, html! {}, None))
@@ -327,10 +333,12 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                     }
                     div.details-body.for-once {
                         strong { "Deleted from the server when revealed" }
-                        ", and with the same security as Private links. Recipients first open "
-                        "the link to a preview, then have a choice to reveal its destination "
-                        "or content. The reveal immediately deletes destination and "
-                        "content from the server."
+                        // Every link previews (docs/PREVIEW.md), but it only matters here:
+                        // it is what keeps an unfurler or prefetch bot from burning the
+                        // link before the recipient sees it.
+                        ", and with the same security as Private links. The recipient opens "
+                        "a preview first and chooses to reveal — nothing is deleted until "
+                        "they do."
                     }
                 }
             }
@@ -399,9 +407,9 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                     button.history-clear-expired #history-clear-expired type="button" hidden { "Clear Expired" }
                 }
             }
-            // Shown by app.js when the user turns local history off while links
-            // exist — right under the switch that did it.
-            p.storage-warning #storage-warning hidden {
+            // Shown by app.js when the user turns local history off from THIS switch
+            // while links exist — the twin above sits under the top pill's toggle.
+            p.storage-warning.at-history #storage-warning-history hidden {
                 "Local history is off — these links will be gone when you close this page."
             }
             div.history-body {

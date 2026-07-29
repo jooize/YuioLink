@@ -1340,12 +1340,24 @@ textarea.form-control {
 
 /* Caution line under the history head when saving was turned off with links still
    present — it appears right where the switch was flipped. Indented like the head. */
+/* Turning Local History off while links exist: the consequence, shown at whichever
+   switch did it (app.js picks). Lines align to each other on the left instead of
+   inheriting the centered `main p` rag — the block still sits under its own switch. */
 .storage-warning {
     margin: -4px 0 10px;
     padding: 0 8px;
+    width: fit-content;
+    max-width: 32ch;
+    text-align: left;
     font-size: 12px;
     line-height: 1.4;
     color: var(--warn);
+}
+
+/* The top pill is centered, so its warning centers with it — the left-aligned lines
+   sit as a block under the toggle rather than drifting to the window edge. */
+.storage-warning.at-pill {
+    margin: 8px auto 0;
 }
 
 /* Created-link history (bottom). In memory for the session unless persisted. */
