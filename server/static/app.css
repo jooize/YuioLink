@@ -19,9 +19,9 @@
        multi-word name reads as blue/navy/blue/navy — two blues, no purple. */
     --word-alt: #003e8f;
 
-    /* Per-type colour key for the link-type picker: Public amber (caution),
+    /* Per-type colour key for the link-type picker: Public blue (open),
        Private green (secure), One-Time purple (single-use). */
-    --c-public: #c9820f;
+    --c-public: #0a6cd6;
     --c-private: #1a8f3c;
     --c-once: #8b2fc9;
 
@@ -63,7 +63,7 @@
         --purple: #bf5af2;
         /* Dark inverts the pairing: the alt word goes pale, the accent stays mid. */
         --word-alt: #99c5ff;
-        --c-public: #ffd400;
+        --c-public: #5aa9ff;
         --c-private: #30d158;
         --c-once: #bf5af2;
 
