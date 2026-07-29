@@ -2,6 +2,11 @@ openapi: "3.1.0"
 
 info:
   title: YuioLink API
+  # Versions THIS DOCUMENT, not the server and not the API. OAS 3.1 defines the
+  # field as "the version of the OpenAPI document (which is distinct from the
+  # OpenAPI Specification version or the API implementation version)", so it is
+  # not kept in lockstep with the crate version -- bump it when this file
+  # changes, and leave it alone across releases that do not touch it.
   version: "0.6.0"
   summary: Wieldy Ephemeral Links
   description: |

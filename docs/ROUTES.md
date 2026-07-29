@@ -33,6 +33,16 @@ crawlers and prefetchers can never spend a use.
 | `/api/v1/links/:name` | DELETE | Withdraw, authorized by `Authorization: Bearer <delete_token>`. `204`; the name stays reserved as a 410 tombstone until expiry. Wrong/missing token or unknown name are both `404` (reveals nothing). |
 | `/api/v1/openapi.yaml` | GET | The OpenAPI 3.1 description (embedded from `server/openapi.yaml`, so the served spec matches the binary). |
 
+That description carries its own version in `info.version`, which is
+deliberately **not** the crate version: OAS 3.1 defines the field as the version
+of the OpenAPI document, "distinct from the OpenAPI Specification version or the
+API implementation version" ([issue #3872] settled the ambiguity — a
+components-only document can be shared by several APIs, so the field cannot mean
+the API's version). It moves when `server/openapi.yaml` changes, at its own
+semver pace, and stays put across releases that leave the document alone.
+
+[issue #3872]: https://github.com/OAI/OpenAPI-Specification/issues/3872
+
 Validation does not fail fast: a `400` reports **every** offending field at
 once — `error` is the joined summary string, `errors` an array of
 `{ "field", "message" }`. The no-JS form and `/create` render the same batch
