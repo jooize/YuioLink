@@ -199,19 +199,25 @@ pub async fn insert_link(
 
         match result {
             Ok(expires_at) => {
-                bump(pool, if link.max_uses == Some(1) {
-                    Stat::CreatedOnce
-                } else if link.secret {
-                    Stat::CreatedSecret
-                } else {
-                    Stat::CreatedPublic
-                })
+                bump(
+                    pool,
+                    if link.max_uses == Some(1) {
+                        Stat::CreatedOnce
+                    } else if link.secret {
+                        Stat::CreatedSecret
+                    } else {
+                        Stat::CreatedPublic
+                    },
+                )
                 .await;
-                bump(pool, if link.kind == "text" {
-                    Stat::CreatedText
-                } else {
-                    Stat::CreatedRedirect
-                })
+                bump(
+                    pool,
+                    if link.kind == "text" {
+                        Stat::CreatedText
+                    } else {
+                        Stat::CreatedRedirect
+                    },
+                )
                 .await;
                 return Ok(InsertedLink {
                     name,
