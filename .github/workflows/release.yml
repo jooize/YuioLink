@@ -19,6 +19,25 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The footer renders both halves of a manually bumped pair: VERSION links
+      # releases/tag/v{VERSION}, and RELEASE_DATE prints as "Updated ...". A tag
+      # can only guarantee them if it refuses to release a mismatch, so check
+      # here, before anything is built or published. The commit's own date (not
+      # the build's) is the reference, so a re-run never changes the verdict.
+      - name: Refuse a tag whose source disagrees with it
+        run: |
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n1)"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "tag is $GITHUB_REF_NAME but Cargo.toml says $version -- the footer would link a wrong release" >&2
+            exit 1
+          fi
+          release_date="$(sed -n 's/^const RELEASE_DATE: &str = "\(.*\)";$/\1/p' server/src/views.rs)"
+          commit_date="$(git log -1 --format=%cs)"
+          if [ "$release_date" != "$commit_date" ]; then
+            echo "RELEASE_DATE is $release_date but the tagged commit was made $commit_date -- bump it with the version" >&2
+            exit 1
+          fi
+
       - name: Build the linux/amd64 binary via the repo Dockerfile
         run: |
           docker buildx build --platform linux/amd64 -f Dockerfile -o type=local,dest=out .
