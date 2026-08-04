@@ -20,13 +20,12 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const RELEASE_DATE: &str = "2026-08-04";
 
 /// The shared page shell: head, the glass "app window", and the masthead.
-fn document(body: Markup, scripts: Markup) -> Markup {
-    document_full("YuioLink", html! {}, body, scripts)
-}
-
-/// As [`document`], but with extra `<head>` markup (e.g. OG tags). The masthead
-/// `<h1>` is plain text, not a home link — clicking it on the create page would
-/// discard whatever the user had typed, so it is no longer a navigation target.
+///
+/// Every page passes its own `<title>` — there is no bare "YuioLink" fallback,
+/// because a tab or a history entry that says only the site name is the one place
+/// the visitor cannot tell two of them apart. The masthead `<h1>` is plain text,
+/// not a home link: clicking it on the create page would discard whatever the
+/// user had typed, so it is no longer a navigation target.
 fn document_full(title: &str, head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
     html! {
         (DOCTYPE)
@@ -96,6 +95,25 @@ fn highlight_name(name: &str) -> Markup {
     }
 }
 
+/// The `<title>` for a page about one link: `YuioLink Redirect: line`.
+///
+/// Brand first, like every other page here, then the kind, then the name — so a
+/// tab or a history entry says what the thing is before it says which one.
+///
+/// A **public** link also names its destination. Nothing about a public link is
+/// secret (its name is one word from a list anyone can walk), and the domain is
+/// already on the page, so the tab may as well be useful. A **secret** or
+/// **one-time** name stops at the name: those are held by people who chose an
+/// unguessable link, and a destination in a tab strip or a history entry outlives
+/// the glance it was meant for.
+fn link_title(kind: &str, name: &str, destination: Option<&str>) -> String {
+    let public = name_words(name).len() < yuiolink_core::LIMITED_WORDS;
+    match destination.filter(|_| public) {
+        Some(domain) => format!("YuioLink {kind}: {name} → {domain}"),
+        None => format!("YuioLink {kind}: {name}"),
+    }
+}
+
 /// The display host (no scheme, no trailing slash) of the public base URL, e.g.
 /// `https://yuio.link/` -> `yuio.link`. Used for the interstitial source line.
 pub fn host_from_base(base_url: &str) -> &str {
@@ -147,8 +165,17 @@ fn seconds_until(expires_at: &str) -> i64 {
         .unwrap_or(0)
 }
 
-/// A coarse, friendly relative expiry like `6 days`, `5 hours`, `48 min`. The
+/// A coarse, friendly relative expiry like `7 days`, `5 hours`, `48 min`. The
 /// view prepends "Expires in " / "frees up in ". Never shows seconds.
+///
+/// **Days round to the nearest**; minutes and hours still floor. Flooring days
+/// made a seven-day link read "Expires in 6 days" from the moment it existed,
+/// which reads as a mistake even though it is true, so a day-scale figure holds
+/// the number that was asked for through the first half of the day and then
+/// steps down. Minutes and hours keep flooring on purpose: near the end, saying
+/// more time remains than there is would be the harmful direction of wrong.
+/// (This is the server-rendered coarse line only — the live JS countdown in
+/// `app.js` has its own set-value-grace scheme and is not touched by this.)
 pub fn humanize_expires_in(expires_at: &str) -> String {
     let secs = seconds_until(expires_at).max(0);
     if secs < 60 {
@@ -159,7 +186,8 @@ pub fn humanize_expires_in(expires_at: &str) -> String {
         let n = secs / 3600;
         format!("{n} hour{}", if n == 1 { "" } else { "s" })
     } else {
-        let n = secs / 86400;
+        // Halves up: 6 d 12 h reads "7 days", 6 d 11 h reads "6 days".
+        let n = (secs + 86400 / 2) / 86400;
         format!("{n} day{}", if n == 1 { "" } else { "s" })
     }
 }
@@ -537,7 +565,14 @@ pub fn result_page(
         p { a href="/" { "Create another" } }
     };
     let scripts = html! { script src="/static/app.js" {} };
-    document(body, scripts)
+    // The destination is what the creator just typed, so naming it here would tell
+    // them nothing; the title identifies which link they are looking at.
+    document_full(
+        &link_title(kind_label, link_name(url), None),
+        html! {},
+        body,
+        scripts,
+    )
 }
 
 // --------------------------------------------------------------------------
@@ -584,7 +619,11 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
         meta name="robots" content="noindex, nofollow";
         (interstitial_head(&i, one_time))
     };
-    document_full("YuioLink", head, body, html! {})
+    let title = match &i.target {
+        Target::Redirect(url) => link_title("Redirect", i.name, Some(&url.card_domain())),
+        Target::TextSnippet => link_title("Text", i.name, None),
+    };
+    document_full(&title, head, body, html! {})
 }
 
 /// `<head>` Open Graph / theme-color tags so a shared link unfurls trustworthily.
@@ -827,7 +866,12 @@ pub fn revealed_page(r: RevealedView) -> Markup {
                 p.pv-meta { "Expires in " (humanize_expires_in(r.expires_at)) }
                 span.pv-caution.single { strong { "Always check the destination." } }
             };
-            document(body, html! {})
+            document_full(
+                &link_title("Redirect", r.name, Some(&url.card_domain())),
+                html! {},
+                body,
+                html! {},
+            )
         }
         RevealedTarget::Text(text) => {
             let body = html! {
@@ -837,7 +881,12 @@ pub fn revealed_page(r: RevealedView) -> Markup {
                 // Dead without JS; text.js un-hides it when it wires the handler.
                 button.btn.btn-block #copy-text type="button" hidden { "Copy" }
             };
-            document(body, html! { script src="/static/text.js" {} })
+            document_full(
+                &link_title("Text", r.name, None),
+                html! {},
+                body,
+                html! { script src="/static/text.js" {} },
+            )
         }
     }
 }
@@ -845,13 +894,18 @@ pub fn revealed_page(r: RevealedView) -> Markup {
 /// A plaintext Text link, rendered immediately (unlimited text). The body is an
 /// escaped `<pre>` — maud escapes it, so a `<script>` in the content shows as text
 /// and never executes. We never emit it as live HTML.
-pub fn text_view_page(text: &str) -> Markup {
+pub fn text_view_page(name: &str, text: &str) -> Markup {
     let body = html! {
         pre.text-body #text-body { (text) }
         // Dead without JS; text.js un-hides it when it wires the handler.
         button.btn.btn-block #copy-text type="button" hidden { "Copy" }
     };
-    document(body, html! { script src="/static/text.js" {} })
+    document_full(
+        &link_title("Text", name, None),
+        html! {},
+        body,
+        html! { script src="/static/text.js" {} },
+    )
 }
 
 // --------------------------------------------------------------------------
@@ -869,7 +923,7 @@ pub fn gone_page(expires_at: Option<&str>) -> Markup {
         }
         a.btn.btn-block href="/" { "Create a New Link" }
     };
-    document(body, html! {})
+    document_full("YuioLink — Link Gone", html! {}, body, html! {})
 }
 
 /// 404 Not Found: nothing here — expired, recycled, or never existed. Framed as
@@ -880,7 +934,7 @@ pub fn not_found_page() -> Markup {
         p { "This link has expired or never existed — links on YuioLink are ephemeral." }
         a.btn.btn-block href="/" { "Create a New Link" }
     };
-    document(body, html! {})
+    document_full("YuioLink — Link Not Found", html! {}, body, html! {})
 }
 
 /// `GET /help` — the usage page: why links expire, what the three types and two
@@ -1136,5 +1190,78 @@ pub fn error_page_list(code: u16, messages: &[&str]) -> Markup {
         }
         footer { a href="/" { "Back to YuioLink" } }
     };
-    document(body, html! {})
+    document_full(
+        &format!("YuioLink — Error {code}"),
+        html! {},
+        body,
+        html! {},
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An `expires_at` string `secs` from now, in SQLite's stored form.
+    fn in_secs(secs: i64) -> String {
+        let t = now_unix() + secs;
+        // Inverse of parse_sqlite_utc, via days-from-civil run backwards.
+        let (days, rem) = (t.div_euclid(86400), t.rem_euclid(86400));
+        let z = days + 719468;
+        let era = z.div_euclid(146097);
+        let doe = z.rem_euclid(146097);
+        let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+        let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+        let mp = (5 * doy + 2) / 153;
+        let d = doy - (153 * mp + 2) / 5 + 1;
+        let m = if mp < 10 { mp + 3 } else { mp - 9 };
+        let y = yoe + era * 400 + i64::from(m <= 2);
+        format!(
+            "{y:04}-{m:02}-{d:02} {:02}:{:02}:{:02}",
+            rem / 3600,
+            (rem % 3600) / 60,
+            rem % 60
+        )
+    }
+
+    #[test]
+    fn days_round_to_the_nearest_while_hours_and_minutes_still_floor() {
+        // The case that prompted this: a seven-day link must not read "6 days"
+        // from the moment it is created. It says 7 for the first half-day.
+        assert_eq!(humanize_expires_in(&in_secs(7 * 86400 - 60)), "7 days");
+        assert_eq!(
+            humanize_expires_in(&in_secs(6 * 86400 + 13 * 3600)),
+            "7 days"
+        );
+        assert_eq!(
+            humanize_expires_in(&in_secs(6 * 86400 + 11 * 3600)),
+            "6 days"
+        );
+        // Unchanged below a day: flooring, so the figure never overstates what
+        // is left as expiry approaches.
+        assert_eq!(
+            humanize_expires_in(&in_secs(23 * 3600 + 40 * 60)),
+            "23 hours"
+        );
+        assert_eq!(humanize_expires_in(&in_secs(59 * 60 + 45)), "59 min");
+        assert_eq!(humanize_expires_in(&in_secs(2 * 3600)), "2 hours");
+        assert_eq!(humanize_expires_in(&in_secs(3600)), "1 hour");
+        assert_eq!(humanize_expires_in(&in_secs(600)), "10 min");
+        assert_eq!(humanize_expires_in(&in_secs(30)), "less than a minute");
+        assert_eq!(humanize_expires_in(&in_secs(-500)), "less than a minute");
+    }
+
+    #[test]
+    fn link_titles_name_the_link_and_gate_the_destination() {
+        assert_eq!(
+            link_title("Redirect", "line", Some("example.com")),
+            "YuioLink Redirect: line → example.com"
+        );
+        // Four words means secret or one-time: the destination stays off the tab.
+        assert_eq!(
+            link_title("Redirect", "actSPILTvistaCOUNTY", Some("example.com")),
+            "YuioLink Redirect: actSPILTvistaCOUNTY"
+        );
+        assert_eq!(link_title("Text", "line", None), "YuioLink Text: line");
+    }
 }

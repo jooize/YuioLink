@@ -50,6 +50,12 @@ once — `error` is the joined summary string, `errors` an array of
 `{ "field", "message" }`. The no-JS form and `/create` render the same batch
 as one message per line.
 
+Unknown JSON fields are **rejected**, not ignored (`additionalProperties:
+false`), and each one comes back named in that same batch. A dropped field is
+one the caller believes took effect: someone sending the pre-0.8 `private`, or
+a typo for `secret`, would otherwise be handed a short guessable name and told
+nothing.
+
 ## Rate limiting
 
 Creation only (the three create surfaces above): per-client token bucket,

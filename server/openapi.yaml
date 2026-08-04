@@ -270,15 +270,11 @@ components:
           description: >-
             Request a secret (four-word, unguessable) name for an unlimited
             link. Single-use links always get the long name.
-        private:
-          type: boolean
-          deprecated: true
-          description: >-
-            Removed — renamed to `secret`. Sending it is a `400`, deliberately:
-            every other unknown field is ignored, but silently dropping this one
-            would hand a caller who asked for an unguessable name a short,
-            guessable one.
-      additionalProperties: true
+      # Rejected, not ignored: a field the server drops is a field the caller
+      # thinks took effect. Someone sending the old `private`, or a typo for
+      # `secret`, would be handed a short guessable name and told nothing, so
+      # every unrecognized field comes back named in the 400.
+      additionalProperties: false
 
     CreateResponse:
       type: object

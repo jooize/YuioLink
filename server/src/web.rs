@@ -11,6 +11,8 @@
 //! POST that 303-redirects (Post/Redirect/Get), so unfurl crawlers cannot burn a
 //! link.
 
+use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -139,10 +141,11 @@ async fn healthz(State(state): State<AppState>) -> Response {
 
 /// One thing wrong with one field of a create request. `field` names the JSON
 /// field of the canonical API (`content`, `kind`, `ttl_seconds`, `max_uses`);
-/// the other surfaces just show the messages.
+/// the other surfaces just show the messages. Borrowed for the fields the server
+/// knows by name, owned for the ones a caller invents.
 #[derive(Serialize)]
 pub struct FieldError {
-    pub field: &'static str,
+    pub field: Cow<'static, str>,
     pub message: String,
 }
 
@@ -184,7 +187,10 @@ async fn create_link(
 ) -> Result<db::InsertedLink, CreateError> {
     let mut errors: Vec<FieldError> = Vec::new();
     let mut fail = |field: &'static str, message: String| {
-        errors.push(FieldError { field, message });
+        errors.push(FieldError {
+            field: Cow::Borrowed(field),
+            message,
+        });
     };
 
     // An unknown kind is its own error; detection still classifies the content so
@@ -474,7 +480,7 @@ pub async fn resolve(
             if let Err(e) = db::consume_link(&state.pool, &name).await {
                 return AppError::internal(e).into_response();
             }
-            Html(views::text_view_page(&d.content).into_string()).into_response()
+            Html(views::text_view_page(&d.name, &d.content).into_string()).into_response()
         }
         // Redirects always preview; limited Text shows only that it exists.
         ("redirect", _) | ("text", true) => interstitial_response(&state, &d),
@@ -917,16 +923,20 @@ pub struct CreateRequest {
     /// for single-use links, which always get the long name.
     #[serde(default)]
     pub secret: bool,
-    /// The old name for [`Self::secret`], accepted only so it can be rejected.
-    /// Unknown fields are otherwise ignored, and staying silent here is the one
-    /// case where that is dangerous: a caller asking for an unguessable name
-    /// would be handed a short, guessable one and never hear about it.
-    #[serde(default)]
-    pub private: Option<bool>,
+    /// Everything the API does not know, collected rather than ignored.
+    ///
+    /// Ignoring an unknown field is silent by nature, and silence is dangerous
+    /// on exactly this endpoint: a caller who asks for an unguessable name with
+    /// a field we drop — the old `private`, a typo like `secrit`, a hopeful
+    /// `expires_at` — is handed a short, guessable link and told nothing. So
+    /// every unrecognized field is named back in a `400`, which generalizes the
+    /// one-off tombstone that used to guard `private` alone.
+    #[serde(flatten)]
+    pub unknown: BTreeMap<String, serde_json::Value>,
 }
 // Note: `content_type` is intentionally absent — minimal Text renders plaintext
 // only. Rich Text (a later step, on a sandboxed origin) will reintroduce it with
-// real handling. Unknown JSON fields are ignored, so older clients still work.
+// real handling.
 
 #[derive(Serialize)]
 pub struct CreateResponse {
@@ -1056,11 +1066,20 @@ pub async fn api_create_link(
         return Err(ApiError::TooManyRequests);
     }
 
-    if req.private.is_some() {
-        return Err(ApiError::BadRequest(vec![FieldError {
-            field: "private",
-            message: "`private` was renamed to `secret`.".to_string(),
-        }]));
+    // Named one per field, in the same batch shape as every other validation
+    // error, so a caller fixes all of them in one round-trip.
+    if !req.unknown.is_empty() {
+        return Err(ApiError::BadRequest(
+            req.unknown
+                .keys()
+                .map(|name| FieldError {
+                    // The message names the field too: the `error` summary is
+                    // these joined, and "not a field" twice over says nothing.
+                    message: format!("`{name}` is not a field of the create API."),
+                    field: Cow::Owned(name.clone()),
+                })
+                .collect(),
+        ));
     }
 
     let ttl_seconds = req.ttl_seconds.unwrap_or(DEFAULT_TTL_SECS);
@@ -1650,21 +1669,73 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn api_rejects_the_old_private_field() {
+    async fn api_names_every_unknown_field_instead_of_ignoring_it() {
         let st = test_state().await;
+        // `private` is the old name for `secret`, `secrit` is a typo: both would
+        // otherwise be dropped and the caller handed a short, guessable name
+        // while believing they had asked for an unguessable one.
         let req = Request::builder()
             .method("POST")
             .uri("/api/v0/links")
             .header("content-type", "application/json")
             .body(Body::from(
-                r#"{"kind":"redirect","content":"https://example.com","private":true}"#,
+                r#"{"kind":"redirect","content":"https://example.com","private":true,"secrit":true}"#,
             ))
             .unwrap();
-        // Loud, not silent: ignoring the old field would hand a caller who asked
-        // for an unguessable name a short guessable one.
         let (s, _, body) = send(&st, req).await;
         assert_eq!(s, StatusCode::BAD_REQUEST);
-        assert!(body.contains("secret"), "should name the new field: {body}");
+        assert!(body.contains("private"), "should name the field: {body}");
+        assert!(body.contains("secrit"), "and all of them at once: {body}");
+
+        // The fields it does know still work.
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/v0/links")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"kind":"redirect","content":"https://example.com","secret":true}"#,
+            ))
+            .unwrap();
+        let (s, _, _) = send(&st, req).await;
+        assert_eq!(s, StatusCode::CREATED);
+    }
+
+    #[tokio::test]
+    async fn titles_name_the_link_and_hide_secret_destinations() {
+        let st = test_state().await;
+        // Public: one word, nothing secret, so the tab may name the destination.
+        let pubw = db::insert_link(
+            &st.pool,
+            redirect("https://example.com/deep/path", None),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+        let (s, _, body) = send(&st, get(&format!("/{}", pubw.name))).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(
+            body.contains(&format!(
+                "<title>YuioLink Redirect: {} → example.com</title>",
+                pubw.name
+            )),
+            "{body}"
+        );
+
+        // One-time: four words, so the destination stays off the tab and out of
+        // browser history.
+        let once = db::insert_link(
+            &st.pool,
+            redirect("https://example.com/deep/path", Some(1)),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+        let (s, _, body) = send(&st, get(&format!("/{}", once.name))).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(
+            body.contains(&format!("<title>YuioLink Redirect: {}</title>", once.name)),
+            "{body}"
+        );
     }
 
     #[tokio::test]

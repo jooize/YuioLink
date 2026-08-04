@@ -22,6 +22,7 @@
 //!
 //! Note: the list contains one hyphenated entry, `yo-yo`; it is kept as-is.
 
+use std::collections::HashSet;
 use std::sync::OnceLock;
 
 /// The raw wordlist, one lowercase word per line.
@@ -58,6 +59,25 @@ pub fn name_bits(word_count: u32) -> f64 {
     (WORD_COUNT as f64).log2() * f64::from(word_count)
 }
 
+/// The word list as a set, cached alongside [`words`]. Name generation tests
+/// membership once per candidate substring — a few dozen lookups per draw — so
+/// the linear scan over 3456 entries that a slice would need is worth avoiding.
+pub fn word_set() -> &'static HashSet<&'static str> {
+    static SET: OnceLock<HashSet<&'static str>> = OnceLock::new();
+    SET.get_or_init(|| words().iter().copied().collect())
+}
+
+/// The shortest and longest word in the list, cached. Bounds the substring
+/// lengths a spelling search has to try.
+pub fn word_len_bounds() -> (usize, usize) {
+    static BOUNDS: OnceLock<(usize, usize)> = OnceLock::new();
+    *BOUNDS.get_or_init(|| {
+        words().iter().fold((usize::MAX, 0), |(lo, hi), w| {
+            (lo.min(w.len()), hi.max(w.len()))
+        })
+    })
+}
+
 /// The word list, split once and cached.
 pub fn words() -> &'static [&'static str] {
     static WORDS: OnceLock<Vec<&'static str>> = OnceLock::new();
@@ -73,7 +93,6 @@ pub fn words() -> &'static [&'static str] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
 
     #[test]
     fn list_has_expected_size_and_bounds() {

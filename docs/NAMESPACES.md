@@ -13,6 +13,26 @@ the whole list, so the `k`-word namespace is `3456^k`.
 | 3 | 41.3 B | 35.3 bits |
 | 4 | 143 T | 47.0 bits |
 
+## One name, one spelling
+
+A lowercased name does not carry its word boundaries, and the list is not a
+uniquely decodable code: twelve words are themselves two words joined (`carpet`
+= `car` + `pet`), and words can re-split across a boundary (`cart`+`one` and
+`car`+`tone` both spell `cartone`). Left alone, that would let a name drawn for
+its 47 bits also be spelled in three words (~1 in 315,000) or two (144 names of
+the 143 trillion) — reachable by walking an 11.9-million-name space instead.
+
+So `generate_name` re-rolls any draw with more than one spelling, exactly as it
+re-rolls a reserved name. The invariant: **an issued name spells exactly one
+word sequence, and it is the tier it was drawn from.** No name is ever reachable
+from a cheaper tier. Rejection sampling stays uniform over what it accepts, so
+the cost is only what it removes — about 0.05% of four-word names, 0.0007 bits,
+against ~0.02 bits of margin in the 47-bit claim.
+
+Uniqueness of the *name* was never at risk (`links.name` is `COLLATE NOCASE
+UNIQUE`, so an ambiguous draw was always an insert collision, not a hijack); what
+this buys is that word count and guessing cost cannot come apart.
+
 ## What the word count is for
 
 Length is **not** sold as privacy except at four words. The dial does two jobs:

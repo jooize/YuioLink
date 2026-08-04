@@ -5,7 +5,7 @@ use rand::RngCore;
 use rand::rngs::OsRng;
 use url::Url;
 
-use crate::words::{WORD_COUNT, words};
+use crate::words::{WORD_COUNT, word_len_bounds, word_set, words};
 
 /// Smallest public-name length: a single wieldy word. A public link guards
 /// nothing — no view to burn, no secrecy promised — so while the 1-word namespace
@@ -170,13 +170,64 @@ pub fn is_reserved_name(name: &str) -> bool {
         .any(|r| r.eq_ignore_ascii_case(name.trim()))
 }
 
+/// How many ways `name` can be spelled as a sequence of list words, counting up
+/// to `stop_at` and no further. Case-insensitive, because lookups are: the
+/// alternating case is decoration, and `carPET` is the same name as `carpet`.
+///
+/// Word boundaries are not recoverable from a lowercased name — twelve list
+/// words are themselves two list words joined (`carpet` = `car` + `pet`,
+/// `sunset` = `sun` + `set`), and words can also re-split across a boundary
+/// (`cart`+`one` and `car`+`tone` both spell `cartone`). So a name can have more
+/// than one spelling, and a four-word name can occasionally be spelled in three
+/// or even two — which would put a name issued for its 47 bits inside a space an
+/// attacker can enumerate in 24. [`generate_name`] uses this to refuse to issue
+/// such a name at all.
+pub fn spelling_count(name: &str, stop_at: usize) -> usize {
+    let list = word_set();
+    let lower = name.to_ascii_lowercase();
+    let (min_len, max_len) = word_len_bounds();
+
+    // ways[i] = spellings of lower[..i]; ways[0] = 1 (the empty prefix).
+    let mut ways = vec![0usize; lower.len() + 1];
+    ways[0] = 1;
+    for end in min_len..=lower.len() {
+        let first = end.saturating_sub(max_len);
+        for start in first..=end.saturating_sub(min_len) {
+            if ways[start] > 0 && list.contains(&lower[start..end]) {
+                ways[end] = (ways[end] + ways[start]).min(stop_at);
+            }
+        }
+        if ways[end] >= stop_at && end == lower.len() {
+            break;
+        }
+    }
+    ways[lower.len()]
+}
+
+/// True if `name` spells exactly one sequence of list words — the invariant every
+/// issued name holds (see [`generate_name`]).
+pub fn is_uniquely_spelled(name: &str) -> bool {
+    spelling_count(name, 2) == 1
+}
+
 /// Generate a random link name from `words` EFF-short words in alternating-case
 /// display form. The words come from the OS CSPRNG, so names are unguessable.
 ///
-/// Re-rolls the rare draw that lands on a routed segment (see
-/// [`RESERVED_NAMES`]). The re-roll is uniform over the remaining names, so it
-/// costs at most one word of the one-word pool and nothing in entropy terms for
-/// the longer tiers, which cannot produce a reserved name at all.
+/// Two draws are re-rolled:
+///
+/// - a routed segment (see [`RESERVED_NAMES`]), which would be unreachable;
+/// - a name with more than one spelling (see [`spelling_count`]), which is what
+///   keeps word count and guessing cost in step. Without it, roughly one
+///   four-word name in 315,000 could also be spelled in three words, and 144 of
+///   them in two — reachable by walking an 11.9-million-name space rather than
+///   the 143-trillion one their secrecy is sold on. With it, no issued name is
+///   reachable from a cheaper tier, and the tier a name was drawn from is the
+///   only way to spell it.
+///
+/// Rejection sampling stays uniform over what it accepts, so this costs entropy
+/// only in what it removes: about 0.05% of four-word names, or 0.0007 bits — the
+/// 47-bit claim has ~0.02 bits of margin, and the guard test in `words.rs`
+/// covers it.
 pub fn generate_name(words_count: usize) -> String {
     let list = words();
     loop {
@@ -184,7 +235,7 @@ pub fn generate_name(words_count: usize) -> String {
             .map(|_| list[pick_index(list.len())])
             .collect();
         let name = alternating_case(&picked);
-        if !is_reserved_name(&name) {
+        if !is_reserved_name(&name) && is_uniquely_spelled(&name) {
             return name;
         }
     }
@@ -368,6 +419,51 @@ mod tests {
         // Absurd: tiers 1-3 all jammed -> a public link reaches four words.
         let jammed = [u64::MAX, u64::MAX, u64::MAX, 0];
         assert_eq!(public_words_for(604800, &jammed), MAX_PUBLIC_WORDS);
+    }
+
+    #[test]
+    fn spelling_count_finds_the_alternate_spellings() {
+        // One word that is also two ("carpet" = "car" + "pet"): two spellings.
+        assert_eq!(spelling_count("carpet", 4), 2);
+        assert_eq!(spelling_count("carPET", 4), 2, "casing must not matter");
+        // A word that is only itself.
+        assert_eq!(spelling_count("abacus", 4), 1);
+        // Not spellable at all (not a name this list can produce).
+        assert_eq!(spelling_count("zzzz", 4), 0);
+        // The count stops where it is told to, so callers can ask a cheap question.
+        assert_eq!(spelling_count("carpet", 2), 2);
+        assert!(!is_uniquely_spelled("carpet"));
+        assert!(is_uniquely_spelled("abacus"));
+    }
+
+    #[test]
+    fn issued_names_have_exactly_one_spelling() {
+        // The invariant that keeps a four-word name out of the two- and
+        // three-word spaces an attacker can afford to enumerate.
+        for words in 1..=4 {
+            for _ in 0..500 {
+                let name = generate_name(words);
+                assert!(
+                    is_uniquely_spelled(&name),
+                    "issued {words}-word name {name} has {} spellings",
+                    spelling_count(&name, 8)
+                );
+                // And the spelling it has is the tier it was drawn from.
+                assert_eq!(name_word_count(&name), words, "{name}");
+            }
+        }
+    }
+
+    /// Words in a name, counted off its alternating case (mirrors the view layer).
+    fn name_word_count(name: &str) -> usize {
+        let b = name.as_bytes();
+        1 + (1..b.len())
+            .filter(|&i| {
+                let (p, c) = (b[i - 1], b[i]);
+                (p.is_ascii_lowercase() && c.is_ascii_uppercase())
+                    || (p.is_ascii_uppercase() && c.is_ascii_lowercase())
+            })
+            .count()
     }
 
     #[test]
