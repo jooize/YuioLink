@@ -42,7 +42,9 @@ fn document_full(title: &str, head_extra: Markup, body: Markup, scripts: Markup)
             body {
                 main.app-window {
                     header {
-                        h1 { "YuioLink" }
+                        // Two-tone wordmark, matching the share card: the accent
+                        // lives inside the name rather than in a separate mark.
+                        h1 { "Yuio" span.wm-link { "Link" } }
                     }
                     (body)
                 }
@@ -472,6 +474,24 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
 
 /// The no-JS result page shown after `POST /` creates a link. "Open link" leads
 /// to the link's own interstitial (the always-preview), not straight out.
+/// What the no-JS result page needs to offer "the same content, the other kind".
+///
+/// The no-JS path has no way to change a link after the fact — it is issued no
+/// delete token, since there is nowhere to keep one — so the offer creates a
+/// second link rather than converting the first. The copy has to say so: the
+/// redirect stays until it expires. This is the whole override on that path,
+/// standing in for the Option key, which does not exist on a phone and does not
+/// exist without JavaScript.
+pub struct ResultRedo<'a> {
+    /// The exact content that was just submitted, re-posted verbatim.
+    pub content: &'a str,
+    /// Expiry to reuse, in seconds, so the second link matches the first
+    /// instead of silently falling back to the default.
+    pub ttl_seconds: i64,
+    /// `public` / `secret` / `once`, likewise carried over.
+    pub link_type: &'a str,
+}
+
 pub fn result_page(
     url: &str,
     kind_label: &str,
@@ -479,6 +499,7 @@ pub fn result_page(
     max_uses: Option<i64>,
     secret: bool,
     words: usize,
+    redo: Option<&ResultRedo>,
 ) -> Markup {
     let meta = html! {
         (kind_label) " · expires " (expires_at) " UTC"
@@ -495,6 +516,21 @@ pub fn result_page(
     let body = html! {
         (result_output(Some(url), meta, note.as_deref()))
         a.btn.btn-block href=(url) { "Open link" }
+        // Only offered after a Redirect: a non-URL is already Text, so there is
+        // no other kind to offer it as.
+        @if let Some(r) = redo {
+            form.redo-form method="post" action="/" {
+                input type="hidden" name="content" value=(r.content);
+                input type="hidden" name="kind" value="text";
+                input type="hidden" name="ttl_seconds" value=(r.ttl_seconds);
+                input type="hidden" name="link_type" value=(r.link_type);
+                button.redo-btn type="submit" { "Share the address as Text instead" }
+            }
+            p.meta.redo-note {
+                "Creates a second link with the same content. The redirect above "
+                "keeps working until it expires."
+            }
+        }
         p { a href="/" { "Create another" } }
     };
     let scripts = html! { script src="/static/app.js" {} };

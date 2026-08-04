@@ -157,7 +157,7 @@ fn pick_index(count: usize) -> usize {
 /// containing a dot (`wordlist.txt`) or a slash (`static/app.css`) cannot collide
 /// and need no entry, but listing them is harmless.
 pub const RESERVED_NAMES: &[&str] = &[
-    "api", "create", "healthz", "openapi", "robots", "static", "stats", "wordlist",
+    "api", "create", "healthz", "help", "openapi", "robots", "static", "stats", "wordlist",
 ];
 
 /// True if `name` is a routed path segment rather than an available link name.

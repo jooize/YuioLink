@@ -180,6 +180,12 @@ header h1 {
     letter-spacing: -0.022em;
 }
 
+/* "Link" in the accent, so the wordmark carries the brand colour itself — the
+   same treatment the share card uses, on every page that shows the masthead. */
+.wm-link {
+    color: var(--accent);
+}
+
 /* Top-left way back out, on pages reached only by following a link (the
    revealed view) rather than by typing the address. */
 main p.back-link {
@@ -1907,6 +1913,34 @@ main > footer {
 .footer-updated a:hover {
     color: var(--text-secondary);
     text-decoration: underline;
+}
+
+/* The no-JS "other kind" offer under a fresh redirect: subordinate to "Open
+   link", but a real button, since it creates something. */
+.redo-form {
+    margin: 10px 0 0;
+}
+
+.redo-btn {
+    display: block;
+    width: 100%;
+    padding: 11px 14px;
+    font: 600 14px/1.2 var(--font);
+    color: var(--accent);
+    background: none;
+    border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    transition: background 0.18s ease;
+}
+
+.redo-btn:hover {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.redo-note {
+    margin-top: 8px;
+    color: var(--text-tertiary);
 }
 
 /* --- /stats: aggregate counters, no chrome beyond what the numbers need --- */

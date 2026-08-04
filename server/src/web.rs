@@ -346,9 +346,13 @@ pub async fn form_create(
     // No kind field: the server detects it (a URL is a redirect, else text).
     // No-JS form: no token issued (nowhere to keep it), so these links are not
     // API-deletable — fail closed.
+    // Captured before the Result is moved into create_link, so the "as Text"
+    // offer can reuse the expiry the user actually chose.
+    let redo_ttl = ttl_seconds.as_ref().copied().unwrap_or(DEFAULT_TTL_SECS);
+
     match create_link(
         &state,
-        None,
+        form.kind.as_deref(),
         &form.content,
         ttl_seconds,
         Ok(max_uses),
@@ -359,10 +363,18 @@ pub async fn form_create(
     {
         Ok(inserted) => {
             let url = format!("{}{}", state.base_url, inserted.name);
-            let kind_label = match detect_kind(&form.content) {
-                Kind::Redirect => "Redirect",
-                Kind::Text => "Text",
+            let forced_text = form.kind.as_deref() == Some("text");
+            let kind_label = match (forced_text, detect_kind(&form.content)) {
+                (true, _) | (false, Kind::Text) => "Text",
+                (false, Kind::Redirect) => "Redirect",
             };
+            // The Text offer only makes sense after a Redirect: a link stored as
+            // Text has no other kind to become, and neither does plain prose.
+            let redo = (kind_label == "Redirect").then(|| views::ResultRedo {
+                content: &form.content,
+                ttl_seconds: redo_ttl,
+                link_type: form.link_type.as_deref().unwrap_or("public"),
+            });
             Html(
                 views::result_page(
                     &url,
@@ -371,6 +383,7 @@ pub async fn form_create(
                     max_uses,
                     secret,
                     inserted.words,
+                    redo.as_ref(),
                 )
                 .into_string(),
             )
@@ -880,6 +893,11 @@ pub struct FormCreate {
     /// Link type: `public` (default), `secret`, or `once`.
     #[serde(default)]
     pub link_type: Option<String>,
+    /// Force the kind instead of letting the server detect it. Only the result
+    /// page's "share the address as Text instead" sends it; absent or `auto`
+    /// means detection, which is what the form itself always does.
+    #[serde(default)]
+    pub kind: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -1525,6 +1543,37 @@ mod tests {
         // Single-use is accepted.
         let (s, _, _) = send(&st, create(1)).await;
         assert_eq!(s, StatusCode::CREATED);
+    }
+
+    #[tokio::test]
+    async fn no_js_can_store_a_url_as_text_from_the_result_page() {
+        let st = test_state().await;
+        // A plain form post detects a Redirect and offers the Text alternative.
+        let form = |extra: &str| {
+            Request::builder()
+                .method("POST")
+                .uri("/")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(format!(
+                    "content=https%3A%2F%2Fexample.com%2Fpath&ttl_stop=7{extra}"
+                )))
+                .unwrap()
+        };
+        let (s, _, body) = send(&st, form("")).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(
+            body.contains("Share the address as Text instead"),
+            "redirect result should offer the Text alternative"
+        );
+        assert!(body.contains(r#"name="kind" value="text""#));
+
+        // Following that offer stores the same URL as Text — the override the
+        // Option key provides on desktop, reachable with no JavaScript at all.
+        let (s, _, body) = send(&st, form("&kind=text")).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(body.contains("Text"), "should report a Text link: {body}");
+        // Not offered again: a Text link has no other kind to become.
+        assert!(!body.contains("Share the address as Text instead"));
     }
 
     #[tokio::test]
