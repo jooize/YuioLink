@@ -123,7 +123,7 @@ As built (full list with semantics: `docs/ROUTES.md`):
   browser history, referrers, or server logs.
 - A trailing `+` on a name is **accepted and ignored** (the bit.ly preview habit): every
   link already previews, so `/:name+` behaves exactly like `/:name`.
-- API under `/api/v1` is **same-origin** (no `CorsLayer` — decided 2026-06-23; the "host
+- API under `/api/v0` is **same-origin** (no `CorsLayer` — decided 2026-06-23; the "host
   your own browser frontend" rationale died with encryption). The REST read does not
   consume a use, and — since 2026-07-02 — does not return a limited link's destination or
   body at all (see §9).
@@ -242,7 +242,7 @@ Remove `crypto.js` / `redirect.js` references (encryption gone); keep `text.js` 
 ## 9. Decisions (updated as they land)
 
 - **API limited-destination leak — REVERSED (2026-07-02): gate it.** The 2026-06-23
-  decision was to accept that `GET /api/v1/links/:name` returned a limited link's full
+  decision was to accept that `GET /api/v0/links/:name` returned a limited link's full
   destination without consuming, relying on future rate limiting. That was wrong: rate
   limiting bounds *volume*, but interception takes a *single* silent read — anyone who
   learned a 4-word name could read a one-time link's destination without spending the use,

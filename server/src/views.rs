@@ -358,7 +358,8 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                         "reaching the link means guessing its exact name within its "
                         "lifetime. "
                         strong.nowrap { "The name is the secret" }
-                        ", and it exists only until the link expires."
+                        ", and it exists only until the link expires. The server can read "
+                        "the destination — this hides the link, not its contents."
                     }
                     div.details-body.for-once {
                         strong { "Deleted from the server when revealed" }
@@ -983,7 +984,7 @@ pub fn help_page(base_url: &str) -> Markup {
             "is the content, so a URL keeps its own query string. The reply is the short URL, "
             "or JSON with " code { "Accept: application/json" } ". This endpoint makes public "
             "and one-time links — a secret one needs the "
-            a href="/api/v1/openapi.yaml" { "API" }
+            a href="/api/v0/openapi.yaml" { "API" }
             "."
         }
 

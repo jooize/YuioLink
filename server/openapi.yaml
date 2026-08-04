@@ -7,14 +7,18 @@ info:
   # OpenAPI Specification version or the API implementation version)", so it is
   # not kept in lockstep with the crate version -- bump it when this file
   # changes, and leave it alone across releases that do not touch it.
-  version: "0.7.0"
+  version: "0.8.0"
   summary: Wieldy Ephemeral Links
   description: |
     Redirects and text snippets that always expire — never permanent.
 
-    The canonical REST surface lives under `/api/v1` and is same-origin
+    The canonical REST surface lives under `/api/v0` and is same-origin
     (no CORS): it serves the site's own JavaScript and local tooling.
     `POST /create` is a separate terminal convenience for `curl`.
+
+    **`v0` means unstable.** The prefix tracks the project's 0.x line and may
+    change shape in any release until 1.0, which is when a `/api/v1` worth
+    holding still gets minted.
 
     Two things to know before integrating:
 
@@ -34,12 +38,12 @@ servers:
 
 tags:
   - name: links
-    description: The canonical REST API under `/api/v1`.
+    description: The canonical REST API under `/api/v0`.
   - name: convenience
-    description: Terminal-friendly creation outside `/api/v1`.
+    description: Terminal-friendly creation outside `/api/v0`.
 
 paths:
-  /api/v1/links:
+  /api/v0/links:
     post:
       tags: [links]
       operationId: createLink
@@ -60,7 +64,7 @@ paths:
           description: Created.
           headers:
             Location:
-              description: URL of the created resource under `/api/v1/links`.
+              description: URL of the created resource under `/api/v0/links`.
               schema:
                 type: string
                 format: uri
@@ -75,7 +79,7 @@ paths:
         "500":
           $ref: "#/components/responses/Internal"
 
-  /api/v1/links/{name}:
+  /api/v0/links/{name}:
     parameters:
       - $ref: "#/components/parameters/name"
     get:

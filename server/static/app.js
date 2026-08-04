@@ -695,7 +695,7 @@
     // (404, expired/reaped). Shared by the confirm-menu Delete and the tombstone out.
     const serverDelete = async (name, token) => {
         try {
-            const resp = await fetch(`${API_BASE}/api/v1/links/${encodeURIComponent(name)}`, {
+            const resp = await fetch(`${API_BASE}/api/v0/links/${encodeURIComponent(name)}`, {
                 method: "DELETE",
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -1065,7 +1065,7 @@
             // create would otherwise flash the label pointlessly.
             const creatingLabel = setTimeout(() => { submitBtn.textContent = "Creating…"; }, 150);
             try {
-                const resp = await fetch(`${API_BASE}/api/v1/links`, {
+                const resp = await fetch(`${API_BASE}/api/v0/links`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({

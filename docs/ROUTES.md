@@ -26,14 +26,14 @@ crawlers and prefetchers can never spend a use.
 |-------|--------|----------|
 | `/create` | POST | `curl -d url=<url> [-d ttl=10m\|2h\|3d] [-d uses=1] https://yuio.link/create` → the short URL as plain text (JSON with `Accept: application/json`). Kind is auto-detected; `--data-binary @file` becomes a Text link. Rate-limited. No delete token is issued. |
 
-## REST API (`/api/v1`, same-origin, no CORS)
+## REST API (`/api/v0`, same-origin, no CORS)
 
 | Route | Method | Behavior |
 |-------|--------|----------|
-| `/api/v1/links` | POST | Create (JSON: `kind`, `content`, `ttl_seconds?`, `max_uses?` (only `1`), `secret?`). `201 Created` + `Location` + a one-time `delete_token`. Rate-limited. |
-| `/api/v1/links/:name` | GET | Read without consuming. For a **limited** (single-use) link this returns **metadata only** — no `target`/`content` — because disclosing the payload without spending the use would defeat the burn-after-read tamper evidence. Unlimited links include their `target`/`content`. |
-| `/api/v1/links/:name` | DELETE | Withdraw, authorized by `Authorization: Bearer <delete_token>`. `204`; the name stays reserved as a 410 tombstone until expiry. Wrong/missing token or unknown name are both `404` (reveals nothing). |
-| `/api/v1/openapi.yaml` | GET | The OpenAPI 3.1 description (embedded from `server/openapi.yaml`, so the served spec matches the binary). |
+| `/api/v0/links` | POST | Create (JSON: `kind`, `content`, `ttl_seconds?`, `max_uses?` (only `1`), `secret?`). `201 Created` + `Location` + a one-time `delete_token`. Rate-limited. |
+| `/api/v0/links/:name` | GET | Read without consuming. For a **limited** (single-use) link this returns **metadata only** — no `target`/`content` — because disclosing the payload without spending the use would defeat the burn-after-read tamper evidence. Unlimited links include their `target`/`content`. |
+| `/api/v0/links/:name` | DELETE | Withdraw, authorized by `Authorization: Bearer <delete_token>`. `204`; the name stays reserved as a 410 tombstone until expiry. Wrong/missing token or unknown name are both `404` (reveals nothing). |
+| `/api/v0/openapi.yaml` | GET | The OpenAPI 3.1 description (embedded from `server/openapi.yaml`, so the served spec matches the binary). |
 
 That description carries its own version in `info.version`, which is
 deliberately **not** the crate version: OAS 3.1 defines the field as the version

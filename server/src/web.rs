@@ -3,7 +3,7 @@
 //! Three surfaces share one creation path ([`create_link`]):
 //! - No-JS browser form: `POST /` -> a server-rendered result page.
 //! - Terminal convenience: `POST /create` -> the short URL as text/JSON.
-//! - Canonical REST API under `/api/v1`: versioned JSON, `201 + Location`,
+//! - Canonical REST API under `/api/v0`: versioned JSON, `201 + Location`,
 //!   same-origin (no open CORS).
 //!
 //! Resolution is the always-preview model: `GET /:name` renders an interstitial
@@ -97,7 +97,7 @@ pub fn router(state: AppState) -> Router {
         // unreachable for its whole life (a GET lands on this route, not the link).
         .route("/help", get(help))
         .route("/stats", get(stats))
-        .nest("/api/v1", api_routes())
+        .nest("/api/v0", api_routes())
         .route("/create", post(create_plain))
         .route("/{name}", get(resolve))
         .route("/{name}/go", post(go))
@@ -1044,7 +1044,7 @@ pub async fn stats(State(state): State<AppState>) -> Response {
     .into_response()
 }
 
-/// `POST /api/v1/links` — create a link. Returns `201 Created` with a
+/// `POST /api/v0/links` — create a link. Returns `201 Created` with a
 /// `Location` header pointing at the new resource. This is the surface JS uses
 /// for an in-place result (and the one a third-party client targets).
 pub async fn api_create_link(
@@ -1077,7 +1077,7 @@ pub async fn api_create_link(
     .await?;
 
     let url = format!("{}{}", state.base_url, inserted.name);
-    let location = format!("{}api/v1/links/{}", state.base_url, inserted.name);
+    let location = format!("{}api/v0/links/{}", state.base_url, inserted.name);
     Ok((
         StatusCode::CREATED,
         [(header::LOCATION, location)],
@@ -1100,7 +1100,7 @@ fn bearer_token(headers: &HeaderMap) -> Option<&str> {
         .strip_prefix("Bearer ")
 }
 
-/// `DELETE /api/v1/links/:name` — withdraw a link, authorized by the per-link
+/// `DELETE /api/v0/links/:name` — withdraw a link, authorized by the per-link
 /// secret from creation sent as `Authorization: Bearer <token>`. Returns
 /// `204 No Content` on success. Withdrawing does not free the name: it tombstones
 /// the row (it then resolves as 410 Gone) and the name stays reserved until
@@ -1125,7 +1125,7 @@ pub async fn api_delete_link(
     }
 }
 
-/// `GET /api/v1/links/:name` — read a link (the REST "expand"). Safe and
+/// `GET /api/v0/links/:name` — read a link (the REST "expand"). Safe and
 /// idempotent: it does NOT count a hit or consume `max_uses`. Because of that, a
 /// **limited** (single-use) link answers with metadata only — returning its
 /// destination or body here would let anyone who learns the name read a one-time
@@ -1189,7 +1189,7 @@ static_asset!(app_css, "app.css", "text/css; charset=utf-8");
 static_asset!(app_js, "app.js", "text/javascript; charset=utf-8");
 static_asset!(text_js, "text.js", "text/javascript; charset=utf-8");
 
-/// `GET /api/v1/openapi.yaml` — the API description, embedded from
+/// `GET /api/v0/openapi.yaml` — the API description, embedded from
 /// `server/openapi.yaml` (inside the crate, so the container build context has
 /// it) so the served spec always matches the built binary.
 pub async fn openapi_yaml() -> impl IntoResponse {
@@ -1538,7 +1538,7 @@ mod tests {
         let create = |max: i64| {
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/links")
+                .uri("/api/v0/links")
                 .header("content-type", "application/json")
                 .body(Body::from(format!(
                     r#"{{"kind":"redirect","content":"https://example.com","max_uses":{max}}}"#
@@ -1654,7 +1654,7 @@ mod tests {
         let st = test_state().await;
         let req = Request::builder()
             .method("POST")
-            .uri("/api/v1/links")
+            .uri("/api/v0/links")
             .header("content-type", "application/json")
             .body(Body::from(
                 r#"{"kind":"redirect","content":"https://example.com","private":true}"#,
@@ -1681,7 +1681,7 @@ mod tests {
         // The REST read must not disclose a one-time link's destination: doing so
         // would let anyone who knows the name read it repeatedly without spending
         // the use, defeating the burn-after-read tamper evidence.
-        let (s, _, body) = send(&st, get(&format!("/api/v1/links/{}", l.name))).await;
+        let (s, _, body) = send(&st, get(&format!("/api/v0/links/{}", l.name))).await;
         assert_eq!(s, StatusCode::OK);
         assert!(
             !body.contains("zzz-gated-path"),
@@ -1701,7 +1701,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let (s, _, body) = send(&st, get(&format!("/api/v1/links/{}", u.name))).await;
+        let (s, _, body) = send(&st, get(&format!("/api/v0/links/{}", u.name))).await;
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("https://example.com/open"));
     }
@@ -1713,7 +1713,7 @@ mod tests {
         // and a multi-use limit. All three must come back together.
         let req = Request::builder()
             .method("POST")
-            .uri("/api/v1/links")
+            .uri("/api/v0/links")
             .header("content-type", "application/json")
             .body(Body::from(
                 r#"{"kind":"carrier-pigeon","content":"https://example.com","ttl_seconds":99999999,"max_uses":5}"#,
@@ -1740,7 +1740,7 @@ mod tests {
         let big = "x".repeat(MAX_CONTENT_BYTES + 1);
         let req = Request::builder()
             .method("POST")
-            .uri("/api/v1/links")
+            .uri("/api/v0/links")
             .header("content-type", "application/json")
             .body(Body::from(format!(
                 r#"{{"kind":"text","content":"{big}"}}"#
@@ -1756,7 +1756,7 @@ mod tests {
         let create = |ip: &str| {
             Request::builder()
                 .method("POST")
-                .uri("/api/v1/links")
+                .uri("/api/v0/links")
                 .header("content-type", "application/json")
                 .header("x-forwarded-for", ip)
                 .body(Body::from(
@@ -1791,7 +1791,7 @@ mod tests {
         // A wrong (or missing) token reads as 404 — the endpoint reveals nothing.
         let bad = Request::builder()
             .method("DELETE")
-            .uri(format!("/api/v1/links/{}", l.name))
+            .uri(format!("/api/v0/links/{}", l.name))
             .header("authorization", "Bearer wrong")
             .body(Body::empty())
             .unwrap();
@@ -1800,7 +1800,7 @@ mod tests {
 
         let req = Request::builder()
             .method("DELETE")
-            .uri(format!("/api/v1/links/{}", l.name))
+            .uri(format!("/api/v0/links/{}", l.name))
             .header("authorization", "Bearer tok")
             .body(Body::empty())
             .unwrap();
