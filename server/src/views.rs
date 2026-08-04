@@ -114,6 +114,26 @@ fn link_title(kind: &str, name: &str, destination: Option<&str>) -> String {
     }
 }
 
+/// The down arrow between a preview's source line and its destination. An
+/// inline SVG rather than a U+2193 character: the text glyph comes from the
+/// OS UI font, so it is wide and substantial under SF Pro but thin and small
+/// under Segoe UI, and the preview should look the same everywhere. The
+/// geometry matches SF Pro's arrow — a stem into a 45-degree, round-capped
+/// head — and inherits `currentColor` so the accent color still applies.
+fn pv_arrow() -> Markup {
+    html! {
+        span.pv-arrow aria-hidden="true" {
+            svg width="16" height="18" viewBox="0 0 16 18" fill="none" {
+                path d="M8 1.5v15M2.25 10.75 8 16.5l5.75-5.75"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round" {}
+            }
+        }
+    }
+}
+
 /// The display host (no scheme, no trailing slash) of the public base URL, e.g.
 /// `https://yuio.link/` -> `yuio.link`. Used for the interstitial source line.
 pub fn host_from_base(base_url: &str) -> &str {
@@ -606,7 +626,7 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
 
     let body = html! {
         (from_line(i.base_host, i.name))
-        span.pv-arrow aria-hidden="true" { "↓" }
+        (pv_arrow())
         @match &i.target {
             Target::Redirect(url) if limited => (limited_redirect_block(&i, url, one_time)),
             Target::Redirect(url) => (unlimited_redirect_block(&i, url)),
@@ -858,7 +878,7 @@ pub fn revealed_page(r: RevealedView) -> Markup {
             let body = html! {
                 (back)
                 (from_line(r.base_host, r.name))
-                span.pv-arrow aria-hidden="true" { "↓" }
+                (pv_arrow())
                 (render_url(url))
                 @if let Some(w) = idn_warning(url) { (idn_panel(w)) }
                 a class=(GO_BTN) href=(href) rel="noopener noreferrer" { (continue_label(url)) }

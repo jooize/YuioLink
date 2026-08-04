@@ -1058,13 +1058,17 @@ textarea.form-control {
     font-weight: 600;
 }
 
+/* An inline SVG (not a U+2193 character) so the arrow has the same shape on
+   every OS instead of whatever the local UI font draws. */
 .pv-arrow {
     display: block;
-    text-align: center;
-    font-size: 24px;
-    line-height: 1;
     color: var(--accent);
     margin: 14px 0;
+}
+
+.pv-arrow svg {
+    display: block;
+    margin: 0 auto;
 }
 
 /* Domain-only host (limited links) and the "A text snippet" placeholder. */
