@@ -9,10 +9,11 @@
     --result: #10b981;
     --warn: #c77a00;
     --danger: #d70015;
-    /* "Text" kind word — a cyan/teal. Darker on the light glass so it stays legible:
-       this hits ~4.8:1 on the card, meeting WCAG AA for 11.5px text
-       (the dark theme uses the bright #0affe4 on its dark card). */
-    --text-kind: #00838f;
+    /* "Text" kind word — orange, warm against the blue Redirect and the green
+       expiry time beside it on the meta line. Deep enough for ~4.7:1 on the
+       light glass, meeting WCAG AA for 11.5px text (dark uses Apple-system
+       orange on its dark card). */
+    --text-kind: #ad5200;
     /* Vibrant purple — the standout border on the create input. */
     --purple: #af52de;
     /* The alternate name-word colour, paired with the accent: a deep navy so a
@@ -61,7 +62,7 @@
         --result: #34d399;
         --warn: #ffd60a;
         --danger: #ff453a;
-        --text-kind: #0affe4;
+        --text-kind: #ff9f0a;
         --purple: #bf5af2;
         /* Dark inverts the pairing: the alt word goes pale, the accent stays mid. */
         --word-alt: #99c5ff;
@@ -1484,7 +1485,7 @@ textarea.form-control {
 }
 
 /* The kind as a coloured word (mockup H3 / Rb): Redirect in accent blue, Text in
-   golden yellow — no chip, sitting before the green time on the meta line. */
+   orange — no chip, sitting before the green time on the meta line. */
 .kind-word {
     flex: none;
     font-weight: 600;
