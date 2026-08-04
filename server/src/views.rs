@@ -17,7 +17,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// rather than a build timestamp on purpose: builds stay reproducible, and a
 /// visitor wants to know when the site last changed, not when this binary was
 /// compiled. Bump it alongside the workspace version.
-const RELEASE_DATE: &str = "2026-08-04";
+const RELEASE_DATE: &str = "2026-08-05";
 
 /// The shared page shell: head, the glass "app window", and the masthead.
 ///
