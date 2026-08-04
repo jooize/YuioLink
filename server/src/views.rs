@@ -134,6 +134,24 @@ fn pv_arrow() -> Markup {
     }
 }
 
+/// The top-left way back out: a circular glass chip holding a left chevron —
+/// the platform back convention — in the window's corner, mirroring the
+/// keyboard-help "?" chip on the right. The wording lives on as the tooltip
+/// and accessible name; the worded "Back to YuioLink" stays in the footer.
+fn back_chip(href: &str, label: &str) -> Markup {
+    html! {
+        a.back-chip href=(href) aria-label=(label) title=(label) {
+            svg width="9" height="14" viewBox="0 0 9 14" fill="none" aria-hidden="true" {
+                path d="M7.5 1.5 2 7l5.5 5.5"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round" {}
+            }
+        }
+    }
+}
+
 /// The display host (no scheme, no trailing slash) of the public base URL, e.g.
 /// `https://yuio.link/` -> `yuio.link`. Used for the interstitial source line.
 pub fn host_from_base(base_url: &str) -> &str {
@@ -394,29 +412,28 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                         }
                     }
                     div.details-body.for-public {
-                        "Public names are short words from a public wordlist, so anyone can "
-                        "run the whole list and turn up every public link. "
+                        "Public links are short words from a public wordlist, so anyone "
+                        "can list every possible link and view the "
+                        "data/contents/destination. "
                         strong { "Ideal for convenience and easy sharing" }
-                        " — never for anything secret. "
+                        ", but not for anything secret. "
                         a href="/wordlist.txt" { "Browse the wordlist →" }
                     }
                     div.details-body.for-secret {
-                        "Link name is four random words from a 47-bit namespace — about "
-                        "143 trillion possibilities — and nothing lists or indexes it, so "
-                        "reaching the link means guessing its exact name within its "
-                        "lifetime. "
                         strong.nowrap { "The name is the secret" }
-                        ", and it exists only until the link expires. The server can read "
-                        "the destination — this hides the link, not its contents."
+                        ", and it is reachable only until the link expires. Our server "
+                        "knows the data/contents/destination, but deletes it at the "
+                        "point of expiry. "
+                        a href="/help#types" { "Show more details →" }
                     }
                     div.details-body.for-once {
-                        strong { "Deleted from the server when revealed" }
-                        // Every link previews (docs/PREVIEW.md), but it only matters here:
-                        // it is what keeps an unfurler or prefetch bot from burning the
-                        // link before the recipient sees it.
-                        ", and with the same security as a secret link. The recipient opens "
-                        "a preview first and chooses to reveal — nothing is deleted until "
-                        "they do."
+                        strong { "Deleted from our server when revealed" }
+                        ", and with the same security as a secret link. Recipient is "
+                        // Every link previews (docs/PREVIEW.md), but it only matters
+                        // here: the preview is what keeps an unfurler or prefetch bot
+                        // from burning the link before the recipient sees it.
+                        "shown a concealed preview with a button to reveal. "
+                        a href="/help#types" { "Learn more →" }
                     }
                 }
             }
@@ -872,7 +889,7 @@ pub struct RevealedView<'a> {
 /// content was just deleted from the server (see `db::reveal_and_redact`), so a
 /// refresh or revisit won't show it again — the page says so up front.
 pub fn revealed_page(r: RevealedView) -> Markup {
-    let back = html! { p.back-link { a href="/" { "← Create New Link" } } };
+    let back = back_chip("/", "Create New Link");
     match r.target {
         RevealedTarget::Redirect { url, href } => {
             let body = html! {
@@ -970,7 +987,7 @@ pub fn not_found_page() -> Markup {
 pub fn help_page(base_url: &str) -> Markup {
     let host = host_from_base(base_url);
     let body = html! {
-        p.back-link { a href="/" { "← Back to YuioLink" } }
+        (back_chip("/", "Back to YuioLink"))
         h2.help-title { "How to use YuioLink" }
         p.help-lead {
             "Paste a link or some text, choose how long it should last, and you get a "
@@ -987,7 +1004,7 @@ pub fn help_page(base_url: &str) -> Markup {
             "is erased, and the name goes back into the pool for someone else."
         }
 
-        h3.help-h { "The three types" }
+        h3.help-h #types { "The three types" }
         ul.help-types {
             li {
                 span.help-type.dot.t-public { "Public" }
@@ -1113,7 +1130,7 @@ pub fn stats_page(s: &StatsView) -> Markup {
     let created = total("created_public") + total("created_secret") + total("created_once");
 
     let body = html! {
-        p.back-link { a href="/" { "← Back to YuioLink" } }
+        (back_chip("/", "Back to YuioLink"))
         h2.stats-h { "Statistics" }
         p { "Aggregate counts, nothing else. No visitor is measured." }
 

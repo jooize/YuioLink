@@ -118,8 +118,8 @@ mod tests {
         assert_eq!(
             trillions, CLAIMED_COMBINATIONS_TRILLIONS,
             "a {CLAIMED_NAME_WORDS}-word name now has ~{trillions} trillion combinations — \
-             update the copy that says {CLAIMED_COMBINATIONS_TRILLIONS} (views.rs picker note \
-             and /help, README, docs/NAMESPACES.md)"
+             update the copy that says {CLAIMED_COMBINATIONS_TRILLIONS} (/help in views.rs, \
+             README, docs/NAMESPACES.md)"
         );
         // Headroom, so a curation pass can see how close it is running.
         let floor = (2f64.powf(CLAIMED_NAME_BITS / f64::from(CLAIMED_NAME_WORDS))).ceil() as usize;
