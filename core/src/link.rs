@@ -147,11 +147,13 @@ fn pick_index(count: usize) -> usize {
 /// 405 to a GET and is unreachable for its whole life — the holder has no way to
 /// know why.
 ///
-/// Only one-word names can land here: multi-word names are alternating-case
-/// concatenations (`braveOTTER`), and lookups are case-insensitive, so no route
-/// spelled in lowercase can be produced from two or more words. That also means
-/// reserving a word costs nothing on the four-word tier the privacy claim rests
-/// on — it only removes a name from the one-word public pool.
+/// Casing does not protect a route: lookups are case-insensitive, so a two-word
+/// draw spelling `wordLIST` is the `/wordlist.txt` segment's neighbour `wordlist`.
+/// [`generate_name`] therefore tests the whole assembled name, not just the
+/// one-word tier. Only short routes are reachable that way — every word is at
+/// least three letters, so nothing under six characters can come from two words
+/// and no route at all can come from four — which is why reserving a word costs
+/// nothing on the four-word tier the privacy claim rests on.
 ///
 /// **Adding a bare path segment to the router means adding it here.** Segments
 /// containing a dot (`wordlist.txt`) or a slash (`static/app.css`) cannot collide
@@ -366,6 +368,16 @@ mod tests {
         // Absurd: tiers 1-3 all jammed -> a public link reaches four words.
         let jammed = [u64::MAX, u64::MAX, u64::MAX, 0];
         assert_eq!(public_words_for(604800, &jammed), MAX_PUBLIC_WORDS);
+    }
+
+    #[test]
+    fn a_reserved_name_can_be_spelled_by_two_words() {
+        // `word` + `list` spells the `wordlist` route, so the reservation check
+        // has to run on the assembled name. If a curation pass ever drops one of
+        // these words this test stops proving anything, hence the pool assert.
+        let list = words();
+        assert!(list.contains(&"word") && list.contains(&"list"));
+        assert!(is_reserved_name(&alternating_case(&["word", "list"])));
     }
 
     #[test]
