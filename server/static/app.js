@@ -51,11 +51,14 @@
     // --- clipboard ---
     const flashCopied = (button) => {
         if (!button) return;
+        // Symbol buttons (the history row's copy sheets) keep their glyph and
+        // flash green via .copied alone; only text buttons swap their label.
+        const isText = !button.querySelector("svg");
         button.classList.add("copied");
-        button.textContent = "Copied";
+        if (isText) button.textContent = "Copied";
         setTimeout(() => {
             button.classList.remove("copied");
-            button.textContent = "Copy";
+            if (isText) button.textContent = "Copy";
         }, 1500);
     };
     // Add `cls` to `el` for the same 1.5s as the button's "Copied" flash — used for the
@@ -529,31 +532,53 @@
 
             const actions = document.createElement("div");
             actions.className = "history-actions";
-            // Copy and Preview are real links to the URL, so right-click offers
-            // Copy Link / Open in New Tab; a left click on Copy copies instead.
+            // The actions are symbols (styled in app.css): two sheets copy, the
+            // trash + "…" opens the remove confirm, and the purple arrow --
+            // last, at the line's right end -- opens the preview in a new tab.
+            // Copy and the arrow are real links to the URL, so right-click
+            // offers Copy Link / Open in New Tab; a left click on the sheets
+            // copies instead. All markup is static, so innerHTML is safe.
             const copy = document.createElement("a");
             copy.className = "history-copy";
             copy.href = it.url;
-            copy.textContent = "Copy";
+            copy.innerHTML =
+                '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">' +
+                '<path d="M9.6 2.2H3.6c-.77 0-1.4.63-1.4 1.4v6.2" ' +
+                'stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
+                '<rect x="4.9" y="4.7" width="7" height="7.2" rx="1.3" ' +
+                'stroke="currentColor" stroke-width="1.6"/></svg>';
+            copy.setAttribute("aria-label", "Copy link");
+            copy.title = "Copy the link";
             copy.addEventListener("click", (event) => {
                 event.preventDefault();
                 copyToClipboard(it.url, copy, () => flashClass(check, "show"));
             });
+            const remove = document.createElement("button");
+            remove.className = "history-remove";
+            remove.type = "button";
+            remove.innerHTML =
+                '<svg width="13" height="14" viewBox="0 0 13 14" fill="none" aria-hidden="true">' +
+                '<path d="M1.5 3.5h10M5 3.3V2.4c0-.5.4-.9.9-.9h1.2c.5 0 .9.4.9.9v.9' +
+                'M2.8 3.5l.62 8c.05.62.57 1.1 1.2 1.1h3.76c.63 0 1.15-.48 1.2-1.1l.62-8" ' +
+                'stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+                '<path d="M5.2 6v4M7.8 6v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>' +
+                "</svg><span aria-hidden=\"true\">…</span>";
+            remove.setAttribute("aria-label", "Remove…");
+            // Opens the confirm prompt over the row — not a toggle; the prompt carries
+            // its own Cancel. openConfirm closes any other row's prompt first.
+            remove.addEventListener("click", () => openConfirm(li, it));
             const show = document.createElement("a");
             show.className = "history-show";
             show.href = it.url;
             show.target = "_blank";
             show.rel = "noopener noreferrer";
-            show.textContent = "Preview";
+            show.innerHTML =
+                '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">' +
+                '<path d="M2.5 10.5 10.5 2.5M4 2.5h6.5V9" ' +
+                'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            show.setAttribute("aria-label", "Preview");
             show.title = "Open this link's preview in a new tab";
-            const remove = document.createElement("button");
-            remove.className = "history-remove";
-            remove.type = "button";
-            remove.textContent = "Remove…";
-            // Opens the confirm prompt over the row — not a toggle; the prompt carries
-            // its own Cancel. openConfirm closes any other row's prompt first.
-            remove.addEventListener("click", () => openConfirm(li, it));
-            actions.append(show, copy, remove);
+            actions.append(copy, remove, show);
             foot.append(meta, actions);
 
             li.append(l1, foot);

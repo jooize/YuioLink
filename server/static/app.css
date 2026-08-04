@@ -187,22 +187,40 @@ header h1 {
     color: var(--accent);
 }
 
-/* Top-left way back out, on pages reached only by following a link (the
-   revealed view) rather than by typing the address. */
-main p.back-link {
-    margin: -8px 0 18px;
-    max-width: none;
-    text-align: left;
-    font-size: 12.5px;
-}
-
-main p.back-link a {
+/* Top-left way back out: a chevron in a circular glass chip, mirroring the
+   keyboard-help "?" chip in the opposite corner. Its wording lives in the
+   tooltip and aria-label; the worded "Back to YuioLink" stays in the footer. */
+.back-chip {
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    width: 27px;
+    height: 27px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     color: var(--text-secondary);
+    background: color-mix(in srgb, var(--text) 7%, transparent);
+    border: 0.5px solid var(--field-border);
+    border-radius: 50%;
+    transition: color 0.15s ease, background 0.15s ease;
 }
 
-main p.back-link a:hover {
+.back-chip svg {
+    display: block;
+    /* Optically centred: the chevron's visual mass leans right, so it sits a
+       hair left of geometric centre. */
+    margin-right: 1px;
+}
+
+.back-chip:hover {
     color: var(--text);
-    text-decoration: underline;
+    background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.back-chip:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 /* Default paragraph: centered secondary text (tagline, status, info lines). */
@@ -1513,7 +1531,8 @@ textarea.form-control {
     flex: none;
     display: flex;
     align-items: center;
-    gap: 12px;
+    /* Spacing between actions comes from each symbol's own hit-area padding. */
+    gap: 2px;
 }
 
 /* Line 1: the tri-colour URL plus a trailing green copy-check, on one row. */
@@ -1591,64 +1610,62 @@ textarea.form-control {
     white-space: nowrap;
 }
 
-/* Show: opens the link in a new tab. An on-brand purple, distinct from Copy's accent
-   blue, sitting to the left of Copy. */
-.history-show {
+/* The per-row actions are symbols: the two sheets copy (accent blue), the
+   trash + "…" opens the remove confirm (quiet grey; the overlay carries its
+   own Cancel, so this is open-only), and the purple arrow — last, at the
+   line's right end — opens the link's preview in a new tab. The glyphs are
+   ~14px, so padding grows each hit target to about 30px square (larger than
+   the 13px text links they replace) and supplies the spacing between
+   neighbours — .history-actions keeps only a hairline gap. */
+.history-show,
+.history-copy,
+.history-remove {
     flex: none;
-    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
     font-family: inherit;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--purple);
     background: none;
     border: 0;
-    padding: 6px 2px;
+    padding: 8px 7px;
+    margin: -4px 0;
     cursor: pointer;
+    opacity: 0.85;
+    transition: opacity 0.15s ease, color 0.15s ease;
 }
 
-.history-show:hover {
-    text-decoration: underline;
+.history-show svg,
+.history-copy svg,
+.history-remove svg {
+    display: block;
+}
+
+.history-show:hover,
+.history-copy:hover,
+.history-remove:hover {
+    opacity: 1;
+}
+
+.history-show {
+    color: var(--purple);
 }
 
 .history-copy {
-    flex: none;
-    text-decoration: none;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 500;
     color: var(--accent);
-    background: none;
-    border: 0;
-    padding: 6px 2px;
-    cursor: pointer;
-}
-
-.history-copy:hover {
-    text-decoration: underline;
 }
 
 .history-copy.copied {
     color: var(--switch-on);
-    text-decoration: none;
 }
 
-/* Per-item Remove…: a quiet text button beside Copy that opens the confirm overlay.
-   The overlay covers the whole row and carries its own Cancel, so this is open-only. */
 .history-remove {
-    flex: none;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 500;
+    gap: 2px;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--text-secondary);
-    background: none;
-    border: 0;
-    padding: 6px 2px;
-    cursor: pointer;
 }
 
 .history-remove:hover {
     color: var(--danger);
-    text-decoration: underline;
 }
 
 /* Confirmation drawn over the row: a short prompt and the two ways to remove. */
