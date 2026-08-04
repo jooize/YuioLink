@@ -142,14 +142,50 @@ fn pick_index(count: usize) -> usize {
     }
 }
 
+/// Path segments the server routes itself, which therefore must never be issued
+/// as a link name. A route wins over `/{name}`, so a link called `create` answers
+/// 405 to a GET and is unreachable for its whole life — the holder has no way to
+/// know why.
+///
+/// Only one-word names can land here: multi-word names are alternating-case
+/// concatenations (`braveOTTER`), and lookups are case-insensitive, so no route
+/// spelled in lowercase can be produced from two or more words. That also means
+/// reserving a word costs nothing on the four-word tier the privacy claim rests
+/// on — it only removes a name from the one-word public pool.
+///
+/// **Adding a bare path segment to the router means adding it here.** Segments
+/// containing a dot (`wordlist.txt`) or a slash (`static/app.css`) cannot collide
+/// and need no entry, but listing them is harmless.
+pub const RESERVED_NAMES: &[&str] = &[
+    "api", "create", "healthz", "openapi", "robots", "static", "stats", "wordlist",
+];
+
+/// True if `name` is a routed path segment rather than an available link name.
+/// Case-insensitive, because name lookups are.
+pub fn is_reserved_name(name: &str) -> bool {
+    RESERVED_NAMES
+        .iter()
+        .any(|r| r.eq_ignore_ascii_case(name.trim()))
+}
+
 /// Generate a random link name from `words` EFF-short words in alternating-case
 /// display form. The words come from the OS CSPRNG, so names are unguessable.
+///
+/// Re-rolls the rare draw that lands on a routed segment (see
+/// [`RESERVED_NAMES`]). The re-roll is uniform over the remaining names, so it
+/// costs at most one word of the one-word pool and nothing in entropy terms for
+/// the longer tiers, which cannot produce a reserved name at all.
 pub fn generate_name(words_count: usize) -> String {
     let list = words();
-    let picked: Vec<&str> = (0..words_count.max(1))
-        .map(|_| list[pick_index(list.len())])
-        .collect();
-    alternating_case(&picked)
+    loop {
+        let picked: Vec<&str> = (0..words_count.max(1))
+            .map(|_| list[pick_index(list.len())])
+            .collect();
+        let name = alternating_case(&picked);
+        if !is_reserved_name(&name) {
+            return name;
+        }
+    }
 }
 
 /// True if `s` already starts with an explicit `scheme:` (RFC 3986 scheme
@@ -330,6 +366,26 @@ mod tests {
         // Absurd: tiers 1-3 all jammed -> a public link reaches four words.
         let jammed = [u64::MAX, u64::MAX, u64::MAX, 0];
         assert_eq!(public_words_for(604800, &jammed), MAX_PUBLIC_WORDS);
+    }
+
+    #[test]
+    fn reserved_names_are_never_issued() {
+        // Only the one-word tier can collide, and only if the word is in the list
+        // at all — assert the guard covers every reserved word that is.
+        let list = words();
+        for r in RESERVED_NAMES {
+            assert!(is_reserved_name(r), "{r} should be reserved");
+            assert!(
+                is_reserved_name(&r.to_uppercase()),
+                "{r} should be reserved case-insensitively"
+            );
+            if list.contains(r) {
+                // In the pool, so generation must be able to draw it and reject it.
+                for _ in 0..5_000 {
+                    assert_ne!(generate_name(1).to_ascii_lowercase(), **r);
+                }
+            }
+        }
     }
 
     #[test]

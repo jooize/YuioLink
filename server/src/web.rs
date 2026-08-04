@@ -92,6 +92,9 @@ pub fn router(state: AppState) -> Router {
         .route("/static/text.js", get(text_js))
         .route("/wordlist.txt", get(wordlist_txt))
         .route("/robots.txt", get(robots_txt))
+        // Any bare segment added here shadows `/{name}` and must also go in
+        // `yuiolink_core::RESERVED_NAMES`, or a link issued under that word is
+        // unreachable for its whole life (a GET lands on this route, not the link).
         .route("/stats", get(stats))
         .nest("/api/v1", api_routes())
         .route("/create", post(create_plain))
