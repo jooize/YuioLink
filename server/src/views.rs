@@ -261,7 +261,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                 dt { kbd { "Shift" } " " kbd { "Enter" } }
                 dd { "Insert a new line" }
                 dt { kbd.k-mod { "⌘" } " " kbd { "Enter" } }
-                dd { "Create a Text link" }
+                dd { "Create a text link" }
                 dt { "Hold " kbd.k-alt { "⌥" } }
                 dd { "Share a link as text instead" }
                 dt { kbd.k-mod { "⌘" } " " kbd { "C" } }
@@ -354,7 +354,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                     }
                     div.details-body.for-secret {
                         "Link name is four random words from a 47-bit namespace — about "
-                        "153 trillion possibilities — and nothing lists or indexes it, so "
+                        "143 trillion possibilities — and nothing lists or indexes it, so "
                         "reaching the link means guessing its exact name within its "
                         "lifetime. "
                         strong.nowrap { "The name is the secret" }
@@ -365,7 +365,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                         // Every link previews (docs/PREVIEW.md), but it only matters here:
                         // it is what keeps an unfurler or prefetch bot from burning the
                         // link before the recipient sees it.
-                        ", and with the same security as Secret links. The recipient opens "
+                        ", and with the same security as a secret link. The recipient opens "
                         "a preview first and chooses to reveal — nothing is deleted until "
                         "they do."
                     }
@@ -452,6 +452,8 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             " · "
             a href="https://github.com/jooize/YuioLink" { "Source on GitHub" }
             " · "
+            a href="/help" { "How to Use" }
+            " · "
             a href="/stats" { "Statistics" }
             span.footer-updated {
                 "Updated " (format_card_date(RELEASE_DATE)) " · "
@@ -524,7 +526,7 @@ pub fn result_page(
                 input type="hidden" name="kind" value="text";
                 input type="hidden" name="ttl_seconds" value=(r.ttl_seconds);
                 input type="hidden" name="link_type" value=(r.link_type);
-                button.redo-btn type="submit" { "Share the address as Text instead" }
+                button.redo-btn type="submit" { "Share the address as a text link instead" }
             }
             p.meta.redo-note {
                 "Creates a second link with the same content. The redirect above "
@@ -878,6 +880,133 @@ pub fn not_found_page() -> Markup {
         a.btn.btn-block href="/" { "Create a New Link" }
     };
     document(body, html! {})
+}
+
+/// `GET /help` — the usage page: why links expire, what the three types and two
+/// kinds are for, worked examples, and the terminal endpoint.
+///
+/// Type and kind names are capitalized only where they name an on-screen control
+/// (the picker segments, the kind chip). In prose they are ordinary adjectives —
+/// "a secret link", "a text link" — because the names were chosen to describe
+/// themselves, and title case would claim a precision the words do not need.
+///
+/// `base_url` ends in `/`, so `{base_url}create` is the terminal endpoint and
+/// `host_from_base` gives the bare host for the example name.
+pub fn help_page(base_url: &str) -> Markup {
+    let host = host_from_base(base_url);
+    let body = html! {
+        p.back-link { a href="/" { "← Back to YuioLink" } }
+        h2.help-title { "How to use YuioLink" }
+        p.help-lead {
+            "Paste a link or some text, choose how long it should last, and you get a "
+            "short name to pass on — " code { (host) "/braveOTTER" } ". Whoever opens it "
+            "sees where it leads before they go. When the time runs out the link is gone, "
+            "and what it held goes with it."
+        }
+
+        h3.help-h { "Everything expires" }
+        p.help-p {
+            "There are no permanent links here. Seven days is the longest life a link can "
+            "have, and it is also the starting position of the slider — drag it down to the "
+            "shortest span that still does the job. Expiry is deletion, not hiding: the row "
+            "is erased, and the name goes back into the pool for someone else."
+        }
+
+        h3.help-h { "The three types" }
+        ul.help-types {
+            li {
+                span.help-type.dot.t-public { "Public" }
+                " — one word, or two or three while short names are in demand. Short enough "
+                "to read out or type from the back of a room. The "
+                a href="/wordlist.txt" { "wordlist" }
+                " is public, so anyone can walk the whole list and turn up every public link. "
+                "For convenience, never for secrets."
+            }
+            li {
+                span.help-type.dot.t-secret { "Secret" }
+                " — four random words out of about 143 trillion combinations. Nothing lists "
+                "or indexes it, so reaching the link means guessing its exact name before it "
+                "expires. The name is the secret, and it exists only until the link does. The "
+                "server can still read the destination — this hides the link, not its contents."
+            }
+            li {
+                span.help-type.dot.t-once { "One-Time" }
+                " — four words as well, and the content is erased the moment it is revealed. "
+                "The recipient sees a preview first and chooses to reveal, so a chat unfurler "
+                "or a prefetch cannot burn it on the way. If they find it already spent, "
+                "someone else opened it first — which is worth knowing."
+            }
+        }
+
+        h3.help-h { "The two kinds" }
+        p.help-p {
+            "Paste something that looks like an address and you get a redirect; paste anything "
+            "else and you get text, shown escaped and never rendered as HTML. If you wanted the "
+            "address itself shown rather than followed, the page you land on after creating "
+            "offers to share it as a text link instead."
+        }
+
+        h3.help-h { "What it is for" }
+        dl.help-cases {
+            dt { "A long address onto your phone" }
+            dd { "Public, ten minutes. Type one word instead of mailing it to yourself." }
+            dt { "The guest Wi-Fi password" }
+            dd {
+                "Secret text, until the end of the day. You hand out the name; nobody walking "
+                "the wordlist finds it."
+            }
+            dt { "A credential, handed over once" }
+            dd {
+                "One-time text, an hour or two. If it reads as already spent when they open "
+                "it, rotate the credential."
+            }
+            dt { "A link on a slide" }
+            dd {
+                "Public, a few hours. Readable from the back of the room, and gone before the "
+                "recording goes up."
+            }
+            dt { "Notes, a log, an error message" }
+            dd { "Text, for as long as the conversation needs. Paste it, or pipe a file in." }
+        }
+
+        h3.help-h { "From a terminal" }
+        pre.help-code {
+            span.c { "# a redirect, lasting the default seven days" } "\n"
+            "curl -d url=https://example.com/a/very/long/path " (base_url) "create\n\n"
+            span.c { "# ten minutes instead" } "\n"
+            "curl -d url=https://example.com -d ttl=10m " (base_url) "create\n\n"
+            span.c { "# a file, as a one-time text link" } "\n"
+            "curl --data-binary @notes.txt -d uses=1 " (base_url) "create\n"
+        }
+        p.help-p.help-note {
+            code { "ttl" } " and " code { "uses" } " have to come last: everything before them "
+            "is the content, so a URL keeps its own query string. The reply is the short URL, "
+            "or JSON with " code { "Accept: application/json" } ". This endpoint makes public "
+            "and one-time links — a secret one needs the "
+            a href="/api/v1/openapi.yaml" { "API" }
+            "."
+        }
+
+        h3.help-h { "What the server knows" }
+        p.help-p {
+            "Destinations and text are stored as you gave them, so whoever runs the server can "
+            "read them. That is true of every link shortener, and it is why the secret type is "
+            "about the name rather than the payload. The counters record nothing about you — no "
+            "addresses, no agents, no referrers, no per-event row to correlate — and all of them "
+            "are on the " a href="/stats" { "statistics page" } ". Local history stays in your "
+            "browser and is never sent."
+        }
+
+        footer { a href="/" { "Back to YuioLink" } }
+    };
+    document_full(
+        "YuioLink — How to Use",
+        html! {
+            meta name="description" content="How YuioLink works: why every link expires, what the public, secret, and one-time types are for, and how to create a link from a terminal.";
+        },
+        body,
+        html! {},
+    )
 }
 
 /// Generic terse error page (used for 400 on the no-JS form and 500).

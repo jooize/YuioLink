@@ -31,7 +31,7 @@ const WORDS_RAW: &str = include_str!("words.txt");
 pub const WORD_COUNT: usize = 3456;
 
 /// The entropy the site markets on: a four-word name is claimed to be ~47 bits.
-/// The claim is public copy ("47-bit namespace", "about 153 trillion
+/// The claim is public copy ("47-bit namespace", "about 143 trillion
 /// possibilities"), so it is asserted in the tests rather than left to arithmetic
 /// nobody redoes after a curation pass.
 ///
@@ -42,6 +42,13 @@ pub const CLAIMED_NAME_BITS: f64 = 47.0;
 
 /// Words in a name whose entropy the claim covers (Secret and One-Time links).
 pub const CLAIMED_NAME_WORDS: u32 = 4;
+
+/// The other half of the public claim, in trillions: "about 143 trillion
+/// possibilities". Pinned to the rounded figure rather than checked against a
+/// wide range — a range roomy enough to survive a curation pass is a range that
+/// lets the copy go stale, which is how the old 3516-word "153 trillion" line
+/// outlived its wordlist.
+pub const CLAIMED_COMBINATIONS_TRILLIONS: u64 = 143;
 
 /// Bits of entropy in a name of `word_count` words drawn uniformly from the list.
 ///
@@ -86,11 +93,14 @@ mod tests {
              {CLAIMED_NAME_BITS} — either restore words or change the public copy \
              (views.rs \"47-bit namespace\", README, docs/NAMESPACES.md)"
         );
-        // The other half of the claim: "about 153 trillion possibilities".
+        // The other half of the claim: "about 143 trillion possibilities".
         let combos = (WORD_COUNT as f64).powi(CLAIMED_NAME_WORDS as i32);
-        assert!(
-            (1.4e14..1.6e14).contains(&combos),
-            "combination count {combos:.3e} no longer rounds to ~153 trillion"
+        let trillions = (combos / 1e12).round() as u64;
+        assert_eq!(
+            trillions, CLAIMED_COMBINATIONS_TRILLIONS,
+            "a {CLAIMED_NAME_WORDS}-word name now has ~{trillions} trillion combinations — \
+             update the copy that says {CLAIMED_COMBINATIONS_TRILLIONS} (views.rs picker note \
+             and /help, README, docs/NAMESPACES.md)"
         );
         // Headroom, so a curation pass can see how close it is running.
         let floor = (2f64.powf(CLAIMED_NAME_BITS / f64::from(CLAIMED_NAME_WORDS))).ceil() as usize;

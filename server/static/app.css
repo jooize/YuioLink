@@ -2055,6 +2055,102 @@ main > footer {
     margin-bottom: 0;
 }
 
+/* --- /help: the usage page. Prose, so it opts out of the centered `main p`. --- */
+
+.help-title {
+    margin: 16px 0 0;
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-align: center;
+}
+
+.help-h {
+    margin: 26px 0 6px;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: left;
+}
+
+main p.help-lead {
+    max-width: none;
+    text-align: left;
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--text);
+}
+
+main p.help-p {
+    max-width: none;
+    text-align: left;
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+main p.help-note {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+.help-types {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.help-types li {
+    padding: 10px 0;
+    border-bottom: 0.5px solid var(--separator);
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+}
+
+.help-types li:last-child {
+    border-bottom: 0;
+}
+
+/* The type name carries the picker's colour dot, so the page reads as a key to
+   the control rather than a second, unrelated vocabulary. */
+.help-type {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.help-cases {
+    margin: 0;
+    font-size: 13px;
+}
+
+.help-cases dt {
+    margin-top: 12px;
+    font-weight: 600;
+}
+
+.help-cases dd {
+    margin: 2px 0 0;
+    line-height: 1.55;
+    color: var(--text-secondary);
+}
+
+.help-code {
+    margin: 8px 0 0;
+    padding: 12px 14px;
+    overflow-x: auto;
+    background: var(--field-bg);
+    border: 0.5px solid var(--field-border);
+    border-radius: var(--radius-control);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.help-code .c {
+    color: var(--text-tertiary);
+}
+
 /* --- Keyboard-shortcuts help: the "?" corner button and its <dialog> --- */
 
 .kbd-help {

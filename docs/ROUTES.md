@@ -14,9 +14,10 @@ crawlers and prefetchers can never spend a use.
 | `/:name/go` | POST | Consume an **unlimited redirect**: hits+1, 303 to the destination. |
 | `/:name/reveal` | POST | Consume a **limited** link (redirect or Text): hits+1, set the path-scoped `yl_reveal` HMAC cookie (~10 min), 303 back to `/:name`, which renders the revealed view. Refresh/back re-renders without re-consuming. |
 | `/:name/card.png` | GET | The og:image share card (redirects only). Spends no use; `Cache-Control: max-age=3600`. |
+| `/help` | GET | The usage page: why links expire, what the three types and two kinds are for, worked scenarios, and the `curl` endpoint (printed with this instance's base URL, so a copied command targets the host being read). Static — touches no database. |
 | `/healthz` | GET | Deploy/update health probe. Touches the database, so a failed migration reads as unhealthy. |
 | `/stats` | GET | Public aggregate counters: live links, created (by type and kind), opened, expired, and the last 7 UTC days. Reads the `stats` table, which holds nothing but `(day, metric, count)` — no IP, user agent, referrer, link name, or destination, and no per-event row. Degrades to zeroes rather than 500ing. |
-| `/wordlist.txt` | GET | The curated 3,516-word name list as plain text (linked from the landing page's Privacy/Security disclosure — the namespace is public by design). |
+| `/wordlist.txt` | GET | The curated 3,456-word name list as plain text (linked from the landing page's Privacy/Security disclosure — the namespace is public by design). |
 | `/static/app.css`, `/static/app.js`, `/static/text.js` | GET | Embedded assets; `Cache-Control: public, max-age=3600`. |
 
 ## Terminal convenience

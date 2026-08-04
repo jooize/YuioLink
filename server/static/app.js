@@ -984,7 +984,7 @@
             // Hint the hidden override only when it would change the outcome (a URL that
             // would otherwise redirect), so the tooltip is never misleading.
             submitBtn.title = (!empty && !altHeld && detectKind(content.value) === "redirect")
-                ? "Hold Option to share as a Text link instead"
+                ? "Hold Option to share as a text link instead"
                 : "";
         };
         const setAlt = (on) => { if (altHeld !== on) { altHeld = on; updateSubmitLabel(); } };

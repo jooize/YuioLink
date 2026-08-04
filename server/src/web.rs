@@ -95,6 +95,7 @@ pub fn router(state: AppState) -> Router {
         // Any bare segment added here shadows `/{name}` and must also go in
         // `yuiolink_core::RESERVED_NAMES`, or a link issued under that word is
         // unreachable for its whole life (a GET lands on this route, not the link).
+        .route("/help", get(help))
         .route("/stats", get(stats))
         .nest("/api/v1", api_routes())
         .route("/create", post(create_plain))
@@ -894,7 +895,7 @@ pub struct FormCreate {
     #[serde(default)]
     pub link_type: Option<String>,
     /// Force the kind instead of letting the server detect it. Only the result
-    /// page's "share the address as Text instead" sends it; absent or `auto`
+    /// page's "share the address as a text link instead" sends it; absent or `auto`
     /// means detection, which is what the form itself always does.
     #[serde(default)]
     pub kind: Option<String>,
@@ -997,6 +998,13 @@ impl IntoResponse for ApiError {
         };
         (status, Json(serde_json::json!({ "error": message }))).into_response()
     }
+}
+
+/// `GET /help` — the usage page. Static apart from the host it prints in the
+/// `curl` examples, which comes from the configured base URL so a copied command
+/// targets the instance the reader is actually on.
+pub async fn help(State(state): State<AppState>) -> Response {
+    Html(views::help_page(&state.base_url).into_string()).into_response()
 }
 
 /// `GET /stats` — the public, aggregate-only counters. Reads three cheap queries
@@ -1562,7 +1570,7 @@ mod tests {
         let (s, _, body) = send(&st, form("")).await;
         assert_eq!(s, StatusCode::OK);
         assert!(
-            body.contains("Share the address as Text instead"),
+            body.contains("Share the address as a text link instead"),
             "redirect result should offer the Text alternative"
         );
         assert!(body.contains(r#"name="kind" value="text""#));
@@ -1573,7 +1581,19 @@ mod tests {
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("Text"), "should report a Text link: {body}");
         // Not offered again: a Text link has no other kind to become.
-        assert!(!body.contains("Share the address as Text instead"));
+        assert!(!body.contains("Share the address as a text link instead"));
+    }
+
+    #[tokio::test]
+    async fn help_page_covers_the_types_and_prints_this_host_in_the_examples() {
+        let st = test_state().await;
+        let (s, _, body) = send(&st, get("/help")).await;
+        assert_eq!(s, StatusCode::OK);
+        for label in ["Public", "Secret", "One-Time"] {
+            assert!(body.contains(label), "help should name {label}: {body}");
+        }
+        // The curl line must target the configured instance, not a hardcoded host.
+        assert!(body.contains(&format!("{}create", st.base_url)), "{body}");
     }
 
     #[tokio::test]
