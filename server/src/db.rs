@@ -38,9 +38,9 @@ pub struct NewLink<'a> {
     pub content_type: Option<&'a str>,
     pub ttl_seconds: i64,
     pub max_uses: Option<i64>,
-    /// Request a private (long, unguessable) name even for an unlimited link. A
+    /// Request a secret (long, unguessable) name even for an unlimited link. A
     /// limited link is always given the long name regardless of this flag.
-    pub private: bool,
+    pub secret: bool,
     /// Secret that authorizes deleting this link later; `None` means the link
     /// cannot be deleted via the API (no holder).
     pub delete_token: Option<&'a str>,
@@ -149,14 +149,21 @@ pub async fn consume_link(
     let sql = format!(
         "UPDATE links SET hits = hits + 1 WHERE name = ? AND {LIVE_PREDICATE} RETURNING {LINK_COLUMNS}"
     );
-    sqlx::query_as::<_, LinkDetail>(&sql)
+    let row = sqlx::query_as::<_, LinkDetail>(&sql)
         .bind(name)
         .fetch_optional(pool)
-        .await
+        .await?;
+    // Counted here rather than in the handlers because this is the single place a
+    // use is actually spent — both the redirect and the one-time reveal come
+    // through it, and a preview or a card fetch never does.
+    if row.is_some() {
+        bump(pool, Stat::Opened).await;
+    }
+    Ok(row)
 }
 
 /// Insert a link under a freshly generated name. The starting word count comes
-/// from the link's type and the current per-tier `occupancy`: private/single-use
+/// from the link's type and the current per-tier `occupancy`: secret/single-use
 /// links always get four words; a public link gets the shortest tier still under
 /// its TTL band's occupancy ceiling (see [`yuiolink_core::words_for`]). It then
 /// grows by one after every `COLLISION_GROW_AT` unique-name collisions, so a tier
@@ -169,7 +176,7 @@ pub async fn insert_link(
     /// Grow the name by a word after this many collisions in a row.
     const COLLISION_GROW_AT: u32 = 8;
 
-    let mut words = words_for(link.max_uses, link.private, link.ttl_seconds, occupancy);
+    let mut words = words_for(link.max_uses, link.secret, link.ttl_seconds, occupancy);
     let mut collisions: u32 = 0;
 
     loop {
@@ -192,6 +199,20 @@ pub async fn insert_link(
 
         match result {
             Ok(expires_at) => {
+                bump(pool, if link.max_uses == Some(1) {
+                    Stat::CreatedOnce
+                } else if link.secret {
+                    Stat::CreatedSecret
+                } else {
+                    Stat::CreatedPublic
+                })
+                .await;
+                bump(pool, if link.kind == "text" {
+                    Stat::CreatedText
+                } else {
+                    Stat::CreatedRedirect
+                })
+                .await;
                 return Ok(InsertedLink {
                     name,
                     expires_at,
@@ -248,7 +269,101 @@ pub async fn reap_expired(pool: &SqlitePool) -> Result<u64, sqlx::Error> {
     let result = sqlx::query("DELETE FROM links WHERE expires_at <= datetime('now')")
         .execute(pool)
         .await?;
-    Ok(result.rows_affected())
+    let reaped = result.rows_affected();
+    if reaped > 0 {
+        bump_by(pool, Stat::Expired, reaped as i64).await;
+    }
+    Ok(reaped)
+}
+
+// --------------------------------------------------------------------------
+// Anonymous counters (see migrations/0005_stats.sql)
+// --------------------------------------------------------------------------
+
+/// A counted event. Every variant is a plain tally on a UTC day — there is no
+/// per-event row, and nothing here can be traced to a person or a link. Adding a
+/// variant is cheap; adding anything that identifies a visitor is not on the
+/// table, since the site's "no tracking" claim has to stay literally true.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Stat {
+    CreatedPublic,
+    CreatedSecret,
+    CreatedOnce,
+    CreatedRedirect,
+    CreatedText,
+    /// A link actually resolved (a use spent), not a preview or a card fetch.
+    Opened,
+    /// Reaped by the sweeper after its lifetime ran out.
+    Expired,
+}
+
+impl Stat {
+    /// The stored `metric` key. Stable — these strings are the table's contents.
+    pub fn key(self) -> &'static str {
+        match self {
+            Stat::CreatedPublic => "created_public",
+            Stat::CreatedSecret => "created_secret",
+            Stat::CreatedOnce => "created_once",
+            Stat::CreatedRedirect => "created_redirect",
+            Stat::CreatedText => "created_text",
+            Stat::Opened => "opened",
+            Stat::Expired => "expired",
+        }
+    }
+}
+
+/// Add `n` to today's tally for `stat`.
+///
+/// Deliberately infallible from the caller's side: a counter is never worth
+/// failing a request over, so a broken write is logged and dropped. The tally
+/// undercounts; the link is still created or resolved.
+pub async fn bump_by(pool: &SqlitePool, stat: Stat, n: i64) {
+    let result = sqlx::query(
+        "INSERT INTO stats (day, metric, count) VALUES (date('now'), ?, ?) \
+         ON CONFLICT(day, metric) DO UPDATE SET count = count + excluded.count",
+    )
+    .bind(stat.key())
+    .bind(n)
+    .execute(pool)
+    .await;
+    if let Err(e) = result {
+        tracing::warn!(metric = stat.key(), error = %e, "stats counter not recorded");
+    }
+}
+
+/// Add one to today's tally for `stat`.
+pub async fn bump(pool: &SqlitePool, stat: Stat) {
+    bump_by(pool, stat, 1).await;
+}
+
+/// Every metric's all-time total, as `(metric, count)`.
+pub async fn stat_totals(pool: &SqlitePool) -> Result<Vec<(String, i64)>, sqlx::Error> {
+    sqlx::query_as("SELECT metric, SUM(count) FROM stats GROUP BY metric")
+        .fetch_all(pool)
+        .await
+}
+
+/// The last `days` UTC days of tallies (today included), as `(day, metric,
+/// count)`, oldest first.
+pub async fn stat_recent(
+    pool: &SqlitePool,
+    days: i64,
+) -> Result<Vec<(String, String, i64)>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT day, metric, count FROM stats \
+         WHERE day >= date('now', '-' || ? || ' days') \
+         ORDER BY day ASC",
+    )
+    .bind(days - 1)
+    .fetch_all(pool)
+    .await
+}
+
+/// How many links are resolvable right now. A live count, not a tally — it falls
+/// as links expire, which is rather the point of the site.
+pub async fn live_count(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
+    let sql = format!("SELECT COUNT(*) FROM links WHERE {LIVE_PREDICATE}");
+    sqlx::query_scalar(&sql).fetch_one(pool).await
 }
 
 #[cfg(test)]
@@ -278,7 +393,7 @@ mod tests {
             content_type: None,
             ttl_seconds: 3600,
             max_uses,
-            private: false,
+            secret: false,
             delete_token: Some("tok"),
         }
     }
@@ -375,7 +490,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn private_unlimited_link_gets_a_long_name() {
+    async fn secret_unlimited_link_gets_a_long_name() {
         let pool = test_pool().await;
         // A public unlimited link is one lowercase word (no case boundary).
         let public = insert_link(
@@ -390,14 +505,14 @@ mod tests {
             "{}",
             public.name
         );
-        // A private unlimited link is four words, so alternating-case adds uppercase.
+        // A secret unlimited link is four words, so alternating-case adds uppercase.
         let mut nl = redirect("https://example.com/b", None);
-        nl.private = true;
-        let private = insert_link(&pool, nl, &EMPTY_OCCUPANCY).await.unwrap();
+        nl.secret = true;
+        let secret = insert_link(&pool, nl, &EMPTY_OCCUPANCY).await.unwrap();
         assert!(
-            private.name.chars().any(|c| c.is_ascii_uppercase()),
+            secret.name.chars().any(|c| c.is_ascii_uppercase()),
             "{}",
-            private.name
+            secret.name
         );
     }
 

@@ -840,6 +840,25 @@
             const n = Number.parseInt(ttlCustomValue.value.trim(), 10);
             return !Number.isNaN(n) && n > Number(ttlCustomValue.max);
         };
+        // Park the thumb on the stop nearest the duration actually in force, so the
+        // slider never contradicts the readout while the exact field is driving.
+        // Setting .value programmatically fires no "input" event, so this cannot
+        // trip the handler that clears the exact field when the slider is dragged.
+        // An over-limit value pins the thumb to the last stop: the ceiling is where
+        // that duration will land if it is submitted.
+        const syncSliderToSeconds = (secs, over) => {
+            if (!ttlSlider) return;
+            if (over || !Number.isFinite(secs)) {
+                ttlSlider.value = String(TTL_STOPS.length - 1);
+                return;
+            }
+            let best = 0;
+            for (let i = 1; i < TTL_STOPS.length; i += 1) {
+                if (Math.abs(TTL_STOPS[i] - secs) < Math.abs(TTL_STOPS[best] - secs)) best = i;
+            }
+            ttlSlider.value = String(best);
+        };
+
         const updateTtlReadout = () => {
             if (!ttlReadout) return;
             // Over the ceiling: the typed duration is shown struck out in red
@@ -863,6 +882,7 @@
                 small.textContent = deadlineLabel(secs);
                 ttlReadout.replaceChildren(dur, small);
             }
+            syncSliderToSeconds(secs, over);
             ttlReadout.classList.toggle("ttl-over", over);
             // Striking out "45 days" corrects a plausible ask; striking out
             // "3.2e+300 years" belabors it. Absurd magnitudes (scientific
@@ -946,11 +966,11 @@
             }
             return TTL_STOPS[+(ttlSlider?.value ?? 16)] ?? 604800;
         };
-        // One control picks the type: public (reusable, short, guessable), private
+        // One control picks the type: public (reusable, short, guessable), secret
         // (reusable, long unguessable name), or once (single-use, long name).
         const linkType = () => checkedValue("link_type", "public");
         const maxUses = () => (linkType() === "once" ? 1 : null);
-        const isPrivate = () => linkType() === "private";
+        const isSecret = () => linkType() === "secret";
 
         // Holding Option/Alt forces a Text link even when the input looks like a URL.
         // We track whether it is held so the button label reflects what a submit makes.
@@ -1034,7 +1054,7 @@
             // reaches here once it passes); the limit is now just once-or-unlimited.
             const ttl = ttlSeconds();
             const uses = maxUses();
-            const priv = isPrivate();
+            const priv = isSecret();
 
             const kind = forceText ? "text" : detectKind(raw);
             const payload = kind === "redirect" ? normalizeTarget(raw.trim()) : raw;
@@ -1053,7 +1073,7 @@
                         content: payload,
                         ttl_seconds: ttl,
                         max_uses: uses,
-                        private: priv,
+                        secret: priv,
                     }),
                 });
                 if (!resp.ok) {

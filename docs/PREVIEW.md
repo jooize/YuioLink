@@ -181,14 +181,15 @@ On the interstitial `GET /:name` response `<head>`, emit (plaintext links only, 
 card **always shows the domain** — decided, for trustworthiness):
 - `og:site_name` = YuioLink
 - `og:title` = e.g. "Redirect to example.com" / "One-time link to acme.co"
-- `og:description` = prose, e.g. "Ephemeral redirect that expires Jun 29, 2026 and may
-  change after." (one-time: "Single-use redirect that expires ...")
+- `og:description` = prose, e.g. "Ephemeral redirect that expires Jun 29, 2026 at 14:30
+  UTC." (one-time: "Single-use redirect that expires ...")
 - `og:image` = absolute URL to the card endpoint; `twitter:card` = summary_large_image
 - `theme-color` = brand blue (Discord left-rail)
 
 og:image endpoint: `GET /:name/card.png` — render the shared card (brand, kicker
 "Ephemeral redirect"/"One-time redirect", destination domain, foot "expires <date, year> ·
-may change after"). **No use consumed** (crawlers fetch it). Build an SVG from a template
+<HH:MM> UTC" — absolute, because a cached card outlives any relative phrasing, and to the
+minute, because a TTL can be an hour). **No use consumed** (crawlers fetch it). Build an SVG from a template
 and rasterise to PNG with `resvg` + `tiny-skia`; serve `image/png`. Consider caching the
 PNG per name until expiry. The visual spec is the `.ogcard` design in the mockup. Cards are
 identical across platforms — iMessage shows image + title + source domain (`yuio.link`);

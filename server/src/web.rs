@@ -92,6 +92,7 @@ pub fn router(state: AppState) -> Router {
         .route("/static/text.js", get(text_js))
         .route("/wordlist.txt", get(wordlist_txt))
         .route("/robots.txt", get(robots_txt))
+        .route("/stats", get(stats))
         .nest("/api/v1", api_routes())
         .route("/create", post(create_plain))
         .route("/{name}", get(resolve))
@@ -174,7 +175,7 @@ async fn create_link(
     raw_content: &str,
     ttl_seconds: Result<i64, String>,
     max_uses: Result<Option<i64>, String>,
-    private: bool,
+    secret: bool,
     delete_token: Option<&str>,
 ) -> Result<db::InsertedLink, CreateError> {
     let mut errors: Vec<FieldError> = Vec::new();
@@ -271,7 +272,7 @@ async fn create_link(
             content_type,
             ttl_seconds,
             max_uses,
-            private,
+            secret,
             delete_token,
         },
         &occupancy,
@@ -332,10 +333,10 @@ pub async fn form_create(
     };
 
     // One control picks the link's type: public (short, guessable, reusable),
-    // private (long unguessable, reusable), or once (long unguessable, single-use).
-    let (max_uses, private) = match form.link_type.as_deref() {
+    // secret (long unguessable, reusable), or once (long unguessable, single-use).
+    let (max_uses, secret) = match form.link_type.as_deref() {
         Some("once") => (Some(1), false),
-        Some("private") => (None, true),
+        Some("secret") => (None, true),
         _ => (None, false), // public (default)
     };
 
@@ -348,7 +349,7 @@ pub async fn form_create(
         &form.content,
         ttl_seconds,
         Ok(max_uses),
-        private,
+        secret,
         None,
     )
     .await
@@ -365,7 +366,7 @@ pub async fn form_create(
                     kind_label,
                     &inserted.expires_at,
                     max_uses,
-                    private,
+                    secret,
                     inserted.words,
                 )
                 .into_string(),
@@ -634,10 +635,13 @@ pub async fn card_image(State(state): State<AppState>, Path(name): Path<String>)
         "Ephemeral redirect"
     };
     let domain = url.card_domain();
-    let foot = format!(
-        "expires {} · may change after",
-        views::format_card_date(&d.expires_at)
-    );
+    // Date and clock, no "may change after" tail: the expiry is the fact worth
+    // the space, and an hour-long link needs the minute to mean anything.
+    let date = views::format_card_date(&d.expires_at);
+    let foot = match views::format_card_time(&d.expires_at) {
+        Some(time) => format!("expires {date} · {time}"),
+        None => format!("expires {date}"),
+    };
 
     // Rasterizing is synchronous CPU work; keep it off the async workers so a
     // burst of crawler card fetches cannot stall every other request.
@@ -870,7 +874,7 @@ pub struct FormCreate {
     /// Custom-expiry unit: `m`, `h`, or `d`.
     #[serde(default)]
     pub ttl_unit: Option<String>,
-    /// Link type: `public` (default), `private`, or `once`.
+    /// Link type: `public` (default), `secret`, or `once`.
     #[serde(default)]
     pub link_type: Option<String>,
 }
@@ -887,10 +891,16 @@ pub struct CreateRequest {
     /// unlimited or single-use.
     #[serde(default)]
     pub max_uses: Option<i64>,
-    /// Request a private (long, unguessable) name for an unlimited link. Ignored
+    /// Request a secret (long, unguessable) name for an unlimited link. Ignored
     /// for single-use links, which always get the long name.
     #[serde(default)]
-    pub private: bool,
+    pub secret: bool,
+    /// The old name for [`Self::secret`], accepted only so it can be rejected.
+    /// Unknown fields are otherwise ignored, and staying silent here is the one
+    /// case where that is dangerous: a caller asking for an unguessable name
+    /// would be handed a short, guessable one and never hear about it.
+    #[serde(default)]
+    pub private: Option<bool>,
 }
 // Note: `content_type` is intentionally absent — minimal Text renders plaintext
 // only. Rich Text (a later step, on a sandboxed origin) will reintroduce it with
@@ -968,6 +978,43 @@ impl IntoResponse for ApiError {
     }
 }
 
+/// `GET /stats` — the public, aggregate-only counters. Reads three cheap queries
+/// and renders them; a failure on any one degrades to zeroes rather than a 500,
+/// since a broken counter is never worth an error page.
+pub async fn stats(State(state): State<AppState>) -> Response {
+    let live = db::live_count(&state.pool).await.unwrap_or(0);
+    let totals = db::stat_totals(&state.pool).await.unwrap_or_default();
+    let recent = db::stat_recent(&state.pool, 7).await.unwrap_or_default();
+
+    // Fold the (day, metric, count) rows into one row per day: created (any type)
+    // and opened. Days with no activity simply do not appear.
+    let mut days: Vec<(String, i64, i64)> = Vec::new();
+    for (day, metric, count) in recent {
+        let row = match days.iter_mut().find(|(d, _, _)| *d == day) {
+            Some(row) => row,
+            None => {
+                days.push((day, 0, 0));
+                days.last_mut().expect("just pushed")
+            }
+        };
+        match metric.as_str() {
+            "created_public" | "created_secret" | "created_once" => row.1 += count,
+            "opened" => row.2 += count,
+            _ => {}
+        }
+    }
+
+    Html(
+        views::stats_page(&views::StatsView {
+            live,
+            totals: &totals,
+            days: &days,
+        })
+        .into_string(),
+    )
+    .into_response()
+}
+
 /// `POST /api/v1/links` — create a link. Returns `201 Created` with a
 /// `Location` header pointing at the new resource. This is the surface JS uses
 /// for an in-place result (and the one a third-party client targets).
@@ -980,6 +1027,13 @@ pub async fn api_create_link(
         return Err(ApiError::TooManyRequests);
     }
 
+    if req.private.is_some() {
+        return Err(ApiError::BadRequest(vec![FieldError {
+            field: "private",
+            message: "`private` was renamed to `secret`.".to_string(),
+        }]));
+    }
+
     let ttl_seconds = req.ttl_seconds.unwrap_or(DEFAULT_TTL_SECS);
     let delete_token = yuiolink_core::generate_token();
     let inserted = create_link(
@@ -988,7 +1042,7 @@ pub async fn api_create_link(
         &req.content,
         Ok(ttl_seconds),
         Ok(req.max_uses),
-        req.private,
+        req.secret,
         Some(&delete_token),
     )
     .await?;
@@ -1245,7 +1299,7 @@ mod tests {
             content_type: None,
             ttl_seconds: 3600,
             max_uses,
-            private: false,
+            secret: false,
             delete_token: Some("tok"),
         }
     }
@@ -1402,7 +1456,7 @@ mod tests {
                 content_type: Some("text/plain"),
                 ttl_seconds: 3600,
                 max_uses: None,
-                private: false,
+                secret: false,
                 delete_token: None,
             },
             &db::EMPTY_OCCUPANCY,
@@ -1468,6 +1522,77 @@ mod tests {
         // Single-use is accepted.
         let (s, _, _) = send(&st, create(1)).await;
         assert_eq!(s, StatusCode::CREATED);
+    }
+
+    #[tokio::test]
+    async fn stats_counts_creates_and_opens_but_no_identities() {
+        let st = test_state().await;
+        let l = db::insert_link(
+            &st.pool,
+            redirect("https://example.com/counted", None),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+        // A preview must not count as an open — only spending a use does.
+        let (s, _, _) = send(&st, get(&format!("/{}", l.name))).await;
+        assert_eq!(s, StatusCode::OK);
+
+        let (s, body) = {
+            let (s, _, b) = send(&st, get("/stats")).await;
+            (s, b)
+        };
+        assert_eq!(s, StatusCode::OK);
+        assert!(body.contains("links created"), "page should render: {body}");
+        // One create, no opens yet.
+        assert!(body.contains("Statistics"));
+
+        // Spending the use is what the counter is for.
+        let req = Request::builder()
+            .method("POST")
+            .uri(format!("/{}/go", l.name))
+            .body(Body::empty())
+            .unwrap();
+        let (s, _, _) = send(&st, req).await;
+        assert!(s.is_redirection() || s == StatusCode::OK, "go returned {s}");
+
+        let totals = db::stat_totals(&st.pool).await.unwrap();
+        let get_total = |k: &str| {
+            totals
+                .iter()
+                .find(|(m, _)| m == k)
+                .map(|(_, n)| *n)
+                .unwrap_or(0)
+        };
+        assert_eq!(get_total("created_public"), 1);
+        assert_eq!(get_total("created_redirect"), 1);
+        assert_eq!(get_total("opened"), 1, "preview must not have counted");
+
+        // The table holds counts and nothing else — no column could carry a name,
+        // a destination, or a visitor.
+        let cols: Vec<String> = sqlx::query_scalar("SELECT name FROM pragma_table_info('stats')")
+            .fetch_all(&st.pool)
+            .await
+            .unwrap();
+        assert_eq!(cols, vec!["day", "metric", "count"]);
+    }
+
+    #[tokio::test]
+    async fn api_rejects_the_old_private_field() {
+        let st = test_state().await;
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/v1/links")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"kind":"redirect","content":"https://example.com","private":true}"#,
+            ))
+            .unwrap();
+        // Loud, not silent: ignoring the old field would hand a caller who asked
+        // for an unguessable name a short guessable one.
+        let (s, _, body) = send(&st, req).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+        assert!(body.contains("secret"), "should name the new field: {body}");
     }
 
     #[tokio::test]
@@ -1647,7 +1772,7 @@ mod tests {
                 content_type: Some("text/plain"),
                 ttl_seconds: 3600,
                 max_uses: None,
-                private: false,
+                secret: false,
                 delete_token: None,
             },
             &db::EMPTY_OCCUPANCY,

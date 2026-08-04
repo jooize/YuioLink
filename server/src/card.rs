@@ -6,6 +6,12 @@
 //! dropped). Two DejaVu fonts are embedded so the card renders identically with no
 //! system fonts installed, e.g. in a slim container. The card always shows the
 //! destination domain — decided, so a shared link reads as trustworthy.
+//!
+//! The wordmark carries the only brand colour — "Link" in the accent blue, with no
+//! separate mark beside it — so the card holds one accent, not three. The greys are
+//! `#55555c` (~6.5:1) rather than the lighter `#6e6e73`: a share card is usually
+//! seen scaled down to a couple of hundred pixels, where the secondary lines are
+//! the first thing to dissolve.
 
 use std::sync::{Arc, OnceLock};
 
@@ -29,7 +35,7 @@ pub struct Card<'a> {
     pub kicker: &'a str,
     /// The destination's registrable domain, shown big.
     pub domain: &'a str,
-    /// e.g. "expires Jun 29, 2026 · may change after".
+    /// e.g. "expires Jun 29, 2026 · 14:30 UTC".
     pub foot: &'a str,
 }
 
@@ -77,18 +83,13 @@ fn build_svg(card: &Card) -> String {
       <stop offset="0" stop-color="#007aff" stop-opacity="0.12"/>
       <stop offset="0.55" stop-color="#007aff" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="dot" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0a84ff"/>
-      <stop offset="1" stop-color="#007aff"/>
-    </linearGradient>
   </defs>
   <rect width="{WIDTH}" height="{HEIGHT}" fill="url(#bg)"/>
   <rect width="{WIDTH}" height="{HEIGHT}" fill="url(#glow)"/>
-  <rect x="96" y="92" width="30" height="30" rx="8" fill="url(#dot)"/>
-  <text x="140" y="117" font-family="DejaVu Sans" font-weight="bold" font-size="40" fill="#1d1d1f">YuioLink</text>
-  <text x="96" y="338" font-family="DejaVu Sans" font-size="33" fill="#6e6e73">{kicker} <tspan fill="#007aff">&#8594;</tspan></text>
+  <text x="96" y="117" font-family="DejaVu Sans" font-weight="bold" font-size="44" fill="#1d1d1f">Yuio<tspan fill="#007aff">Link</tspan></text>
+  <text x="96" y="338" font-family="DejaVu Sans" font-size="35" fill="#55555c">{kicker} <tspan fill="#007aff">&#8594;</tspan></text>
   <text x="94" y="432" font-family="DejaVu Sans Mono" font-weight="bold" font-size="{dest_size}" fill="#1d1d1f">{domain}</text>
-  <text x="96" y="566" font-family="DejaVu Sans" font-size="31" fill="#6e6e73">{foot}</text>
+  <text x="96" y="566" font-family="DejaVu Sans" font-size="33" fill="#55555c">{foot}</text>
 </svg>"##
     )
 }
@@ -130,7 +131,7 @@ mod tests {
         let png = render_png(&Card {
             kicker: "Ephemeral redirect",
             domain: "example.com",
-            foot: "expires Jun 29, 2026 · may change after",
+            foot: "expires Jun 29, 2026 · 14:30 UTC",
         })
         .expect("render");
         // PNG magic number.

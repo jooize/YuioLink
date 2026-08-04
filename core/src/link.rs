@@ -90,18 +90,18 @@ pub fn public_words_for(ttl_seconds: i64, live_per_tier: &[u64]) -> usize {
 
 /// Number of words a fresh name needs.
 ///
-/// A name must be unguessable ([`LIMITED_WORDS`]) when the link is **private** or
+/// A name must be unguessable ([`LIMITED_WORDS`]) when the link is **secret** or
 /// **single-use** — a guesser could otherwise discover it or burn its one view, so
 /// the name itself has to be the secret. An ordinary **public** link guards
 /// nothing, so its length is chosen purely for *availability*: the shortest tier
 /// not over-subscribed for the link's TTL ([`public_words_for`]).
 pub fn words_for(
     max_uses: Option<i64>,
-    private: bool,
+    secret: bool,
     ttl_seconds: i64,
     live_per_tier: &[u64],
 ) -> usize {
-    if private || max_uses.is_some() {
+    if secret || max_uses.is_some() {
         LIMITED_WORDS
     } else {
         public_words_for(ttl_seconds, live_per_tier)
@@ -297,12 +297,12 @@ mod tests {
     }
 
     #[test]
-    fn words_for_forces_four_for_private_and_single_use() {
+    fn words_for_forces_four_for_secret_and_single_use() {
         let empty = [0u64; 4];
         let ttl = 3600;
         // Public + uncrowded namespace -> one wieldy word.
         assert_eq!(words_for(None, false, ttl, &empty), PUBLIC_WORDS);
-        // Private reusable, or single-use, must stand on its own as a secret.
+        // Secret reusable, or single-use, must stand on its own as a secret.
         assert_eq!(words_for(None, true, ttl, &empty), LIMITED_WORDS);
         assert_eq!(words_for(Some(1), false, ttl, &empty), LIMITED_WORDS);
         assert_eq!(words_for(Some(5), true, ttl, &empty), LIMITED_WORDS);

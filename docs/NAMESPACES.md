@@ -19,8 +19,8 @@ Length is **not** sold as privacy except at four words. The dial does two jobs:
 
 - **Unguessability (privacy).** Only a **4-word** name is unguessable enough to stand
   on its own as a secret (~47 bits — a sustained 10⁴ req/s botnet has ~1-in-25,000
-  odds over a full 7-day life). So **Private** and **One-time** links are always 4
-  words. A 1–3-word name is never called private in the UI.
+  odds over a full 7-day life). So **Secret** and **One-time** links are always 4
+  words. A 1–3-word name is never called secret in the UI.
 - **Availability.** Public links guard nothing, so their length is chosen purely to
   keep short names *available*: the shortest tier that is not over-subscribed.
 

@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YuioLink — share card: mark, legibility, foot copy</title>
+<!--
+  Options for the og:image share card rendered by server/src/card.rs. Three
+  separate decisions, one section each: the mark beside the wordmark, the
+  legibility of the grey text, and the wording of the foot line. Open directly
+  in a browser (file://). Not served by the app -- a design reference only.
+
+  The cards are the same SVG the server builds, generated here by JS from one
+  template so the variants differ only where labelled. One deviation: the server
+  embeds DejaVu Sans and DejaVu Sans Mono, which a browser probably does not
+  have, so the stacks below fall back to the platform sans/mono. Proportions
+  shift a little; alignment and colour are faithful.
+-->
+<style>
+:root {
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, system-ui, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Monaco, monospace;
+    --page: #f4f4f6;
+    --ink: #1d1d1f;
+    --rule: rgba(127, 127, 127, 0.22);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root { --page: #17171a; --ink: #f5f5f7; }
+}
+
+body {
+    margin: 0;
+    padding: 30px 22px 70px;
+    background: var(--page);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+.doc { max-width: 1120px; margin: 0 auto 26px; }
+.doc h1 { font-size: 22px; margin: 0 0 8px; }
+.doc h2 { font-size: 17px; margin: 34px 0 8px; }
+.doc h3 { font-size: 14px; margin: 22px 0 6px; }
+.doc p { margin: 0 0 10px; max-width: 80ch; }
+code {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: rgba(127, 127, 127, 0.16);
+}
+
+.grid {
+    max-width: 1120px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
+    gap: 26px 24px;
+}
+
+.opt > h3 {
+    font: 600 14px/1.4 var(--font);
+    margin: 0 0 2px;
+}
+
+.opt > p {
+    margin: 0 0 10px;
+    font-size: 13px;
+    opacity: 0.78;
+    max-width: 60ch;
+}
+
+/* Cards carry their own shadow so they read as images, not page regions. */
+.card {
+    width: 100%;
+    border-radius: 12px;
+    display: block;
+    box-shadow: 0 8px 26px -12px rgba(20, 24, 40, 0.5);
+}
+
+/* The small row: what a chat client actually shows before you tap it. */
+.thumbs {
+    max-width: 1120px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-start;
+}
+.thumb { width: 260px; }
+.thumb .card { border-radius: 7px; }
+.thumb-label {
+    font-size: 12px;
+    opacity: 0.7;
+    margin: 6px 0 0;
+}
+
+.feet {
+    max-width: 1120px;
+    margin: 0 auto;
+    display: grid;
+    gap: 22px;
+}
+
+.foot-opt {
+    display: grid;
+    grid-template-columns: 430px 1fr;
+    gap: 20px;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .foot-opt { grid-template-columns: 1fr; }
+}
+.foot-opt h3 { margin: 0 0 4px; font-size: 14px; }
+.foot-opt .say { margin: 0 0 6px; font-size: 13px; }
+.foot-opt .acc { margin: 0; font-size: 13px; opacity: 0.78; }
+.tag {
+    display: inline-block;
+    font: 600 11px/1.6 var(--font);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0 7px;
+    border-radius: 5px;
+    margin-left: 7px;
+    vertical-align: 1px;
+}
+.tag.now { background: rgba(127, 127, 127, 0.22); }
+.tag.pick { background: rgba(26, 143, 60, 0.18); color: #1a8f3c; }
+.tag.risk { background: rgba(215, 0, 21, 0.14); color: #c0392b; }
+
+.own {
+    max-width: 1120px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 430px 1fr;
+    gap: 20px;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .own { grid-template-columns: 1fr; }
+}
+.own input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    font: 14px var(--font-mono);
+    padding: 8px 10px;
+    border: 1px solid rgba(127, 127, 127, 0.4);
+    border-radius: 7px;
+    background: rgba(127, 127, 127, 0.08);
+    color: inherit;
+}
+.own label { display: block; font-size: 13px; margin: 0 0 6px; }
+.own .hint { font-size: 12.5px; opacity: 0.7; margin: 8px 0 0; }
+
+.tbl {
+    max-width: 1120px;
+    margin: 16px auto 0;
+    border-collapse: collapse;
+    font-size: 13px;
+    width: 100%;
+}
+.tbl th, .tbl td {
+    text-align: left;
+    padding: 7px 12px 7px 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+}
+.tbl th { font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="doc">
+    <h1>Share card — mark, legibility, foot copy</h1>
+    <p>The card <code>server/src/card.rs</code> rasterises for <code>og:image</code>, at 1200×630. Three decisions are separated below so each can be judged on its own: what sits beside the wordmark, how dark and how large the grey text runs, and what the foot line says. Everything not under discussion in a section is held at its shipped value.</p>
+</div>
+
+<!-- ==================== 1. The mark ==================== -->
+<div class="doc">
+    <h2>1 · The mark</h2>
+    <p>The blue square is 30×30 at <code>y=92</code> while the wordmark's cap height spans roughly <code>y=88</code> to <code>y=117</code> — so the square sits about 5px low and hangs below the baseline. Option A just fixes that. B and C drop the shape: one keeps a colour accent inside the wordmark, the other goes fully monochrome and lets the arrow be the only blue on the card.</p>
+</div>
+
+<div class="grid" id="marks"></div>
+
+<div class="doc">
+    <h3>At the size a chat client shows it</h3>
+    <p>Link previews are rendered small — this row is 260px wide, close to what iMessage and Discord give an unopened card.</p>
+</div>
+<div class="thumbs" id="mark-thumbs"></div>
+
+<!-- ==================== 2. Legibility ==================== -->
+<div class="doc">
+    <h2>2 · Legibility of the grey text</h2>
+    <p>The kicker and foot are <code>#6e6e73</code> on the near-white card — about 4.6:1, AA at those sizes but the first thing to disappear when the card is scaled down. Darkening to <code>#55555c</code> (≈6.5:1) and nudging both up two points costs nothing else on the card. Shown here on option C.</p>
+</div>
+
+<div class="grid" id="legibility"></div>
+
+<div class="thumbs" id="legibility-thumbs"></div>
+
+<!-- ==================== 3. Foot copy ==================== -->
+<div class="doc">
+    <h2>3 · The foot line</h2>
+    <p>What is certain at expiry: the link stops working, and the name goes back in the pool. What is <em>not</em> certain is that anyone claims it again — so "will change after" promises a new destination the name may never get. The options below split on which half they assert. The same wording should carry to the <code>og:description</code> prose in <code>server/src/views.rs</code> and the example in <code>docs/PREVIEW.md</code>.</p>
+</div>
+
+<div class="feet" id="feet"></div>
+
+<div class="doc">
+    <h3>Write your own</h3>
+</div>
+<div class="own">
+    <svg class="card" id="own-card" viewBox="0 0 1200 630"></svg>
+    <div>
+        <label for="own-foot">Foot line</label>
+        <input type="text" id="own-foot" value="expires Jun 29, 2026 · never points here again">
+        <p class="hint">Rendered on option C with the darkened greys. The foot has room for roughly 46 characters at 33px before it reaches the right padding; the card does not wrap, so a longer line runs off the edge.</p>
+        <label for="own-domain" style="margin-top:14px">Destination domain</label>
+        <input type="text" id="own-domain" value="example.com">
+    </div>
+</div>
+
+<div class="doc">
+    <h3>What each line claims</h3>
+    <table class="tbl">
+        <tr><th>Line</th><th>Asserts</th><th>True?</th></tr>
+        <tr><td><code>may change after</code></td><td>The destination might differ later.</td><td>Accurate, but it undersells the certain part — this link is over on that date either way.</td></tr>
+        <tr><td><code>will change after</code></td><td>The destination will differ later.</td><td>Overclaims. If nobody takes the name, it resolves to nothing at all, which is not a change of destination.</td></tr>
+        <tr><td><code>never points here again</code></td><td>This name will not lead to this destination after the date.</td><td>Certain, and it is the half that matters to whoever holds the link.</td></tr>
+        <tr><td><code>then the name is free</code></td><td>The name returns to the pool.</td><td>Certain, but it explains the mechanism rather than the consequence.</td></tr>
+        <tr><td><code>this link ends for good</code></td><td>The link is finished.</td><td>Certain. Says nothing about the name being reusable, which is the part that could surprise someone later.</td></tr>
+    </table>
+</div>
+
+<script>
+// ---- One template, driven entirely by options, so variants differ only where
+// labelled. Mirrors build_svg() in server/src/card.rs.
+var SANS = "-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif";
+var MONO = "ui-monospace, 'SF Mono', Menlo, Monaco, monospace";
+var WIDTH = 1200, PAD = 96;
+
+// card.rs: (avail / (0.62 * len)).clamp(28, 92) -- DejaVu Mono advances ~0.6em.
+function destSize(domain) {
+    var len = Math.max(domain.length, 1);
+    return Math.min(92, Math.max(28, (WIDTH - 2 * PAD) / (0.62 * len)));
+}
+
+function esc(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function card(o) {
+    var id = o.id;
+    var grey = o.grey || "#6e6e73";
+    var kickerSize = o.kickerSize || 33;
+    var footSize = o.footSize || 31;
+    var domain = o.domain || "example.com";
+    var kicker = o.kicker || "Ephemeral redirect";
+    var foot = o.foot || "expires Jun 29, 2026 · may change after";
+
+    var mark = "";
+    var wordX = 96, wordSize = 40;
+    if (o.mark === "square") {
+        mark = '<rect x="96" y="92" width="30" height="30" rx="8" fill="url(#dot-' + id + ')"/>';
+        wordX = 140;
+    } else if (o.mark === "square-aligned") {
+        mark = '<rect x="96" y="87" width="30" height="30" rx="8" fill="url(#dot-' + id + ')"/>';
+        wordX = 138;
+    } else {
+        wordSize = 44;
+    }
+
+    var word = o.twoTone
+        ? 'Yuio<tspan fill="#007aff">Link</tspan>'
+        : "YuioLink";
+
+    return '' +
+'<defs>' +
+'  <linearGradient id="bg-' + id + '" x1="0" y1="0" x2="1" y2="1">' +
+'    <stop offset="0" stop-color="#f7f8fa"/><stop offset="1" stop-color="#e7e8ec"/>' +
+'  </linearGradient>' +
+'  <radialGradient id="glow-' + id + '" cx="1" cy="0" r="0.9">' +
+'    <stop offset="0" stop-color="#007aff" stop-opacity="0.12"/>' +
+'    <stop offset="0.55" stop-color="#007aff" stop-opacity="0"/>' +
+'  </radialGradient>' +
+'  <linearGradient id="dot-' + id + '" x1="0" y1="0" x2="1" y2="1">' +
+'    <stop offset="0" stop-color="#0a84ff"/><stop offset="1" stop-color="#007aff"/>' +
+'  </linearGradient>' +
+'</defs>' +
+'<rect width="1200" height="630" fill="url(#bg-' + id + ')"/>' +
+'<rect width="1200" height="630" fill="url(#glow-' + id + ')"/>' +
+mark +
+'<text x="' + wordX + '" y="117" font-family="' + SANS + '" font-weight="bold" font-size="' + wordSize + '" fill="#1d1d1f">' + word + '</text>' +
+'<text x="96" y="338" font-family="' + SANS + '" font-size="' + kickerSize + '" fill="' + grey + '">' + esc(kicker) + ' <tspan fill="#007aff">&#8594;</tspan></text>' +
+'<text x="94" y="432" font-family="' + MONO + '" font-weight="bold" font-size="' + destSize(domain) + '" fill="#1d1d1f">' + esc(domain) + '</text>' +
+'<text x="96" y="566" font-family="' + SANS + '" font-size="' + footSize + '" fill="' + grey + '">' + esc(foot) + '</text>';
+}
+
+function svg(o, cls) {
+    return '<svg class="card ' + (cls || "") + '" viewBox="0 0 1200 630">' + card(o) + "</svg>";
+}
+
+// ---- 1. The mark ----
+var MARKS = [
+    {
+        id: "m0", mark: "square", title: "Shipped",
+        note: "The square sits ~5px below the wordmark's optical centre and drops past the baseline."
+    },
+    {
+        id: "m1", mark: "square-aligned", title: "A · Square, aligned",
+        note: "y 92 → 87 so the square centres on the cap height, and the gap tightens from 14px to 12px. Nothing else changes."
+    },
+    {
+        id: "m2", mark: "none", twoTone: true, title: "B · No square, two-tone wordmark",
+        note: "The shape goes; the blue moves into the name. Wordmark grows 40 → 44px now that it starts at the left margin."
+    },
+    {
+        id: "m3", mark: "none", title: "C · No square, monochrome wordmark",
+        note: "Quietest of the four. The arrow after the kicker is the only blue left, so it reads as the one accent rather than one of three."
+    }
+];
+
+document.getElementById("marks").innerHTML = MARKS.map(function (m) {
+    return '<div class="opt"><h3>' + m.title + "</h3><p>" + m.note + "</p>" + svg(m) + "</div>";
+}).join("");
+
+document.getElementById("mark-thumbs").innerHTML = MARKS.map(function (m) {
+    var t = Object.assign({}, m, { id: m.id + "t" });
+    return '<div class="thumb">' + svg(t) + '<p class="thumb-label">' + m.title + "</p></div>";
+}).join("");
+
+// ---- 2. Legibility ----
+var LEGIBILITY = [
+    {
+        id: "g0", mark: "none", title: "Shipped greys",
+        note: "#6e6e73, kicker 33px, foot 31px."
+    },
+    {
+        id: "g1", mark: "none", grey: "#55555c", kickerSize: 35, footSize: 33,
+        title: "Darkened",
+        note: "#55555c, kicker 35px, foot 33px."
+    }
+];
+
+document.getElementById("legibility").innerHTML = LEGIBILITY.map(function (m) {
+    return '<div class="opt"><h3>' + m.title + "</h3><p>" + m.note + "</p>" + svg(m) + "</div>";
+}).join("");
+
+document.getElementById("legibility-thumbs").innerHTML = LEGIBILITY.map(function (m) {
+    var t = Object.assign({}, m, { id: m.id + "t" });
+    return '<div class="thumb">' + svg(t) + '<p class="thumb-label">' + m.title + " — at 260px</p></div>";
+}).join("");
+
+// ---- 3. Foot copy ----
+var FEET = [
+    {
+        id: "f0", foot: "expires Jun 29, 2026 · may change after",
+        title: "Shipped", tag: '<span class="tag now">now</span>',
+        say: "Hedged on both halves.",
+        acc: "Nothing here is wrong, but “may” is doing the work in the wrong place: the expiry is not a maybe."
+    },
+    {
+        id: "f1", foot: "expires Jun 29, 2026 · will change after",
+        title: "Will change after", tag: '<span class="tag risk">overclaims</span>',
+        say: "Definite, and one word from the shipped line.",
+        acc: "It promises a different destination. A name nobody reclaims just stops resolving, so the promise can quietly fail."
+    },
+    {
+        id: "f2", foot: "expires Jun 29, 2026 · never points here again",
+        title: "Never points here again", tag: '<span class="tag pick">suggested</span>',
+        say: "Definite about the part that is actually guaranteed.",
+        acc: "States the certainty without inventing a successor, and it is the sentence the recipient cares about."
+    },
+    {
+        id: "f3", foot: "expires Jun 29, 2026 · then the name is free",
+        title: "Then the name is free",
+        say: "Definite, and explains the recycling.",
+        acc: "True, and it hints that the word may resurface elsewhere — useful framing, one step removed from the consequence."
+    },
+    {
+        id: "f4", foot: "expires Jun 29, 2026 · this link ends for good",
+        title: "This link ends for good",
+        say: "Definite and final.",
+        acc: "The plainest of the set. Says nothing about the name being reusable, so a later stranger's link at the same word arrives unannounced."
+    }
+];
+
+document.getElementById("feet").innerHTML = FEET.map(function (f) {
+    var o = Object.assign({ mark: "none", grey: "#55555c", kickerSize: 35, footSize: 33 }, f);
+    return '<div class="foot-opt">' + svg(o) +
+        "<div><h3>" + f.title + (f.tag || "") + "</h3>" +
+        '<p class="say">' + f.say + "</p>" +
+        '<p class="acc">' + f.acc + "</p></div></div>";
+}).join("");
+
+// ---- Write your own ----
+(function () {
+    var footEl = document.getElementById("own-foot");
+    var domainEl = document.getElementById("own-domain");
+    var target = document.getElementById("own-card");
+
+    function paint() {
+        target.innerHTML = card({
+            id: "own", mark: "none", grey: "#55555c", kickerSize: 35, footSize: 33,
+            foot: footEl.value, domain: domainEl.value
+        });
+    }
+
+    footEl.addEventListener("input", paint);
+    domainEl.addEventListener("input", paint);
+    paint();
+})();
+</script>
+
+</body>
+</html>

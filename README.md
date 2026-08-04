@@ -14,7 +14,7 @@ No permanent links, no accounts, no tracking.
 - **Three link types.**
   - *Public* — the shortest name currently available (1–3 words depending on
     namespace occupancy and TTL). Guessable by design; guards nothing.
-  - *Private* — a four-word name (~47 bits, ~153 trillion combinations). Not
+  - *Secret* — a four-word name (~47 bits, ~153 trillion combinations). Not
     encryption: protection by sheer improbability of guessing within the
     link's life.
   - *One-Time* — a four-word name that burns on first reveal. If it answers

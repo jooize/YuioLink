@@ -15,6 +15,7 @@ crawlers and prefetchers can never spend a use.
 | `/:name/reveal` | POST | Consume a **limited** link (redirect or Text): hits+1, set the path-scoped `yl_reveal` HMAC cookie (~10 min), 303 back to `/:name`, which renders the revealed view. Refresh/back re-renders without re-consuming. |
 | `/:name/card.png` | GET | The og:image share card (redirects only). Spends no use; `Cache-Control: max-age=3600`. |
 | `/healthz` | GET | Deploy/update health probe. Touches the database, so a failed migration reads as unhealthy. |
+| `/stats` | GET | Public aggregate counters: live links, created (by type and kind), opened, expired, and the last 7 UTC days. Reads the `stats` table, which holds nothing but `(day, metric, count)` — no IP, user agent, referrer, link name, or destination, and no per-event row. Degrades to zeroes rather than 500ing. |
 | `/wordlist.txt` | GET | The curated 3,516-word name list as plain text (linked from the landing page's Privacy/Security disclosure — the namespace is public by design). |
 | `/static/app.css`, `/static/app.js`, `/static/text.js` | GET | Embedded assets; `Cache-Control: public, max-age=3600`. |
 
@@ -28,7 +29,7 @@ crawlers and prefetchers can never spend a use.
 
 | Route | Method | Behavior |
 |-------|--------|----------|
-| `/api/v1/links` | POST | Create (JSON: `kind`, `content`, `ttl_seconds?`, `max_uses?` (only `1`), `private?`). `201 Created` + `Location` + a one-time `delete_token`. Rate-limited. |
+| `/api/v1/links` | POST | Create (JSON: `kind`, `content`, `ttl_seconds?`, `max_uses?` (only `1`), `secret?`). `201 Created` + `Location` + a one-time `delete_token`. Rate-limited. |
 | `/api/v1/links/:name` | GET | Read without consuming. For a **limited** (single-use) link this returns **metadata only** — no `target`/`content` — because disclosing the payload without spending the use would defeat the burn-after-read tamper evidence. Unlimited links include their `target`/`content`. |
 | `/api/v1/links/:name` | DELETE | Withdraw, authorized by `Authorization: Bearer <delete_token>`. `204`; the name stays reserved as a 410 tombstone until expiry. Wrong/missing token or unknown name are both `404` (reveals nothing). |
 | `/api/v1/openapi.yaml` | GET | The OpenAPI 3.1 description (embedded from `server/openapi.yaml`, so the served spec matches the binary). |

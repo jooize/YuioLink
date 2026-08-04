@@ -19,10 +19,12 @@
        multi-word name reads as blue/navy/blue/navy — two blues, no purple. */
     --word-alt: #003e8f;
 
-    /* Per-type colour key for the link-type picker: Public blue (open),
-       Private green (secure), One-Time purple (single-use). */
-    --c-public: #0a6cd6;
-    --c-private: #1a8f3c;
+    /* Per-type colour key for the link-type picker: Public rose (open), Secret
+       green (secure), One-Time purple (single-use). Public deliberately sits
+       outside the blue family: --accent already owns blue, and a Public dot in
+       that family read as "the app colour" rather than as a type key. */
+    --c-public: #c11574;
+    --c-secret: #1a8f3c;
     --c-once: #8b2fc9;
 
     --bg-1: #e7e8ec;
@@ -63,8 +65,8 @@
         --purple: #bf5af2;
         /* Dark inverts the pairing: the alt word goes pale, the accent stays mid. */
         --word-alt: #99c5ff;
-        --c-public: #5aa9ff;
-        --c-private: #30d158;
+        --c-public: #ff6fb5;
+        --c-secret: #30d158;
         --c-once: #bf5af2;
 
         --bg-1: #121214;
@@ -579,7 +581,7 @@ textarea.form-control {
 }
 
 .t-public { --dot: var(--c-public); }
-.t-private { --dot: var(--c-private); }
+.t-secret { --dot: var(--c-secret); }
 .t-once { --dot: var(--c-once); }
 
 /* The Type picker's legend is visually hidden; below the segments sits one shared
@@ -587,17 +589,17 @@ textarea.form-control {
    word, body) show — :has drives it, so it works without JavaScript — and the
    open state carries across type switches. `revert` restores span/div display. */
 .type-picker .for-public,
-.type-picker .for-private,
+.type-picker .for-secret,
 .type-picker .for-once { display: none; }
 .type-picker:has(#type-public:checked) .for-public,
-.type-picker:has(#type-private:checked) .for-private,
+.type-picker:has(#type-secret:checked) .for-secret,
 .type-picker:has(#type-once:checked) .for-once { display: revert; }
 
 /* The selected type tints the summary text and body accents (border, link).
    The toggle word stays a fixed accent color regardless of type (it's a
    control, not a status) — its own rule below overrides this inherited color. */
 .type-picker:has(#type-public:checked) .note { --tint: var(--c-public); color: var(--tint); }
-.type-picker:has(#type-private:checked) .note { --tint: var(--c-private); color: var(--tint); }
+.type-picker:has(#type-secret:checked) .note { --tint: var(--c-secret); color: var(--tint); }
 .type-picker:has(#type-once:checked) .note { --tint: var(--c-once); color: var(--tint); }
 
 .note {
@@ -697,7 +699,7 @@ textarea.form-control {
     margin-bottom: 0;
 }
 
-/* The grey-bold tail on each summary line ("Not private!", "47-bit namespace.") —
+/* The grey-bold tail on each summary line ("Not secret!", "47-bit namespace.") —
    quiet next to the type-tinted lead, but weighted so it still registers. */
 .summary-sub {
     color: var(--text-secondary);
@@ -1886,6 +1888,137 @@ main > footer {
 /* The quiet AI credit in the footer — present, not shouting. */
 .with-ai {
     color: var(--text-tertiary);
+}
+
+/* "Updated <date> · v0.0.0" on its own line under the credit: the site says
+   everything expires, so when it last changed is worth stating — quietly. */
+.footer-updated {
+    display: block;
+    margin-top: 5px;
+    font-size: 11.5px;
+    color: var(--text-tertiary);
+}
+
+.footer-updated a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.footer-updated a:hover {
+    color: var(--text-secondary);
+    text-decoration: underline;
+}
+
+/* --- /stats: aggregate counters, no chrome beyond what the numbers need --- */
+
+.stats-h {
+    margin: 26px 0 6px;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.stat-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 14px 10px;
+    background: var(--field-bg);
+    border: 0.5px solid var(--field-border);
+    border-radius: var(--radius-control);
+}
+
+.stat-num {
+    font-size: 26px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.stats-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 13px;
+}
+
+.stats-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 2px;
+    border-bottom: 0.5px solid var(--separator);
+}
+
+.stats-list li:last-child {
+    border-bottom: 0;
+}
+
+.stats-n {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+.stats-table th,
+.stats-table td {
+    padding: 6px 2px;
+    text-align: right;
+    border-bottom: 0.5px solid var(--separator);
+}
+
+.stats-table th:first-child,
+.stats-table td:first-child {
+    text-align: left;
+}
+
+.stats-table th {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* The disclosure sits with the numbers on purpose — a statistics page is where a
+   visitor is entitled to ask what is being collected. */
+.stats-note {
+    margin-top: 24px;
+    padding: 12px 14px;
+    border-left: 2px solid var(--switch-on);
+    background: color-mix(in srgb, var(--switch-on) 8%, transparent);
+    border-radius: 0 8px 8px 0;
+}
+
+.stats-note p {
+    margin: 0 0 8px;
+    max-width: none;
+    text-align: left;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+.stats-note p:last-child {
+    margin-bottom: 0;
 }
 
 /* --- Keyboard-shortcuts help: the "?" corner button and its <dialog> --- */

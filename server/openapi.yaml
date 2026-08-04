@@ -7,7 +7,7 @@ info:
   # OpenAPI Specification version or the API implementation version)", so it is
   # not kept in lockstep with the crate version -- bump it when this file
   # changes, and leave it alone across releases that do not touch it.
-  version: "0.6.0"
+  version: "0.7.0"
   summary: Wieldy Ephemeral Links
   description: |
     Redirects and text snippets that always expire — never permanent.
@@ -260,12 +260,20 @@ components:
           description: >-
             `1` makes the link single-use (burn after one view); omitted or
             null is unlimited within the TTL. Any other value is rejected.
-        private:
+        secret:
           type: boolean
           default: false
           description: >-
-            Request a private (four-word, unguessable) name for an unlimited
+            Request a secret (four-word, unguessable) name for an unlimited
             link. Single-use links always get the long name.
+        private:
+          type: boolean
+          deprecated: true
+          description: >-
+            Removed — renamed to `secret`. Sending it is a `400`, deliberately:
+            every other unknown field is ignored, but silently dropping this one
+            would hand a caller who asked for an unguessable name a short,
+            guessable one.
       additionalProperties: true
 
     CreateResponse:

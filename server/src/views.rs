@@ -10,6 +10,15 @@ use maud::{DOCTYPE, Markup, html};
 
 use crate::urlview::{IdnWarning, UrlView};
 
+/// The crate version, shown in the footer and linked to its release tag.
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The date the footer reports as "last updated", as `YYYY-MM-DD`. A constant
+/// rather than a build timestamp on purpose: builds stay reproducible, and a
+/// visitor wants to know when the site last changed, not when this binary was
+/// compiled. Bump it alongside the workspace version.
+const RELEASE_DATE: &str = "2026-08-04";
+
 /// The shared page shell: head, the glass "app window", and the masthead.
 fn document(body: Markup, scripts: Markup) -> Markup {
     document_full("YuioLink", html! {}, body, scripts)
@@ -171,6 +180,24 @@ pub fn format_card_date(expires_at: &str) -> String {
     }
 }
 
+/// The clock part of a stored expiry, e.g. `14:30 UTC`. `expires_at` comes from
+/// SQLite's `datetime('now', ...)`, which is always UTC, so the zone is a
+/// constant rather than something to derive. `None` when the value carries no
+/// usable time, leaving the caller to fall back to the date alone.
+///
+/// A card is the one place a link's expiry is read cold, hours or days after it
+/// was shared and possibly out of a crawler's cache, so it states an absolute
+/// instant — "in 3 hours" would be a lie the moment the card is cached. The
+/// minute matters: a TTL can be as short as an hour, and a bare date would say
+/// nothing at all about those.
+pub fn format_card_time(expires_at: &str) -> Option<String> {
+    let time = expires_at.split([' ', 'T']).nth(1)?;
+    let mut p = time.split(':');
+    let (h, m) = (p.next()?, p.next()?);
+    let two_digits = |s: &str| s.len() == 2 && s.bytes().all(|b| b.is_ascii_digit());
+    (two_digits(h) && two_digits(m)).then(|| format!("{h}:{m} UTC"))
+}
+
 /// Humanize a TTL ceiling for display, e.g. 604800 -> "7 days". Also used by
 /// `web::check_ttl` to phrase the out-of-range error in days/hours, not seconds.
 pub fn humanize_duration(secs: i64) -> String {
@@ -217,7 +244,7 @@ fn result_output(url: Option<&str>, meta: Markup, note: Option<&str>) -> Markup 
 /// detection, keyboard shortcuts, an in-place result, and copy.
 pub fn index_page(max_ttl_secs: i64) -> Markup {
     let body = html! {
-        p { "Wieldy Ephemeral Link" }
+        p { "Wieldy Ephemeral Links" }
 
         // Keyboard-shortcuts help: a quiet "?" in the window corner opening a
         // native <dialog>. The shortcuts only exist with JavaScript, so both ship
@@ -240,7 +267,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                 dt { kbd { "?" } }
                 dd { "Show this overview" }
                 dt { kbd { "Esc" } }
-                dd { "Close it again" }
+                dd { "Close this overview" }
             }
             form method="dialog" {
                 button.btn.btn-block type="submit" { "Done" }
@@ -283,8 +310,8 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                 div.segmented {
                     input.seg-radio #type-public type="radio" name="link_type" value="public" checked;
                     label.seg-label.dot.t-public for="type-public" { "Public" }
-                    input.seg-radio #type-private type="radio" name="link_type" value="private";
-                    label.seg-label.dot.t-private for="type-private" { "Private" }
+                    input.seg-radio #type-secret type="radio" name="link_type" value="secret";
+                    label.seg-label.dot.t-secret for="type-secret" { "Secret" }
                     input.seg-radio #type-once type="radio" name="link_type" value="once";
                     label.seg-label.dot.t-once for="type-once" { "One-Time" }
                 }
@@ -297,10 +324,10 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                         span.summary-txt {
                             span.for-public {
                                 "Convenient link with 1 to 3 words. "
-                                span.summary-sub { "Not private!" }
+                                span.summary-sub { "Not secret!" }
                             }
-                            span.for-private {
-                                "Private link with 4 words. "
+                            span.for-secret {
+                                "Secret link with 4 words. "
                                 span.summary-sub { "47-bit namespace." }
                             }
                             span.for-once {
@@ -323,7 +350,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                         " — never for anything secret. "
                         a href="/wordlist.txt" { "Browse the wordlist →" }
                     }
-                    div.details-body.for-private {
+                    div.details-body.for-secret {
                         "Link name is four random words from a 47-bit namespace — about "
                         "153 trillion possibilities — and nothing lists or indexes it, so "
                         "reaching the link means guessing its exact name within its "
@@ -336,7 +363,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                         // Every link previews (docs/PREVIEW.md), but it only matters here:
                         // it is what keeps an unfurler or prefetch bot from burning the
                         // link before the recipient sees it.
-                        ", and with the same security as Private links. The recipient opens "
+                        ", and with the same security as Secret links. The recipient opens "
                         "a preview first and chooses to reveal — nothing is deleted until "
                         "they do."
                     }
@@ -422,11 +449,19 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             span.with-ai { " (with AI)" }
             " · "
             a href="https://github.com/jooize/YuioLink" { "Source on GitHub" }
+            " · "
+            a href="/stats" { "Statistics" }
+            span.footer-updated {
+                "Updated " (format_card_date(RELEASE_DATE)) " · "
+                a href=(format!("https://github.com/jooize/YuioLink/releases/tag/v{VERSION}")) {
+                    "v" (VERSION)
+                }
+            }
         }
     };
     let scripts = html! { script src="/static/app.js" {} };
     document_full(
-        "YuioLink — Wieldy Ephemeral Link",
+        "YuioLink — Wieldy Ephemeral Links",
         html! {
             meta name="description" content="Redirects and text snippets that always expire — never permanent, and every link shows where it leads before you go.";
         },
@@ -442,7 +477,7 @@ pub fn result_page(
     kind_label: &str,
     expires_at: &str,
     max_uses: Option<i64>,
-    private: bool,
+    secret: bool,
     words: usize,
 ) -> Markup {
     let meta = html! {
@@ -454,7 +489,7 @@ pub fn result_page(
         }
     };
     // A public link is normally one word; more means the short tiers are crowded.
-    let note = (max_uses.is_none() && !private && words > 1).then(|| {
+    let note = (max_uses.is_none() && !secret && words > 1).then(|| {
         format!("Short names are in high demand right now, so this link uses {words} words.")
     });
     let body = html! {
@@ -524,10 +559,11 @@ fn interstitial_head(i: &Interstitial, one_time: bool) -> Markup {
                 format!("Redirect to {domain}")
             };
             let kind = if one_time { "Single-use" } else { "Ephemeral" };
-            let desc = format!(
-                "{kind} redirect that expires {} and may change after.",
-                format_card_date(i.expires_at)
-            );
+            let date = format_card_date(i.expires_at);
+            let desc = match format_card_time(i.expires_at) {
+                Some(time) => format!("{kind} redirect that expires {date} at {time}."),
+                None => format!("{kind} redirect that expires {date}."),
+            };
             let card = format!("{}/card.png", i.short_url);
             html! {
                 meta property="og:site_name" content="YuioLink";
@@ -809,6 +845,117 @@ pub fn not_found_page() -> Markup {
 }
 
 /// Generic terse error page (used for 400 on the no-JS form and 500).
+/// What `/stats` reports. Every field is an aggregate: a live count, or a tally of
+/// events per UTC day. Nothing in here is per-link or per-visitor.
+pub struct StatsView<'a> {
+    /// Links resolvable right now.
+    pub live: i64,
+    /// All-time totals, keyed by `db::Stat::key()`.
+    pub totals: &'a [(String, i64)],
+    /// Per-day rows, oldest first: `(day, created, opened)`.
+    pub days: &'a [(String, i64, i64)],
+}
+
+/// `GET /stats` — the public, aggregate-only counters.
+///
+/// The page states what is *not* counted as prominently as what is. The site
+/// promises no tracking, and a statistics page is exactly where a visitor is
+/// entitled to be suspicious, so the disclosure belongs next to the numbers
+/// rather than buried in a privacy page nobody opens.
+pub fn stats_page(s: &StatsView) -> Markup {
+    let total = |key: &str| {
+        s.totals
+            .iter()
+            .find(|(m, _)| m == key)
+            .map(|(_, n)| *n)
+            .unwrap_or(0)
+    };
+    let created = total("created_public") + total("created_secret") + total("created_once");
+
+    let body = html! {
+        p.back-link { a href="/" { "← Back to YuioLink" } }
+        h2.stats-h { "Statistics" }
+        p { "Aggregate counts, nothing else. No visitor is measured." }
+
+        div.stats-grid {
+            div.stat-cell {
+                span.stat-num { (s.live) }
+                span.stat-label { "live right now" }
+            }
+            div.stat-cell {
+                span.stat-num { (created) }
+                span.stat-label { "links created" }
+            }
+            div.stat-cell {
+                span.stat-num { (total("opened")) }
+                span.stat-label { "links opened" }
+            }
+            div.stat-cell {
+                span.stat-num { (total("expired")) }
+                span.stat-label { "expired and erased" }
+            }
+        }
+
+        h3.stats-h { "By type" }
+        ul.stats-list {
+            li { span.dot.t-public { "Public" } span.stats-n { (total("created_public")) } }
+            li { span.dot.t-secret { "Secret" } span.stats-n { (total("created_secret")) } }
+            li { span.dot.t-once { "One-Time" } span.stats-n { (total("created_once")) } }
+        }
+
+        h3.stats-h { "By kind" }
+        ul.stats-list {
+            li { span { "Redirect" } span.stats-n { (total("created_redirect")) } }
+            li { span { "Text" } span.stats-n { (total("created_text")) } }
+        }
+
+        h3.stats-h { "Last 7 days" }
+        @if s.days.is_empty() {
+            p { "Nothing counted yet." }
+        } @else {
+            table.stats-table {
+                thead {
+                    tr { th { "Day (UTC)" } th { "Created" } th { "Opened" } }
+                }
+                tbody {
+                    @for (day, created, opened) in s.days {
+                        tr {
+                            td { (day) }
+                            td { (created) }
+                            td { (opened) }
+                        }
+                    }
+                }
+            }
+        }
+
+        div.stats-note {
+            p {
+                strong { "What is not recorded." }
+                " No IP addresses, no user agents, no referrers, no cookies, no sessions. "
+                "Link names and destinations never reach these counters, and there is no "
+                "per-event row to correlate: a counter only says that something happened "
+                "a number of times on a day."
+            }
+            p {
+                "Days are UTC, and a day is the finest resolution kept — anything finer "
+                "would start placing a person at a moment, which is the line this page "
+                "exists not to cross."
+            }
+        }
+
+        footer { a href="/" { "Back to YuioLink" } }
+    };
+    document_full(
+        "YuioLink — Statistics",
+        html! {
+            meta name="description" content="Aggregate, anonymous counters for YuioLink — links created, opened, and expired. No visitors are measured.";
+        },
+        body,
+        html! {},
+    )
+}
+
 pub fn error_page(code: u16, message: &str) -> Markup {
     error_page_list(code, &[message])
 }
