@@ -187,9 +187,12 @@ header h1 {
     color: var(--accent);
 }
 
-/* Top-left way back out: a chevron in a circular glass chip, mirroring the
-   keyboard-help "?" chip in the opposite corner. Its wording lives in the
-   tooltip and aria-label; the worded "Back to YuioLink" stays in the footer. */
+/* Top-left way out to the site root: a diagonal up-left arrow in a circular
+   glass chip, mirroring the keyboard-help "?" chip in the opposite corner. An
+   arrow rather than a back chevron because these pages are often entered cold
+   (a shared link, a bookmark), where "back" would promise a page the visitor
+   has never seen — this points out and up to the root instead. Its wording
+   lives in the tooltip and aria-label. */
 .back-chip {
     position: absolute;
     top: 18px;
@@ -208,9 +211,6 @@ header h1 {
 
 .back-chip svg {
     display: block;
-    /* Optically centred: the chevron's visual mass leans right, so it sits a
-       hair left of geometric centre. */
-    margin-right: 1px;
 }
 
 .back-chip:hover {
@@ -1535,19 +1535,11 @@ textarea.form-control {
     gap: 2px;
 }
 
-/* Line 1: the tri-colour URL plus a trailing green copy-check, on one row. */
-.history-l1 {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-}
-
-/* The full-width tri-colour URL — dim scheme, standout host, the name highlighted
-   by word. flex: 1 so it takes the whole line (the actions moved to line 2); it
-   still ellipsizes when a redirect URL is too long for the row. */
+/* Line 1: the full-width tri-colour URL — dim scheme, standout host, the name
+   highlighted by word. It owns the whole line (the actions live on line 2) and
+   ellipsizes only what the scheme-drop below couldn't save. */
 .history-url {
-    flex: 1 1 auto;
+    flex: none;
     min-width: 0;
     font-family: var(--font-mono);
     font-size: 14px;
@@ -1558,11 +1550,18 @@ textarea.form-control {
     user-select: text;
 }
 
-/* Green check trailing the URL on copy (matches the result); opacity-toggled so the
-   row never reflows. */
+/* When the URL overflows its row, the scheme is the first thing to go — app.js
+   flags the row and the whole "https://" disappears (the name is the point of
+   the row; the scheme never is). Ellipsis only trims what still doesn't fit. */
+.history-url.no-scheme .u-scheme {
+    display: none;
+}
+
+/* Green copy-check on the actions line, just left of the copy sheets (flashes
+   with them on copy); opacity-toggled so the row never reflows. */
 .history-check {
     flex: none;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 700;
     color: var(--switch-on);
     opacity: 0;
@@ -1610,13 +1609,13 @@ textarea.form-control {
     white-space: nowrap;
 }
 
-/* The per-row actions are symbols: the two sheets copy (accent blue), the
-   trash + "…" opens the remove confirm (quiet grey; the overlay carries its
-   own Cancel, so this is open-only), and the purple arrow — last, at the
-   line's right end — opens the link's preview in a new tab. The glyphs are
-   ~14px, so padding grows each hit target to about 30px square (larger than
-   the 13px text links they replace) and supplies the spacing between
-   neighbours — .history-actions keeps only a hairline gap. */
+/* The per-row actions are symbols, ordered Copy, Preview, Trash: the two sheets
+   copy (accent blue), the purple arrow opens the link's preview in a new tab,
+   and the trash + "…" — last, at the row's edge, where a stray tap only opens
+   the confirm (the overlay carries its own Cancel, so it is open-only). The
+   glyphs are ~15-16px, so padding grows each hit target to about 30px square
+   (larger than the 13px text links they replaced) and supplies the spacing
+   between neighbours — .history-actions keeps only a hairline gap. */
 .history-show,
 .history-copy,
 .history-remove {
@@ -1631,6 +1630,14 @@ textarea.form-control {
     cursor: pointer;
     opacity: 0.85;
     transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+/* The last symbol's hit padding would otherwise inset its glyph 7px from the
+   row edge, leaving the cluster hanging short of the URL text above and the
+   row's own padding: pull the padding back out so the glyphs align with the
+   text columns (the hit area simply extends into the row padding). */
+.history-actions > :last-child {
+    margin-right: -7px;
 }
 
 .history-show svg,
@@ -1659,7 +1666,7 @@ textarea.form-control {
 
 .history-remove {
     gap: 2px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text-secondary);
 }
@@ -1911,6 +1918,13 @@ main > footer {
     text-align: center;
     font-size: 12.5px;
     color: var(--text-secondary);
+}
+
+/* The landing footer stacks: the two site pages first (the useful links), the
+   project credit under them, then the source link, then the updated line. */
+.footer-line {
+    display: block;
+    margin-top: 5px;
 }
 
 /* The quiet AI credit in the footer — present, not shouting. */

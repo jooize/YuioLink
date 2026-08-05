@@ -284,17 +284,28 @@
         }
     };
 
-    // ⌘C copies the link even with nothing visibly selected (tidier than a highlighted
-    // selection). While the result panel holds focus and the user hasn't made their own
-    // selection inside it, intercept ⌘C / Ctrl-C and copy the link URL, flashing Copy.
+    // ⌘C copies the created link from anywhere on the page, with nothing visibly
+    // selected (tidier than a highlighted selection). The one thing that beats it
+    // is a real selection the user made — anywhere, including inside a field —
+    // which always copies natively. Listens on the document, so it works long
+    // after the result panel lost focus.
     const enableQuietCopy = (panel, linkEl) => {
-        panel.addEventListener("keydown", (event) => {
+        // A selection inside an input/textarea is invisible to window.getSelection()
+        // in some engines; ask the field itself. selectionStart throws on field
+        // types that don't support selection — those can't hold one anyway.
+        const fieldHasSelection = (el) => {
+            if (!el) return false;
+            try { return el.selectionStart != null && el.selectionStart !== el.selectionEnd; }
+            catch { return false; }
+        };
+        document.addEventListener("keydown", (event) => {
             const isCopy = (event.metaKey || event.ctrlKey) && (event.key === "c" || event.key === "C");
             if (!isCopy) return;
+            if (panel.hidden) return; // no result yet: nothing to copy
             if (panel.classList.contains("expired")) return; // dead link: nothing to copy
-            // Respect a real selection the user made within the panel — let it copy natively.
+            if (fieldHasSelection(document.activeElement)) return;
             const sel = window.getSelection();
-            if (sel && !sel.isCollapsed && panel.contains(sel.anchorNode)) return;
+            if (sel && !sel.isCollapsed) return;
             const url = linkEl.textContent.trim();
             if (!url) return;
             event.preventDefault();
@@ -387,6 +398,9 @@
     const persistOpen = () => { if (persistEnabled) lsSet(OPEN_KEY, historyOpen ? "1" : "0"); };
     const applyHistoryOpen = () => {
         document.getElementById("history")?.classList.toggle("collapsed", !historyOpen);
+        // Rows rendered while the list was collapsed had zero width to measure;
+        // refit now that it is (or just became) visible.
+        if (historyOpen) fitHistoryUrls();
     };
     const setHistoryOpen = (open) => { historyOpen = open; applyHistoryOpen(); persistOpen(); };
     const setPersist = (on) => {
@@ -403,6 +417,23 @@
         memHistory.unshift(entry);
         persistNow();
     };
+
+    // When a history row's URL overflows, the scheme is the first thing to go:
+    // hide "https://" whole (the name is the point of the row; the scheme never
+    // is) and only ellipsize what still doesn't fit. Re-run after every render
+    // and on resize — growing the window brings the scheme back.
+    const fitHistoryUrls = () => {
+        for (const url of document.querySelectorAll(".history-url")) {
+            url.classList.remove("no-scheme");
+            if (url.scrollWidth > url.clientWidth) url.classList.add("no-scheme");
+        }
+    };
+    let fitQueued = false;
+    window.addEventListener("resize", () => {
+        if (fitQueued) return;
+        fitQueued = true;
+        requestAnimationFrame(() => { fitQueued = false; fitHistoryUrls(); });
+    });
 
     const renderHistory = () => {
         persistNow();
@@ -504,16 +535,11 @@
             if (isExpired(it)) li.classList.add("expired");
 
             // Line 1: the full-width tri-colour URL (dim scheme, standout host, the
-            // name highlighted by word) with a trailing green copy-check.
-            const l1 = document.createElement("div");
-            l1.className = "history-l1";
+            // name highlighted by word). fitHistoryUrls() drops the scheme first if
+            // the row overflows; the green copy-check lives on the actions line.
             const url = document.createElement("code");
             url.className = "history-url";
             renderUrlInto(url, it.url);
-            const check = document.createElement("span");
-            check.className = "history-check";
-            check.setAttribute("aria-hidden", "true");
-            l1.append(url, check);
 
             // Line 2: kind word + green time on the left, the actions on the right.
             const foot = document.createElement("div");
@@ -532,17 +558,21 @@
 
             const actions = document.createElement("div");
             actions.className = "history-actions";
-            // The actions are symbols (styled in app.css): two sheets copy, the
-            // trash + "…" opens the remove confirm, and the purple arrow --
-            // last, at the line's right end -- opens the preview in a new tab.
-            // Copy and the arrow are real links to the URL, so right-click
-            // offers Copy Link / Open in New Tab; a left click on the sheets
-            // copies instead. All markup is static, so innerHTML is safe.
+            // The actions are symbols (styled in app.css), ordered Copy, Preview,
+            // Trash: the two link actions first, the destructive one last at the
+            // row's edge (a stray tap only opens the confirm). The green check
+            // sits left of the copy sheets and flashes on copy. Copy and the
+            // arrow are real links to the URL, so right-click offers Copy Link /
+            // Open in New Tab; a left click on the sheets copies instead. All
+            // markup is static, so innerHTML is safe.
+            const check = document.createElement("span");
+            check.className = "history-check";
+            check.setAttribute("aria-hidden", "true");
             const copy = document.createElement("a");
             copy.className = "history-copy";
             copy.href = it.url;
             copy.innerHTML =
-                '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">' +
+                '<svg width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true">' +
                 '<path d="M9.6 2.2H3.6c-.77 0-1.4.63-1.4 1.4v6.2" ' +
                 'stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
                 '<rect x="4.9" y="4.7" width="7" height="7.2" rx="1.3" ' +
@@ -553,11 +583,22 @@
                 event.preventDefault();
                 copyToClipboard(it.url, copy, () => flashClass(check, "show"));
             });
+            const show = document.createElement("a");
+            show.className = "history-show";
+            show.href = it.url;
+            show.target = "_blank";
+            show.rel = "noopener noreferrer";
+            show.innerHTML =
+                '<svg width="15" height="15" viewBox="0 0 13 13" fill="none" aria-hidden="true">' +
+                '<path d="M2.5 10.5 10.5 2.5M4 2.5h6.5V9" ' +
+                'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            show.setAttribute("aria-label", "Preview");
+            show.title = "Open this link's preview in a new tab";
             const remove = document.createElement("button");
             remove.className = "history-remove";
             remove.type = "button";
             remove.innerHTML =
-                '<svg width="13" height="14" viewBox="0 0 13 14" fill="none" aria-hidden="true">' +
+                '<svg width="15" height="16.2" viewBox="0 0 13 14" fill="none" aria-hidden="true">' +
                 '<path d="M1.5 3.5h10M5 3.3V2.4c0-.5.4-.9.9-.9h1.2c.5 0 .9.4.9.9v.9' +
                 'M2.8 3.5l.62 8c.05.62.57 1.1 1.2 1.1h3.76c.63 0 1.15-.48 1.2-1.1l.62-8" ' +
                 'stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
@@ -567,23 +608,13 @@
             // Opens the confirm prompt over the row — not a toggle; the prompt carries
             // its own Cancel. openConfirm closes any other row's prompt first.
             remove.addEventListener("click", () => openConfirm(li, it));
-            const show = document.createElement("a");
-            show.className = "history-show";
-            show.href = it.url;
-            show.target = "_blank";
-            show.rel = "noopener noreferrer";
-            show.innerHTML =
-                '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">' +
-                '<path d="M2.5 10.5 10.5 2.5M4 2.5h6.5V9" ' +
-                'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-            show.setAttribute("aria-label", "Preview");
-            show.title = "Open this link's preview in a new tab";
-            actions.append(copy, remove, show);
+            actions.append(check, copy, show, remove);
             foot.append(meta, actions);
 
-            li.append(l1, foot);
+            li.append(url, foot);
             listEl.append(li);
         }
+        fitHistoryUrls();
         syncClearMenu();
     };
 
@@ -1063,9 +1094,9 @@
             buildMeta(metaEl, kind, expiresIso, uses);
             if (resultNoteEl) resultNoteEl.hidden = true; // reset; create path re-shows if crowded
             panel.hidden = false;
-            // Focus the panel (it precedes the form in the DOM) so ⌘C copies the link
-            // (the quiet-copy handler) and the next Tab lands on the input — with no
-            // visible text selection, which looks tidier.
+            // Focus the panel (it precedes the form in the DOM) so the next Tab lands
+            // on the input — no visible text selection, which looks tidier. ⌘C works
+            // page-wide regardless (the quiet-copy handler listens on the document).
             panel.focus({ preventScroll: true });
         };
 

@@ -134,17 +134,20 @@ fn pv_arrow() -> Markup {
     }
 }
 
-/// The top-left way back out: a circular glass chip holding a left chevron —
-/// the platform back convention — in the window's corner, mirroring the
-/// keyboard-help "?" chip on the right. The wording lives on as the tooltip
-/// and accessible name; the worded "Back to YuioLink" stays in the footer.
+/// The top-left way out to the site root: a circular glass chip in the
+/// window's corner, mirroring the keyboard-help "?" chip on the right. It
+/// holds a diagonal up-left arrow, not a back chevron, on purpose: many of
+/// these pages are entered cold (a shared link, a bookmark), where "back"
+/// would promise a return to a page the visitor has never seen — the arrow
+/// points out and up to the root instead, and reads fine either way. The
+/// wording lives on as the tooltip and accessible name.
 fn back_chip(href: &str, label: &str) -> Markup {
     html! {
         a.back-chip href=(href) aria-label=(label) title=(label) {
-            svg width="9" height="14" viewBox="0 0 9 14" fill="none" aria-hidden="true" {
-                path d="M7.5 1.5 2 7l5.5 5.5"
+            svg width="12" height="12" viewBox="0 0 13 13" fill="none" aria-hidden="true" {
+                path d="M10.5 10.5 2.5 2.5M9 2.5H2.5V9"
                     stroke="currentColor"
-                    stroke-width="2.2"
+                    stroke-width="1.8"
                     stroke-linecap="round"
                     stroke-linejoin="round" {}
             }
@@ -424,7 +427,11 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                         ", and it is reachable only until the link expires. Our server "
                         "knows the data/contents/destination, but deletes it at the "
                         "point of expiry. "
-                        a href="/help#types" { "Show more details →" }
+                        // Same wording as One-Time's link: both go to /help#types,
+                        // and a shared destination reads as one action, not two.
+                        // Public's link stays distinct — it goes somewhere else
+                        // (the wordlist), so it earns its own words.
+                        a href="/help#types" { "Learn more →" }
                     }
                     div.details-body.for-once {
                         strong { "Deleted from our server when revealed" }
@@ -513,14 +520,18 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
         }
 
         footer {
-            "A project by " a href="https://github.com/jooize" { "jooize" }
-            span.with-ai { " (with AI)" }
-            " · "
-            a href="https://github.com/jooize/YuioLink" { "Source on GitHub" }
-            " · "
+            // Stacked: the two site pages first (the links a visitor actually
+            // uses), the credit under them, the source link on its own line.
             a href="/help" { "How to Use" }
             " · "
             a href="/stats" { "Statistics" }
+            span.footer-line {
+                "A project by " a href="https://github.com/jooize" { "jooize" }
+                span.with-ai { " (with AI)" }
+            }
+            span.footer-line {
+                a href="https://github.com/jooize/YuioLink" { "Source on GitHub" }
+            }
             span.footer-updated {
                 "Updated " (format_card_date(RELEASE_DATE)) " · "
                 a href=(format!("https://github.com/jooize/YuioLink/releases/tag/v{VERSION}")) {
@@ -582,6 +593,7 @@ pub fn result_page(
         format!("Short names are in high demand right now, so this link uses {words} words.")
     });
     let body = html! {
+        (back_chip("/", "Create New Link"))
         (result_output(Some(url), meta, note.as_deref()))
         a.btn.btn-block href=(url) { "Open link" }
         // Only offered after a Redirect: a non-URL is already Text, so there is
@@ -642,6 +654,7 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
     let limited = i.max_uses.is_some();
 
     let body = html! {
+        (back_chip("/", "Go to YuioLink"))
         (from_line(i.base_host, i.name))
         (pv_arrow())
         @match &i.target {
@@ -933,6 +946,7 @@ pub fn revealed_page(r: RevealedView) -> Markup {
 /// and never executes. We never emit it as live HTML.
 pub fn text_view_page(name: &str, text: &str) -> Markup {
     let body = html! {
+        (back_chip("/", "Go to YuioLink"))
         pre.text-body #text-body { (text) }
         // Dead without JS; text.js un-hides it when it wires the handler.
         button.btn.btn-block #copy-text type="button" hidden { "Copy" }
@@ -953,6 +967,7 @@ pub fn text_view_page(name: &str, text: &str) -> Markup {
 /// reserved until expiry, so it cannot be silently repurposed in the meantime.
 pub fn gone_page(expires_at: Option<&str>) -> Markup {
     let body = html! {
+        (back_chip("/", "Go to YuioLink"))
         p.error-code { "410" }
         p { "This link has been used or withdrawn." }
         @if let Some(exp) = expires_at {
@@ -967,6 +982,7 @@ pub fn gone_page(expires_at: Option<&str>) -> Markup {
 /// by-design, since every YuioLink is ephemeral.
 pub fn not_found_page() -> Markup {
     let body = html! {
+        (back_chip("/", "Go to YuioLink"))
         p.error-code { "404" }
         p { "This link has expired or never existed — links on YuioLink are ephemeral." }
         a.btn.btn-block href="/" { "Create a New Link" }
@@ -1221,6 +1237,7 @@ pub fn error_page(code: u16, message: &str) -> Markup {
 /// every validation problem at once, not just the first.
 pub fn error_page_list(code: u16, messages: &[&str]) -> Markup {
     let body = html! {
+        (back_chip("/", "Go to YuioLink"))
         p.error-code { (code) }
         @for message in messages {
             p { (message) }
