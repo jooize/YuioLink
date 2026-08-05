@@ -739,7 +739,12 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
     };
     // preview.js only wires ⌘C to the destination, and no-ops when there is no
     // destination on the page (a limited link shows just the domain).
-    document_link(&title, head, body, html! { script src="/static/preview.js" {} })
+    document_link(
+        &title,
+        head,
+        body,
+        html! { script src="/static/preview.js" {} },
+    )
 }
 
 /// `<head>` Open Graph / theme-color tags so a shared link unfurls trustworthily.

@@ -482,7 +482,8 @@ pub async fn resolve(
                 return AppError::internal(e).into_response();
             }
             let base_host = views::host_from_base(&state.base_url);
-            Html(views::text_view_page(base_host, &d.name, &d.content).into_string()).into_response()
+            Html(views::text_view_page(base_host, &d.name, &d.content).into_string())
+                .into_response()
         }
         // Redirects always preview; limited Text shows only that it exists.
         ("redirect", _) | ("text", true) => interstitial_response(&state, &d),
