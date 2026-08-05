@@ -125,7 +125,7 @@ systemctl reload caddy 2>/dev/null || systemctl restart caddy || true
 # Pull-based: yuiolink-update fetches the latest GitHub release binary, verifies
 # its SHA-256, installs, restarts, and health-checks (rolling back on failure).
 # It is a no-op when already on the latest tag, so yuiolink-update.timer polls
-# it every 10 minutes for auto-deploy: tag a release and it is live within 10
+# it every 5 minutes for auto-deploy: tag a release and it is live within 5
 # minutes, unattended. yuiolink-backup snapshots the SQLite database nightly
 # and before every update.
 raw="https://raw.githubusercontent.com/jooize/YuioLink/main/deploy"
@@ -146,4 +146,4 @@ systemctl enable --now yuiolink-update.timer
 
 echo "[yuiolink-init] done $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "[yuiolink-init] next: point DNS at this IP. Deploys: tag a release and"
-echo "[yuiolink-init]       it auto-installs within 10 minutes (yuiolink-update.timer)."
+echo "[yuiolink-init]       it auto-installs within 5 minutes (yuiolink-update.timer)."

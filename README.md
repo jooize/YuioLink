@@ -61,8 +61,8 @@ the linux/amd64 binary and attaches it to a GitHub release
 `deploy/droplet-user-data.bash` and updates itself pull-based:
 `yuiolink-update` fetches the latest release, verifies its SHA-256,
 snapshots the database, installs, and health-checks `/healthz` — rolling the
-binary back on failure. `yuiolink-update.timer` runs it every 10 minutes (a
-no-op when already current), so tagging a release auto-deploys within 10
+binary back on failure. `yuiolink-update.timer` runs it every 5 minutes (a
+no-op when already current), so tagging a release auto-deploys within 5
 minutes with no SSH needed; `systemctl start yuiolink-update` also runs it
 on demand. Nightly database snapshots run via `yuiolink-backup.timer`.
 
