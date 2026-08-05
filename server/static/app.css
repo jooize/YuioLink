@@ -1556,6 +1556,11 @@ textarea.form-control {
     display: flex;
     width: fit-content;
     max-width: 100%;
+    /* Both segments ship hidden and app.js reveals them, so without a reserved
+       height this box is 0px until the script runs and then jumps to 30px,
+       shoving the whole page down — a layout shift on every cold load. The
+       height is the taller segment: 6px padding + the 18px switch + 6px. */
+    min-height: 30px;
     margin: 16px auto 0;
     border-radius: 999px;
     overflow: hidden;
@@ -1939,10 +1944,15 @@ textarea.form-control {
 }
 
 .history-remove {
-    gap: 2px;
-    font-size: 13px;
-    font-weight: 600;
     color: var(--text-secondary);
+}
+
+/* The can's weight sits low — its lid and handle are drawn above the centre of
+   the box, so centring the box optically drops the glyph against the symbols
+   beside it. A pixel up puts it back on their line. Transform rather than
+   margin, so the button's own box does not move with it. */
+.history-remove svg {
+    transform: translateY(-1px);
 }
 
 .history-remove:hover {

@@ -19,6 +19,16 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// compiled. Bump it alongside the workspace version.
 const RELEASE_DATE: &str = "2026-08-06";
 
+/// A static asset's URL, stamped with the release it belongs to.
+///
+/// The stamp is what lets the handlers answer `immutable` with a year of
+/// `max-age`: a deploy changes the query, which is a new cache key, so a client
+/// picks up new CSS without ever revalidating the old. Unversioned URLs and a
+/// long `max-age` are the combination that strands a stale stylesheet.
+fn asset_url(path: &str) -> String {
+    format!("{path}?v={VERSION}")
+}
+
 /// The shared page shell: head, the glass "app window", and the masthead.
 ///
 /// Every page passes its own `<title>` — there is no bare "YuioLink" fallback,
@@ -42,7 +52,7 @@ fn document_shell(
                 meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover";
                 meta name="color-scheme" content="light dark";
                 title { (title) }
-                link rel="stylesheet" href="/static/app.css";
+                link rel="stylesheet" href=(asset_url("/static/app.css"));
                 (head_extra)
             }
             body {
@@ -644,7 +654,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             }
         }
     };
-    let scripts = html! { script src="/static/app.js" {} };
+    let scripts = html! { script src=(asset_url("/static/app.js")) {} };
     document_full(
         "YuioLink — Wieldy Ephemeral Links",
         html! {
@@ -718,7 +728,7 @@ pub fn result_page(
         // No "Create another" link: the back chip in the corner already goes to
         // the create page, and it said the same thing twice.
     };
-    let scripts = html! { script src="/static/app.js" {} };
+    let scripts = html! { script src=(asset_url("/static/app.js")) {} };
     // The destination is what the creator just typed, so naming it here would tell
     // them nothing; the title identifies which link they are looking at.
     document_full(
@@ -787,7 +797,7 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
         &title,
         head,
         body,
-        html! { script src="/static/preview.js" {} },
+        html! { script src=(asset_url("/static/preview.js")) {} },
     )
 }
 
@@ -1082,7 +1092,7 @@ pub fn revealed_page(r: RevealedView) -> Markup {
                 &link_title("Redirect", r.name, Some(&url.card_domain())),
                 html! {},
                 body,
-                html! { script src="/static/preview.js" {} },
+                html! { script src=(asset_url("/static/preview.js")) {} },
             )
         }
         RevealedTarget::Text(text) => {
@@ -1095,7 +1105,7 @@ pub fn revealed_page(r: RevealedView) -> Markup {
                 &link_title("Text", r.name, None),
                 html! {},
                 body,
-                html! { script src="/static/text.js" {} },
+                html! { script src=(asset_url("/static/text.js")) {} },
             )
         }
     }
@@ -1113,7 +1123,7 @@ pub fn text_view_page(base_host: &str, name: &str, text: &str) -> Markup {
         &link_title("Text", name, None),
         html! {},
         body,
-        html! { script src="/static/text.js" {} },
+        html! { script src=(asset_url("/static/text.js")) {} },
     )
 }
 

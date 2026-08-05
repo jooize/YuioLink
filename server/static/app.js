@@ -697,14 +697,17 @@
             const remove = document.createElement("button");
             remove.className = "history-remove";
             remove.type = "button";
+            // The same can the result panel's Delete draws, so the two places a
+            // link can be removed from show one icon. No trailing "…": the glyph
+            // sat on the text baseline and pulled the eye off the row.
             remove.innerHTML =
-                '<svg width="15" height="16.2" viewBox="0 0 13 14" fill="none" aria-hidden="true">' +
-                '<path d="M1.5 3.5h10M5 3.3V2.4c0-.5.4-.9.9-.9h1.2c.5 0 .9.4.9.9v.9' +
-                'M2.8 3.5l.62 8c.05.62.57 1.1 1.2 1.1h3.76c.63 0 1.15-.48 1.2-1.1l.62-8" ' +
-                'stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
-                '<path d="M5.2 6v4M7.8 6v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>' +
-                "</svg><span aria-hidden=\"true\">…</span>";
-            remove.setAttribute("aria-label", "Remove…");
+                '<svg width="15" height="15" viewBox="0 0 14 14" fill="none" aria-hidden="true">' +
+                '<path d="M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2' +
+                'M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7" ' +
+                'stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>' +
+                "</svg>";
+            remove.setAttribute("aria-label", "Remove");
+            remove.title = "Remove this link";
             // Opens the confirm prompt over the row — not a toggle; the prompt carries
             // its own Cancel. openConfirm closes any other row's prompt first.
             remove.addEventListener("click", () => openConfirm(li, it));
