@@ -16,10 +16,9 @@
     --text-kind: #ad5200;
     /* Vibrant purple — the standout border on the create input. */
     --purple: #af52de;
-    /* The two names in the footer credit: the site's purple and Anthropic's own
-       terracotta, each darkened until 12.5px text clears 4.5:1 on the glass. */
+    /* The name in the footer credit: the site's purple, darkened until 12.5px
+       text clears 4.5:1 on the glass. */
     --credit-jooize: #8b2fc9;
-    --credit-claude: #ab5230;
     /* The alternate name-word colour, paired with the accent: a deep navy so a
        multi-word name reads as blue/navy/blue/navy — two blues, no purple. */
     --word-alt: #003e8f;
@@ -68,10 +67,9 @@
         --danger: #ff453a;
         --text-kind: #ff9f0a;
         --purple: #bf5af2;
-        /* On the dark card there is headroom: Claude's terracotta goes in
-           unchanged, and the purple lifts rather than deepens. */
+        /* On the dark card there is headroom, so the purple lifts rather than
+           deepens. */
         --credit-jooize: #c77dff;
-        --credit-claude: #d97757;
         /* Dark inverts the pairing: the alt word goes pale, the accent stays mid. */
         --word-alt: #99c5ff;
         --c-public: #ff6fb5;
@@ -871,16 +869,19 @@ textarea.form-control {
 
 
 /* The link name as the giant hero (direction R4): the memorable word, big and in
-   the accent colour, centred and selectable. */
+   the accent colour, centred and selectable. Wraps by half, like the link-page
+   hero — a four-word name goes two-and-two, and each row keeps the same
+   blue-then-navy rhythm, so the rows read as rows and not as two colour columns. */
 .result-word {
-    display: block;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     font-family: var(--font-mono);
     /* The mockup's "arson" is a fixed 30px; clamp only shrinks it on narrow phones. */
     font-size: clamp(24px, 7vw, 30px);
     font-weight: 700;
     line-height: 1.1;
     letter-spacing: -0.01em;
-    word-break: break-all;
     margin-bottom: 4px;
     color: var(--accent);
     user-select: text;
@@ -2200,16 +2201,30 @@ textarea.form-control {
     margin-top: 5px;
 }
 
-/* "Created by jooize + Claude": a colour each, so the credit reads as two names
-   rather than one string. Both are deepened from their brand values for the
-   light glass — 12.5px text needs 4.5:1, which neither #af52de nor #d97757
-   reaches on white; dark mode takes values that pass as they are. */
+/* "Created by jooize + AI". Only the name is coloured — a colour identifies who
+   made a thing, and "AI" names a category rather than anyone, so it sits back in
+   tertiary instead of taking a second identifying hue. The purple is deepened
+   from --purple for the light glass: 12.5px text needs 4.5:1, and #af52de gives
+   3.6:1 there; dark mode lifts it rather than deepening it. */
 .by-jooize {
     color: var(--credit-jooize);
 }
 
-.by-claude {
-    color: var(--credit-claude);
+.by-ai {
+    color: var(--text-tertiary);
+}
+
+/* A link that leaves the site carries the box-and-arrow mark. Sized in `em` so it
+   tracks the text, nudged up to sit against the cap height rather than the
+   baseline, and given a hair of space so it does not touch the last letter. */
+.ext-mark {
+    margin-left: 0.28em;
+    vertical-align: -0.05em;
+    opacity: 0.75;
+}
+
+.ext:hover .ext-mark {
+    opacity: 1;
 }
 
 /* "Updated <date> · v0.0.0" on its own line under the credit: the site says

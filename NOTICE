@@ -1,0 +1,45 @@
+YuioLink
+Copyright (c) 2026 jooize
+
+This product includes third-party material under its own terms. Those terms
+are not superseded by the MIT/Apache-2.0 grant covering YuioLink itself, and
+this notice must be carried by redistributions (Apache License 2.0, section
+4(d)).
+
+
+EFF wordlists
+-------------
+
+The link-name wordlist in core/src/words.txt is derived from the Electronic
+Frontier Foundation's passphrase wordlists -- EFF Short Wordlist #1 and the
+EFF Large Wordlist -- by taking a length-capped union of their base forms and
+hand-curating it down. The EFF wordlists are (c) Electronic Frontier
+Foundation and licensed CC-BY-3.0-US.
+
+  Author:  Electronic Frontier Foundation
+  Source:  https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases
+  License: https://creativecommons.org/licenses/by/3.0/us/
+
+The wordlist here is a modified subset, not a copy of either list.
+
+BIP39 English wordlist
+----------------------
+
+The same union drew on the BIP-0039 English wordlist, published in the
+bitcoin/bips repository under the MIT License.
+
+  Source:  https://github.com/bitcoin/bips/blob/master/bip-0039/english.txt
+
+
+DejaVu fonts
+------------
+
+server/assets/fonts/DejaVuSans.ttf and DejaVuSansMono.ttf are embedded in the
+server binary so share-card images render with no system fonts installed.
+
+  DejaVu changes: public domain
+  Bitstream Vera Fonts: (c) 2003 Bitstream, Inc.
+  Arev Fonts: (c) 2006 Tavmjong Bah
+
+  Full terms: server/assets/fonts/LICENSE.txt
+  Source:     https://dejavu-fonts.github.io/

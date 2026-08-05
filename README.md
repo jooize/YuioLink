@@ -74,4 +74,22 @@ the SQLite database).
 [SemVer 2.0.0](https://semver.org), tags `vX.Y.Z`. The flake reads the
 workspace version from `Cargo.toml`.
 
-YuioLink is a project by [jooize](https://github.com/jooize).
+## License
+
+Dual-licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or
+  <https://www.apache.org/licenses/LICENSE-2.0>)
+- MIT License ([LICENSE-MIT](LICENSE-MIT) or
+  <https://opensource.org/licenses/MIT>)
+
+at your option. Unless you state otherwise, any contribution you submit for
+inclusion shall be dual-licensed as above, with no additional terms.
+
+Bundled third-party material keeps its own terms — the link-name wordlist
+derives from the [EFF wordlists](https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases)
+(CC-BY-3.0-US) and the BIP-0039 English wordlist, and the share-card renderer
+embeds the DejaVu fonts. See [NOTICE](NOTICE), which redistributions must
+carry.
+
+YuioLink is created by [jooize](https://github.com/jooize) with AI.

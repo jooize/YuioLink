@@ -17,7 +17,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// rather than a build timestamp on purpose: builds stay reproducible, and a
 /// visitor wants to know when the site last changed, not when this binary was
 /// compiled. Bump it alongside the workspace version.
-const RELEASE_DATE: &str = "2026-08-05";
+const RELEASE_DATE: &str = "2026-08-06";
 
 /// The shared page shell: head, the glass "app window", and the masthead.
 ///
@@ -115,24 +115,14 @@ fn name_words(name: &str) -> Vec<&str> {
 }
 
 /// Render a shoutkey name with each word in an alternating colour, so a multi-word
-/// name reads as separate words (`braveOTTER`). Mirrors the client's `nameSpans`.
-fn highlight_name(name: &str) -> Markup {
-    html! {
-        @for (i, word) in name_words(name).into_iter().enumerate() {
-            span class=(format!("nw nw-{}", i % 2)) { (word) }
-        }
-    }
-}
-
-/// The same alternating-colour name, but split down the middle into two halves
-/// (`.nwg`) for the link-page hero, which is large enough that a four-word name
-/// does not fit on one line.
+/// name reads as separate words (`braveOTTER`), grouped into two halves (`.nwg`).
+/// Mirrors the client's `nameSpans`.
 ///
-/// The halves are the only places the hero may break, so a name that has to wrap
-/// wraps between whole words — and a four-word name wraps two-and-two instead of
-/// shedding its last word onto a line of its own. An odd count leans the extra
-/// word onto the first line (`2 + 1`), which is where the eye starts.
-fn highlight_name_halves(name: &str) -> Markup {
+/// The halves are the only places a hero name may break, so a name too wide for
+/// its line wraps between whole words — and a four-word name wraps two-and-two
+/// instead of shedding its last word onto a line of its own. An odd count leans
+/// the extra word onto the first line (`2 + 1`), which is where the eye starts.
+fn highlight_name(name: &str) -> Markup {
     let words = name_words(name);
     let split = words.len().div_ceil(2);
     html! {
@@ -204,6 +194,23 @@ fn home_chip(href: &str, label: &str) -> Markup {
                     stroke-linecap="round"
                     stroke-linejoin="round" {}
             }
+        }
+    }
+}
+
+/// The "this link leaves YuioLink" mark: a box with an arrow leaving its top-right
+/// corner, the convention every OS and browser already uses for it. An inline SVG
+/// rather than U+2197 or U+29C9, so it has one shape everywhere and takes the link's
+/// own colour; `aria-hidden` because the destination is already in the link text.
+fn external_mark() -> Markup {
+    html! {
+        svg.ext-mark width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true" {
+            // The box, open at the corner the arrow leaves through.
+            path d="M7 1.5H10.5V5M10.5 1.5 6.75 5.25M9 7v3.5H1.5V3H5"
+                stroke="currentColor"
+                stroke-width="1.4"
+                stroke-linecap="round"
+                stroke-linejoin="round" {}
         }
     }
 }
@@ -606,17 +613,26 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
         footer {
             // Stacked: the two site pages first (the links a visitor actually
             // uses), the credit under them, the source link on its own line.
-            a href="/help" { "How to Use" }
+            a href="/help" { "Help" }
             " · "
             a href="/stats" { "Statistics" }
-            // The credit names both authors and links neither: the source link
-            // on the next line is where someone who wants to look goes, so the
-            // names stay plain text and carry only their colour.
+            // The credit links neither name: the source link on the next line is
+            // where someone who wants to look goes. Only jooize takes a colour —
+            // "AI" is a category, not a name, so a second identifying colour
+            // would be decoration, and it sits back in tertiary instead.
             span.footer-line {
-                "Created by " span.by-jooize { "jooize" } " + " span.by-claude { "Claude" }
+                "Created by " span.by-jooize { "jooize" } " + " span.by-ai { "AI" }
             }
+            // The terms first, then where to go and read them. The arrow says the
+            // link leaves the site, which every other link in this footer does not.
             span.footer-line {
-                a href="https://github.com/jooize/YuioLink" { "Source (GitHub)" }
+                // The licence links inward, to the page that also carries the
+                // attributions it does not cover; the source links outward.
+                a href="/help#license" { "MIT/Apache-2.0" }
+                ", "
+                a.ext href="https://github.com/jooize/YuioLink" {
+                    "GitHub" (external_mark())
+                }
             }
             span.footer-updated {
                 "Updated " (format_card_date(RELEASE_DATE)) " · "
@@ -836,7 +852,7 @@ fn link_heading(kind: Kind, name: &str, host: &str, back: Markup) -> Markup {
                     "YuioLink "
                     span class=(format!("kind kind-{}", kind.slug())) { (kind.label()) }
                 }
-                span.pv-name { (highlight_name_halves(name)) }
+                span.pv-name { (highlight_name(name)) }
             }
             span.pv-hostline { (host) }
         }
@@ -1259,10 +1275,35 @@ pub fn help_page(base_url: &str) -> Markup {
             "browser and is never sent."
         }
 
+        // The footer's licence line points here. CC-BY asks that the credit sit
+        // where comparable authorship credit sits, so this is a section of the
+        // page every footer links to rather than a route of its own — and `help`
+        // is already reserved, so it costs no name from the namespace.
+        h3.help-h #license { "Licence and credits" }
+        p.help-p {
+            "YuioLink is dual-licensed "
+            a href="https://github.com/jooize/YuioLink/blob/main/LICENSE-MIT" { "MIT" }
+            " or "
+            a href="https://github.com/jooize/YuioLink/blob/main/LICENSE-APACHE" { "Apache-2.0" }
+            ", at your option. Two things it bundles keep their own terms."
+        }
+        p.help-p {
+            "Link names are drawn from a list derived from the "
+            a href="https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases" {
+                "EFF passphrase wordlists"
+            }
+            " — © Electronic Frontier Foundation, "
+            a href="https://creativecommons.org/licenses/by/3.0/us/" { "CC-BY-3.0-US" }
+            " — together with the BIP-0039 English wordlist. The list here is a curated subset, "
+            "not a copy of either. The share-card images are drawn with the "
+            a href="https://dejavu-fonts.github.io/" { "DejaVu fonts" }
+            ", embedded so a card renders without any font installed on the server."
+        }
+
         footer { a href="/" { "Back to YuioLink" } }
     };
     document_full(
-        "YuioLink — How to Use",
+        "YuioLink — Help",
         html! {
             meta name="description" content="How YuioLink works: why every link expires, what the public, secret, and one-time types are for, and how to create a link from a terminal.";
         },
