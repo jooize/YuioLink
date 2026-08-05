@@ -26,7 +26,14 @@ const RELEASE_DATE: &str = "2026-08-05";
 /// the visitor cannot tell two of them apart. The masthead `<h1>` is plain text,
 /// not a home link: clicking it on the create page would discard whatever the
 /// user had typed, so it is no longer a navigation target.
-fn document_full(title: &str, head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
+fn document_shell(
+    title: &str,
+    head_extra: Markup,
+    masthead: bool,
+    centered: bool,
+    body: Markup,
+    scripts: Markup,
+) -> Markup {
     html! {
         (DOCTYPE)
         html lang="en" {
@@ -40,17 +47,39 @@ fn document_full(title: &str, head_extra: Markup, body: Markup, scripts: Markup)
             }
             body {
                 main.app-window {
-                    header {
-                        // Two-tone wordmark, matching the share card: the accent
-                        // lives inside the name rather than in a separate mark.
-                        h1 { "Yuio" span.wm-link { "Link" } }
+                    // One wrapper around everything the page shows, so the phone
+                    // sheet can centre its content with a single auto margin.
+                    div.sheet-body.centered[centered] {
+                        @if masthead {
+                            header {
+                                // Two-tone wordmark, matching the share card: the accent
+                                // lives inside the name rather than in a separate mark.
+                                h1 { "Yuio" span.wm-link { "Link" } }
+                            }
+                        }
+                        (body)
                     }
-                    (body)
                 }
                 (scripts)
             }
         }
     }
+}
+
+fn document_full(title: &str, head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
+    document_shell(title, head_extra, true, false, body, scripts)
+}
+
+/// A short page that gets the wordmark but is allowed to float to the middle of a
+/// phone sheet: the tombstones and errors, which are a line or two of text.
+fn document_short(title: &str, body: Markup, scripts: Markup) -> Markup {
+    document_shell(title, html! {}, true, true, body, scripts)
+}
+
+/// A page about one link. It carries its own heading (`link_heading`) instead of
+/// the wordmark, and centres on a phone.
+fn document_link(title: &str, head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
+    document_shell(title, head_extra, false, true, body, scripts)
 }
 
 /// The link name — the last path segment, minus any `#fragment` — shown as the hero.
@@ -141,9 +170,9 @@ fn pv_arrow() -> Markup {
 /// would promise a return to a page the visitor has never seen — the arrow
 /// points out and up to the root instead, and reads fine either way. The
 /// wording lives on as the tooltip and accessible name.
-fn back_chip(href: &str, label: &str) -> Markup {
+fn home_chip(href: &str, label: &str) -> Markup {
     html! {
-        a.back-chip href=(href) aria-label=(label) title=(label) {
+        a.home-chip href=(href) aria-label=(label) title=(label) {
             svg width="12" height="12" viewBox="0 0 13 13" fill="none" aria-hidden="true" {
                 path d="M10.5 10.5 2.5 2.5M9 2.5H2.5V9"
                     stroke="currentColor"
@@ -300,11 +329,42 @@ fn result_output(url: Option<&str>, meta: Markup, note: Option<&str>) -> Markup 
             small.result-note #result-note hidden[note.is_none()] { @if let Some(n) = note { (n) } }
             div.result-foot {
                 small.result-meta #link-expiry { (meta) }
+                // Copy is the one thing almost everyone came here to do, so it is a
+                // full-width button and stays a word, not a symbol. A real link to
+                // the created URL (right-click gives Copy Link); app.js fills the
+                // href and turns a left click into a copy.
+                a.result-copy #copy-result hidden { "Copy" }
+                // The secondary pair, in the glyphs and colours the history rows
+                // already use. Preview opens this link's own interstitial, so the
+                // creator sees exactly what a recipient will see.
                 div.result-actions {
-                    // A real link to the created URL (right-click gives Copy Link);
-                    // app.js fills the href and turns a left click into a copy.
-                    a.result-copy #copy-result hidden { "Copy" }
+                    a.result-preview #preview-result href=[url] target="_blank"
+                        rel="noopener noreferrer" hidden[url.is_none()]
+                        title="Open this link's preview in a new tab" {
+                        svg width="15" height="15" viewBox="0 0 13 13" fill="none" aria-hidden="true" {
+                            path d="M2.5 10.5 10.5 2.5M4 2.5h6.5V9"
+                                stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" stroke-linejoin="round" {}
+                        }
+                        span { "Preview" }
+                    }
+                    // Withdrawing needs the creation token, which only the JavaScript
+                    // path holds — so this ships hidden and app.js reveals it.
+                    button.result-delete #delete-result type="button" hidden
+                        title="Stop this link working" {
+                        svg width="15" height="15" viewBox="0 0 14 14" fill="none" aria-hidden="true" {
+                            path d="M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7"
+                                stroke="currentColor" stroke-width="1.4"
+                                stroke-linecap="round" stroke-linejoin="round" {}
+                        }
+                        span { "Delete" }
+                    }
                 }
+                // Filled by app.js when Delete is pressed: a prompt and the two ways
+                // out. Deleting never frees the name — the row becomes a tombstone
+                // and the name stays reserved until the link would have expired — so
+                // the prompt promises only that the link stops working.
+                div.result-confirm #result-confirm hidden {}
             }
         }
     }
@@ -593,7 +653,7 @@ pub fn result_page(
         format!("Short names are in high demand right now, so this link uses {words} words.")
     });
     let body = html! {
-        (back_chip("/", "Create New Link"))
+        (home_chip("/", "Create New Link"))
         (result_output(Some(url), meta, note.as_deref()))
         a.btn.btn-block href=(url) { "Open link" }
         // Only offered after a Redirect: a non-URL is already Text, so there is
@@ -611,7 +671,8 @@ pub fn result_page(
                 "keeps working until it expires."
             }
         }
-        p { a href="/" { "Create another" } }
+        // No "Create another" link: the back chip in the corner already goes to
+        // the create page, and it said the same thing twice.
     };
     let scripts = html! { script src="/static/app.js" {} };
     // The destination is what the creator just typed, so naming it here would tell
@@ -653,9 +714,12 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
     let one_time = i.max_uses == Some(1);
     let limited = i.max_uses.is_some();
 
+    let kind = match &i.target {
+        Target::Redirect(_) => Kind::Redirect,
+        Target::TextSnippet => Kind::Text,
+    };
     let body = html! {
-        (back_chip("/", "Go to YuioLink"))
-        (from_line(i.base_host, i.name))
+        (link_heading(kind, i.name, i.base_host, home_chip("/", "Go to YuioLink")))
         (pv_arrow())
         @match &i.target {
             Target::Redirect(url) if limited => (limited_redirect_block(&i, url, one_time)),
@@ -673,7 +737,9 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
         Target::Redirect(url) => link_title("Redirect", i.name, Some(&url.card_domain())),
         Target::TextSnippet => link_title("Text", i.name, None),
     };
-    document_full(&title, head, body, html! {})
+    // preview.js only wires ⌘C to the destination, and no-ops when there is no
+    // destination on the page (a limited link shows just the domain).
+    document_link(&title, head, body, html! { script src="/static/preview.js" {} })
 }
 
 /// `<head>` Open Graph / theme-color tags so a shared link unfurls trustworthily.
@@ -717,9 +783,55 @@ fn interstitial_head(i: &Interstitial, one_time: bool) -> Markup {
     }
 }
 
-fn from_line(host: &str, name: &str) -> Markup {
+/// The heading every page about one link now carries: a quiet "YuioLink Redirect"
+/// kicker over the link name, with the bare host beneath. It replaces both the
+/// generic wordmark and the old `yuio.link/<name>` source line — the name was the
+/// only thing that line added, and it says it far better as the hero.
+///
+/// The kind word takes the colour it already has in the history list (Redirect
+/// accent blue, Text orange) and is the only colour on the kicker; the name stays
+/// greyscale, its alternating case doing the work of separating the words. The
+/// whole block is one `<h1>`: it is one heading, and it reads as one.
+///
+/// The back chip is a sibling, not part of the heading — assistive tech should not
+/// hear "Go to YuioLink" inside the page title — but it lives in this block so that
+/// it travels with the content when the phone sheet centres it.
+fn link_heading(kind: Kind, name: &str, host: &str, back: Markup) -> Markup {
     html! {
-        span.pv-from { (host) "/" span.name { (name) } }
+        div.pv-head {
+            (back)
+            h1 {
+                span.kicker {
+                    "YuioLink "
+                    span class=(format!("kind kind-{}", kind.slug())) { (kind.label()) }
+                }
+                span.pv-name { (highlight_name(name)) }
+            }
+            span.pv-hostline { (host) }
+        }
+    }
+}
+
+/// What a link is, for the heading and the `<title>`.
+#[derive(Clone, Copy)]
+pub enum Kind {
+    Redirect,
+    Text,
+}
+
+impl Kind {
+    fn label(self) -> &'static str {
+        match self {
+            Kind::Redirect => "Redirect",
+            Kind::Text => "Text",
+        }
+    }
+
+    fn slug(self) -> &'static str {
+        match self {
+            Kind::Redirect => "redirect",
+            Kind::Text => "text",
+        }
     }
 }
 
@@ -807,9 +919,11 @@ fn idn_warning(url: &UrlView) -> Option<&IdnWarning> {
 
 /// The full destination URL, coloured by part: dim scheme/delimiters, the
 /// registrable domain highlighted, path segments and query values distinguished.
+/// The spans concatenate back to the exact URL (no separators are added for
+/// display), so `preview.js` can copy this element's text on ⌘C.
 fn render_url(url: &UrlView) -> Markup {
     html! {
-        code.pv-url {
+        code.pv-url #destination {
             span.sch { (url.scheme) }
             @match &url.host {
                 Some(h) => {
@@ -902,12 +1016,11 @@ pub struct RevealedView<'a> {
 /// content was just deleted from the server (see `db::reveal_and_redact`), so a
 /// refresh or revisit won't show it again — the page says so up front.
 pub fn revealed_page(r: RevealedView) -> Markup {
-    let back = back_chip("/", "Create New Link");
+    let back = home_chip("/", "Create New Link");
     match r.target {
         RevealedTarget::Redirect { url, href } => {
             let body = html! {
-                (back)
-                (from_line(r.base_host, r.name))
+                (link_heading(Kind::Redirect, r.name, r.base_host, back))
                 (pv_arrow())
                 (render_url(url))
                 @if let Some(w) = idn_warning(url) { (idn_panel(w)) }
@@ -916,22 +1029,20 @@ pub fn revealed_page(r: RevealedView) -> Markup {
                 p.pv-meta { "Expires in " (humanize_expires_in(r.expires_at)) }
                 span.pv-caution.single { strong { "Always check the destination." } }
             };
-            document_full(
+            document_link(
                 &link_title("Redirect", r.name, Some(&url.card_domain())),
                 html! {},
                 body,
-                html! {},
+                html! { script src="/static/preview.js" {} },
             )
         }
         RevealedTarget::Text(text) => {
             let body = html! {
-                (back)
+                (link_heading(Kind::Text, r.name, r.base_host, back))
                 p.pv-revealed { "Deleted from the server on this view — refreshing won't bring it back." }
-                pre.text-body #text-body { (text) }
-                // Dead without JS; text.js un-hides it when it wires the handler.
-                button.btn.btn-block #copy-text type="button" hidden { "Copy" }
+                (text_body(text))
             };
-            document_full(
+            document_link(
                 &link_title("Text", r.name, None),
                 html! {},
                 body,
@@ -944,19 +1055,31 @@ pub fn revealed_page(r: RevealedView) -> Markup {
 /// A plaintext Text link, rendered immediately (unlimited text). The body is an
 /// escaped `<pre>` — maud escapes it, so a `<script>` in the content shows as text
 /// and never executes. We never emit it as live HTML.
-pub fn text_view_page(name: &str, text: &str) -> Markup {
+pub fn text_view_page(base_host: &str, name: &str, text: &str) -> Markup {
     let body = html! {
-        (back_chip("/", "Go to YuioLink"))
-        pre.text-body #text-body { (text) }
-        // Dead without JS; text.js un-hides it when it wires the handler.
-        button.btn.btn-block #copy-text type="button" hidden { "Copy" }
+        (link_heading(Kind::Text, name, base_host, home_chip("/", "Go to YuioLink")))
+        (text_body(text))
     };
-    document_full(
+    document_link(
         &link_title("Text", name, None),
         html! {},
         body,
         html! { script src="/static/text.js" {} },
     )
+}
+
+/// The snippet itself, plus the Copy button that is dead without JavaScript.
+///
+/// No height cap here: the collapse and its "Show all" control are applied by
+/// `text.js`, so a visitor without JavaScript gets the whole snippet in flow and
+/// scrolls the page, rather than a box they cannot open.
+fn text_body(text: &str) -> Markup {
+    html! {
+        div.text-wrap #text-wrap {
+            pre.text-body #text-body { (text) }
+        }
+        button.btn.btn-block #copy-text type="button" hidden { "Copy" }
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -967,7 +1090,7 @@ pub fn text_view_page(name: &str, text: &str) -> Markup {
 /// reserved until expiry, so it cannot be silently repurposed in the meantime.
 pub fn gone_page(expires_at: Option<&str>) -> Markup {
     let body = html! {
-        (back_chip("/", "Go to YuioLink"))
+        (home_chip("/", "Go to YuioLink"))
         p.error-code { "410" }
         p { "This link has been used or withdrawn." }
         @if let Some(exp) = expires_at {
@@ -975,19 +1098,19 @@ pub fn gone_page(expires_at: Option<&str>) -> Markup {
         }
         a.btn.btn-block href="/" { "Create a New Link" }
     };
-    document_full("YuioLink — Link Gone", html! {}, body, html! {})
+    document_short("YuioLink — Link Gone", body, html! {})
 }
 
 /// 404 Not Found: nothing here — expired, recycled, or never existed. Framed as
 /// by-design, since every YuioLink is ephemeral.
 pub fn not_found_page() -> Markup {
     let body = html! {
-        (back_chip("/", "Go to YuioLink"))
+        (home_chip("/", "Go to YuioLink"))
         p.error-code { "404" }
         p { "This link has expired or never existed — links on YuioLink are ephemeral." }
         a.btn.btn-block href="/" { "Create a New Link" }
     };
-    document_full("YuioLink — Link Not Found", html! {}, body, html! {})
+    document_short("YuioLink — Link Not Found", body, html! {})
 }
 
 /// `GET /help` — the usage page: why links expire, what the three types and two
@@ -1003,7 +1126,7 @@ pub fn not_found_page() -> Markup {
 pub fn help_page(base_url: &str) -> Markup {
     let host = host_from_base(base_url);
     let body = html! {
-        (back_chip("/", "Back to YuioLink"))
+        (home_chip("/", "Back to YuioLink"))
         h2.help-title { "How to use YuioLink" }
         p.help-lead {
             "Paste a link or some text, choose how long it should last, and you get a "
@@ -1146,7 +1269,7 @@ pub fn stats_page(s: &StatsView) -> Markup {
     let created = total("created_public") + total("created_secret") + total("created_once");
 
     let body = html! {
-        (back_chip("/", "Back to YuioLink"))
+        (home_chip("/", "Back to YuioLink"))
         h2.stats-h { "Statistics" }
         p { "Aggregate counts, nothing else. No visitor is measured." }
 
@@ -1237,7 +1360,7 @@ pub fn error_page(code: u16, message: &str) -> Markup {
 /// every validation problem at once, not just the first.
 pub fn error_page_list(code: u16, messages: &[&str]) -> Markup {
     let body = html! {
-        (back_chip("/", "Go to YuioLink"))
+        (home_chip("/", "Go to YuioLink"))
         p.error-code { (code) }
         @for message in messages {
             p { (message) }

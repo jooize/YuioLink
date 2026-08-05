@@ -92,6 +92,7 @@ pub fn router(state: AppState) -> Router {
         .route("/static/app.css", get(app_css))
         .route("/static/app.js", get(app_js))
         .route("/static/text.js", get(text_js))
+        .route("/static/preview.js", get(preview_js))
         .route("/wordlist.txt", get(wordlist_txt))
         .route("/robots.txt", get(robots_txt))
         // Any bare segment added here shadows `/{name}` and must also go in
@@ -480,7 +481,8 @@ pub async fn resolve(
             if let Err(e) = db::consume_link(&state.pool, &name).await {
                 return AppError::internal(e).into_response();
             }
-            Html(views::text_view_page(&d.name, &d.content).into_string()).into_response()
+            let base_host = views::host_from_base(&state.base_url);
+            Html(views::text_view_page(base_host, &d.name, &d.content).into_string()).into_response()
         }
         // Redirects always preview; limited Text shows only that it exists.
         ("redirect", _) | ("text", true) => interstitial_response(&state, &d),
@@ -1207,6 +1209,7 @@ macro_rules! static_asset {
 static_asset!(app_css, "app.css", "text/css; charset=utf-8");
 static_asset!(app_js, "app.js", "text/javascript; charset=utf-8");
 static_asset!(text_js, "text.js", "text/javascript; charset=utf-8");
+static_asset!(preview_js, "preview.js", "text/javascript; charset=utf-8");
 
 /// `GET /api/v0/openapi.yaml` — the API description, embedded from
 /// `server/openapi.yaml` (inside the crate, so the container build context has
@@ -1540,7 +1543,19 @@ mod tests {
         assert_ne!(typed, l.name);
         let (s, _, body) = send(&st, get(&format!("/{typed}"))).await;
         assert_eq!(s, StatusCode::OK);
-        assert!(body.contains(&format!(r#"<span class="name">{}</span>"#, l.name)));
+        // The heading renders the name one span per shoutkey word, so compare the
+        // text rather than the markup.
+        let inner = body
+            .split_once(r#"<span class="pv-name">"#)
+            .and_then(|(_, rest)| rest.split_once("</span></h1>"))
+            .map(|(inner, _)| inner)
+            .expect("the preview heading carries the link name");
+        let shown: String = inner
+            .split('<')
+            .filter_map(|chunk| chunk.split_once('>'))
+            .map(|(_, text)| text)
+            .collect();
+        assert_eq!(shown, l.name);
     }
 
     #[tokio::test]

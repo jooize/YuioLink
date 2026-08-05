@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YuioLink — A4 heading, sheet anchoring, text-body copy border</title>
+<style>
+:root {
+    --accent: #007aff; --accent-hover: #2b90ff; --switch-on: #34c759; --warn: #c77a00; --danger: #d70015;
+    --result: #10b981; --text-kind: #ad5200; --word-alt: #003e8f; --purple: #af52de;
+    --bg-1: #e7e8ec; --bg-2: #f6f7f9; --glow-1: rgba(0,122,255,0.20); --glow-2: rgba(255,64,129,0.14);
+    --text: #1d1d1f; --text-secondary: rgba(60,60,67,0.6); --text-tertiary: rgba(60,60,67,0.4);
+    --card-bg: rgba(255,255,255,0.58); --card-border: rgba(255,255,255,0.7); --card-highlight: rgba(255,255,255,0.9);
+    --card-shadow: 0 24px 70px -22px rgba(20,24,40,0.42), 0 8px 22px -14px rgba(20,24,40,0.28);
+    --field-bg: rgba(255,255,255,0.72); --field-border: rgba(0,0,0,0.1); --separator: rgba(0,0,0,0.08);
+    --radius-window: 28px; --radius-control: 12px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, system-ui, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Monaco, "Cascadia Code", monospace;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --accent: #0a84ff; --accent-hover: #3d9bff; --switch-on: #34c759; --warn: #ffd60a; --danger: #ff453a;
+        --result: #34d399; --text-kind: #ff9f0a; --word-alt: #99c5ff; --purple: #bf5af2;
+        --bg-1: #121214; --bg-2: #202024; --glow-1: rgba(10,132,255,0.22); --glow-2: rgba(191,90,242,0.18);
+        --text: #f5f5f7; --text-secondary: rgba(235,235,245,0.6); --text-tertiary: rgba(235,235,245,0.35);
+        --card-bg: rgba(40,40,44,0.55); --card-border: rgba(255,255,255,0.12); --card-highlight: rgba(255,255,255,0.1);
+        --card-shadow: 0 28px 80px -24px rgba(0,0,0,0.7), 0 10px 26px -16px rgba(0,0,0,0.6);
+        --field-bg: rgba(255,255,255,0.06); --field-border: rgba(255,255,255,0.12); --separator: rgba(255,255,255,0.1);
+    }
+}
+* { box-sizing: border-box; }
+html {
+    min-height: 100%; background-color: var(--bg-1);
+    background-image:
+        radial-gradient(1100px 760px at 12% 6%, var(--glow-1), transparent 60%),
+        radial-gradient(1000px 720px at 88% 96%, var(--glow-2), transparent 58%),
+        linear-gradient(155deg, var(--bg-2), var(--bg-1));
+    background-attachment: fixed;
+}
+body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    gap: 30px; padding: 48px 18px 80px; font-family: var(--font); color: var(--text); -webkit-font-smoothing: antialiased;
+}
+.page-head { width: min(100%, 1000px); text-align: center; }
+.page-head h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.page-head p { margin: 10px auto 0; max-width: 64ch; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+.section-title { width: min(100%, 1000px); margin: 26px 6px -10px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--text-tertiary); }
+.section-note { width: min(100%, 1000px); margin: 0 6px; max-width: 70ch; font-size: 12.5px; line-height: 1.55; color: var(--text-secondary); }
+.section-note code { font-family: var(--font-mono); font-size: 0.92em; }
+
+.grid { width: min(100%, 1000px); display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 26px; }
+.frame { min-width: 0; }
+.frame-label { display: flex; align-items: baseline; gap: 8px; margin: 0 6px 10px; flex-wrap: wrap; }
+.frame-label .key { font-weight: 700; color: var(--accent); }
+.frame-label .name { font-weight: 600; font-size: 14.5px; }
+.frame-label .desc { flex: 0 0 100%; color: var(--text-secondary); font-size: 12.5px; line-height: 1.5; }
+.verdict { flex: 0 0 100%; font-size: 12px; color: var(--text-tertiary); line-height: 1.5; }
+.verdict.good { color: var(--result); }
+.verdict.bad { color: var(--danger); }
+
+.window {
+    position: relative; background: var(--card-bg);
+    -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%);
+    border: 0.5px solid var(--card-border); border-radius: var(--radius-window);
+    box-shadow: var(--card-shadow), inset 0 1px 0 var(--card-highlight); padding: 34px 26px 26px;
+}
+.back-chip {
+    position: absolute; top: 18px; left: 18px; width: 27px; height: 27px; display: inline-flex;
+    align-items: center; justify-content: center; color: var(--text-secondary);
+    background: color-mix(in srgb, var(--text) 7%, transparent); border: 0.5px solid var(--field-border); border-radius: 50%;
+}
+
+/* ---------- A4 heading family ---------- */
+.pv-head { text-align: center; }
+.pv-head h1 { margin: 0; font-weight: 600; }
+.kicker { display: block; font-size: 14px; font-weight: 600; letter-spacing: 0.01em; color: var(--text-secondary); }
+.kicker .kind { font-weight: 700; }
+.kind-redirect { color: var(--accent); }
+.kind-text { color: var(--text-kind); }
+.pv-name {
+    display: block; margin-top: 5px; font-family: var(--font-mono); font-size: clamp(28px, 8vw, 36px);
+    font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; word-break: break-all;
+}
+.mono-name .nw-0 { color: var(--text); }
+.mono-name .nw-1 { color: var(--text-secondary); }
+.blue-name .nw-0 { color: var(--accent); }
+.blue-name .nw-1 { color: var(--word-alt); }
+.pv-hostline { display: block; margin-top: 7px; font-family: var(--font-mono); font-size: 12.5px; color: var(--text-tertiary); }
+
+/* ---------- shared preview pieces ---------- */
+.pv-arrow { display: block; color: var(--accent); margin: 14px 0; }
+.pv-arrow svg { display: block; margin: 0 auto; }
+.pv-url { display: block; text-align: center; margin-top: 4px; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.9; letter-spacing: 0.03em; word-break: break-all; }
+.pv-url .sch { color: var(--text-tertiary); }
+.pv-url .sub { color: var(--text-secondary); }
+.pv-url .reg { color: var(--text); font-weight: 700; font-size: 1.06em; padding: 1px 4px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 13%, transparent); }
+.pv-url .seg { color: var(--text-secondary); }
+.pv-host { display: block; text-align: center; font-family: var(--font); font-size: clamp(22px, 6vw, 27px); font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+.btn {
+    display: block; width: 100%; padding: 13px 18px; font-family: inherit; font-size: 16px; font-weight: 600;
+    color: #fff; background: linear-gradient(180deg, var(--accent-hover), var(--accent)); border: 0;
+    border-radius: var(--radius-control); cursor: pointer; text-align: center;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 2px rgba(0,0,0,0.16);
+}
+.btn--go { background: linear-gradient(180deg, #ffb52e, #ff9f0a); color: #241a05; box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 1px 2px rgba(0,0,0,0.18); }
+.pv-btn { margin-top: 24px; }
+.pv-badge-wrap { text-align: center; margin-top: 16px; }
+.pv-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 12px; border-radius: 999px; color: var(--text-secondary); background: color-mix(in srgb, var(--text) 8%, transparent); }
+.pv-meta { text-align: center; font-size: 12px; color: var(--text-secondary); margin: 9px 0 0; }
+.pv-caution { display: block; text-align: center; font-size: 11.5px; line-height: 1.6; color: var(--text-secondary); margin-top: 20px; padding-top: 15px; border-top: 0.5px solid var(--separator); }
+.pv-caution strong { display: block; margin-top: 6px; color: var(--text); }
+.pv-revealed { text-align: center; font-size: 11.5px; color: var(--text-secondary); margin: 14px 0 0; line-height: 1.4; }
+.pv-revealed::before { content: "\2713\00a0"; color: var(--switch-on); font-weight: 700; }
+
+/* ---------- text body (the box section C is about) ---------- */
+.text-body {
+    margin: 16px 0 0; padding: 14px; max-height: 220px; overflow: auto;
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.5; white-space: pre-wrap;
+    overflow-wrap: anywhere; color: var(--text); background: var(--field-bg);
+    border: 0.5px solid var(--field-border); border-radius: var(--radius-control);
+    /* box-shadow, never border-width: a thicker border would reflow the text inside */
+    transition: border-color 0.55s ease, box-shadow 0.55s ease, background 0.55s ease;
+}
+/* C1 — border colour only */
+.copy-border.lit { border-color: var(--switch-on); transition-duration: 0.1s; }
+/* C2 — border colour, doubled by an inset ring so it reads at 0.5px on any display */
+.copy-ring.lit {
+    border-color: var(--switch-on);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--switch-on) 55%, transparent);
+    transition-duration: 0.1s;
+}
+/* C3 — border colour plus an outer halo */
+.copy-halo.lit {
+    border-color: var(--switch-on);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--switch-on) 22%, transparent),
+                0 0 18px 1px color-mix(in srgb, var(--switch-on) 22%, transparent);
+    transition-duration: 0.1s;
+}
+/* C4 — border colour, held twice as long, no other change */
+.copy-slow.lit { border-color: var(--switch-on); transition-duration: 0.1s; }
+.copy-pill {
+    display: block; width: 100%; margin-top: 14px; padding: 12px 18px; font-family: inherit; font-size: 15px;
+    font-weight: 600; color: #fff; background: linear-gradient(180deg, var(--accent-hover), var(--accent));
+    border: 0; border-radius: var(--radius-control); cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 2px rgba(0,0,0,0.16);
+}
+.hint { margin: 11px 2px 0; font-size: 11.5px; color: var(--text-tertiary); line-height: 1.5; }
+
+/* ---------- phones ---------- */
+.phones { width: min(100%, 1000px); display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; justify-items: center; }
+.phone-col { width: 100%; max-width: 280px; }
+.phone {
+    position: relative; width: 100%; aspect-ratio: 9 / 19.5; border-radius: 36px; overflow: hidden;
+    border: 6px solid color-mix(in srgb, var(--text) 72%, transparent); box-shadow: var(--card-shadow);
+    background-color: var(--bg-1);
+    background-image:
+        radial-gradient(420px 300px at 12% 6%, var(--glow-1), transparent 60%),
+        radial-gradient(400px 280px at 88% 96%, var(--glow-2), transparent 58%),
+        linear-gradient(155deg, var(--bg-2), var(--bg-1));
+}
+.sheet {
+    position: absolute; inset: 0; display: flex; flex-direction: column; overflow: auto;
+    background: var(--card-bg); -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%);
+    padding: 30px 16px 24px;
+}
+.sheet.center > .sheet-body { margin-block: auto; }
+.sheet.bottom > .sheet-body { margin-block-start: auto; }
+.sheet .kicker { font-size: 11px; }
+.sheet .pv-name { font-size: 25px; }
+.sheet .pv-hostline { font-size: 10px; }
+.sheet .btn { font-size: 14px; padding: 11px 14px; }
+.sheet .pv-url { font-size: 11px; line-height: 1.8; }
+.sheet .pv-caution { font-size: 10px; margin-top: 14px; padding-top: 11px; }
+.sheet .pv-meta { font-size: 10.5px; }
+.sheet .pv-badge { font-size: 9.5px; }
+.sheet .pv-host { font-size: 19px; }
+.sheet .pv-arrow { margin: 10px 0; }
+.sheet .pv-arrow svg { width: 13px; height: 15px; }
+.sheet .back-chip { top: 14px; left: 14px; width: 24px; height: 24px; }
+.sheet .text-body { font-size: 10.5px; padding: 10px; margin-top: 12px; max-height: none; }
+.sheet .copy-pill { font-size: 13px; padding: 10px 14px; margin-top: 10px; }
+.sheet .pv-revealed { font-size: 9.5px; margin-top: 10px; }
+.phone.reach::after {
+    content: ""; position: absolute; left: -30%; right: -6%; bottom: -34%; height: 92%; border-radius: 50%;
+    border: 1.5px dashed color-mix(in srgb, var(--switch-on) 70%, transparent);
+    background: color-mix(in srgb, var(--switch-on) 9%, transparent); pointer-events: none;
+}
+.reach-key { margin: 10px 4px 0; font-size: 11.5px; line-height: 1.5; color: var(--text-secondary); }
+.reach-key .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 1.5px dashed var(--switch-on); background: color-mix(in srgb, var(--switch-on) 18%, transparent); margin-right: 5px; vertical-align: middle; }
+.col-title { margin: 0 4px 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; color: var(--text-tertiary); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+    <h1>Round 2 — A4 heading, sheet anchoring, copied-border</h1>
+    <p><strong>A</strong> settles the A4 details (kicker weight, colour, colon, host line).
+    <strong>B</strong> answers &ldquo;can everything go to the bottom?&rdquo; — including what happens when the page is long.
+    <strong>C</strong> is the right box this time: the <code>&lt;pre&gt;</code> holding the text content, border only. Click any Copy button.</p>
+</div>
+
+<!-- ======================================================================
+     A. A4 details
+     ====================================================================== -->
+<div class="section-title">A · A4 — QUIET KICKER, LOUD NAME</div>
+<p class="section-note">Structurally the whole block is one <code>h1</code>: a small <code>span</code> line
+(&ldquo;YuioLink Redirect&rdquo;) then the name. Screen readers announce it as one heading, which is what it is.
+The variants below differ only in how the kicker is weighted and whether the name stays greyscale.</p>
+
+<div class="grid">
+
+    <div class="frame">
+        <div class="frame-label">
+            <span class="key">A4a</span><span class="name">Secondary kicker, greyscale name</span>
+            <span class="desc">Kicker in secondary grey with only the kind word coloured; name in text/grey word alternation.</span>
+            <span class="verdict good">The name is unambiguously the hero and the kind still registers. My pick.</span>
+        </div>
+        <div class="window">
+            <span class="back-chip" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 13 13" fill="none"><path d="M10.5 10.5 2.5 2.5M9 2.5H2.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <div class="pv-head">
+                <h1><span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+                <span class="pv-name mono-name"><span class="nw-0">brave</span><span class="nw-1">OTTER</span></span></h1>
+                <span class="pv-hostline">yuio.link</span>
+            </div>
+            <span class="pv-arrow" aria-hidden="true"><svg width="16" height="18" viewBox="0 0 16 18" fill="none"><path d="M8 1.5v15M2.25 10.75 8 16.5l5.75-5.75" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <code class="pv-url"><span class="sch">https://</span><span class="sub">docs.</span><span class="reg">example.com</span><span class="seg">/guides/setup</span></code>
+            <button class="btn btn--go pv-btn" type="button">Continue to example.com</button>
+            <p class="pv-meta">Expires in 6 days</p>
+            <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere else later. <strong>Always check the destination.</strong></span>
+        </div>
+    </div>
+
+    <div class="frame">
+        <div class="frame-label">
+            <span class="key">A4b</span><span class="name">Whole kicker in the kind colour</span>
+            <span class="desc">&ldquo;YuioLink Text&rdquo; entirely orange, so the kind reads as a label on the page rather than a word in a sentence.</span>
+            <span class="verdict">Louder kind signal; the brand name picks up a colour it doesn't own elsewhere.</span>
+        </div>
+        <div class="window">
+            <span class="back-chip" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 13 13" fill="none"><path d="M10.5 10.5 2.5 2.5M9 2.5H2.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <div class="pv-head">
+                <h1><span class="kicker kind-text" style="font-weight: 700;">YuioLink Text</span>
+                <span class="pv-name mono-name"><span class="nw-0">dangle</span></span></h1>
+                <span class="pv-hostline">yuio.link</span>
+            </div>
+            <span class="pv-arrow" aria-hidden="true"><svg width="16" height="18" viewBox="0 0 16 18" fill="none"><path d="M8 1.5v15M2.25 10.75 8 16.5l5.75-5.75" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="pv-host">A text snippet</span>
+            <button class="btn pv-btn" type="button">Reveal Text</button>
+            <div class="pv-badge-wrap"><span class="pv-badge">Opens Once</span></div>
+            <p class="pv-meta">Expires in 3 hours</p>
+            <span class="pv-caution single">If this page says the link is gone (410), someone already opened it.</span>
+        </div>
+    </div>
+
+    <div class="frame">
+        <div class="frame-label">
+            <span class="key">A4c</span><span class="name">Blue/navy name</span>
+            <span class="desc">Keeps the name's usual accent/navy alternation from the result hero instead of going greyscale.</span>
+            <span class="verdict bad">On a Redirect the blue name and the blue kind word chime; the kicker stops being a separate layer.</span>
+        </div>
+        <div class="window">
+            <span class="back-chip" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 13 13" fill="none"><path d="M10.5 10.5 2.5 2.5M9 2.5H2.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <div class="pv-head">
+                <h1><span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+                <span class="pv-name blue-name"><span class="nw-0">brave</span><span class="nw-1">OTTER</span></span></h1>
+                <span class="pv-hostline">yuio.link</span>
+            </div>
+            <span class="pv-arrow" aria-hidden="true"><svg width="16" height="18" viewBox="0 0 16 18" fill="none"><path d="M8 1.5v15M2.25 10.75 8 16.5l5.75-5.75" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <code class="pv-url"><span class="sch">https://</span><span class="sub">docs.</span><span class="reg">example.com</span><span class="seg">/guides/setup</span></code>
+            <button class="btn btn--go pv-btn" type="button">Continue to example.com</button>
+            <p class="pv-meta">Expires in 6 days</p>
+        </div>
+    </div>
+
+    <div class="frame">
+        <div class="frame-label">
+            <span class="key">A4d</span><span class="name">No host line, name carries the path</span>
+            <span class="desc">Drops the separate <code>yuio.link</code> line and prefixes the name with a dim host instead, so the heading is still a real address.</span>
+            <span class="verdict">Most literal (&ldquo;this is the URL you're on&rdquo;), at the cost of a longer, wrappier hero on a phone.</span>
+        </div>
+        <div class="window">
+            <span class="back-chip" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 13 13" fill="none"><path d="M10.5 10.5 2.5 2.5M9 2.5H2.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <div class="pv-head">
+                <h1><span class="kicker">YuioLink <span class="kind kind-text">Text</span></span>
+                <span class="pv-name mono-name" style="font-size: 29px;"><span style="color: var(--text-tertiary); font-weight: 600;">yuio.link/</span><span class="nw-0">runny</span><span class="nw-1">DUSK</span></span></h1>
+            </div>
+            <span class="pv-arrow" aria-hidden="true"><svg width="16" height="18" viewBox="0 0 16 18" fill="none"><path d="M8 1.5v15M2.25 10.75 8 16.5l5.75-5.75" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="pv-host">A text snippet</span>
+            <button class="btn pv-btn" type="button">Reveal Text</button>
+            <div class="pv-badge-wrap"><span class="pv-badge">Limited Use</span></div>
+            <p class="pv-meta">Expires in 3 hours</p>
+        </div>
+    </div>
+
+</div>
+
+<!-- ======================================================================
+     B. anchoring
+     ====================================================================== -->
+<div class="section-title">B · CENTRED VS. EVERYTHING AT THE BOTTOM</div>
+<p class="section-note">Both are one property on the sheet body: <code>margin-block: auto</code> centres,
+<code>margin-block-start: auto</code> pushes the whole block down. Both collapse to today's top-anchored layout
+automatically once the content is taller than the screen — the second row shows exactly that, with the same two
+rules on a long revealed-text page. Desktop is untouched either way (the rule lives in the
+<code>max-width: 520px</code> block). The dashed arc is a comfortable right-thumb sweep.</p>
+
+<p class="col-title">SHORT PAGE — WHERE THEY DIFFER</p>
+<div class="phones">
+
+    <div class="phone-col">
+        <div class="frame-label"><span class="key">B1</span><span class="name">Today — top</span>
+            <span class="desc">All the slack collects below the caution.</span></div>
+        <div class="phone reach">
+            <div class="sheet">
+                <span class="back-chip" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M10.5 10.5 2.5 2.5M9 2.5H2.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <div class="sheet-body">
+                    <div class="pv-head">
+                        <h1><span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+                        <span class="pv-name mono-name"><span class="nw-0">brave</span><span class="nw-1">OTTER</span></span></h1>
+                        <span class="pv-hostline">yuio.link</span>
+                    </div>
+                    <span class="pv-arrow" aria-hidden="true"><svg viewBox="0 0 16 18" fill="none"><path d="M8 1.5v15M2.25 10.75 8 16.5l5.75-5.75" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    <code class="pv-url"><span class="sch">https://</span><span class="sub">docs.</span><span class="reg">example.com</span><span class="seg">/guides/setup</span></code>
+                    <button class="btn btn--go pv-btn" type="button">Continue to example.com</button>
+                    <p class="pv-meta">Expires in 6 days</p>
+                    <span class="pv-caution">YuioLinks expire and are reused. <strong>Always check the destination.</strong></span>
+                </div>
+            </div>
+        </div>
+        <p class="reach-key"><span class="dot"></span>Button above the arc.</p>
+    </div>
+
+    <div class="phone-col">
+        <div class="frame-label"><span class="key">B2</span><span class="name">Centred</span>
+            <span class="desc"><code>margin-block: auto</code>.</span></div>
+        <div class="phone reach">
+            <div class="sheet center">
+                <span class="back-chip" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M10.5 10.5 2.5 2.5M9 2.5H2.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <div class="sheet-body">
+                    <div class="pv-head">
+                        <h1><span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+                        <span class="pv-name mono-name"><span class="nw-0">brave</span><span class="nw-1">OTTER</span></span></h1>
+                        <span class="pv-hostline">yuio.link</span>
+                    </div>
+                    <span class="pv-arrow" aria-hidden="true"><svg viewBox="0 0 16 18" fill="none"><path d="M8 1.5v15M2.25 10.75 8 16.5l5.75-5.75" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    <code class="pv-url"><span class="sch">https://</span><span class="sub">docs.</span><span class="reg">example.com</span><span class="seg">/guides/setup</span></code>
+                    <button class="btn btn--go pv-btn" type="button">Continue to example.com</button>
+                    <p class="pv-meta">Expires in 6 days</p>
+                    <span class="pv-caution">YuioLinks expire and are reused. <strong>Always check the destination.</strong></span>
+                </div>
+            </div>
+        </div>
+        <p class="reach-key"><span class="dot"></span>Button at the top of the arc; equal air above and below.</p>
+    </div>
+
+    <div class="phone-col">
+        <div class="frame-label"><span class="key">B4</span><span class="name">Everything at the bottom</span>
+            <span class="desc"><code>margin-block-start: auto</code>.</span></div>
+        <div class="phone reach">
+            <div class="sheet bottom">
+                <span class="back-chip" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M10.5 10.5 2.5 2.5M9 2.5H2.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <div class="sheet-body">
+                    <div class="pv-head">
+                        <h1><span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+                        <span class="pv-name mono-name"><span class="nw-0">brave</span><span class="nw-1">OTTER</span></span></h1>
+                        <span class="pv-hostline">yuio.link</span>
+                    </div>
+                    <span class="pv-arrow" aria-hidden="true"><svg viewBox="0 0 16 18" fill="none"><path d="M8 1.5v15M2.25 10.75 8 16.5l5.75-5.75" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    <code class="pv-url"><span class="sch">https://</span><span class="sub">docs.</span><span class="reg">example.com</span><span class="seg">/guides/setup</span></code>
+                    <button class="btn btn--go pv-btn" type="button">Continue to example.com</button>
+                    <p class="pv-meta">Expires in 6 days</p>
+                    <span class="pv-caution">YuioLinks expire and are reused. <strong>Always check the destination.</strong></span>
+                </div>
+            </div>
+        </div>
+        <p class="reach-key"><span class="dot"></span>Everything inside the arc — but the heading is now far from the back chip, and a browser's bottom toolbar eats into this exact band.</p>
+    </div>
+
+    <div class="phone-col">
+        <div class="frame-label"><span class="key">B4′</span><span class="name">Bottom, with the chip's line held</span>
+            <span class="desc">Bottom-anchored, but the heading never rises above the top gutter. Same rule; shown on a Text link so the block is shorter and the drop is larger.</span></div>
+        <div class="phone reach">
+            <div class="sheet bottom">
+                <span class="back-chip" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M10.5 10.5 2.5 2.5M9 2.5H2.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <div class="sheet-body">
+                    <div class="pv-head">
+                        <h1><span class="kicker">YuioLink <span class="kind kind-text">Text</span></span>
+                        <span class="pv-name mono-name"><span class="nw-0">dangle</span></span></h1>
+                        <span class="pv-hostline">yuio.link</span>
+                    </div>
+                    <span class="pv-arrow" aria-hidden="true"><svg viewBox="0 0 16 18" fill="none"><path d="M8 1.5v15M2.25 10.75 8 16.5l5.75-5.75" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    <span class="pv-host">A text snippet</span>
+                    <button class="btn pv-btn" type="button">Reveal Text</button>
+                    <div class="pv-badge-wrap"><span class="pv-badge">Opens Once</span></div>
+                    <p class="pv-meta">Expires in 3 hours</p>
+                    <span class="pv-caution single">If this page says the link is gone (410), someone already opened it.</span>
+                </div>
+            </div>
+        </div>
+        <p class="reach-key"><span class="dot"></span>The shorter the page, the more the top of the sheet reads as empty.</p>
+    </div>
+
+</div>
+
+<p class="col-title" style="margin-top: 22px;">LONG PAGE — BOTH DEGRADE THE SAME WAY (SCROLL EACH)</p>
+<div class="phones">
+
+    <div class="phone-col">
+        <div class="frame-label"><span class="key">B2·long</span><span class="name">Centred, content overflows</span>
+            <span class="desc">Auto margins go to zero when there is no free space — identical to today, and nothing is clipped off the top.</span></div>
+        <div class="phone">
+            <div class="sheet center">
+                <span class="back-chip" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M10.5 10.5 2.5 2.5M9 2.5H2.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <div class="sheet-body">
+                    <div class="pv-head">
+                        <h1><span class="kicker">YuioLink <span class="kind kind-text">Text</span></span>
+                        <span class="pv-name mono-name"><span class="nw-0">runny</span><span class="nw-1">DUSK</span></span></h1>
+                    </div>
+                    <p class="pv-revealed">Deleted from the server on this view — refreshing won't bring it back.</p>
+                    <pre class="text-body">ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH3k9v
+deploy@yuio.link
+
+Rotation notes, 2026-08:
+  - old key retired after the droplet
+    restart
+  - fingerprint checked against the
+    console before first use
+  - no agent forwarding on this host
+
+Meeting moved to Thursday 14:00 UTC;
+the agenda is in the shared folder and
+the recording link expires with this
+snippet.</pre>
+                    <button class="copy-pill" type="button">Copy</button>
+                </div>
+            </div>
+        </div>
+        <p class="reach-key">Top-anchored again, automatically.</p>
+    </div>
+
+    <div class="phone-col">
+        <div class="frame-label"><span class="key">B4·long</span><span class="name">Bottom, content overflows</span>
+            <span class="desc">Same collapse — but note it is the <em>same</em> page, so on a phone the two rules only differ while the content is short.</span></div>
+        <div class="phone">
+            <div class="sheet bottom">
+                <span class="back-chip" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M10.5 10.5 2.5 2.5M9 2.5H2.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <div class="sheet-body">
+                    <div class="pv-head">
+                        <h1><span class="kicker">YuioLink <span class="kind kind-text">Text</span></span>
+                        <span class="pv-name mono-name"><span class="nw-0">runny</span><span class="nw-1">DUSK</span></span></h1>
+                    </div>
+                    <p class="pv-revealed">Deleted from the server on this view — refreshing won't bring it back.</p>
+                    <pre class="text-body">ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH3k9v
+deploy@yuio.link
+
+Rotation notes, 2026-08:
+  - old key retired after the droplet
+    restart
+  - fingerprint checked against the
+    console before first use
+  - no agent forwarding on this host
+
+Meeting moved to Thursday 14:00 UTC;
+the agenda is in the shared folder and
+the recording link expires with this
+snippet.</pre>
+                    <button class="copy-pill" type="button">Copy</button>
+                </div>
+            </div>
+        </div>
+        <p class="reach-key">Identical to B2 once the page is full.</p>
+    </div>
+
+</div>
+
+<p class="section-note" style="margin-top: 6px;"><strong>On B4:</strong> it is as easy to ship as B2 and it does put
+everything in the thumb zone. Two things to weigh. The bottom ~60px of a phone viewport is where Safari and Chrome
+park their toolbars and the home indicator sits, so a bottom-anchored block loses some of what it gained — B2 keeps
+clear of that band by construction. And with the back chip pinned to the top-left, bottom-anchoring leaves the chip
+alone in an empty quarter of the screen, which reads as a rendering fault more than as a layout. B2 keeps the chip
+attached to something.</p>
+
+<!-- ======================================================================
+     C. text-body copy border
+     ====================================================================== -->
+<div class="section-title">C · THE COPIED BOX BORDER</div>
+<p class="section-note">The <code>&lt;pre class="text-body"&gt;</code> already has a 0.5px border, so there is a shape
+to work with — no new plate needed. All four change border colour only; none changes border <em>width</em>, which would
+reflow the text inside. Click Copy on each.</p>
+
+<div class="grid">
+
+    <div class="frame">
+        <div class="frame-label"><span class="key">C1</span><span class="name">Border colour, 1.2s</span>
+            <span class="desc">The hairline turns green, then fades back over half a second.</span>
+            <span class="verdict good">Exactly what you asked for. Faint on a low-DPI external display, where 0.5px renders as one thin pixel.</span></div>
+        <div class="window">
+            <pre class="text-body copy-border" id="t1">ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH3k9vQ2 deploy@yuio.link
+
+Rotation notes, 2026-08:
+  - old key retired after the droplet restart
+  - fingerprint checked against the console</pre>
+            <button class="copy-pill" type="button" data-target="t1" data-hold="1200">Copy</button>
+            <p class="hint">Border only. No fill, no halo, no movement.</p>
+        </div>
+    </div>
+
+    <div class="frame">
+        <div class="frame-label"><span class="key">C2</span><span class="name">Border plus inset ring</span>
+            <span class="desc">Same green border, doubled by a 1px inset shadow just inside it — so it reads as a
+            confident line on every display without the box growing by a pixel.</span>
+            <span class="verdict good">Still &ldquo;just the border&rdquo;, but survives a 1× screen. My pick.</span></div>
+        <div class="window">
+            <pre class="text-body copy-ring" id="t2">ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH3k9vQ2 deploy@yuio.link
+
+Rotation notes, 2026-08:
+  - old key retired after the droplet restart
+  - fingerprint checked against the console</pre>
+            <button class="copy-pill" type="button" data-target="t2" data-hold="1200">Copy</button>
+            <p class="hint">The ring is inside the border, so nothing shifts.</p>
+        </div>
+    </div>
+
+    <div class="frame">
+        <div class="frame-label"><span class="key">C3</span><span class="name">Border plus outer halo</span>
+            <span class="desc">Adds a soft green bloom outside the box — a literal glow.</span>
+            <span class="verdict">Unmissable, but it looks like a focus ring, and a focus ring on a box you cannot type into is a small lie.</span></div>
+        <div class="window">
+            <pre class="text-body copy-halo" id="t3">ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH3k9vQ2 deploy@yuio.link
+
+Rotation notes, 2026-08:
+  - old key retired after the droplet restart
+  - fingerprint checked against the console</pre>
+            <button class="copy-pill" type="button" data-target="t3" data-hold="1200">Copy</button>
+            <p class="hint">Compare against C2 back to back.</p>
+        </div>
+    </div>
+
+    <div class="frame">
+        <div class="frame-label"><span class="key">C4</span><span class="name">C1, held to 2.5s</span>
+            <span class="desc">Identical to C1, but the green stays up as long as the button reads &ldquo;Copied&rdquo;, so the two
+            confirmations start and end together instead of the border blinking out early.</span>
+            <span class="verdict good">Timing matters more than intensity here — pair whichever style wins with the button's own 1.5s.</span></div>
+        <div class="window">
+            <pre class="text-body copy-slow" id="t4">ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH3k9vQ2 deploy@yuio.link
+
+Rotation notes, 2026-08:
+  - old key retired after the droplet restart
+  - fingerprint checked against the console</pre>
+            <button class="copy-pill" type="button" data-target="t4" data-hold="2500">Copy</button>
+            <p class="hint">Watch the button and the border settle at the same moment.</p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+document.querySelectorAll(".copy-pill[data-target]").forEach((btn) => {
+    const box = document.getElementById(btn.dataset.target);
+    const hold = Number(btn.dataset.hold) || 1200;
+    btn.addEventListener("click", () => {
+        box.classList.remove("lit");
+        void box.offsetWidth;
+        box.classList.add("lit");
+        btn.textContent = "Copied";
+        clearTimeout(box._t);
+        clearTimeout(btn._t);
+        box._t = setTimeout(() => box.classList.remove("lit"), hold);
+        btn._t = setTimeout(() => { btn.textContent = "Copy"; }, hold);
+    });
+});
+</script>
+</body>
+</html>

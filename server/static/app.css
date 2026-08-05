@@ -170,7 +170,11 @@ body {
     }
 }
 
-main > header {
+/* Everything the page shows, wrapped so the phone sheet can move it as one block
+   (see the `max-width: 520px` rules at the foot of this file). Deliberately left
+   as a plain block: turning it into a flex container would stop its children's
+   margins collapsing and quietly re-space every page. */
+.sheet-body > header {
     text-align: center;
 }
 
@@ -193,7 +197,7 @@ header h1 {
    (a shared link, a bookmark), where "back" would promise a page the visitor
    has never seen — this points out and up to the root instead. Its wording
    lives in the tooltip and aria-label. */
-.back-chip {
+.home-chip {
     position: absolute;
     top: 18px;
     left: 18px;
@@ -209,16 +213,16 @@ header h1 {
     transition: color 0.15s ease, background 0.15s ease;
 }
 
-.back-chip svg {
+.home-chip svg {
     display: block;
 }
 
-.back-chip:hover {
+.home-chip:hover {
     color: var(--text);
     background: color-mix(in srgb, var(--text) 12%, transparent);
 }
 
-.back-chip:focus-visible {
+.home-chip:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
 }
@@ -991,30 +995,123 @@ textarea.form-control {
     font-weight: 600;
 }
 
+/* The secondary pair under Copy — Preview and Delete, in the glyphs and colours
+   the history rows use, with their words kept: on the result there is room, and
+   two unexplained symbols under a labelled button read as decoration. */
 .result-actions {
     display: flex;
     align-items: center;
-    gap: 9px;
+    justify-content: center;
+    gap: 4px;
 }
 
-/* Copy pill beneath the URL — an anchor to the created URL styled as a button,
-   so the context menu offers Copy Link while a left click copies via JS. */
+.result-preview,
+.result-delete {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    opacity: 0.85;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.result-preview svg,
+.result-delete svg {
+    display: block;
+}
+
+.result-preview:hover,
+.result-delete:hover {
+    text-decoration: none;
+    opacity: 1;
+}
+
+.result-preview {
+    color: var(--purple);
+}
+
+.result-delete {
+    color: var(--text-secondary);
+}
+
+.result-delete:hover {
+    color: var(--danger);
+}
+
+/* Confirm for a withdrawal, in flow beneath the actions (the history rows overlay
+   theirs, but the result panel has no row to cover). */
+.result-confirm {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px 8px 13px;
+    background: var(--bg-2);
+    border: 0.5px solid var(--separator);
+    border-radius: 10px;
+    box-shadow: 0 2px 10px -4px rgba(0, 0, 0, 0.35);
+}
+
+.result-confirm-label {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.result-confirm button {
+    flex: none;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 11px;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.result-confirm .cancel {
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.result-confirm .delete {
+    color: #fff;
+    background: var(--danger);
+}
+
+/* Copy beneath the URL — an anchor to the created URL styled as a button, so the
+   context menu offers Copy Link while a left click copies via JS. Full width and
+   in words: it is what nearly every visit to this panel is for. */
 .result-copy {
-    display: inline-block;
+    display: block;
+    width: 100%;
+    text-align: center;
     text-decoration: none;
     font-family: inherit;
-    font-size: 13.5px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--accent);
     background: color-mix(in srgb, var(--accent) 12%, transparent);
     border: 0.5px solid color-mix(in srgb, var(--accent) 22%, transparent);
-    border-radius: 999px;
-    padding: 7px 22px;
+    border-radius: var(--radius-control);
+    padding: 12px 22px;
     cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
+/* It is an anchor, so the global `a:hover` underline applies unless refused —
+   and an underline inside a pill reads as a second, competing control. */
 .result-copy:hover {
+    text-decoration: none;
     background: color-mix(in srgb, var(--accent) 20%, transparent);
     border-color: color-mix(in srgb, var(--accent) 32%, transparent);
 }
@@ -1038,12 +1135,18 @@ textarea.form-control {
     cursor: not-allowed;
 }
 
-/* Text-link viewer body. */
+/* Text-link viewer body. No height cap in the stylesheet: without JavaScript
+   there is no way to expand a collapsed box, so a no-JS visitor must get the
+   whole snippet. text.js adds .capped (and the fade + "Show all" control) when
+   the text is long enough to be worth folding. */
+.text-wrap {
+    position: relative;
+    margin-top: 16px;
+}
+
 .text-body {
-    margin: 16px 0 0;
+    margin: 0;
     padding: 14px;
-    max-height: 60vh;
-    overflow: auto;
     font-family: var(--font-mono);
     font-size: 13px;
     line-height: 1.5;
@@ -1053,6 +1156,80 @@ textarea.form-control {
     background: var(--field-bg);
     border: 0.5px solid var(--field-border);
     border-radius: var(--radius-control);
+    /* Both back to resting over half a second; the copied flash overrides the
+       duration on the way in so it arrives at once and leaves gently. */
+    transition: border-color 0.55s ease, box-shadow 0.55s ease;
+}
+
+/* Copy confirmation: the box's own hairline turns green, doubled by a 1px inset
+   ring so it still reads on a 1x display. Inset, and never a wider border — a
+   thicker edge would reflow the monospace text inside it. */
+.text-body.copied {
+    border-color: var(--switch-on);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--switch-on) 55%, transparent);
+    transition-duration: 0.1s;
+}
+
+.text-body.capped {
+    max-height: 55vh;
+    overflow: hidden;
+}
+
+/* The last rows of a collapsed box fade into the card, so the cut never looks
+   like the end of the text. Sits inside the border (0.5px inset all round). */
+.text-wrap.capped::after {
+    content: "";
+    position: absolute;
+    left: 0.5px;
+    right: 0.5px;
+    bottom: 0.5px;
+    height: 84px;
+    border-radius: 0 0 var(--radius-control) var(--radius-control);
+    pointer-events: none;
+    background: linear-gradient(to bottom,
+        transparent,
+        color-mix(in srgb, var(--card-bg) 60%, var(--field-bg)) 60%,
+        color-mix(in srgb, var(--card-bg) 92%, var(--field-bg)));
+}
+
+/* "Show all · 42 lines", straddling the bottom edge of the box it opens. */
+.text-expand-row {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: center;
+    margin-top: -15px;
+}
+
+.text-expand {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--card-bg) 70%, var(--field-bg));
+    border: 0.5px solid color-mix(in srgb, var(--accent) 32%, transparent);
+    border-radius: 999px;
+    cursor: pointer;
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+}
+
+.text-expand .lines {
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+.text-expand svg {
+    display: block;
+    transition: transform 0.2s ease;
+}
+
+.text-expand[aria-expanded="true"] svg {
+    transform: rotate(180deg);
 }
 
 /* ==========================================================================
@@ -1061,20 +1238,71 @@ textarea.form-control {
    amber (.btn--go, dark text) = Continue (you leave to the external site).
    ========================================================================== */
 
-/* "yuio.link/<name>" source line. */
-.pv-from {
-    display: block;
+/* The heading a page about one link carries instead of the wordmark: a quiet
+   "YuioLink Redirect" kicker over the name, with the bare host beneath. It
+   replaced the old "yuio.link/<name>" source line, which said the same thing in
+   14px grey. `position: relative` anchors the back chip on phones (below). */
+.pv-head {
+    position: relative;
     text-align: center;
-    font-family: var(--font-mono);
-    font-size: 14px;
-    color: var(--text-secondary);
-    word-break: break-all;
-    margin-top: 26px;
 }
 
-.pv-from .name {
-    color: var(--text);
+.pv-head h1 {
+    margin: 0;
     font-weight: 600;
+}
+
+/* Small, quiet, and the only place the kind is named — the kind word takes the
+   colour it already has in the history list, and nothing else on the line is
+   coloured. */
+.kicker {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--text-secondary);
+}
+
+.kicker .kind {
+    font-weight: 700;
+}
+
+.kicker .kind-redirect {
+    color: var(--accent);
+}
+
+.kicker .kind-text {
+    color: var(--text-kind);
+}
+
+/* The name is the hero. Monospace and large, but greyscale: the alternating case
+   already separates the words, and the accent is spent on the kind above. */
+.pv-name {
+    display: block;
+    margin-top: 5px;
+    font-family: var(--font-mono);
+    font-size: clamp(28px, 8vw, 36px);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    word-break: break-all;
+}
+
+/* Beats the global .nw-0/.nw-1 accent pairing (0,2,0 over 0,1,0). */
+.pv-name .nw-0 {
+    color: var(--text);
+}
+
+.pv-name .nw-1 {
+    color: var(--text-secondary);
+}
+
+.pv-hostline {
+    display: block;
+    margin-top: 7px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--text-tertiary);
 }
 
 /* An inline SVG (not a U+2193 character) so the arrow has the same shape on
@@ -1122,6 +1350,22 @@ textarea.form-control {
     line-height: 1.9;
     letter-spacing: 0.03em;
     word-break: break-all;
+}
+
+/* ⌘C on a preview page copies the destination (preview.js); a green check trails
+   it, the same confirmation the created link uses. Opacity-toggled with the space
+   reserved, so the centred line never reflows. */
+.pv-url::after {
+    content: "\2713";
+    margin-left: 0.4em;
+    font-weight: 700;
+    color: var(--switch-on);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+.pv-url.copied::after {
+    opacity: 1;
 }
 
 .pv-url .sch {
@@ -1470,6 +1714,13 @@ textarea.form-control {
 
 .history-item:last-child {
     border-bottom: 0;
+}
+
+/* While a row's remove menu is open it is a panel, not a list row: the separator
+   underneath would draw a line across the bottom of the prompt. Only this row's
+   line goes — the rest of the list keeps its rhythm. */
+.history-item.confirming {
+    border-bottom-color: transparent;
 }
 
 /* Expired links stay in the list until cleared via "Clear Expired". Only the dead
@@ -2315,6 +2566,34 @@ code {
         border-right: 0;
         border-top: 0;
         padding: calc(30px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
+        /* Only so the auto margin below has something to take space from. The
+           sheet has a single child, so nothing else changes. */
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* A page that is a screen of glass with six lines in it put its button a
+       third of the way down the phone, out of thumb reach with a drift of empty
+       sheet beneath. Auto margins take the slack from both ends instead — and
+       they resolve to zero the moment the content is taller than the screen, so
+       a long snippet or an IDN warning simply goes back to starting at the top.
+       Only the short "about one link" pages opt in; the create page never does,
+       since re-centring as a result appears would read as a scroll jump. */
+    .sheet-body.centered {
+        margin-block: auto;
+    }
+
+    /* With the content floating, a chip pinned to the window corner is stranded
+       in an empty quarter of the screen. It moves onto the kicker's line, where
+       it travels with the heading; the symmetric padding keeps the kicker
+       optically centred between it and the right edge. */
+    .pv-head {
+        padding: 0 34px;
+    }
+
+    .pv-head .home-chip {
+        top: -1px;
+        left: 0;
     }
 }
 

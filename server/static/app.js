@@ -284,19 +284,95 @@
         }
     };
 
+    // The pair beneath Copy. Preview is a plain link to the created URL — it works
+    // on the no-JS result page too, so all it needs here is its href and its hidden
+    // attribute dropped. Delete needs the creation token, which only this path
+    // holds, so it stays hidden without one.
+    //
+    // Deleting withdraws the link: it stops resolving and answers 410, but the row
+    // survives and the name stays reserved until the link would have expired — a
+    // withdrawn name is never handed to someone else. The prompt therefore promises
+    // only that the link stops working, and never a name released.
+    const setupResultActions = (entry) => {
+        const preview = document.getElementById("preview-result");
+        if (preview && entry.url) {
+            preview.href = entry.url;
+            preview.hidden = false;
+        }
+        const del = document.getElementById("delete-result");
+        const box = document.getElementById("result-confirm");
+        if (!del || !box) return;
+        box.hidden = true;
+        box.replaceChildren();
+        // `onclick` rather than addEventListener: this runs again on every create,
+        // and a stacked listener would delete whichever link was made first.
+        if (!entry.name || !entry.token) { del.hidden = true; del.onclick = null; return; }
+        del.hidden = false;
+        del.onclick = () => {
+            const label = document.createElement("span");
+            label.className = "result-confirm-label";
+            label.textContent = "Stop this link working?";
+            const cancel = document.createElement("button");
+            cancel.type = "button";
+            cancel.className = "cancel";
+            cancel.textContent = "Cancel";
+            cancel.addEventListener("click", () => { box.hidden = true; box.replaceChildren(); });
+            const go = document.createElement("button");
+            go.type = "button";
+            go.className = "delete";
+            go.textContent = "Delete Link";
+            go.addEventListener("click", async () => {
+                label.textContent = "Deleting link…";
+                cancel.remove();
+                go.remove();
+                if (await serverDelete(entry.name, entry.token)) {
+                    label.textContent = "Deleted. The name stays reserved until it would have expired.";
+                    del.hidden = true;
+                    const panel = document.getElementById("link-panel");
+                    panel?.classList.add("expired");
+                    document.getElementById("copy-result")?.classList.add("disabled");
+                    tombstone(entry, "deleted");
+                } else {
+                    label.textContent = "Could not delete the link.";
+                    box.append(go);
+                }
+            });
+            box.replaceChildren(label, cancel, go);
+            box.hidden = false;
+        };
+    };
+
     // ⌘C copies the created link from anywhere on the page, with nothing visibly
     // selected (tidier than a highlighted selection). The one thing that beats it
     // is a real selection the user made — anywhere, including inside a field —
     // which always copies natively. Listens on the document, so it works long
     // after the result panel lost focus.
     const enableQuietCopy = (panel, linkEl) => {
+        // Controls that hold no text. Focus sits on one of these most of the time
+        // (the link-type radios, the expiry slider), and a quiet copy there is the
+        // whole point of this handler — so they never block it.
+        const NON_TEXT_INPUT = new Set([
+            "button", "checkbox", "color", "file", "hidden", "image",
+            "radio", "range", "reset", "submit",
+        ]);
+
+        const isTextEntry = (el) =>
+            !!el && (el.isContentEditable || el.tagName === "TEXTAREA"
+                || (el.tagName === "INPUT" && !NON_TEXT_INPUT.has((el.type || "text").toLowerCase())));
+
         // A selection inside an input/textarea is invisible to window.getSelection()
-        // in some engines; ask the field itself. selectionStart throws on field
-        // types that don't support selection — those can't hold one anyway.
+        // in some engines; ask the field itself. `selectionStart` is not available on
+        // every text-entry type — Chromium and Edge throw outright on `number`, which
+        // is the expiry amount — so an unreadable field counts as "might be holding a
+        // selection": we would rather do nothing than copy the result URL out from
+        // under a Ctrl-C aimed at the digits the user just selected.
         const fieldHasSelection = (el) => {
-            if (!el) return false;
-            try { return el.selectionStart != null && el.selectionStart !== el.selectionEnd; }
-            catch { return false; }
+            if (!isTextEntry(el)) return false;
+            if (el.isContentEditable) return false; // window.getSelection() sees these
+            try {
+                if (el.selectionStart == null) return true;
+                return el.selectionStart !== el.selectionEnd;
+            } catch { return true; }
         };
         document.addEventListener("keydown", (event) => {
             const isCopy = (event.metaKey || event.ctrlKey) && (event.key === "c" || event.key === "C");
@@ -1153,8 +1229,10 @@
                 }
                 // Keep the name + delete token so the history row can offer a real
                 // server delete (token is undefined if the backend didn't send one).
-                addHistory({ url, name: data.name, kind, uses, expires: data.expires_at, token: data.delete_token, created: Date.now() });
+                const entry = { url, name: data.name, kind, uses, expires: data.expires_at, token: data.delete_token, created: Date.now() };
+                addHistory(entry); // stamps entry.id, which the result's Delete needs
                 renderHistory();
+                setupResultActions(entry);
                 // The input greys (still clickable); the result is in sync with it.
                 resultSourceValue = raw;
                 content.classList.add("submitted");
@@ -1324,6 +1402,7 @@
                     const metaEl = document.getElementById("link-expiry");
                     if (metaEl) buildMeta(metaEl, entry.kind, entry.expires, entry.uses);
                     setupResultCopy(resultLink);
+                    setupResultActions(entry); // Preview only: the page carries no token
                     // Quiet ⌘C: focus the panel and copy on ⌘C without a visible selection.
                     const panel = document.getElementById("link-panel");
                     if (panel) {

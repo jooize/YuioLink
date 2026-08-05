@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YuioLink — actions on the result</title>
+<style>
+:root {
+    --accent: #007aff; --accent-hover: #2b90ff; --switch-on: #34c759; --warn: #c77a00; --danger: #d70015;
+    --result: #10b981; --text-kind: #ad5200; --word-alt: #003e8f; --purple: #af52de;
+    --bg-1: #e7e8ec; --bg-2: #f6f7f9; --glow-1: rgba(0,122,255,0.20); --glow-2: rgba(255,64,129,0.14);
+    --text: #1d1d1f; --text-secondary: rgba(60,60,67,0.6); --text-tertiary: rgba(60,60,67,0.4);
+    --card-bg: rgba(255,255,255,0.58); --card-border: rgba(255,255,255,0.7); --card-highlight: rgba(255,255,255,0.9);
+    --card-shadow: 0 24px 70px -22px rgba(20,24,40,0.42), 0 8px 22px -14px rgba(20,24,40,0.28);
+    --field-bg: rgba(255,255,255,0.72); --field-border: rgba(0,0,0,0.1); --separator: rgba(0,0,0,0.08);
+    --radius-window: 28px; --radius-control: 12px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, system-ui, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Monaco, "Cascadia Code", monospace;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --accent: #0a84ff; --accent-hover: #3d9bff; --switch-on: #34c759; --warn: #ffd60a; --danger: #ff453a;
+        --result: #34d399; --text-kind: #ff9f0a; --word-alt: #99c5ff; --purple: #bf5af2;
+        --bg-1: #121214; --bg-2: #202024; --glow-1: rgba(10,132,255,0.22); --glow-2: rgba(191,90,242,0.18);
+        --text: #f5f5f7; --text-secondary: rgba(235,235,245,0.6); --text-tertiary: rgba(235,235,245,0.35);
+        --card-bg: rgba(40,40,44,0.55); --card-border: rgba(255,255,255,0.12); --card-highlight: rgba(255,255,255,0.1);
+        --card-shadow: 0 28px 80px -24px rgba(0,0,0,0.7), 0 10px 26px -16px rgba(0,0,0,0.6);
+        --field-bg: rgba(255,255,255,0.06); --field-border: rgba(255,255,255,0.12); --separator: rgba(255,255,255,0.1);
+    }
+}
+* { box-sizing: border-box; }
+html {
+    min-height: 100%; background-color: var(--bg-1);
+    background-image:
+        radial-gradient(1100px 760px at 12% 6%, var(--glow-1), transparent 60%),
+        radial-gradient(1000px 720px at 88% 96%, var(--glow-2), transparent 58%),
+        linear-gradient(155deg, var(--bg-2), var(--bg-1));
+    background-attachment: fixed;
+}
+body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 30px;
+    padding: 48px 18px 80px; font-family: var(--font); color: var(--text); -webkit-font-smoothing: antialiased;
+}
+.page-head { width: min(100%, 1000px); text-align: center; }
+.page-head h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.page-head p { margin: 10px auto 0; max-width: 64ch; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+.section-note { width: min(100%, 1000px); margin: 0 6px; max-width: 70ch; font-size: 12.5px; line-height: 1.55; color: var(--text-secondary); }
+.section-note code { font-family: var(--font-mono); font-size: 0.92em; }
+.grid { width: min(100%, 1000px); display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 26px; }
+.frame { min-width: 0; }
+.frame-label { display: flex; align-items: baseline; gap: 8px; margin: 0 6px 10px; flex-wrap: wrap; }
+.frame-label .key { font-weight: 700; color: var(--accent); }
+.frame-label .name { font-weight: 600; font-size: 14.5px; }
+.frame-label .desc { flex: 0 0 100%; color: var(--text-secondary); font-size: 12.5px; line-height: 1.5; }
+.verdict { flex: 0 0 100%; font-size: 12px; color: var(--text-tertiary); line-height: 1.5; }
+.verdict.good { color: var(--result); }
+.verdict.bad { color: var(--danger); }
+.window {
+    position: relative; background: var(--card-bg);
+    -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%);
+    border: 0.5px solid var(--card-border); border-radius: var(--radius-window);
+    box-shadow: var(--card-shadow), inset 0 1px 0 var(--card-highlight); padding: 26px 26px 24px;
+}
+header.mast { text-align: center; margin-bottom: 4px; }
+header.mast h1 { margin: 0; font-size: 30px; font-weight: 600; letter-spacing: -0.022em; }
+.wm-link { color: var(--accent); }
+
+/* the result panel, as shipped */
+.link-panel { margin: 24px 0 4px; text-align: center; }
+.result-word { display: block; font-family: var(--font-mono); font-size: 30px; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; word-break: break-all; }
+.result-word .nw-0 { color: var(--accent); }
+.result-word .nw-1 { color: var(--word-alt); }
+.result-url { display: block; font-family: var(--font-mono); font-size: 15px; line-height: 1.4; color: var(--text); word-break: break-all; }
+.result-url .u-scheme, .result-url .u-sep, .result-url .u-name { color: var(--text-secondary); }
+.result-url .u-host { color: var(--text); }
+.result-url::after { content: "\2713"; margin-left: 0.4em; font-weight: 700; color: var(--switch-on); opacity: 0; transition: opacity 0.18s ease; }
+.result-url.copied::after { opacity: 1; }
+.result-foot { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 13px; }
+.result-meta { font-size: 12.5px; color: var(--text-secondary); }
+.countdown { color: color-mix(in srgb, var(--switch-on) 82%, var(--text)); font-weight: 600; }
+.result-actions { display: flex; align-items: center; gap: 9px; }
+.result-copy {
+    display: inline-block; text-decoration: none; font-family: inherit; font-size: 13.5px; font-weight: 600;
+    color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 0.5px solid color-mix(in srgb, var(--accent) 22%, transparent); border-radius: 999px;
+    padding: 7px 22px; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.result-copy:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.result-copy.copied { color: var(--switch-on); background: color-mix(in srgb, var(--switch-on) 18%, transparent); border-color: color-mix(in srgb, var(--switch-on) 30%, transparent); }
+.result-copy.wide { display: block; width: 100%; padding: 12px 22px; font-size: 15px; border-radius: var(--radius-control); }
+.after-link { margin: 16px 0 0; text-align: center; font-size: 15px; }
+.after-link a { color: var(--accent); text-decoration: none; }
+
+/* symbol actions, borrowed verbatim from the history rows */
+.sym {
+    display: inline-flex; align-items: center; gap: 2px; font-family: inherit; font-size: 13px; font-weight: 600;
+    background: none; border: 0; padding: 8px 7px; cursor: pointer; opacity: 0.85; text-decoration: none;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+.sym:hover { opacity: 1; }
+.sym svg { display: block; }
+.sym-preview { color: var(--purple); }
+.sym-copy { color: var(--accent); }
+.sym-trash { color: var(--text-secondary); }
+.sym-trash:hover { color: var(--danger); }
+.sym-label { font-size: 12.5px; font-weight: 600; }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
+.sym-row { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.hint { margin: 12px 2px 0; font-size: 11.5px; color: var(--text-tertiary); line-height: 1.5; }
+.confirm {
+    display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 10px 8px 13px;
+    background: var(--bg-2); border: 0.5px solid var(--separator); border-radius: 10px;
+    box-shadow: 0 2px 10px -4px rgba(0,0,0,0.35);
+}
+.confirm-label { flex: 1; min-width: 0; font-size: 12px; text-align: left; color: var(--text-secondary); }
+.confirm button { font-family: inherit; font-size: 12px; font-weight: 600; padding: 6px 11px; border-radius: 8px; border: 0; cursor: pointer; }
+.confirm .cancel { color: var(--text-secondary); background: color-mix(in srgb, var(--text) 8%, transparent); }
+.confirm .del { color: #fff; background: var(--danger); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+    <h1>Actions on the result</h1>
+    <p>Copy stays a text button in all four — the question is only what joins it, and in what form.
+    Preview (open this link's own preview page in a new tab, purple arrow) and Trash both already exist on history
+    rows; these reuse those exact glyphs and colours so the two lists teach each other.</p>
+</div>
+
+<div class="grid">
+
+    <div class="frame">
+        <div class="frame-label"><span class="key">R1</span><span class="name">Copy pill, symbols flanking</span>
+            <span class="desc">The pill keeps its place and size; Preview and Trash sit either side of it as bare
+            symbols, same 30px hit areas as in history.</span>
+            <span class="verdict good">Compact and symmetrical, and Copy stays visibly the primary. My pick.</span></div>
+        <div class="window">
+            <header class="mast"><h1>Yuio<span class="wm-link">Link</span></h1></header>
+            <div class="link-panel">
+                <span class="result-word"><span class="nw-0">brave</span><span class="nw-1">OTTER</span></span>
+                <code class="result-url" id="u1"><span class="u-scheme">https://</span><span class="u-host">yuio.link</span><span class="u-sep">/</span><span class="u-name">braveOTTER</span></code>
+                <div class="result-foot">
+                    <span class="result-meta">Redirect · expires in <span class="countdown">6d 23h</span></span>
+                    <div class="result-actions">
+                        <a class="sym sym-preview" href="#" title="Open this link's preview in a new tab" aria-label="Preview">
+                            <svg width="15" height="15" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M2.5 10.5 10.5 2.5M4 2.5h6.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </a>
+                        <a class="result-copy" href="#" data-url="u1">Copy</a>
+                        <button class="sym sym-trash" type="button" data-confirm="c1" title="Delete this link" aria-label="Delete">
+                            <svg width="15" height="15" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <span aria-hidden="true">…</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="confirm" id="c1" hidden>
+                    <span class="confirm-label">Delete braveOTTER from the server?</span>
+                    <button class="cancel" type="button" data-close="c1">Cancel</button>
+                    <button class="del" type="button">Delete Link</button>
+                </div>
+            </div>
+            <p class="after-link"><a href="#">Create another</a></p>
+        </div>
+    </div>
+
+    <div class="frame">
+        <div class="frame-label"><span class="key">R2</span><span class="name">Full-width Copy, symbols under</span>
+            <span class="desc">Copy becomes a real block button (the size the Continue button is on preview pages),
+            with the two symbols on their own centred row beneath.</span>
+            <span class="verdict good">The most thumb-friendly, and the clearest hierarchy. Costs one more row of height.</span></div>
+        <div class="window">
+            <header class="mast"><h1>Yuio<span class="wm-link">Link</span></h1></header>
+            <div class="link-panel">
+                <span class="result-word"><span class="nw-0">brave</span><span class="nw-1">OTTER</span></span>
+                <code class="result-url" id="u2"><span class="u-scheme">https://</span><span class="u-host">yuio.link</span><span class="u-sep">/</span><span class="u-name">braveOTTER</span></code>
+                <div class="result-foot">
+                    <span class="result-meta">Redirect · expires in <span class="countdown">6d 23h</span></span>
+                    <a class="result-copy wide" href="#" data-url="u2">Copy</a>
+                    <div class="sym-row">
+                        <a class="sym sym-preview" href="#" title="Open this link's preview in a new tab">
+                            <svg width="15" height="15" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M2.5 10.5 10.5 2.5M4 2.5h6.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <span class="sym-label">Preview</span>
+                        </a>
+                        <button class="sym sym-trash" type="button" data-confirm="c2">
+                            <svg width="15" height="15" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <span class="sym-label">Delete</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="confirm" id="c2" hidden>
+                    <span class="confirm-label">Delete braveOTTER from the server?</span>
+                    <button class="cancel" type="button" data-close="c2">Cancel</button>
+                    <button class="del" type="button">Delete Link</button>
+                </div>
+            </div>
+            <p class="after-link"><a href="#">Create another</a></p>
+        </div>
+    </div>
+
+    <div class="frame">
+        <div class="frame-label"><span class="key">R3</span><span class="name">History's own layout</span>
+            <span class="desc">Meta on the left, symbol cluster on the right — the result reads exactly like the row
+            it is about to become, with the Copy pill below.</span>
+            <span class="verdict">Strongest continuity with the list. But the result is centred and the row is not,
+            so the panel loses its axis.</span></div>
+        <div class="window">
+            <header class="mast"><h1>Yuio<span class="wm-link">Link</span></h1></header>
+            <div class="link-panel">
+                <span class="result-word"><span class="nw-0">brave</span><span class="nw-1">OTTER</span></span>
+                <code class="result-url" id="u3"><span class="u-scheme">https://</span><span class="u-host">yuio.link</span><span class="u-sep">/</span><span class="u-name">braveOTTER</span></code>
+                <div class="result-foot">
+                    <div class="row-between">
+                        <span class="result-meta">Redirect · <span class="countdown">6d 23h</span></span>
+                        <span class="sym-row">
+                            <a class="sym sym-copy" href="#" data-flash="u3" title="Copy the link">
+                                <svg width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M9.6 2.2H3.6c-.77 0-1.4.63-1.4 1.4v6.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="4.9" y="4.7" width="7" height="7.2" rx="1.3" stroke="currentColor" stroke-width="1.6"/></svg>
+                            </a>
+                            <a class="sym sym-preview" href="#" title="Open this link's preview in a new tab">
+                                <svg width="15" height="15" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M2.5 10.5 10.5 2.5M4 2.5h6.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </a>
+                            <button class="sym sym-trash" type="button" data-confirm="c3">
+                                <svg width="15" height="15" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                <span aria-hidden="true">…</span>
+                            </button>
+                        </span>
+                    </div>
+                    <a class="result-copy" href="#" data-url="u3">Copy</a>
+                </div>
+                <div class="confirm" id="c3" hidden>
+                    <span class="confirm-label">Delete braveOTTER from the server?</span>
+                    <button class="cancel" type="button" data-close="c3">Cancel</button>
+                    <button class="del" type="button">Delete Link</button>
+                </div>
+            </div>
+            <p class="after-link"><a href="#">Create another</a></p>
+        </div>
+    </div>
+
+    <div class="frame">
+        <div class="frame-label"><span class="key">R4</span><span class="name">Preview only, no Trash</span>
+            <span class="desc">Copy and Preview on the result; deleting stays a history-row action, one scroll below.</span>
+            <span class="verdict">Worth considering seriously: a Trash sitting 40px from Copy, seconds after
+            creating a link, is a mis-tap with no undo — the link is gone from the server.</span></div>
+        <div class="window">
+            <header class="mast"><h1>Yuio<span class="wm-link">Link</span></h1></header>
+            <div class="link-panel">
+                <span class="result-word"><span class="nw-0">brave</span><span class="nw-1">OTTER</span></span>
+                <code class="result-url" id="u4"><span class="u-scheme">https://</span><span class="u-host">yuio.link</span><span class="u-sep">/</span><span class="u-name">braveOTTER</span></code>
+                <div class="result-foot">
+                    <span class="result-meta">Redirect · expires in <span class="countdown">6d 23h</span></span>
+                    <div class="result-actions">
+                        <a class="result-copy" href="#" data-url="u4">Copy</a>
+                        <a class="sym sym-preview" href="#" title="Open this link's preview in a new tab">
+                            <svg width="15" height="15" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M2.5 10.5 10.5 2.5M4 2.5h6.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <span class="sym-label">Preview</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <p class="after-link"><a href="#">Create another</a></p>
+        </div>
+    </div>
+
+</div>
+
+<p class="section-note"><strong>On Trash specifically.</strong> History's trash opens a confirm offering two very
+different outs — <em>Forget Link</em> (drop it from this device) and <em>Delete Link</em> (remove it from the server,
+possible only while the creation token is held). On the result, Forget is meaningless — the link was created one
+second ago and forgetting it would just erase the row you are looking at — so the result's trash can only sensibly
+mean Delete, with the confirm shown in R1–R3. That is a real action worth having (you pasted the wrong URL and want
+the link to stop resolving before you send it anywhere), but it is also the one action on this page that cannot be
+undone, sitting next to the one you tap most. If it ships, it belongs at the edge of the cluster, never between Copy
+and Preview.</p>
+
+<p class="section-note" style="margin-top: 14px;"><strong>Deleting does not free the name.</strong>
+<code>delete_link</code> sets <code>withdrawn = 1</code> and keeps the row, so the name stays reserved until the
+link would have expired anyway — it answers 410, never 404, and can never be re-registered in the meantime. So the
+confirm should not promise a name back. &ldquo;Stop this link working?&rdquo; is the honest prompt; the name is
+spent either way.</p>
+
+<script>
+document.querySelectorAll("[data-url]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const url = document.getElementById(btn.dataset.url);
+        url.classList.add("copied");
+        btn.classList.add("copied");
+        btn.textContent = "Copied";
+        clearTimeout(btn._t);
+        btn._t = setTimeout(() => {
+            url.classList.remove("copied"); btn.classList.remove("copied"); btn.textContent = "Copy";
+        }, 1500);
+    });
+});
+document.querySelectorAll("[data-flash]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const url = document.getElementById(btn.dataset.flash);
+        url.classList.add("copied");
+        clearTimeout(btn._t);
+        btn._t = setTimeout(() => url.classList.remove("copied"), 1500);
+    });
+});
+document.querySelectorAll("[data-confirm]").forEach((btn) => {
+    btn.addEventListener("click", () => { document.getElementById(btn.dataset.confirm).hidden = false; });
+});
+document.querySelectorAll("[data-close]").forEach((btn) => {
+    btn.addEventListener("click", () => { document.getElementById(btn.dataset.close).hidden = true; });
+});
+</script>
+</body>
+</html>
