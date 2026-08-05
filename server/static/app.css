@@ -16,6 +16,10 @@
     --text-kind: #ad5200;
     /* Vibrant purple — the standout border on the create input. */
     --purple: #af52de;
+    /* The two names in the footer credit: the site's purple and Anthropic's own
+       terracotta, each darkened until 12.5px text clears 4.5:1 on the glass. */
+    --credit-jooize: #8b2fc9;
+    --credit-claude: #ab5230;
     /* The alternate name-word colour, paired with the accent: a deep navy so a
        multi-word name reads as blue/navy/blue/navy — two blues, no purple. */
     --word-alt: #003e8f;
@@ -64,6 +68,10 @@
         --danger: #ff453a;
         --text-kind: #ff9f0a;
         --purple: #bf5af2;
+        /* On the dark card there is headroom: Claude's terracotta goes in
+           unchanged, and the purple lifts rather than deepens. */
+        --credit-jooize: #c77dff;
+        --credit-claude: #d97757;
         /* Dark inverts the pairing: the alt word goes pale, the accent stays mid. */
         --word-alt: #99c5ff;
         --c-public: #ff6fb5;
@@ -1241,9 +1249,10 @@ textarea.form-control {
 /* The heading a page about one link carries instead of the wordmark: a quiet
    "YuioLink Redirect" kicker over the name, with the bare host beneath. It
    replaced the old "yuio.link/<name>" source line, which said the same thing in
-   14px grey. `position: relative` anchors the back chip on phones (below). */
+   14px grey. Deliberately not positioned: the home chip is absolute, and it
+   belongs to the window corner here — giving this block a containing block
+   would drop the chip onto the name instead. The phone rules below take it. */
 .pv-head {
-    position: relative;
     text-align: center;
 }
 
@@ -1276,16 +1285,26 @@ textarea.form-control {
 }
 
 /* The name is the hero. Monospace and large, but greyscale: the alternating case
-   already separates the words, and the accent is spent on the kind above. */
+   already separates the words, and the accent is spent on the kind above.
+   A wrapping flex row of the two `.nwg` halves, so the only break the browser
+   is offered is the one down the middle — a name has no spaces in it, and
+   `word-break: break-all` used to guillotine it mid-word (`...NUTME` / `G`). */
 .pv-name {
-    display: block;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     margin-top: 5px;
     font-family: var(--font-mono);
     font-size: clamp(28px, 8vw, 36px);
     font-weight: 700;
     line-height: 1.1;
     letter-spacing: -0.02em;
-    word-break: break-all;
+}
+
+/* Half a name. The widest one can be is two six-letter words, which fits on one
+   line at every size this clamp produces, so nothing has to break inside. */
+.nwg {
+    white-space: nowrap;
 }
 
 /* Beats the global .nw-0/.nw-1 accent pairing (0,2,0 over 0,1,0). */
@@ -2162,7 +2181,10 @@ textarea.form-control {
     text-decoration: underline;
 }
 
-main > footer {
+/* Matches on `.sheet-body`, not on `main`: the footer is a child of the sheet
+   wrapper, so a `main > footer` rule silently stops applying and the footer
+   falls back to body text — full size and flush left. */
+.sheet-body > footer {
     margin: 22px 0 0;
     padding-top: 18px;
     border-top: 0.5px solid var(--separator);
@@ -2178,9 +2200,16 @@ main > footer {
     margin-top: 5px;
 }
 
-/* The quiet AI credit in the footer — present, not shouting. */
-.with-ai {
-    color: var(--text-tertiary);
+/* "Created by jooize + Claude": a colour each, so the credit reads as two names
+   rather than one string. Both are deepened from their brand values for the
+   light glass — 12.5px text needs 4.5:1, which neither #af52de nor #d97757
+   reaches on white; dark mode takes values that pass as they are. */
+.by-jooize {
+    color: var(--credit-jooize);
+}
+
+.by-claude {
+    color: var(--credit-claude);
 }
 
 /* "Updated <date> · v0.0.0" on its own line under the credit: the site says
@@ -2588,6 +2617,7 @@ code {
        it travels with the heading; the symmetric padding keeps the kicker
        optically centred between it and the right edge. */
     .pv-head {
+        position: relative;
         padding: 0 34px;
     }
 

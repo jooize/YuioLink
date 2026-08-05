@@ -124,6 +124,30 @@ fn highlight_name(name: &str) -> Markup {
     }
 }
 
+/// The same alternating-colour name, but split down the middle into two halves
+/// (`.nwg`) for the link-page hero, which is large enough that a four-word name
+/// does not fit on one line.
+///
+/// The halves are the only places the hero may break, so a name that has to wrap
+/// wraps between whole words — and a four-word name wraps two-and-two instead of
+/// shedding its last word onto a line of its own. An odd count leans the extra
+/// word onto the first line (`2 + 1`), which is where the eye starts.
+fn highlight_name_halves(name: &str) -> Markup {
+    let words = name_words(name);
+    let split = words.len().div_ceil(2);
+    html! {
+        @for (half, group) in [&words[..split], &words[split..]].into_iter().enumerate() {
+            @if !group.is_empty() {
+                span.nwg {
+                    @for (i, word) in group.iter().enumerate() {
+                        span class=(format!("nw nw-{}", (split * half + i) % 2)) { (word) }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// The `<title>` for a page about one link: `YuioLink Redirect: line`.
 ///
 /// Brand first, like every other page here, then the kind, then the name — so a
@@ -585,12 +609,14 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             a href="/help" { "How to Use" }
             " · "
             a href="/stats" { "Statistics" }
+            // The credit names both authors and links neither: the source link
+            // on the next line is where someone who wants to look goes, so the
+            // names stay plain text and carry only their colour.
             span.footer-line {
-                "A project by " a href="https://github.com/jooize" { "jooize" }
-                span.with-ai { " (with AI)" }
+                "Created by " span.by-jooize { "jooize" } " + " span.by-claude { "Claude" }
             }
             span.footer-line {
-                a href="https://github.com/jooize/YuioLink" { "Source on GitHub" }
+                a href="https://github.com/jooize/YuioLink" { "Source (GitHub)" }
             }
             span.footer-updated {
                 "Updated " (format_card_date(RELEASE_DATE)) " · "
@@ -810,7 +836,7 @@ fn link_heading(kind: Kind, name: &str, host: &str, back: Markup) -> Markup {
                     "YuioLink "
                     span class=(format!("kind kind-{}", kind.slug())) { (kind.label()) }
                 }
-                span.pv-name { (highlight_name(name)) }
+                span.pv-name { (highlight_name_halves(name)) }
             }
             span.pv-hostline { (host) }
         }
