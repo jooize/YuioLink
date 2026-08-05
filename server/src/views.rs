@@ -626,9 +626,11 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             // The terms first, then where to go and read them. The arrow says the
             // link leaves the site, which every other link in this footer does not.
             span.footer-line {
-                // The licence links inward, to the page that also carries the
-                // attributions it does not cover; the source links outward.
-                a href="/help#license" { "MIT/Apache-2.0" }
+                // The licence links inward, to the colophon, which also carries
+                // the attributions it does not cover; the source links outward.
+                // The label names the licence rather than the page: "Colophon" is
+                // the nicer word for the URL but tells a visitor nothing.
+                a href="/colophon" { "MIT/Apache-2.0" }
                 ", "
                 a.ext href="https://github.com/jooize/YuioLink" {
                     "GitHub" (external_mark())
@@ -1275,37 +1277,87 @@ pub fn help_page(base_url: &str) -> Markup {
             "browser and is never sent."
         }
 
-        // The footer's licence line points here. CC-BY asks that the credit sit
-        // where comparable authorship credit sits, so this is a section of the
-        // page every footer links to rather than a route of its own — and `help`
-        // is already reserved, so it costs no name from the namespace.
-        h3.help-h #license { "Licence and credits" }
-        p.help-p {
-            "YuioLink is dual-licensed "
-            a href="https://github.com/jooize/YuioLink/blob/main/LICENSE-MIT" { "MIT" }
-            " or "
-            a href="https://github.com/jooize/YuioLink/blob/main/LICENSE-APACHE" { "Apache-2.0" }
-            ", at your option. Two things it bundles keep their own terms."
-        }
-        p.help-p {
-            "Link names are drawn from a list derived from the "
-            a href="https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases" {
-                "EFF passphrase wordlists"
-            }
-            " — © Electronic Frontier Foundation, "
-            a href="https://creativecommons.org/licenses/by/3.0/us/" { "CC-BY-3.0-US" }
-            " — together with the BIP-0039 English wordlist. The list here is a curated subset, "
-            "not a copy of either. The share-card images are drawn with the "
-            a href="https://dejavu-fonts.github.io/" { "DejaVu fonts" }
-            ", embedded so a card renders without any font installed on the server."
-        }
-
         footer { a href="/" { "Back to YuioLink" } }
     };
     document_full(
         "YuioLink — Help",
         html! {
             meta name="description" content="How YuioLink works: why every link expires, what the public, secret, and one-time types are for, and how to create a link from a terminal.";
+        },
+        body,
+        html! {},
+    )
+}
+
+/// `GET /colophon` — what YuioLink is made of: the licence it is offered under,
+/// and the third-party work it carries that the licence does not cover.
+///
+/// A page rather than a section of `/help` because the two answer different
+/// questions, and because CC-BY-3.0 §4(c) asks that the credit appear "in a
+/// manner at least as prominent" as other authorship credit — the footer names
+/// jooize, so the EFF credit has to be reachable at that level, not buried.
+///
+/// The old printer's sense of the word: the note at the end of a book saying who
+/// set it, and in what type. That is exactly this page, fonts included.
+pub fn colophon_page() -> Markup {
+    let body = html! {
+        (home_chip("/", "Back to YuioLink"))
+        h2.help-title { "Colophon" }
+        p.help-lead {
+            "What this site is made of — the terms it is offered under, and the work it "
+            "carries that those terms do not cover."
+        }
+
+        h3.help-h #license { "Licence" }
+        p.help-p {
+            "YuioLink is dual-licensed "
+            a.ext href="https://github.com/jooize/YuioLink/blob/main/LICENSE-MIT" {
+                "MIT" (external_mark())
+            }
+            " or "
+            a.ext href="https://github.com/jooize/YuioLink/blob/main/LICENSE-APACHE" {
+                "Apache-2.0" (external_mark())
+            }
+            ", at your option — take whichever suits you. The source is on "
+            a.ext href="https://github.com/jooize/YuioLink" { "GitHub" (external_mark()) }
+            "."
+        }
+
+        h3.help-h #words { "The words" }
+        p.help-p {
+            "Link names are drawn from a list derived from the "
+            a.ext href="https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases" {
+                "EFF passphrase wordlists" (external_mark())
+            }
+            " — © Electronic Frontier Foundation, licensed "
+            a.ext href="https://creativecommons.org/licenses/by/3.0/us/" {
+                "CC-BY-3.0-US" (external_mark())
+            }
+            " — together with the BIP-0039 English wordlist. What ships here is a "
+            "length-capped, hand-curated subset of those, not a copy of any of them: "
+            "sound-alike pairs were dropped so a name survives being read aloud. The "
+            "list is at "
+            a href="/wordlist.txt" { "/wordlist.txt" }
+            "."
+        }
+
+        h3.help-h #type { "The type" }
+        p.help-p {
+            "The share-card images are drawn server-side with the "
+            a.ext href="https://dejavu-fonts.github.io/" { "DejaVu fonts" (external_mark()) }
+            " — descended from Bitstream Vera (© 2003 Bitstream, Inc.) and Arev "
+            "(© 2006 Tavmjong Bah), with the DejaVu changes in the public domain. They are "
+            "embedded in the binary, so a card renders the same with no fonts installed on "
+            "the server at all. The pages themselves ask for whatever your system calls its "
+            "interface font, and are not sent any."
+        }
+
+        footer { a href="/" { "Back to YuioLink" } }
+    };
+    document_full(
+        "YuioLink — Colophon",
+        html! {
+            meta name="description" content="What YuioLink is made of: the MIT/Apache-2.0 licence it is offered under, the EFF and BIP-0039 wordlists its link names come from, and the DejaVu fonts its share cards are drawn with.";
         },
         body,
         html! {},

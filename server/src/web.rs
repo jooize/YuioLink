@@ -99,6 +99,7 @@ pub fn router(state: AppState) -> Router {
         // `yuiolink_core::RESERVED_NAMES`, or a link issued under that word is
         // unreachable for its whole life (a GET lands on this route, not the link).
         .route("/help", get(help))
+        .route("/colophon", get(colophon))
         .route("/stats", get(stats))
         .nest("/api/v0", api_routes())
         .route("/create", post(create_plain))
@@ -1020,6 +1021,12 @@ pub async fn help(State(state): State<AppState>) -> Response {
     Html(views::help_page(&state.base_url).into_string()).into_response()
 }
 
+/// `GET /colophon` — the licence and the third-party attributions. Fully static:
+/// nothing on it depends on the instance, unlike `/help` and its `curl` examples.
+pub async fn colophon() -> Response {
+    Html(views::colophon_page().into_string()).into_response()
+}
+
 /// `GET /stats` — the public, aggregate-only counters. Reads three cheap queries
 /// and renders them; a failure on any one degrades to zeroes rather than a 500,
 /// since a broken counter is never worth an error page.
@@ -1617,6 +1624,69 @@ mod tests {
         assert!(body.contains("Text"), "should report a Text link: {body}");
         // Not offered again: a Text link has no other kind to become.
         assert!(!body.contains("Share the address as a text link instead"));
+    }
+
+    /// Every bare segment routed at the root shadows `/{name}`, so it must also be
+    /// in `RESERVED_NAMES` — otherwise a link issued under that word is a 405 for
+    /// its whole life, which is how `/stats` shipped once already.
+    ///
+    /// The list is read out of this file's own source rather than restated here,
+    /// so adding a route cannot silently skip the check: a new `.route("/x")`
+    /// fails this test until `x` is reserved. Only the `router()` body counts —
+    /// `api_routes()` is nested under `/api/v0` and shadows nothing.
+    #[test]
+    fn every_root_route_is_a_reserved_name() {
+        let src = include_str!("web.rs");
+        let router_body = src
+            .split_once("fn api_routes(")
+            .map(|(before, _)| before)
+            .expect("api_routes marks the end of the root router");
+
+        let mut checked = 0;
+        for (marker, _) in [(".route(\"", 0), (".nest(\"", 0)] {
+            for chunk in router_body.split(marker).skip(1) {
+                let path = chunk.split('"').next().expect("a closing quote");
+                // The root itself, and the `/{name}` family, shadow nothing.
+                let Some(segment) = path.trim_start_matches('/').split('/').next() else {
+                    continue;
+                };
+                if segment.is_empty() || segment.starts_with('{') {
+                    continue;
+                }
+                // `/robots.txt` cannot collide, but `/robots` is what a reader
+                // would try, and both are reserved — compare on the stem.
+                let stem = segment.split('.').next().expect("a non-empty segment");
+                assert!(
+                    yuiolink_core::link::is_reserved_name(stem),
+                    "route /{segment} shadows /{{name}}: add \"{stem}\" to RESERVED_NAMES"
+                );
+                checked += 1;
+            }
+        }
+        // Guard the guard: a parse that silently matched nothing would pass.
+        assert!(
+            checked >= 8,
+            "expected to find the root routes, saw {checked}"
+        );
+    }
+
+    #[tokio::test]
+    async fn colophon_credits_the_bundled_work() {
+        let st = test_state().await;
+        let (s, _, body) = send(&st, get("/colophon")).await;
+        assert_eq!(s, StatusCode::OK);
+        // CC-BY asks for the author, and the fonts carry their own terms — both
+        // have to survive an edit to this page.
+        for credit in ["Electronic Frontier Foundation", "CC-BY-3.0-US", "DejaVu"] {
+            assert!(
+                body.contains(credit),
+                "colophon should credit {credit}: {body}"
+            );
+        }
+        // The footer's licence link is the only route to this page.
+        let (s, _, home) = send(&st, get("/")).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(home.contains("href=\"/colophon\""), "{home}");
     }
 
     #[tokio::test]

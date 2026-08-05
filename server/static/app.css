@@ -1580,7 +1580,10 @@ textarea.form-control {
 }
 
 /* HIG-style switch on the old purple (mockup C): a "Local History" label and a toggle
-   that shows state by colour + knob position (green/right = on), not by words. */
+   that shows state by colour + knob position (green/right = on), not by words.
+   The purple is #7a4de5, not the mockup's #8b5cf6: white 12.5px on that was 4.23:1,
+   just under the 4.5:1 AA needs. This value comes from the 2026-07-15 audit, which
+   picked it to hold the hue — the two are indistinguishable side by side. */
 .storage-toggle {
     display: flex;
     align-items: center;
@@ -1591,7 +1594,7 @@ textarea.form-control {
     padding: 6px 12px;
     border: none;
     color: #fff;
-    background: #8b5cf6;
+    background: #7a4de5;
     cursor: pointer;
     white-space: nowrap;
     transition: filter 0.15s ease;
