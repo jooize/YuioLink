@@ -6,7 +6,7 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use maud::{DOCTYPE, Markup, html};
+use maud::{DOCTYPE, Markup, PreEscaped, html};
 
 use crate::urlview::{IdnWarning, UrlView};
 
@@ -52,6 +52,17 @@ fn document_shell(
                 meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover";
                 meta name="color-scheme" content="light dark";
                 title { (title) }
+                // Marks the document as scripted before anything is painted, so
+                // the stylesheet can draw the JS-on state directly instead of
+                // app.js rearranging the page after the fact. Folding the exact
+                // expiry field away from script was the site's largest layout
+                // shift; as a CSS rule it costs nothing.
+                //
+                // Inline and in the head on purpose: it must run before first
+                // paint, and being part of this response it cannot fail on its
+                // own. If app.js itself never arrives the slider still posts
+                // natively — only the typed exact value is out of reach.
+                script { (PreEscaped("document.documentElement.classList.add('js')")) }
                 link rel="stylesheet" href=(asset_url("/static/app.css"));
                 (head_extra)
             }
@@ -472,8 +483,8 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
 
             div.split-btn {
                 button #submit.btn.split-primary type="submit" { "Create Link" }
-                // Dead without JS; app.js un-hides it when it wires the handler.
-                button #clear.btn.split-clear type="button" hidden { "Clear" }
+                // Dead without JS, so CSS hides it there (html:not(.js)).
+                button #clear.btn.split-clear type="button" { "Clear" }
             }
             p.form-error #form-error role="alert" hidden {}
 
@@ -548,10 +559,10 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
 
             fieldset.picker #ttl-picker {
                 legend { "Expires after" }
-                // JS path (app.js un-hides and drives these): a big readout over a
+                // JS path (CSS shows these, app.js drives them): a big readout over a
                 // stepped slider whose 17 stops are sensible durations from 1 minute
                 // to 7 days. Tapping the readout opens the exact field below.
-                button.ttl-readout #ttl-readout type="button" hidden
+                button.ttl-readout #ttl-readout type="button"
                     title="Set an exact expiry" {}
                 // The slider and its ticks work without JavaScript too (the index
                 // posts as ttl_stop); only the live readout needs app.js.

@@ -1063,10 +1063,8 @@
         const setupTtl = () => {
             if (!ttlSlider || !ttlReadout) return;
             // The slider and ticks work without JS (ttl_stop posts natively);
-            // JS adds the live readout and folds the exact field away behind a
-            // readout tap (a filled exact field beats the slider).
-            ttlReadout.hidden = false;
-            ttlCustomField.hidden = true;
+            // JS adds the live readout, and CSS has already folded the exact
+            // field away behind it (a filled exact field beats the slider).
             syncCustomMax();
             ttlSlider.addEventListener("input", () => {
                 ttlCustomValue.value = ""; // the slider takes back over
@@ -1075,12 +1073,12 @@
             ttlReadout.addEventListener("click", () => {
                 // Closing the exact field on an over-limit value settles it at
                 // the ceiling — tapping the number is accepting what it shows.
-                if (!ttlCustomField.hidden && (ttlOverLimit() || ttlCustomValue.validity.badInput)) {
+                const open = ttlCustomField.classList.contains("open");
+                if (open && (ttlOverLimit() || ttlCustomValue.validity.badInput)) {
                     ttlCustomValue.value = ttlCustomValue.max;
                     updateTtlReadout();
                 }
-                ttlCustomField.hidden = !ttlCustomField.hidden;
-                if (!ttlCustomField.hidden) ttlCustomValue.focus();
+                if (ttlCustomField.classList.toggle("open")) ttlCustomValue.focus();
             });
             // The labeled landmarks jump straight to their stop.
             for (const tick of document.querySelectorAll(".ttl-tick"))
@@ -1281,9 +1279,8 @@
             createLink();
         });
 
-        // Clear ships hidden (dead without JS); reveal it as it gets its handler.
+        // Clear is hidden by CSS without JS, so here it only needs its handler.
         if (clearBtn) {
-            clearBtn.hidden = false;
             clearBtn.addEventListener("click", () => {
                 content.value = "";
                 autosize();

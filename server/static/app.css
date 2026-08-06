@@ -383,6 +383,26 @@ textarea.form-control {
     flex-wrap: wrap;
 }
 
+/* --- What each path shows, decided in one place --------------------------
+   The `js` class lands on <html> from an inline script in the head, before
+   anything is painted, so these three rules draw the right form the first
+   time. Doing the same work from app.js meant painting the no-JS form and
+   then rearranging it: the exact-expiry field is a whole row, and collapsing
+   it after load was this page's largest layout shift.
+
+   Without JS the exact field IS the control (the slider posts its stop
+   natively, but only this can express "23 minutes"), so it stays open and the
+   two script-driven controls go away. With JS it folds behind the readout,
+   which app.js opens by adding `.open`. */
+html:not(.js) .ttl-readout,
+html:not(.js) .split-clear {
+    display: none;
+}
+
+html.js .custom-field:not(.open) {
+    display: none;
+}
+
 /* --- Expires After: readout + stepped slider (JS un-hides these) --- */
 
 /* The live readout — also the tap target that opens the exact field. It sits
