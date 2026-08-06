@@ -26,7 +26,7 @@ use axum::http::{HeaderName, HeaderValue, header};
 use axum::middleware::Next;
 use axum::response::Response;
 use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD as B64;
+use base64::engine::general_purpose::STANDARD as B64;
 use rand::RngCore;
 
 tokio::task_local! {
@@ -38,9 +38,10 @@ tokio::task_local! {
 
 /// A fresh 128-bit nonce.
 ///
-/// The CSP grammar takes either base64 alphabet and up to two `=`; this is the
-/// URL-safe one without padding, the same engine `token.rs` signs with, so the
-/// site's opaque strings all read alike. Nothing about the policy cares which.
+/// The CSP grammar takes either base64 alphabet and up to two `=`, and a browser
+/// compares the nonce as an opaque string — it never decodes it — so nothing
+/// about the policy cares which. This is the standard alphabet, `+/` and padding
+/// included; `token.rs` uses the URL-safe one because its output goes in a URL.
 fn mint() -> Arc<str> {
     let mut bytes = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut bytes);
