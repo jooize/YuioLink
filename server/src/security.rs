@@ -26,7 +26,7 @@ use axum::http::{HeaderName, HeaderValue, header};
 use axum::middleware::Next;
 use axum::response::Response;
 use base64::Engine;
-use base64::engine::general_purpose::STANDARD as B64;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD as B64;
 use rand::RngCore;
 
 tokio::task_local! {
@@ -36,7 +36,11 @@ tokio::task_local! {
     static NONCE: Arc<str>;
 }
 
-/// A fresh 128-bit nonce, base64 as the CSP grammar wants it.
+/// A fresh 128-bit nonce.
+///
+/// The CSP grammar takes either base64 alphabet and up to two `=`; this is the
+/// URL-safe one without padding, the same engine `token.rs` signs with, so the
+/// site's opaque strings all read alike. Nothing about the policy cares which.
 fn mint() -> Arc<str> {
     let mut bytes = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut bytes);
@@ -110,6 +114,18 @@ pub async fn headers(req: Request, next: Next) -> Response {
         header::REFERRER_POLICY,
         HeaderValue::from_static("no-referrer"),
     );
+    // A page carries a nonce, so it must never be stored anywhere a second
+    // visitor could be handed the first one's — a shared cache in front of this
+    // would turn the strictest part of the policy into a constant to read off.
+    // `no-store` says so to every cache in the path, including whatever CDN ends
+    // up there later, and it costs a page this small nothing. Content type, not
+    // route: it is exactly the responses that carry a nonce that must not be
+    // stored, and the versioned static assets keep their year.
+    if h.get(header::CONTENT_TYPE)
+        .is_some_and(|v| v.as_bytes().starts_with(b"text/html"))
+    {
+        h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    }
     // Anything that opened us lands in its own browsing-context group, so a
     // window handle to this page cannot be used to poke at it.
     h.insert(COOP, HeaderValue::from_static("same-origin"));

@@ -2052,6 +2052,20 @@ mod tests {
         // read off one page and reuse on the next.
         let (_, again, _) = send(&st, get("/")).await;
         assert_ne!(again.get("content-security-policy").unwrap(), csp.as_str());
+
+        // ...and a stored page is a repeated nonce by another route: one visitor's
+        // would be served to everyone who followed.
+        assert_eq!(headers.get("cache-control").unwrap(), "no-store");
+        let (_, asset, _) = send(&st, get("/static/app.js")).await;
+        assert!(
+            asset
+                .get("cache-control")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .contains("immutable"),
+            "only the pages go uncached — the versioned assets keep their year"
+        );
     }
 
     /// Every response leaves through the same middleware, including the ones no
