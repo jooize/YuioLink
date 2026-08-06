@@ -717,10 +717,11 @@
             // arrow are real links to the URL, so right-click offers Copy Link /
             // Open in New Tab; a left click on the sheets copies instead.
             //
-            // Every label names the link it acts on. The symbols are identical down
-            // the list, so "Copy link" alone would give four links the same name and
-            // four different destinations — indistinguishable to a screen reader
-            // reading the page's links on their own.
+            // Every label names the link it acts on, title-cased like the visible
+            // labels but leaving the name's own alternating case alone. The symbols
+            // are identical down the list, so "Copy Link" by itself would give four
+            // links one name and four destinations — indistinguishable to a screen
+            // reader reading the page's links on their own.
             const rowName = it.url.split("#")[0].split("/").pop();
             const check = document.createElement("span");
             check.className = "history-check";
@@ -729,7 +730,7 @@
             copy.className = "history-copy";
             copy.href = it.url;
             copy.append(copyIcon());
-            copy.setAttribute("aria-label", `Copy link ${rowName}`);
+            copy.setAttribute("aria-label", `Copy Link ${rowName}`);
             copy.title = "Copy the link";
             copy.addEventListener("click", (event) => {
                 event.preventDefault();
@@ -741,7 +742,7 @@
             show.target = "_blank";
             show.rel = "noopener noreferrer";
             show.append(openIcon());
-            show.setAttribute("aria-label", `Preview link ${rowName}`);
+            show.setAttribute("aria-label", `Preview Link ${rowName}`);
             show.title = "Open this link's preview in a new tab";
             const remove = document.createElement("button");
             remove.className = "history-remove";
@@ -749,7 +750,7 @@
             // No trailing "…": the glyph sat on the text baseline and pulled the eye
             // off the row.
             remove.append(trashIcon());
-            remove.setAttribute("aria-label", `Remove link ${rowName}`);
+            remove.setAttribute("aria-label", `Remove Link ${rowName}`);
             remove.title = "Remove this link";
             // Opens the confirm prompt over the row — not a toggle; the prompt carries
             // its own Cancel. openConfirm closes any other row's prompt first.
