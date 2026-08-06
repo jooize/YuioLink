@@ -95,11 +95,17 @@ pub async fn headers(req: Request, next: Next) -> Response {
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
     );
-    // A shortener must not name itself to the destination: the URL of the page a
-    // visitor clicks through from *is* the link's name, and for a secret link
-    // that name is the secret. `no-referrer` is the only setting that keeps it
-    // off the wire on the `POST /:name/go` redirect, where a `rel` on an anchor
-    // cannot reach.
+    // A destination learns nothing about where its visitor came from — not the
+    // link's name, not that a shortener was involved.
+    //
+    // Current browsers default to `strict-origin-when-cross-origin` and already
+    // keep the path off a cross-origin navigation, so the name does not leak on
+    // its own; older ones (before Chrome 85 / Firefox 87) sent the whole URL, and
+    // the name is the one thing a secret link cannot afford to spend. Stating the
+    // policy makes that a property of the site rather than of the visitor's
+    // browser. The alternative worth having is `origin`, which would let a site
+    // owner see YuioLink in their referrer report — attribution for a third party,
+    // paid for by the visitor, which is not the trade this site makes elsewhere.
     h.insert(
         header::REFERRER_POLICY,
         HeaderValue::from_static("no-referrer"),
