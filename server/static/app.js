@@ -48,6 +48,52 @@
     };
     const normalizeTarget = (s) => (hasScheme(s) ? s : `https://${s}`);
 
+    // --- inline icons ---
+    // Built as nodes rather than assigned as markup: the page runs under
+    // `require-trusted-types-for 'script'`, which rejects a plain string handed to
+    // innerHTML — the one DOM-XSS sink a Content-Security-Policy cannot see. These
+    // shapes are ours and static, so nothing is lost by drawing them this way.
+    // Each shape is `[element, attributes]`; the same geometry is server-rendered
+    // in views.rs for the result panel.
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const icon = (size, viewBox, shapes) => {
+        const svg = document.createElementNS(SVG_NS, "svg");
+        svg.setAttribute("width", size);
+        svg.setAttribute("height", size);
+        svg.setAttribute("viewBox", viewBox);
+        svg.setAttribute("fill", "none");
+        svg.setAttribute("aria-hidden", "true");
+        for (const [name, attrs] of shapes) {
+            const shape = document.createElementNS(SVG_NS, name);
+            for (const [k, v] of Object.entries(attrs)) shape.setAttribute(k, v);
+            svg.append(shape);
+        }
+        return svg;
+    };
+    const round = { stroke: "currentColor", "stroke-linecap": "round", "stroke-linejoin": "round" };
+    // Two sheets, the back one peeking out behind the front.
+    const copyIcon = () =>
+        icon(16, "0 0 14 14", [
+            ["path", { stroke: "currentColor", "stroke-linecap": "round", d: "M9.6 2.2H3.6c-.77 0-1.4.63-1.4 1.4v6.2", "stroke-width": "1.6" }],
+            ["rect", { stroke: "currentColor", x: "4.9", y: "4.7", width: "7", height: "7.2", rx: "1.3", "stroke-width": "1.6" }],
+        ]);
+    // The arrow out of a box's corner: opens elsewhere.
+    const openIcon = () =>
+        icon(15, "0 0 13 13", [["path", { ...round, d: "M2.5 10.5 10.5 2.5M4 2.5h6.5V9", "stroke-width": "1.8" }]]);
+    // The can the result panel's Delete draws too, so the two places a link can be
+    // removed from show one icon.
+    const trashIcon = () =>
+        icon(15, "0 0 14 14", [
+            [
+                "path",
+                {
+                    ...round,
+                    d: "M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7",
+                    "stroke-width": "1.4",
+                },
+            ],
+        ]);
+
     // --- clipboard ---
     const flashCopied = (button) => {
         if (!button) return;
@@ -497,7 +543,9 @@
     // Remember the open/closed choice only while persistence is on.
     const persistOpen = () => { if (persistEnabled) lsSet(OPEN_KEY, historyOpen ? "1" : "0"); };
     const applyHistoryOpen = () => {
-        document.getElementById("history")?.classList.toggle("collapsed", !historyOpen);
+        // On the root element, not the section: the pre-paint script has to be able
+        // to set it before the section exists (see PRE_PAINT_JS in views.rs).
+        document.documentElement.classList.toggle("history-collapsed", !historyOpen);
         // Rows rendered while the list was collapsed had zero width to measure;
         // refit now that it is (or just became) visible.
         if (historyOpen) fitHistoryUrls();
@@ -576,9 +624,8 @@
         const warnHistory = document.getElementById("storage-warning-history");
         if (warnHistory) warnHistory.hidden = !(warned && warnAt === "history");
 
-        const section = document.getElementById("history");
         const listEl = document.getElementById("history-list");
-        if (!section || !listEl) return;
+        if (!listEl) return;
         // The save-on-this-device switch beside the heading mirrors the top toggle:
         // state shown by the switch itself, so the title never grows a suffix.
         const hp = document.getElementById("history-persist");
@@ -597,8 +644,13 @@
         }
 
         listEl.replaceChildren();
-        if (n === 0) { section.hidden = true; return; }
-        section.hidden = false;
+        // Hand the reserved height its real number, so the space held open since the
+        // first paint matches what is about to fill it. Both live on the root element
+        // (see PRE_PAINT_JS in views.rs).
+        const root = document.documentElement;
+        root.style.setProperty("--history-rows", String(n));
+        root.classList.toggle("has-history", n > 0);
+        if (n === 0) return;
         for (const it of shown) {
             if (it.tombstone) {
                 // A marker where a removed entry was. A just-forgotten live link keeps its
@@ -663,21 +715,21 @@
             // row's edge (a stray tap only opens the confirm). The green check
             // sits left of the copy sheets and flashes on copy. Copy and the
             // arrow are real links to the URL, so right-click offers Copy Link /
-            // Open in New Tab; a left click on the sheets copies instead. All
-            // markup is static, so innerHTML is safe.
+            // Open in New Tab; a left click on the sheets copies instead.
+            //
+            // Every label names the link it acts on. The symbols are identical down
+            // the list, so "Copy link" alone would give four links the same name and
+            // four different destinations — indistinguishable to a screen reader
+            // reading the page's links on their own.
+            const rowName = it.url.split("#")[0].split("/").pop();
             const check = document.createElement("span");
             check.className = "history-check";
             check.setAttribute("aria-hidden", "true");
             const copy = document.createElement("a");
             copy.className = "history-copy";
             copy.href = it.url;
-            copy.innerHTML =
-                '<svg width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true">' +
-                '<path d="M9.6 2.2H3.6c-.77 0-1.4.63-1.4 1.4v6.2" ' +
-                'stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
-                '<rect x="4.9" y="4.7" width="7" height="7.2" rx="1.3" ' +
-                'stroke="currentColor" stroke-width="1.6"/></svg>';
-            copy.setAttribute("aria-label", "Copy link");
+            copy.append(copyIcon());
+            copy.setAttribute("aria-label", `Copy link ${rowName}`);
             copy.title = "Copy the link";
             copy.addEventListener("click", (event) => {
                 event.preventDefault();
@@ -688,25 +740,16 @@
             show.href = it.url;
             show.target = "_blank";
             show.rel = "noopener noreferrer";
-            show.innerHTML =
-                '<svg width="15" height="15" viewBox="0 0 13 13" fill="none" aria-hidden="true">' +
-                '<path d="M2.5 10.5 10.5 2.5M4 2.5h6.5V9" ' +
-                'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-            show.setAttribute("aria-label", "Preview");
+            show.append(openIcon());
+            show.setAttribute("aria-label", `Preview link ${rowName}`);
             show.title = "Open this link's preview in a new tab";
             const remove = document.createElement("button");
             remove.className = "history-remove";
             remove.type = "button";
-            // The same can the result panel's Delete draws, so the two places a
-            // link can be removed from show one icon. No trailing "…": the glyph
-            // sat on the text baseline and pulled the eye off the row.
-            remove.innerHTML =
-                '<svg width="15" height="15" viewBox="0 0 14 14" fill="none" aria-hidden="true">' +
-                '<path d="M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2' +
-                'M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7" ' +
-                'stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>' +
-                "</svg>";
-            remove.setAttribute("aria-label", "Remove");
+            // No trailing "…": the glyph sat on the text baseline and pulled the eye
+            // off the row.
+            remove.append(trashIcon());
+            remove.setAttribute("aria-label", `Remove link ${rowName}`);
             remove.title = "Remove this link";
             // Opens the confirm prompt over the row — not a toggle; the prompt carries
             // its own Cancel. openConfirm closes any other row's prompt first.

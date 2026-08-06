@@ -29,6 +29,41 @@ fn asset_url(path: &str) -> String {
     format!("{path}?v={VERSION}")
 }
 
+/// The inline head script: everything that has to be true before the first paint.
+///
+/// It marks the document as scripted, so the stylesheet can draw the JS-on state
+/// directly instead of app.js rearranging the page after the fact — folding the
+/// exact-expiry field away from script was once the site's largest layout shift,
+/// and as a CSS rule it costs nothing.
+///
+/// It then does the same for saved history. Those rows come from `localStorage`,
+/// which the server cannot see, so the section sits between the form and the
+/// footer and shoves both down the moment app.js renders it — the footer's whole
+/// CLS. Reading the count here (and the open/closed choice with it) lets the CSS
+/// reserve the rows' height at first paint; app.js fills the space it finds.
+///
+/// The keys and the shape are app.js's (`HISTORY_KEY` and friends); this is the
+/// one other place that knows them, so they move together. A miscount is a
+/// smaller shift, never a broken page: everything is inside one `try`, and app.js
+/// rewrites `--history-rows` with the real number as soon as it renders.
+const PRE_PAINT_JS: &str = "\
+document.documentElement.classList.add('js');\
+try{if(localStorage.getItem('yuiolink:history:persist')==='1'){\
+var s=JSON.parse(localStorage.getItem('yuiolink:history')||'[]');\
+var n=Array.isArray(s)?s.filter(function(e){return e&&e.tombstone!=='cleared'}).length:0;\
+if(n){var d=document.documentElement;d.classList.add('has-history');\
+d.style.setProperty('--history-rows',n);\
+if(localStorage.getItem('yuiolink:history:open')==='0')d.classList.add('history-collapsed')}}}catch(e){}";
+
+/// A `<script src>` for one of our own files, carrying this response's CSP nonce.
+///
+/// Every script tag on the site goes through here or through [`document_shell`]:
+/// the policy allows script by nonce alone, so a tag written without one is a tag
+/// that does not run.
+fn script_tag(path: &str) -> Markup {
+    html! { script src=(asset_url(path)) nonce=(crate::security::nonce().as_ref()) {} }
+}
+
 /// The shared page shell: head, the glass "app window", and the masthead.
 ///
 /// Every page passes its own `<title>` — there is no bare "YuioLink" fallback,
@@ -52,17 +87,12 @@ fn document_shell(
                 meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover";
                 meta name="color-scheme" content="light dark";
                 title { (title) }
-                // Marks the document as scripted before anything is painted, so
-                // the stylesheet can draw the JS-on state directly instead of
-                // app.js rearranging the page after the fact. Folding the exact
-                // expiry field away from script was the site's largest layout
-                // shift; as a CSS rule it costs nothing.
-                //
-                // Inline and in the head on purpose: it must run before first
-                // paint, and being part of this response it cannot fail on its
-                // own. If app.js itself never arrives the slider still posts
-                // natively — only the typed exact value is out of reach.
-                script { (PreEscaped("document.documentElement.classList.add('js')")) }
+                // The pre-paint marker (see `PRE_PAINT_JS`). Inline and in the
+                // head on purpose: it must run before first paint, and being part
+                // of this response it cannot fail on its own. If app.js itself
+                // never arrives the slider still posts natively — only the typed
+                // exact value is out of reach.
+                script nonce=(crate::security::nonce().as_ref()) { (PreEscaped(PRE_PAINT_JS)) }
                 link rel="stylesheet" href=(asset_url("/static/app.css"));
                 (head_extra)
             }
@@ -601,7 +631,12 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
 
         // Created-link history (bottom). Kept in memory for the session unless the
         // user ticks "Save on this device", which opts into localStorage.
-        section.history.collapsed #history hidden {
+        //
+        // Both of its states live on the root element, not here: `has-history`
+        // shows the section at all (so a page with no script, or no links, never
+        // shows an empty one), `history-collapsed` folds the list away. The
+        // pre-paint script sets them from storage; app.js keeps them true after.
+        section.history #history {
             div.history-head {
                 button.history-toggle #history-toggle type="button" {
                     span.history-chevron aria-hidden="true" { "›" }
@@ -665,7 +700,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             }
         }
     };
-    let scripts = html! { script src=(asset_url("/static/app.js")) {} };
+    let scripts = script_tag("/static/app.js");
     document_full(
         "YuioLink — Wieldy Ephemeral Links",
         html! {
@@ -739,7 +774,7 @@ pub fn result_page(
         // No "Create another" link: the back chip in the corner already goes to
         // the create page, and it said the same thing twice.
     };
-    let scripts = html! { script src=(asset_url("/static/app.js")) {} };
+    let scripts = script_tag("/static/app.js");
     // The destination is what the creator just typed, so naming it here would tell
     // them nothing; the title identifies which link they are looking at.
     document_full(
@@ -804,12 +839,7 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
     };
     // preview.js only wires ⌘C to the destination, and no-ops when there is no
     // destination on the page (a limited link shows just the domain).
-    document_link(
-        &title,
-        head,
-        body,
-        html! { script src=(asset_url("/static/preview.js")) {} },
-    )
+    document_link(&title, head, body, script_tag("/static/preview.js"))
 }
 
 /// `<head>` Open Graph / theme-color tags so a shared link unfurls trustworthily.
@@ -1103,7 +1133,7 @@ pub fn revealed_page(r: RevealedView) -> Markup {
                 &link_title("Redirect", r.name, Some(&url.card_domain())),
                 html! {},
                 body,
-                html! { script src=(asset_url("/static/preview.js")) {} },
+                script_tag("/static/preview.js"),
             )
         }
         RevealedTarget::Text(text) => {
@@ -1116,7 +1146,7 @@ pub fn revealed_page(r: RevealedView) -> Markup {
                 &link_title("Text", r.name, None),
                 html! {},
                 body,
-                html! { script src=(asset_url("/static/text.js")) {} },
+                script_tag("/static/text.js"),
             )
         }
     }
@@ -1134,7 +1164,7 @@ pub fn text_view_page(base_host: &str, name: &str, text: &str) -> Markup {
         &link_title("Text", name, None),
         html! {},
         body,
-        html! { script src=(asset_url("/static/text.js")) {} },
+        script_tag("/static/text.js"),
     )
 }
 

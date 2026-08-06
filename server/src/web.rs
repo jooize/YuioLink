@@ -108,6 +108,10 @@ pub fn router(state: AppState) -> Router {
         .route("/{name}/reveal", post(reveal))
         .route("/{name}/card.png", get(card_image))
         .fallback(not_found_fallback)
+        // Inside the router, not around it: every response the site can produce —
+        // pages, assets, API JSON, errors — leaves through here with the same
+        // headers, and the tests below exercise the real thing.
+        .layer(axum::middleware::from_fn(crate::security::headers))
         .with_state(state)
 }
 
@@ -689,6 +693,12 @@ pub async fn card_image(State(state): State<AppState>, Path(name): Path<String>)
                 (header::CONTENT_TYPE, "image/png"),
                 // Immutable for the link's life; safe for crawlers to cache.
                 (header::CACHE_CONTROL, "public, max-age=3600"),
+                // The card exists to be shown by other sites, so it opts out of
+                // the same-origin resource policy the rest of the site takes.
+                (
+                    header::HeaderName::from_static("cross-origin-resource-policy"),
+                    "cross-origin",
+                ),
             ],
             png,
         )
@@ -2013,6 +2023,75 @@ mod tests {
         .unwrap();
         let (s, _, _) = send(&st, get(&format!("/{}/card.png", t.name))).await;
         assert_eq!(s, StatusCode::NOT_FOUND);
+    }
+
+    /// The policy is only worth having if the page it guards actually matches it:
+    /// script is allowed by nonce alone, so every `<script>` the page ships has to
+    /// carry the one this response minted, and no two responses may share it.
+    #[tokio::test]
+    async fn every_script_carries_this_response_nonce() {
+        let st = test_state().await;
+        let (s, headers, body) = send(&st, get("/")).await;
+        assert_eq!(s, StatusCode::OK);
+
+        let csp = headers
+            .get("content-security-policy")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned();
+        let nonce = csp
+            .split_once("'nonce-")
+            .and_then(|(_, rest)| rest.split_once('\''))
+            .expect("the policy carries a script nonce")
+            .0;
+        assert_eq!(body.matches("<script").count(), 2); // the pre-paint marker + app.js
+        assert_eq!(body.matches(&format!("nonce=\"{nonce}\"")).count(), 2);
+
+        // A nonce that repeated across responses would be a nonce an attacker can
+        // read off one page and reuse on the next.
+        let (_, again, _) = send(&st, get("/")).await;
+        assert_ne!(again.get("content-security-policy").unwrap(), csp.as_str());
+    }
+
+    /// Every response leaves through the same middleware, including the ones no
+    /// handler renders (errors) and the ones that are not pages at all.
+    #[tokio::test]
+    async fn security_headers_are_on_every_response() {
+        let st = test_state().await;
+        for uri in ["/", "/static/app.js", "/api/v0/links/nope", "/nope"] {
+            let (_, h, _) = send(&st, get(uri)).await;
+            assert_eq!(h.get("x-frame-options").unwrap(), "DENY", "{uri}");
+            assert_eq!(h.get("x-content-type-options").unwrap(), "nosniff", "{uri}");
+            assert_eq!(h.get("referrer-policy").unwrap(), "no-referrer", "{uri}");
+            assert_eq!(
+                h.get("cross-origin-opener-policy").unwrap(),
+                "same-origin",
+                "{uri}"
+            );
+            assert_eq!(
+                h.get("cross-origin-resource-policy").unwrap(),
+                "same-origin",
+                "{uri}"
+            );
+        }
+
+        // The one exception: the share card is meant to be shown by other sites.
+        let l = db::insert_link(
+            &st.pool,
+            redirect("https://example.com/blog", None),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+        let card = router(st.clone())
+            .oneshot(get(&format!("/{}/card.png", l.name)))
+            .await
+            .unwrap();
+        assert_eq!(
+            card.headers().get("cross-origin-resource-policy").unwrap(),
+            "cross-origin"
+        );
     }
 
     #[tokio::test]

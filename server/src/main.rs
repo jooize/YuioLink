@@ -3,6 +3,7 @@ mod config;
 mod db;
 mod error;
 mod ratelimit;
+mod security;
 mod token;
 mod urlview;
 mod views;

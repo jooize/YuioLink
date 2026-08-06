@@ -1684,11 +1684,20 @@ html.js .custom-field:not(.open) {
 }
 
 /* Created-link history (bottom). In memory for the session unless persisted. */
+/* Shown only once there is something in it: without script there is no history at
+   all, and with script there may be none yet. `has-history` is set before the
+   first paint from what is in storage, so a returning visitor's rows do not drop
+   in later and shove the footer down. */
 .history {
+    display: none;
     margin: 22px 0 0;
     padding-top: 18px;
     border-top: 0.5px solid var(--separator);
     scroll-margin-top: 18px;
+}
+
+html.has-history .history {
+    display: block;
 }
 
 .history-head {
@@ -1720,11 +1729,11 @@ html.js .custom-field:not(.open) {
     transform: rotate(90deg);
 }
 
-.history.collapsed .history-chevron {
+html.history-collapsed .history-chevron {
     transform: rotate(0deg);
 }
 
-.history.collapsed .history-body {
+html.history-collapsed .history-body {
     display: none;
 }
 
@@ -1740,6 +1749,11 @@ html.js .custom-field:not(.open) {
     list-style: none;
     margin: 0;
     padding: 0;
+    /* The rows' height, held open from the first paint: `--history-rows` is the
+       saved count (pre-paint script) and then the rendered count (app.js). One
+       row is `.history-item`'s 56px, plus this panel's own hairline top and
+       bottom. Only ever a floor, so a row that grows still grows. */
+    min-height: calc(var(--history-rows, 0) * 56px + 1px);
     background: var(--field-bg);
     border: 0.5px solid var(--field-border);
     border-radius: 12px;
