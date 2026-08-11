@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Each format at its best</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-note { max-width: 1160px; margin: 0 auto 18px; padding: 0 20px;
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .mock-note strong { color: var(--text); font-weight: 600; }
+    .mock-note code { font-family: var(--font-mono); font-size: .92em; }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .cap { display: block; text-align: center; margin: 0 0 10px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .note { max-width: 400px; margin: 12px auto 0; font: 400 12.5px/1.55 var(--font);
+      color: var(--text-secondary); text-align: left; }
+    .note b { color: var(--text); font-weight: 600; }
+    .note code { font-family: var(--font-mono); font-size: .95em; }
+    .fixnote { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .fixnote ul { margin: 6px 0 0; padding-left: 20px; }
+    .fixnote li { margin: 3px 0; }
+    .win { width: min(100%, 400px); }
+    .app-window.win { margin: 0; padding: 30px 26px 26px; }
+    .anatomy { display: block; overflow-x: auto; margin: 10px 0 2px; padding: 12px 14px;
+      border-radius: 10px; background: var(--field-bg);
+      border: .5px solid var(--card-border); font-family: var(--font-mono);
+      font-size: 12.5px; line-height: 2; white-space: nowrap; color: var(--text); }
+    .anatomy .d { color: var(--text-tertiary); }
+    .anatomy .lab { display: block; font-family: var(--font); font-size: 10.5px;
+      color: var(--text-tertiary); white-space: nowrap; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+    .btn .glyph { flex: none; opacity: .72; }
+
+    .pv-scheme { display: block; text-align: center; margin-top: 4px;
+      font-family: var(--font-mono); font-weight: 700; letter-spacing: -.01em;
+      line-height: 1.35; font-size: clamp(19px, 5vw, 24px); color: var(--text); }
+    .pv-scheme .colon { opacity: .45; }
+
+    /* --- the headline value --------------------------------------------- */
+    .pv-value { display: block; margin-top: 9px; font-family: var(--font-mono);
+      font-size: clamp(17px, 4.6vw, 21px); font-weight: 700; line-height: 1.4;
+      word-break: break-all; text-align: center; color: var(--text);
+      font-variant-numeric: tabular-nums; }
+    .pv-value .reg { padding: 1px 5px; border-radius: 5px;
+      background: color-mix(in srgb, var(--accent) 13%, transparent); }
+    .pv-value .seg { color: var(--text-secondary); font-weight: 400; }
+    .pv-value .dl { color: var(--text-tertiary); font-weight: 400; }
+    /* Digit rhythm from margins, never characters — the text node is untouched. */
+    .pv-value .grp + .grp { margin-left: .4em; }
+    /* An extension or an explicit port rides the headline, subordinate in size
+       and colour: part of the address, not a parameter of it. */
+    .pv-value .ext { margin-left: .55em; font-size: .66em; font-weight: 500;
+      color: var(--text-secondary); letter-spacing: 0; }
+    .pv-value .port { font-size: .78em; font-weight: 500; color: var(--text-tertiary); }
+
+    /* --- fact chips ------------------------------------------------------ */
+    .pv-facts { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center;
+      margin-top: 10px; }
+    .pv-fact { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px;
+      border-radius: 999px; font: 600 11px/1.45 var(--font);
+      color: var(--text-secondary); background: var(--field-bg);
+      border: .5px solid var(--card-border); }
+    .pv-fact svg { flex: none; color: var(--danger); }
+    .pv-fact.warn { color: var(--danger); }
+    .pv-fact .flag { font-size: 13px; line-height: 1; }
+
+    /* --- parameter table (tags retired — notes carry the judgement) ------ */
+    .pv-params { width: 100%; margin-top: 14px; border-collapse: collapse;
+      font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; }
+    .pv-params td { padding: 7px 0; vertical-align: top;
+      border-top: .5px solid var(--card-border); text-align: left; }
+    .pv-params tr:first-child td { border-top: none; }
+    .pv-params .k { width: 1%; white-space: nowrap; padding-right: 12px;
+      font-weight: 700; color: var(--text-secondary); }
+    .pv-params .v { color: var(--text); word-break: break-all; }
+    .pv-params .v .dl { color: var(--text-tertiary); }
+    .pv-params .v .reg { font-weight: 700; }
+
+    /* --- the exact stored string, in the site's own syntax colours -------
+       Same palette as .pv-url, one size down: scheme and delimiters recede,
+       keys sit up as signposts, percent-escapes dim to encoding noise.
+       The one thing it never borrows is the accent wash — that appears once
+       per page, on the headline's registrable domain. Hazard marks (space
+       tint, decoded-invisible escapes) keep their danger colour. */
+    .pv-exact { display: block; margin-top: 14px; padding-top: 11px;
+      border-top: .5px solid var(--card-border); font-family: var(--font-mono);
+      font-size: 11.5px; line-height: 1.65; word-break: break-all; text-align: left;
+      color: var(--text-secondary); }
+    .pv-exact .lbl { display: block; font-family: var(--font); font-size: 11px;
+      font-weight: 500; font-style: italic; color: var(--text-tertiary);
+      margin-bottom: 3px; }
+    .pv-exact .sch { color: var(--text-tertiary); }
+    .pv-exact .dl { color: var(--text-tertiary); }
+    .pv-exact .k { font-weight: 700; }
+    .pv-exact .reg { color: var(--text); font-weight: 700; }
+    .pv-exact .pct { color: var(--text-tertiary); }
+    .pv-exact .ws { border-radius: 3px;
+      background: color-mix(in srgb, var(--danger) 26%, transparent);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 40%, transparent); }
+    .pv-exact .bad { color: var(--danger); font-weight: 700; }
+
+    .pv-note { display: block; max-width: 96%; margin: 12px auto 0; text-align: center;
+      font: 400 12px/1.55 var(--font); color: var(--text-secondary); }
+    .pv-note code { font-family: var(--font-mono); font-size: .95em; color: var(--text);
+      font-weight: 700; }
+
+    .btn.btn-2 { flex-direction: column; gap: 2px; padding-top: 9px; padding-bottom: 9px;
+      min-height: 54px; line-height: 1.25; }
+    .btn.btn-2 .lead { display: inline-flex; align-items: center; gap: 7px; }
+    .btn.btn-2 .what { font-size: 11.5px; font-weight: 500; opacity: .82; letter-spacing: 0; }
+    .btn .sch-tag { font-family: var(--font-mono); font-weight: 700; opacity: .72; }
+    .pv-open { margin-top: 22px; }
+
+    /* --- the guard, only where a chip burned red -------------------------
+       Not a drained clone of the button (that read as a disabled control) —
+       a plain disclosure line that says exactly what pressing it does. Opens
+       without JS, and the button lands where the line was: no grid, no
+       ::details-content trap, nothing to animate. */
+    .pv-guard { display: block; margin-top: 22px; }
+    .pv-guard-lid { list-style: none; cursor: pointer; text-align: center;
+      padding: 15px 10px; font: 600 13px/1.4 var(--font);
+      color: var(--text-secondary); border-radius: var(--radius-control);
+      border: .5px dashed var(--card-border); }
+    .pv-guard-lid::-webkit-details-marker { display: none; }
+    .pv-guard-lid::marker { content: ""; }
+    .pv-guard-lid .chev { color: var(--text-tertiary); margin-right: 4px; }
+    .pv-guard[open] > .pv-guard-lid { display: none; }
+
+    .pv-hedge { display: block; max-width: 92%; margin: 12px auto 0; text-align: center;
+      font: 400 11.5px/1.55 var(--font); color: var(--text-tertiary); }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 15</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Each format at its best</h1>
+</div>
+
+<div class="fixnote">
+  <b>What this round changes, per review of note 14.</b>
+  <ul>
+    <li><b>Flags are emoji now</b> — 🇳🇴 costs no characters of copy and is the one place an
+      emoji earns its keep. On platforms without flag glyphs it degrades to the letters
+      <code>NO</code>; the country name beside it carries the content either way.</li>
+    <li><b>The extension joins the number.</b> <code>;ext=4021</code> is part of dialling, not a
+      payload parameter — so it rides the headline as <code>ext.&nbsp;4021</code>, which is
+      libphonenumber's own rendering. The <code>tel:</code> table is gone entirely.</li>
+    <li><b>The row tags are retired.</b> <code>identifies</code> / <code>name only</code> /
+      <code>sent as you</code> shouted in uppercase what the note under the table already says
+      in a sentence. The notes stay; the tags go.</li>
+    <li><b>"Exactly as stored" gets the site's own syntax colours</b> — the <code>.pv-url</code>
+      palette one size down, and a sentence-case italic label instead of the uppercase one.
+      It never collapses, at any length: it is the copy target and the proof.</li>
+    <li><b>The lid is gone from the common case</b> — argued in full below. Where a chip burned
+      red, a guard remains, but as a plain disclosure line, not a drained fake button.</li>
+    <li><b>sms: gets the same chips as tel:</b> — same numbers, same tables, same hazards.</li>
+  </ul>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · Phone formats: tel and sms</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">tel · premium rate, extension in the headline</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">brave</span><span class="nwg nw-1">OTTER</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">tel<span class="colon">:</span></span>
+      <span class="pv-value"><span class="grp">+47</span><span class="grp">820</span><span class="grp">12</span><span class="grp">345</span><span class="ext">ext. 4021</span></span>
+      <div class="pv-facts">
+        <span class="pv-fact"><span class="flag">🇳🇴</span> Norway</span>
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Premium Rate</span>
+      </div>
+      <code class="pv-exact"><span class="lbl">Exactly as stored</span><span class="sch">tel:</span>+4782012345<span class="dl">;</span><span class="k">ext</span><span class="dl">=</span>4021</code>
+      <details class="pv-guard">
+        <summary class="pv-guard-lid"><span class="chev">▸</span> Show the Call button</summary>
+        <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+          <span class="lead">Call +47 820 12 345</span><span class="what">A phone number</span></a>
+      </details>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note"><b>No table left at all.</b> The extension is dialling information, so it
+      belongs to the number — <code>ext.&nbsp;4021</code> is how libphonenumber itself formats
+      it, so the headline is a standard rendering, not an invention. The exact line underneath
+      keeps it honest (<code>;ext=4021</code> verbatim). And because Premium Rate burned red,
+      this card carries the <b>guard</b>: a disclosure line that says precisely what pressing
+      it does, sitting next to the chip that explains why it exists.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">sms · same chips, body in the table</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">swift</span><span class="nwg nw-1">DINGO</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">sms<span class="colon">:</span></span>
+      <span class="pv-value"><span class="grp">+47</span><span class="grp">991</span><span class="grp">23</span><span class="grp">456</span></span>
+      <div class="pv-facts">
+        <span class="pv-fact"><span class="flag">🇳🇴</span> Norway</span>
+        <span class="pv-fact">Mobile</span>
+      </div>
+      <table class="pv-params">
+        <tr><td class="k">body</td><td class="v">JOIN LIST</td></tr>
+      </table>
+      <span class="pv-note">The <code>body</code> was written by the link's creator, not by
+        you. A message sent from here goes out from your number.</span>
+      <code class="pv-exact"><span class="lbl">Exactly as stored</span><span class="sch">sms:</span>+4799123456<span class="dl">?</span><span class="k">body</span><span class="dl">=</span>JOIN<span class="pct">%20</span>LIST</code>
+      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
+        <span class="lead">Text +47 991 23 456</span><span class="what">A phone number, for a message</span></a>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note">Everything <code>tel:</code> knows, <code>sms:</code> knows — same numbers,
+      same libphonenumber tables, so <b>the chips carry over unchanged</b>. Premium-rate
+      shortcodes are the classic subscription-trap here, and the same chip would catch them.
+      The chips are calm on this card, so <b>the button sits in the open</b>: no guard, no lid.
+      The pre-written <code>body</code> gets the mailto treatment — a row, and a note in words.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · magnet and mailto, tags retired</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">magnet · the note does the work now</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">quick</span><span class="nwg nw-1">HERON</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">magnet<span class="colon">:</span></span>
+      <table class="pv-params">
+        <tr><td class="k">xt</td>
+          <td class="v">urn<span class="dl">:</span>btih<span class="dl">:</span>c12fe3a94b81d7e05f2c6a9048bb3e1d7f4a2c60</td></tr>
+        <tr><td class="k">dn</td>
+          <td class="v">ubuntu-24.04-desktop-amd64.iso</td></tr>
+        <tr><td class="k">tr</td>
+          <td class="v">udp<span class="dl">://</span>tracker.example.org<span class="dl">:</span>6969</td></tr>
+        <tr><td class="k">tr</td>
+          <td class="v">udp<span class="dl">://</span>tracker.example.net<span class="dl">:</span>1337</td></tr>
+      </table>
+      <span class="pv-note">Only <code>xt</code> identifies the data. <code>dn</code> is a name
+        the link's creator chose, and it does not have to match what arrives.</span>
+      <code class="pv-exact"><span class="lbl">Exactly as stored</span><span class="sch">magnet:</span><span class="dl">?</span><span class="k">xt</span><span class="dl">=</span>urn:btih:c12fe3a94b81d7e05f2c6a9048bb3e1d7f4a2c60<span class="dl">&amp;</span><span class="k">dn</span><span class="dl">=</span>ubuntu-24.04-desktop-amd64.iso<span class="dl">&amp;</span><span class="k">tr</span><span class="dl">=</span>udp<span class="pct">%3A%2F%2F</span>tracker.example.org<span class="pct">%3A</span>6969<span class="dl">&amp;</span><span class="k">tr</span><span class="dl">=</span>udp<span class="pct">%3A%2F%2F</span>tracker.example.net<span class="pct">%3A</span>1337</code>
+      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
+        <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">magnet:</span></span>
+        <span class="what">A file identified by its hash</span></a>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note">With the tags gone the rows are quieter and the note — the sentence that
+      earned its keep — is the only voice of judgement on the card. The exact line is the same
+      ~200 characters as before, but in the site's syntax colours: keys bold, delimiters and
+      percent-escapes receded to <b>encoding noise</b>. It reads as structure now instead of
+      as a wall, which is most of what made it feel too tall.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">mailto · the tag becomes a sentence</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">plain</span><span class="nwg nw-1">MARTEN</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">mailto<span class="colon">:</span></span>
+      <span class="pv-value"><span class="seg">sales</span><span class="dl">@</span><span class="reg">example.com</span></span>
+      <table class="pv-params">
+        <tr><td class="k">subject</td><td class="v">Order 4192</td></tr>
+        <tr><td class="k">body</td><td class="v">Please send a quote for 40 units.</td></tr>
+      </table>
+      <span class="pv-note">The <code>subject</code> and <code>body</code> are pre-written by
+        the link's creator. A message sent from here goes out as you.</span>
+      <code class="pv-exact"><span class="lbl">Exactly as stored</span><span class="sch">mailto:</span>sales<span class="dl">@</span><span class="reg">example.com</span><span class="dl">?</span><span class="k">subject</span><span class="dl">=</span>Order<span class="pct">%20</span>4192<span class="dl">&amp;</span><span class="k">body</span><span class="dl">=</span>Please<span class="pct">%20</span>send<span class="pct">%20</span>a<span class="pct">%20</span>quote<span class="pct">%20</span>for<span class="pct">%20</span>40<span class="pct">%20</span>units.</code>
+      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
+        <span class="lead">Write to sales@example.com</span>
+        <span class="what">An email address</span></a>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note">Two <code>sent as you</code> tags said less than one sentence under the
+      table, and the sentence can carry the mechanism ("goes out as you") without shouting.
+      In the exact line, <code>example.com</code> is bold — <b>bold still means a registrable
+      domain, everywhere</b> — but the accent wash stays on the headline, its once-per-page
+      home. Note the <code>%20</code>s: dim, unmarked, ordinary. A decoded-invisible escape
+      would sit in the same line in red; a literal space run would carry the tint.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · The button question, answered</p>
+
+<div class="fixnote">
+  <b>Recommendation: no lid in the common case; a guard only where a chip burned red.</b>
+  <br><br>
+  "Show…" was confusing because it was answering a question nobody asked. Walk the flow: the
+  visitor already chose to follow a YuioLink; this page <em>is</em> the safety step — the whole
+  card exists so nothing happens before they have seen everything. On a one-time link they have
+  additionally pressed Reveal, a deliberate POST. By the time the amber button is on screen,
+  pressing it is the <em>third</em> intentional act, it does nothing destructive (the use was
+  spent by Reveal, not by this anchor), and its two lines already say what it is and what it
+  does. A second gate on top of that is not caution — it is friction that trains reflexive
+  double-clicking, which is worse than no gate. And the drained clone had a deeper problem than
+  its label: <b>a greyed-out button reads as a disabled button</b>, i.e. "broken", not "armed".
+  <br><br>
+  Where something <em>is</em> wrong — Premium Rate, Hidden Characters, Padded With Spaces — a
+  pause is honest, so a guard stays. But shaped as what it is: a plain dashed disclosure line
+  reading <b>"Show the Call button"</b> — naming the exact thing that will appear, sitting
+  beside the chip that justifies it (card 1 above). It cannot be mistaken for the action,
+  because it does not look like a button; it opens without JS; and the real button lands where
+  the line was — no grid, no <code>::details-content</code> trap, nothing to animate.
+  <br><br>
+  If a universal lid is wanted after all, the same line works everywhere ("Show the button"),
+  but I would not ship it: the pages above are calmer and more honest without it.
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">4 · http(s) with the same table</p>
+
+<div class="fixnote">
+  <b>Every part a URL can carry, and where each one goes.</b>
+  <span class="anatomy">
+    <span class="d">https://</span>alice<span class="d">:</span>hunter2<span class="d">@</span>login<span class="d">.</span>example.co.uk<span class="d">:</span>8443<span class="d">/</span>reset<span class="d">/</span>9f2c<span class="d">?</span>next<span class="d">=</span>…<span class="d">&amp;</span>theme<span class="d">=</span>dark<span class="d">#</span>step-2
+  </span>
+  <ul>
+    <li><b>scheme</b> → the plate, same as every other format. Plain <code>http</code> keeps
+      the settled treatment: red scheme characters, open padlock, Not Encrypted chip.</li>
+    <li><b>username / password</b> → table rows plus a red chip. Text before the <code>@</code>
+      is the oldest disguise a URL has (<code>https://bbc.co.uk@evil.example/</code>), and a
+      password embedded in a shared link is worth a red chip in its own right. Shown verbatim —
+      it is stored content like everything else.</li>
+    <li><b>host</b> → the headline: subdomain dim, registrable domain bold on the accent wash,
+      exactly as today. IDN mixed-script keeps its existing red panel.</li>
+    <li><b>port</b> → rides the headline, dim, like a phone extension rides its number. The
+      <code>url</code> crate never serialises default ports, so if one is visible it is
+      non-standard by definition — the dim <code>:8443</code> is itself the signal.</li>
+    <li><b>path</b> → first table row, percent-decoded for reading.</li>
+    <li><b>query</b> → one row per pair, repeated keys repeated, order preserved — the magnet
+      treatment exactly.</li>
+    <li><b>fragment</b> → last row, keyed <code>#</code>. Never sent to the site; the browser
+      keeps it for the page.</li>
+  </ul>
+</div>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">the whole anatomy at once</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">zesty</span><span class="nwg nw-1">KOALA</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">https<span class="colon">:</span></span>
+      <span class="pv-value"><span class="seg">login</span><span class="dl">.</span><span class="reg">example.co.uk</span><span class="dl">:</span><span class="port">8443</span></span>
+      <div class="pv-facts">
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Username in the Address</span>
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Carries Another Address</span>
+      </div>
+      <table class="pv-params">
+        <tr><td class="k">user</td><td class="v">alice</td></tr>
+        <tr><td class="k">path</td><td class="v"><span class="dl">/</span>reset<span class="dl">/</span>token<span class="dl">/</span>9f2c</td></tr>
+        <tr><td class="k">next</td><td class="v">https<span class="dl">://</span><span class="reg">example-mail.com</span><span class="dl">/</span>inbox</td></tr>
+        <tr><td class="k">theme</td><td class="v">dark</td></tr>
+        <tr><td class="k">#</td><td class="v">step-2</td></tr>
+      </table>
+      <span class="pv-note">Text before the <code>@</code> is a login name, not part of the
+        address — this page is on <code>example.co.uk</code>. And <code>next</code> is itself
+        a complete web address, on a different domain.</span>
+      <code class="pv-exact"><span class="lbl">Exactly as stored</span><span class="sch">https://</span>alice<span class="dl">@</span><span class="seg">login</span><span class="dl">.</span><span class="reg">example.co.uk</span><span class="dl">:</span>8443<span class="dl">/</span>reset<span class="dl">/</span>token<span class="dl">/</span>9f2c<span class="dl">?</span><span class="k">next</span><span class="dl">=</span>https<span class="pct">%3A%2F%2F</span>example-mail.com<span class="pct">%2F</span>inbox<span class="dl">&amp;</span><span class="k">theme</span><span class="dl">=</span>dark<span class="dl">#</span>step-2</code>
+      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
+        <span class="lead">Continue to example.co.uk
+          <svg class="glyph" width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+            <path d="M3 10 10 3M4.5 3H10v5.5" stroke="currentColor" stroke-width="1.7"
+                  stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="what">A web page</span></a>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note">This URL is a torture test — nothing real should ever light two red chips
+      and five rows. The point is that <b>every part has exactly one home</b>, so nothing can
+      hide: the username that pretends to be a domain gets a row and a chip, the
+      <code>next</code> hop is named for what it is, and the fragment is just a row like any
+      other. <code>example-mail.com</code> in the table is bold (a registrable domain) but
+      unwashed — the wash stays on the domain you would actually visit. Tier 1 keeps its
+      single-press amber anchor and bare ↗; the hedge line is tier 2's and does not appear.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">an ordinary link stays calm</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">calm</span><span class="nwg nw-1">FALCON</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">https<span class="colon">:</span></span>
+      <span class="pv-value"><span class="reg">example.com</span></span>
+      <table class="pv-params">
+        <tr><td class="k">path</td><td class="v"><span class="dl">/</span>articles<span class="dl">/</span>2026<span class="dl">/</span>preview-design</td></tr>
+      </table>
+      <code class="pv-exact"><span class="lbl">Exactly as stored</span><span class="sch">https://</span><span class="reg">example.com</span><span class="dl">/</span>articles<span class="dl">/</span>2026<span class="dl">/</span>preview-design</code>
+      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
+        <span class="lead">Continue to example.com
+          <svg class="glyph" width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+            <path d="M3 10 10 3M4.5 3H10v5.5" stroke="currentColor" stroke-width="1.7"
+                  stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="what">A web page</span></a>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note"><b>The case for unifying, in one card.</b> No userinfo, no port, no query,
+      no fragment — so no chips, no note, and a one-row table. The cost of the unification is
+      this card versus today's <code>.pv-host</code> + <code>.pv-url</code> page, and the
+      difference is small; the gains are one renderer for every scheme, one copy target
+      everywhere ("Exactly as stored" inherits <code>pv-url</code>'s ⌘C-and-checkmark), long
+      paths that wrap in a row instead of snaking through a centred line, and http(s) finally
+      getting hazard chips like everyone else. I would unify.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">5 · Ideas beyond the brief</p>
+
+<div class="fixnote">
+  <ul>
+    <li><b>⌘C moves to the exact line.</b> <code>.pv-url</code> today owns the copy handler and
+      the trailing green ✓; in the unified layout the exact line is the string worth copying,
+      so the handler and the checkmark move there with it.</li>
+    <li><b>Spotify can sharpen its subtitle from its own URI.</b>
+      <code>spotify:track:…</code> / <code>album</code> / <code>playlist</code> /
+      <code>artist</code> is right there in the second segment: "A track in Spotify's
+      catalogue" is a published fact, not a prediction, and beats the generic "Something in
+      Spotify's catalogue" whenever the segment is recognised.</li>
+    <li><b>Same trick for chat schemes.</b> <code>xmpp:</code> with <code>?join</code> is a
+      room, not a person; <code>matrix:</code> paths start <code>u/</code> (user),
+      <code>r/</code> (room), <code>roomid/</code>. The subtitle can say which without
+      guessing.</li>
+    <li><b>mailto with several recipients</b> gets one row per address —
+      <code>to</code> / <code>to</code> / <code>cc</code> / <code>bcc</code> — the repeated-key
+      treatment magnet already established. A <code>cc</code> full of strangers is worth
+      seeing before your mail app opens.</li>
+    <li><b>Short codes are the sms trap worth catching.</b> libphonenumber's short-number
+      metadata knows premium SMS codes; when the crate lands, the Premium Rate chip should
+      fire for those too — that is the subscription scam, and it is a table lookup away.</li>
+    <li><b>Trackers could be counted instead of listed</b> when a magnet carries many:
+      first two rows, then a plain <code>tr</code> row reading "6 more trackers". The exact
+      line still carries all of them, so nothing is hidden — but I would hold this until a
+      real magnet proves the need; the two-tracker card above is fine as is.</li>
+  </ul>
+</div>
+
+</body>
+</html>
