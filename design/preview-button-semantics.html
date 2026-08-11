@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Preview button semantics</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1080px; margin: 46px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-note { max-width: 1080px; margin: 0 auto 18px; padding: 0 20px;
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .mock-note strong { color: var(--text); font-weight: 600; }
+    .mock-note code, .mock-t code { font-family: var(--font-mono); font-size: .92em; }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+
+    /* A small card standing in for one situation. */
+    .spec { width: 300px; background: var(--card-bg); border: .5px solid var(--card-border);
+      border-radius: var(--radius-window); box-shadow: var(--card-shadow);
+      padding: 20px 20px 22px; }
+    .spec h3 { margin: 0 0 2px; font: 600 15px/1.3 var(--font); }
+    .spec .sub { display: block; font: 400 12.5px/1.5 var(--font); color: var(--text-secondary);
+      margin-bottom: 14px; }
+    .spec .why { margin: 14px 0 0; font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .spec .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .tag { font: 600 10.5px/1 var(--font); letter-spacing: .02em; text-transform: uppercase;
+      padding: 5px 8px; border-radius: 999px; background: var(--bg-2);
+      border: .5px solid var(--card-border); color: var(--text-secondary); }
+    .tag.on { background: color-mix(in srgb, var(--accent) 16%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent); }
+    .tag.go { background: color-mix(in srgb, #ff9f0a 20%, transparent);
+      border-color: color-mix(in srgb, #ff9f0a 40%, transparent); color: #8a5a00; }
+    @media (prefers-color-scheme: dark) { .tag.go { color: #ffc266; } }
+
+    /* Swatches for the colour argument. */
+    .swatches { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; padding: 0 16px; }
+    .sw { width: 330px; }
+    .sw .chip { height: 62px; border-radius: var(--radius-control); display: flex;
+      align-items: center; justify-content: center; font: 600 13px/1 var(--font); }
+    .sw .chip.blue { background: linear-gradient(180deg, var(--accent-hover), var(--accent)); color: #fff; }
+    .sw .chip.amber { background: linear-gradient(180deg, #ffb52e, #ff9f0a); color: #241a05; }
+    .sw .chip.red { background: linear-gradient(180deg, #ff5f52, #ff3b30); color: #fff; }
+    .sw p { margin: 10px 0 0; font: 400 12.5px/1.6 var(--font); color: var(--text-secondary); }
+    .sw p b { color: var(--text); font-weight: 600; }
+
+    /* Comparison table. */
+    .mock-t { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+    table { width: 100%; border-collapse: collapse; font: 400 13px/1.5 var(--font);
+      background: var(--card-bg); border-radius: var(--radius-control); overflow: hidden;
+      border: .5px solid var(--card-border); }
+    th, td { text-align: left; padding: 11px 13px; border-bottom: .5px solid var(--card-border);
+      vertical-align: top; }
+    th { font-weight: 600; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    tr:last-child td { border-bottom: none; }
+    td.no { color: var(--text-tertiary); }
+    .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+      margin-right: 6px; vertical-align: baseline; }
+    .dot.blue { background: var(--accent); }
+    .dot.amber { background: #ff9f0a; }
+
+    /* Variant strips. */
+    .vari { width: 330px; background: var(--card-bg); border: .5px solid var(--card-border);
+      border-radius: var(--radius-window); box-shadow: var(--card-shadow); padding: 20px; }
+    .vari h3 { margin: 0 0 3px; font: 600 15px/1.3 var(--font); }
+    .vari .sub { display: block; font: 400 12.5px/1.5 var(--font); color: var(--text-secondary);
+      margin-bottom: 6px; }
+    .vari .verdict { margin: 14px 0 0; font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .vari .verdict b { color: var(--text); font-weight: 600; }
+
+    /* ===================================================================
+       CANDIDATES for app.css — the actual proposals
+       =================================================================== */
+
+    /* An anchor styled as a button needs the button's own reset: <a> brings its
+       own colour, underline and inline layout that .btn does not override. */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+
+    /* Trailing glyph, sized to the cap height and set at the label's optical end.
+       Only anchors carry it: it says "this navigates away", which is exactly the
+       thing a <button> on this page never does. */
+    .btn .glyph { flex: none; opacity: .72; }
+
+    /* Two-line button: label over a smaller line naming what the press costs.
+       Only the Reveal buttons take it — Continue costs nothing. */
+    .btn.btn-2 { flex-direction: column; gap: 1px; padding-top: 9px; padding-bottom: 9px;
+      min-height: 52px; line-height: 1.25; }
+    .btn.btn-2 .cost { font-size: 11.5px; font-weight: 500; opacity: .82; letter-spacing: 0; }
+    .btn.btn-2 .lead { display: inline-flex; align-items: center; gap: 7px; }
+
+    /* Dotted underline under the domain inside the label, so the one part of the
+       label that is a real destination reads as one. */
+    .btn .dom { text-decoration: underline dotted currentColor 1.5px;
+      text-underline-offset: 3px; }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Preview buttons: colour, element, cost</h1>
+  <p class="mock-note" style="padding-left:0; padding-right:0">
+    Four buttons appear on link pages. They differ along three axes that are currently
+    carried by <strong>one</strong> signal (colour). This note separates the axes and proposes
+    which ones deserve their own visible treatment.
+  </p>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · The colour rule, stated</p>
+<p class="mock-note">
+  Colour answers exactly one question: <strong>where do I end up?</strong> Nothing else is
+  encoded in it — not the kind of link, not the cost, not the risk.
+</p>
+
+<div class="swatches">
+  <div class="sw">
+    <div class="chip blue">Blue — <code style="margin-left:5px">--accent</code></div>
+    <p><b>You stay on YuioLink.</b> It is the site's own accent, used for every action whose
+      result is another YuioLink page. Reveal spends a use, but it lands you here, on a page
+      we render and stand behind.</p>
+  </div>
+  <div class="sw">
+    <div class="chip amber">Amber — <code style="margin-left:5px">#ff9f0a</code></div>
+    <p><b>You leave for somewhere we don't vouch for.</b> Amber is the one break in the
+      palette, and it earns it: crossing to a stranger's site is the only irreversible,
+      un-undoable thing this site offers. Dark text, because white cannot reach 4.5:1 on
+      amber — this pairing is ~8:1.</p>
+  </div>
+  <div class="sw">
+    <div class="chip red">Red — rejected</div>
+    <p><b>Not used.</b> Red asserts the destination is malicious. We don't know that, and a
+      warning that fires on every single redirect is a warning nobody reads by week two.
+      Amber says "check this", which is the true claim.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · The four situations</p>
+<p class="mock-note">
+  What differs between them is not only colour: it is <strong>what the control is</strong>
+  (a link you can copy, or a form that changes server state) and <strong>what pressing it
+  costs</strong>. Today both of those are invisible.
+</p>
+
+<div class="mock-t">
+  <table>
+    <thead>
+      <tr><th>Page</th><th>Label</th><th>Colour</th><th>Element</th><th>Costs</th><th>Copyable URL</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Unlimited redirect<br><span style="color:var(--text-tertiary)">preview</span></td>
+        <td>Continue to example.com</td>
+        <td><span class="dot amber"></span>Amber</td>
+        <td><code>&lt;a href=dest&gt;</code><br><span style="color:var(--text-tertiary)">was a POST form</span></td>
+        <td class="no">nothing</td>
+        <td>Yes — the real destination</td>
+      </tr>
+      <tr>
+        <td>Limited redirect<br><span style="color:var(--text-tertiary)">preview, pre-reveal</span></td>
+        <td>Reveal Destination</td>
+        <td><span class="dot blue"></span>Blue</td>
+        <td><code>POST /:name/reveal</code></td>
+        <td>1 use</td>
+        <td class="no">No — nothing to copy yet</td>
+      </tr>
+      <tr>
+        <td>Limited text<br><span style="color:var(--text-tertiary)">preview, pre-reveal</span></td>
+        <td>Reveal Text</td>
+        <td><span class="dot blue"></span>Blue</td>
+        <td><code>POST /:name/reveal</code></td>
+        <td>1 use</td>
+        <td class="no">No — nothing to copy yet</td>
+      </tr>
+      <tr>
+        <td>Revealed redirect<br><span style="color:var(--text-tertiary)">post-reveal</span></td>
+        <td>Continue to example.com</td>
+        <td><span class="dot amber"></span>Amber</td>
+        <td><code>&lt;a href=dest&gt;</code></td>
+        <td class="no">nothing — already spent</td>
+        <td>Yes — the real destination</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p class="mock-note" style="margin-top:16px">
+  The table collapses to a clean rule: <strong>amber is always an anchor and always free;
+  blue is always a form and always costs a use.</strong> Colour already correlates perfectly
+  with both — so the question is whether the other two axes need their own marks, or whether
+  restating them is noise.
+</p>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · What each situation looks like today</p>
+
+<div class="mock-row">
+  <div class="spec">
+    <h3>Continue</h3>
+    <span class="sub">Unlimited redirect · after the fix</span>
+    <a class="btn btn--go btn-block pv-btn btn-link" href="https://example.com/products/keycaps" style="margin-top:0">Continue to example.com</a>
+    <div class="tags"><span class="tag go">Leaves</span><span class="tag">Free</span><span class="tag">Anchor</span></div>
+    <p class="why">A real <code>&lt;a href&gt;</code>: right-click to copy, middle-click for a
+      new tab, hover shows the true URL in the status bar. The destination is printed in full
+      above it anyway, so the href discloses nothing new.</p>
+  </div>
+
+  <div class="spec">
+    <h3>Reveal Destination</h3>
+    <span class="sub">Limited redirect · pre-reveal</span>
+    <button class="btn btn-block pv-btn" style="margin-top:0">Reveal Destination</button>
+    <div class="tags"><span class="tag on">Stays</span><span class="tag">Spends 1 use</span><span class="tag">Form</span></div>
+    <p class="why">Must stay a POST: it consumes a use and mints the reveal cookie. Having no
+      copyable URL is the point — the destination is the gated resource.</p>
+  </div>
+
+  <div class="spec">
+    <h3>Reveal Text</h3>
+    <span class="sub">Limited text · pre-reveal</span>
+    <button class="btn btn-block pv-btn" style="margin-top:0">Reveal Text</button>
+    <div class="tags"><span class="tag on">Stays</span><span class="tag">Spends 1 use</span><span class="tag">Form</span></div>
+    <p class="why">Same control, different noun. The badge below it already says
+      "Opens Once" or "Limited Use" — but below the button, after the decision.</p>
+  </div>
+
+  <div class="spec">
+    <h3>Continue Anyway</h3>
+    <span class="sub">Deceptive URL · the exception</span>
+    <a class="btn btn--go btn-block pv-btn btn-link" href="#" style="margin-top:0">Continue Anyway</a>
+    <div class="tags"><span class="tag go">Leaves</span><span class="tag">Free</span><span class="tag">Anchor</span></div>
+    <p class="why">When the domain is deceptive we refuse to print it on the button —
+      the label would be doing the deceiver's work for them.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">4 · Three ways to make the difference visible</p>
+<p class="mock-note">
+  Each variant is shown as the full set, so the family reads together rather than one button
+  at a time.
+</p>
+
+<div class="mock-row">
+
+  <!-- ---------------------------------------------------------------- -->
+  <div class="vari">
+    <h3>A · Glyph only</h3>
+    <span class="sub">Anchors carry ↗. Buttons carry nothing.</span>
+
+    <a class="btn btn--go btn-block pv-btn btn-link" href="https://example.com/products/keycaps">
+      Continue to example.com
+      <svg class="glyph" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M5 11L11 5M11 5H6M11 5V10" stroke="currentColor" stroke-width="1.9"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+    <button class="btn btn-block pv-btn">Reveal Destination</button>
+    <button class="btn btn-block pv-btn">Reveal Text</button>
+
+    <p class="verdict"><b>Adds:</b> the one axis colour can't carry — "this is a link, you can
+      take it with you". <b>Costs:</b> nothing; ↗ is the most conventional glyph on the web.
+      <b>Silent on:</b> the cost of Reveal, which the badge below already names.</p>
+  </div>
+
+  <!-- ---------------------------------------------------------------- -->
+  <div class="vari">
+    <h3>B · Glyph + cost line</h3>
+    <span class="sub">Reveal states its price on the button itself.</span>
+
+    <a class="btn btn--go btn-block pv-btn btn-link" href="https://example.com/products/keycaps">
+      Continue to example.com
+      <svg class="glyph" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M5 11L11 5M11 5H6M11 5V10" stroke="currentColor" stroke-width="1.9"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+    <button class="btn btn-2 btn-block pv-btn">
+      <span class="lead">Reveal Destination</span>
+      <span class="cost">Spends 1 of 3 views</span>
+    </button>
+    <button class="btn btn-2 btn-block pv-btn">
+      <span class="lead">Reveal Text</span>
+      <span class="cost">Spends the only view</span>
+    </button>
+
+    <p class="verdict"><b>Adds:</b> the price is where the decision is, not below it, and the
+      one-time case reads as a sentence instead of a badge. <b>Costs:</b> the "Opens Once" /
+      "Limited Use" badge under the button becomes a repeat — it would have to go, and it is
+      currently the only place the link's shape is named.</p>
+  </div>
+
+  <!-- ---------------------------------------------------------------- -->
+  <div class="vari">
+    <h3>C · Glyph + cost + live domain</h3>
+    <span class="sub">The domain inside the label is marked as the thing you're going to.</span>
+
+    <a class="btn btn--go btn-block pv-btn btn-link" href="https://example.com/products/keycaps">
+      Continue to <span class="dom">example.com</span>
+      <svg class="glyph" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M5 11L11 5M11 5H6M11 5V10" stroke="currentColor" stroke-width="1.9"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+    <button class="btn btn-2 btn-block pv-btn">
+      <span class="lead">Reveal Destination</span>
+      <span class="cost">Spends 1 of 3 views</span>
+    </button>
+    <button class="btn btn-2 btn-block pv-btn">
+      <span class="lead">Reveal Text</span>
+      <span class="cost">Spends the only view</span>
+    </button>
+
+    <p class="verdict"><b>Adds:</b> nothing a user acts on. <b>Costs:</b> a dotted underline on
+      a domain is what a phishing page does to look legitimate, and it competes with the
+      full URL printed directly above. <b>Recommended against.</b></p>
+  </div>
+</div>
+
+<p class="mock-note" style="margin-top:26px">
+  <strong>Recommendation: A, or B if the cost line survives dropping the badge.</strong>
+  The ↗ is the honest addition — it marks a genuine capability change (this control is now
+  copyable and openable in a new tab) rather than restating what colour already says. The
+  cost line in B is a real improvement to the limited-link decision, but it duplicates the
+  badge; adopting it means deleting <code>.pv-badge</code>, and that badge is also what tells
+  a visitor the link is one-time <em>before</em> they read any button.
+</p>
+
+<p class="mock-note">
+  <strong>Not proposed:</strong> a third colour, an icon on the Reveal buttons (an eye reads
+  as "peek", which is wrong — the view is spent whether or not you look), and any treatment
+  that makes Continue less prominent than Reveal. Continue is the expected outcome of
+  visiting a link; the interstitial already taxes it with a click.
+</p>
+
+</body>
+</html>

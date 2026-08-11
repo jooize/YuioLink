@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Icons, alignment, and lid copy</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1120px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-note { max-width: 1120px; margin: 0 auto 18px; padding: 0 20px;
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .mock-note strong { color: var(--text); font-weight: 600; }
+    .mock-note code { font-family: var(--font-mono); font-size: .92em; }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .card { width: 340px; background: var(--card-bg); border: .5px solid var(--card-border);
+      border-radius: var(--radius-window); box-shadow: var(--card-shadow); padding: 20px; }
+    .card.wide { width: 470px; }
+    .card h3 { margin: 0 0 3px; font: 600 15px/1.3 var(--font); }
+    .card .sub { display: block; font: 400 12.5px/1.5 var(--font); color: var(--text-secondary);
+      margin-bottom: 14px; }
+    .card .note { margin: 14px 0 0; font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .card .note b { color: var(--text); font-weight: 600; }
+    .rank { float: right; font: 700 11px/1 var(--font); letter-spacing: .04em;
+      text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+      background: var(--bg-2); border: .5px solid var(--card-border); color: var(--text-tertiary); }
+    .rank.pick { background: color-mix(in srgb, var(--switch-on) 18%, transparent);
+      border-color: color-mix(in srgb, var(--switch-on) 42%, transparent); color: #1a7a35; }
+    .rank.nope { background: color-mix(in srgb, var(--danger) 12%, transparent);
+      border-color: color-mix(in srgb, var(--danger) 34%, transparent); color: var(--danger); }
+    @media (prefers-color-scheme: dark) { .rank.pick { color: #4ede78; } }
+    .fixnote { max-width: 1120px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.6 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    /* Ruler to make the optical line visible in section 1. */
+    .ruler { position: relative; }
+    .ruler::after { content: ""; position: absolute; left: 8px; right: 8px; top: 21.5px;
+      height: 1px; background: color-mix(in srgb, var(--accent) 70%, transparent); }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+    .btn .glyph { flex: none; opacity: .72; }
+
+    .pv-scheme { display: flex; align-items: center; justify-content: center; gap: 9px;
+      margin-top: 4px; color: #8a5a00; }
+    .pv-scheme .mark { flex: none; display: block; }
+    .pv-scheme .word { font-family: var(--font-mono); font-size: clamp(19px, 5vw, 24px);
+      font-weight: 700; letter-spacing: -.01em; }
+    .pv-scheme .word .colon { opacity: .45; }
+    @media (prefers-color-scheme: dark) { .pv-scheme { color: #ffc266; } }
+    .pv-opaque { display: block; margin-top: 8px; font-family: var(--font-mono);
+      font-size: 14px; line-height: 1.5; word-break: break-all; color: var(--text-secondary);
+      text-align: center; }
+
+    /* --- refusal alert: the real fix ------------------------------------
+       The symbol box takes the heading's exact line box and centres its glyph
+       in it. The part that was actually broken: .msg is a <p>, and the sheet's
+       global paragraph margin was pushing the text down while the symbol,
+       being an <svg>, stayed put. Zero the margin and the two agree. */
+    .pv-refuse-alert { display: grid; grid-template-columns: auto 1fr; gap: 11px;
+      margin: 14px auto 0; max-width: 94%; padding: 12px 14px; border-radius: 10px;
+      text-align: left; background: var(--field-bg); border: .5px solid var(--card-border); }
+    .pv-refuse-alert .sym { display: grid; place-items: center; height: 19px; width: 16px;
+      color: var(--danger); }
+    .pv-refuse-alert .msg { margin: 0; max-width: none; text-align: left;
+      font-size: 11.5px; line-height: 1.55; color: var(--text-secondary); }
+    .pv-refuse-alert .msg b { display: block; font-size: 12.5px; line-height: 19px;
+      font-weight: 700; color: var(--text); margin-bottom: 2px; }
+    /* Mockup-only: reinstate the bug for the before/after. */
+    .was .msg { margin: 1em 0; }
+    .was .sym { display: block; height: auto; width: auto; margin-top: 1px; place-items: initial; }
+
+    /* --- the lid --------------------------------------------------------- */
+    .pv-cover { display: grid; margin-top: 24px; }
+    .pv-cover > * { grid-area: 1 / 1; }
+    .pv-cover-lid { display: flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 46px; padding: 10px 16px; border-radius: var(--radius-control);
+      cursor: pointer; list-style: none; font: 400 14px/1.3 var(--font); color: #8a5a00;
+      background: repeating-linear-gradient(135deg,
+        color-mix(in srgb, #ff9f0a 15%, transparent) 0 7px,
+        color-mix(in srgb, #ff9f0a 7%, transparent) 7px 14px);
+      border: 1.5px solid color-mix(in srgb, #ff9f0a 55%, transparent);
+      transform-origin: top center;
+      transition: transform .28s cubic-bezier(.2,.8,.3,1), opacity .28s ease; }
+    .pv-cover-lid::-webkit-details-marker { display: none; }
+    .pv-cover-lid::marker { content: ""; }
+    .pv-cover[open] .pv-cover-lid { transform: perspective(420px) rotateX(-88deg); opacity: 0;
+      pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { .pv-cover-lid { transition: none; } }
+    @media (prefers-color-scheme: dark) { .pv-cover-lid { color: #ffc266; } }
+    /* The separator is drawn, not typed: a real element cannot be swallowed by
+       flex gap collapsing or a missing glyph in the UI font. */
+    .pv-cover-lid .sep { flex: none; width: 3px; height: 3px; border-radius: 50%;
+      background: currentColor; opacity: .5; }
+    .pv-cover-lid .act { font-weight: 700; }
+
+    /* --- quieter "Not Encrypted" ----------------------------------------- */
+    .pv-url .sch.insecure { color: var(--danger); font-weight: 700; }
+    .pv-insecure { display: inline-flex; align-items: center; gap: 5px; margin-top: 9px;
+      padding: 3px 9px; border-radius: 999px; font: 600 11px/1.45 var(--font); }
+    .pv-insecure svg { flex: none; }
+    .pv-insecure.loud { color: var(--danger);
+      background: color-mix(in srgb, var(--danger) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--danger) 38%, transparent); }
+    .pv-insecure.quiet { color: var(--text-secondary); background: var(--field-bg);
+      border: .5px solid var(--card-border); }
+    .pv-insecure.quiet svg { color: var(--danger); }
+    .pv-insecure.bare { padding: 0; color: var(--text-secondary); }
+    .pv-insecure.bare svg { color: var(--danger); }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 6</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Icons, the alignment bug, and lid copy</h1>
+</div>
+
+<div class="fixnote">
+  <b>Two things you were right about, and I was wrong about the cause of one.</b>
+  The symbol was never misaligned by 1px — <code>.msg</code> is a <code>&lt;p&gt;</code>, and
+  the sheet's global paragraph margin was pushing the <em>text</em> down while the
+  <code>&lt;svg&gt;</code> stayed put. My "fix" last round adjusted the symbol, which is the
+  half that was already correct. Zeroing <code>margin</code> on <code>.msg</code> is the
+  actual repair.
+  <br><br>
+  The <b>·</b> never rendered because there wasn't one: I described the lid with a middot in
+  prose but built it with a flex gap. It is a real element now — drawn as a dot, so it cannot
+  go missing from a UI font.
+  <br><br>
+  <b>And you are right about the TTL.</b> I proposed cutting it to ~2 minutes on the grounds
+  that it only spans a redirect. It does — but a stalled radio, a captive portal, or a phone
+  that sleeps mid-hop can stretch that hop arbitrarily, and the failure mode is a visitor
+  whose use was already spent seeing 410 for content they never got. That is the worst
+  outcome on the site. The 10 minutes costs nothing now that the cookie is deleted on use.
+  <b>Leave <code>TTL_SECS</code> alone.</b>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · The alignment, actually fixed</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <span class="rank nope">Was</span>
+    <h3>Paragraph margin pushing the text</h3>
+    <div class="pv-refuse-alert was ruler" style="margin-top:0">
+      <svg class="sym" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+      <p class="msg"><b>No Button for This One</b>The address stored here would tell your
+        browser to do something rather than go somewhere.</p>
+    </div>
+    <p class="note">The blue rule marks the symbol's centre. The heading sits well below it —
+      the gap is a paragraph margin, not a pixel.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank pick">Now</span>
+    <h3>Margin zeroed, line boxes shared</h3>
+    <div class="pv-refuse-alert ruler" style="margin-top:0">
+      <svg class="sym" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+      <p class="msg"><b>No Button for This One</b>The address stored here would tell your
+        browser to do something rather than go somewhere.</p>
+    </div>
+    <p class="note">Same rule, now through both. The symbol box carries the heading's
+      <code>line-height</code> and centres inside it, so this holds if the type scales.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · Lid copy: sentence case, then the action</p>
+<p class="mock-note">
+  <strong>"Show…" over "Proceed".</strong> "Proceed" is what you press to <em>go</em>, and
+  this lid does not go anywhere — it uncovers a button. And the ellipsis is the site's own
+  established convention: the history head already uses <strong>"Clear…"</strong> for exactly
+  this, a control that opens further controls rather than acting. Apple's rule is the same —
+  a trailing ellipsis means more is required before anything happens.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>tel</h3>
+    <span class="sub">Sentence case · Title case action</span>
+    <div class="pv-scheme">
+      <svg class="mark" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M6.3 3.4 8 6.2 6.4 7.9c.8 1.8 2 3 3.7 3.7l1.7-1.6 2.8 1.7-.4 2.4c-.1.6-.7 1-1.3.9C8.2 14.3 5 11.1 4.2 5.3c-.1-.6.3-1.2.9-1.3l1.2-.6Z"
+              stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      <span class="word">tel<span class="colon">:</span></span>
+    </div>
+    <code class="pv-opaque">+47 800 12 345</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Dials a number<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">Call +47 800 12 345</a>
+    </details>
+  </div>
+
+  <div class="card">
+    <h3>magnet</h3>
+    <span class="sub">With the redrawn glyph</span>
+    <div class="pv-scheme">
+      <svg class="mark" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M10 3.2v8.1M6.6 8.1 10 11.5l3.4-3.4" stroke="currentColor" stroke-width="1.6"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4.2 14.4v1.1c0 .7.6 1.3 1.3 1.3h9c.7 0 1.3-.6 1.3-1.3v-1.1"
+              stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span class="word">magnet<span class="colon">:</span></span>
+    </div>
+    <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Hands this to a torrent app<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">Open in Your Torrent App</a>
+    </details>
+  </div>
+
+  <div class="card">
+    <h3>mailto</h3>
+    <span class="sub">No lid — nothing commits</span>
+    <div class="pv-scheme">
+      <svg class="mark" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <rect x="2.4" y="4.4" width="15.2" height="11.2" rx="2.2" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M3.2 6.2 10 10.8l6.8-4.6" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="word">mailto<span class="colon">:</span></span>
+    </div>
+    <code class="pv-opaque">hello@example.com</code>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:24px">Write to hello@example.com</a>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · The magnet glyph</p>
+<p class="mock-note">
+  A horseshoe magnet needs an outer arc, an inner arc and two pole bands — six strokes inside
+  20 pixels, which is why the last one turned to mush.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank nope">Was</span>
+    <h3>Literal horseshoe</h3>
+    <div class="pv-scheme">
+      <svg class="mark" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M5 15V9a5 5 0 0 1 10 0v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M5 15h3.2M11.8 15H15M5 11.6h3.2M11.8 11.6H15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span class="word">magnet<span class="colon">:</span></span>
+    </div>
+    <p class="note">At this size the pole bands read as noise and the whole thing looks like a
+      bridge.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Literal, redrawn</span>
+    <h3>Horseshoe with open poles</h3>
+    <div class="pv-scheme">
+      <svg class="mark" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M4.6 15.4V9.4a5.4 5.4 0 0 1 10.8 0v6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        <path d="M8.6 15.4V9.4a1.4 1.4 0 0 1 2.8 0v6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span class="word">magnet<span class="colon">:</span></span>
+    </div>
+    <p class="note">Two strokes instead of six: outer and inner U, poles implied by the gap.
+      Reads as a magnet, but only if you already expect one.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>Hand-off to an app</h3>
+    <div class="pv-scheme">
+      <svg class="mark" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M10 3.2v8.1M6.6 8.1 10 11.5l3.4-3.4" stroke="currentColor" stroke-width="1.6"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4.2 14.4v1.1c0 .7.6 1.3 1.3 1.3h9c.7 0 1.3-.6 1.3-1.3v-1.1"
+              stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span class="word">magnet<span class="colon">:</span></span>
+    </div>
+    <p class="note">The icon's job is not to illustrate the word <code>magnet</code> — the
+      word is right there in 24px mono. Its job is to say <b>what will happen</b>, and what
+      happens is a payload going into an app. Legible at 20px, and honest.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">4 · The arrow: what the site already means by it</p>
+<p class="mock-note">
+  Your proposed rule — plain arrow for internal, boxed arrow for external — isn't the web's
+  convention, and more importantly isn't <em>this site's</em>. The real axis in common use is
+  <strong>does it open a new tab</strong>. And <code>app.js</code> already draws one of these:
+  <code>openIcon</code>, commented "the arrow out of a box's corner: opens elsewhere",
+  used on the history row's <code>target="_blank"</code> link. That gives the boxed arrow a
+  settled meaning here — <b>new tab</b> — and Continue is a same-tab navigation.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>Bare arrow</h3>
+    <span class="sub">Same tab, another site</span>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">
+      Continue to example.com
+      <svg class="glyph" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M5 11L11 5M11 5H6M11 5V10" stroke="currentColor" stroke-width="1.9"
+              stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <p class="note">The most-used external-link mark on the web, and it stays clear of the
+      boxed arrow the history row has already claimed for "new tab". Amber is what says
+      "you leave"; the arrow just confirms the direction.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">If new tab</span>
+    <h3>Boxed arrow</h3>
+    <span class="sub">Only if Continue gains <code>target="_blank"</code></span>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">
+      Continue to example.com
+      <svg class="glyph" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M12.4 9.1v3.4c0 .9-.7 1.6-1.6 1.6H4.1c-.9 0-1.6-.7-1.6-1.6V5.9c0-.9.7-1.6 1.6-1.6h3.4"
+              stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M10.2 2.3h3.5v3.5M13.7 2.3 8.3 7.7" stroke="currentColor" stroke-width="1.6"
+              stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <p class="note">Correct <i>if</i> the button opens a new tab — but it shouldn't. A visitor
+      followed a link to get somewhere; leaving a spent preview behind in the old tab is
+      clutter, and the back button is the thing that makes an interstitial tolerable.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Also fine</span>
+    <h3>No glyph</h3>
+    <span class="sub">Colour and label carry it</span>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">Continue to example.com</a>
+    <p class="note">The label already names another site and the colour already means "you
+      leave". <b>Against:</b> the arrow is the one mark that says <i>link, not button</i> —
+      which is the whole capability change, and the reason right-click now works.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">5 · "Not Encrypted", turned down</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank nope">Was</span>
+    <h3>Full red pill</h3>
+    <code class="pv-url" style="display:block;text-align:center">
+      <span class="sch insecure">http://</span><span class="reg">example.com</span><span class="seg">/page</span>
+    </code>
+    <div style="text-align:center">
+      <span class="pv-insecure loud">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M4.4 7.2V5.1a3.6 3.6 0 0 1 6.4-2.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <rect x="3.1" y="7.2" width="9.8" height="6.4" rx="1.8" stroke="currentColor" stroke-width="1.5"/></svg>
+        Not Encrypted
+      </span>
+    </div>
+    <p class="note">Two red objects competing, and it out-shouts the lookalike-domain panel —
+      which is the warning that actually means someone is trying something.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>Neutral pill, red padlock</h3>
+    <code class="pv-url" style="display:block;text-align:center">
+      <span class="sch insecure">http://</span><span class="reg">example.com</span><span class="seg">/page</span>
+    </code>
+    <div style="text-align:center">
+      <span class="pv-insecure quiet">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M4.4 7.2V5.1a3.6 3.6 0 0 1 6.4-2.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <rect x="3.1" y="7.2" width="9.8" height="6.4" rx="1.8" stroke="currentColor" stroke-width="1.5"/></svg>
+        Not Encrypted
+      </span>
+    </div>
+    <p class="note">Red stays on the four characters that are the problem and in the padlock.
+      The pill itself becomes the site's ordinary field surface, so it reads as a
+      <b>label</b>, not an alarm — which matches the severity: plain http is a weakness, not
+      an attack.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Quietest</span>
+    <h3>No pill at all</h3>
+    <code class="pv-url" style="display:block;text-align:center">
+      <span class="sch insecure">http://</span><span class="reg">example.com</span><span class="seg">/page</span>
+    </code>
+    <div style="text-align:center">
+      <span class="pv-insecure bare">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M4.4 7.2V5.1a3.6 3.6 0 0 1 6.4-2.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <rect x="3.1" y="7.2" width="9.8" height="6.4" rx="1.8" stroke="currentColor" stroke-width="1.5"/></svg>
+        Not encrypted
+      </span>
+    </div>
+    <p class="note">Barely there. <b>Against:</b> with no enclosure it joins the two advisory
+      lines already at the foot of this page and stops being a property of the
+      <i>destination</i>.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">6 · On blue in the URL — it is already there</p>
+<p class="mock-note">
+  Worth knowing before changing it: <code>.pv-url .reg</code> already carries the accent, as a
+  <strong>13% blue highlight behind bold near-black text</strong>, not as blue text. That was
+  the right call and I would keep it. The registrable domain is the single most
+  security-critical string on the page, so it wants maximum contrast; blue text would trade
+  legibility for decoration, and — on a page whose entire job is teaching people to read a
+  URL — it would make the domain look clickable when it deliberately is not.
+</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <span class="rank pick">Today</span>
+    <h3>Accent highlight, dark text</h3>
+    <code class="pv-url" style="display:block;text-align:center">
+      <span class="sch">https://</span><span class="reg">example.com</span><span class="seg">/products/keycaps</span>
+    </code>
+    <p class="note">The domain is marked <i>and</i> maximally readable. Everything else on the
+      line is graded by importance: scheme tertiary, path and query secondary.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank nope">Blue text</span>
+    <h3>Domain in accent</h3>
+    <code class="pv-url" style="display:block;text-align:center">
+      <span class="sch">https://</span><span style="color:var(--accent);font-weight:700;font-size:1.06em">example.com</span><span class="seg">/products/keycaps</span>
+    </code>
+    <p class="note">Reads as a hyperlink inside a block whose whole point is that it is
+      <b>text you inspect, not a control you press</b> — and blue is the colour this site uses
+      for "stays on YuioLink", which is the opposite of what this string represents.</p>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Scheme page, assembled</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1120px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-note { max-width: 1120px; margin: 0 auto 18px; padding: 0 20px;
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .mock-note strong { color: var(--text); font-weight: 600; }
+    .mock-note code { font-family: var(--font-mono); font-size: .92em; }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .card { width: 340px; background: var(--card-bg); border: .5px solid var(--card-border);
+      border-radius: var(--radius-window); box-shadow: var(--card-shadow); padding: 20px; }
+    .card.wide { width: 470px; }
+    .card h3 { margin: 0 0 3px; font: 600 15px/1.3 var(--font); }
+    .card .sub { display: block; font: 400 12.5px/1.5 var(--font); color: var(--text-secondary);
+      margin-bottom: 16px; }
+    .card .note { margin: 16px 0 0; font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .card .note b { color: var(--text); font-weight: 600; }
+    .rank { float: right; font: 700 11px/1 var(--font); letter-spacing: .04em;
+      text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+      background: var(--bg-2); border: .5px solid var(--card-border); color: var(--text-tertiary); }
+    .rank.pick { background: color-mix(in srgb, var(--switch-on) 18%, transparent);
+      border-color: color-mix(in srgb, var(--switch-on) 42%, transparent); color: #1a7a35; }
+    @media (prefers-color-scheme: dark) { .rank.pick { color: #4ede78; } }
+    .stack > * + * { margin-top: 16px; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+    .btn .glyph { flex: none; opacity: .72; }
+
+    /* --- the plate: B, with nothing dimmed ------------------------------
+       The scheme takes the domain's own marking (dark text on an accent
+       highlight). The body underneath stays at full text colour — it is the
+       value a person came to check, so it is never the quiet half. */
+    .pv-scheme { display: block; text-align: center; margin-top: 4px;
+      font-family: var(--font-mono); font-weight: 700; letter-spacing: -.01em;
+      line-height: 1.35; font-size: clamp(19px, 5vw, 24px); }
+    .pv-scheme .word { color: var(--text); padding: 2px 8px; border-radius: 6px;
+      background: color-mix(in srgb, var(--accent) 13%, transparent); }
+    .pv-scheme .colon { opacity: .45; }
+
+    .pv-opaque { display: block; margin-top: 10px; font-family: var(--font-mono);
+      font-size: 15px; line-height: 1.5; letter-spacing: .01em; word-break: break-all;
+      text-align: center; color: var(--text); }
+    /* Variants for section 1 only. */
+    .v-dim .pv-opaque { color: var(--text-secondary); }
+    .v-bold .pv-opaque { font-weight: 700; font-size: 17px; }
+
+    /* --- two-line button ------------------------------------------------
+       Only the non-web schemes take it. The second line is the scheme's own
+       definition, which is a fact about a standard rather than a prediction
+       about a device. */
+    .btn.btn-2 { flex-direction: column; gap: 2px; padding-top: 9px; padding-bottom: 9px;
+      min-height: 54px; line-height: 1.25; }
+    .btn.btn-2 .lead { display: inline-flex; align-items: center; gap: 7px; }
+    .btn.btn-2 .what { font-size: 11.5px; font-weight: 500; opacity: .82; letter-spacing: 0; }
+
+    /* The one hedge, after the control. */
+    .pv-hedge { display: block; max-width: 92%; margin: 12px auto 0; text-align: center;
+      font: 400 11.5px/1.55 var(--font); color: var(--text-tertiary); }
+
+    /* --- the lid, sized to the button it covers -------------------------
+       Both live in one grid cell and both are 54px tall, so the button lands
+       exactly where the lid was — no shift under the pointer, on any width. */
+    .pv-cover { display: grid; margin-top: 22px; }
+    .pv-cover > * { grid-area: 1 / 1; }
+    .pv-cover-lid { display: flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 54px; padding: 10px 16px; border-radius: var(--radius-control);
+      cursor: pointer; list-style: none; font: 400 14px/1.3 var(--font); color: #8a5a00;
+      background: repeating-linear-gradient(135deg,
+        color-mix(in srgb, #ff9f0a 15%, transparent) 0 7px,
+        color-mix(in srgb, #ff9f0a 7%, transparent) 7px 14px);
+      border: 1.5px solid color-mix(in srgb, #ff9f0a 55%, transparent);
+      transform-origin: top center;
+      transition: transform .28s cubic-bezier(.2,.8,.3,1), opacity .22s ease; }
+    .pv-cover-lid::-webkit-details-marker { display: none; }
+    .pv-cover-lid::marker { content: ""; }
+    .pv-cover[open] .pv-cover-lid { transform: perspective(460px) rotateX(-90deg); opacity: 0;
+      pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { .pv-cover-lid { transition: none; } }
+    @media (prefers-color-scheme: dark) { .pv-cover-lid { color: #ffc266; } }
+    .pv-cover-lid .sep { flex: none; width: 3px; height: 3px; border-radius: 50%;
+      background: currentColor; opacity: .5; }
+    .pv-cover-lid .act { font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 9</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Assembled: plate, two-line button, boxed arrow, lid</h1>
+  <p class="mock-note" style="padding-left:0;padding-right:0">
+    Taking your calls: <strong>B without dimming</strong>, <strong>description on the
+    button</strong>, <strong>lid kept</strong> (unusual schemes are the surprise, and the
+    surprise is the reason), and the hedge line underneath.
+  </p>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · B, with the body at full strength</p>
+<p class="mock-note">
+  The mix read as messy because two bold objects at similar sizes were competing. Keep one
+  marked object — the scheme — and let the body simply be legible.
+</p>
+
+<div class="mock-row">
+  <div class="card v-dim">
+    <span class="rank">Was</span>
+    <h3>Body dimmed</h3>
+    <span class="pv-scheme"><span class="word">mailto<span class="colon">:</span></span></span>
+    <code class="pv-opaque">hello@example.com</code>
+    <span class="pv-scheme" style="margin-top:20px"><span class="word">magnet<span class="colon">:</span></span></span>
+    <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4&amp;dn=ubuntu-24.04</code>
+    <p class="note">The address is the thing being checked, and it is the faintest text in the
+      card. Wrong emphasis.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>Body at full text colour</h3>
+    <span class="pv-scheme"><span class="word">mailto<span class="colon">:</span></span></span>
+    <code class="pv-opaque">hello@example.com</code>
+    <span class="pv-scheme" style="margin-top:20px"><span class="word">magnet<span class="colon">:</span></span></span>
+    <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4&amp;dn=ubuntu-24.04</code>
+    <p class="note">Same 15px, same weight, just not greyed. One object is marked (the
+      scheme), one is plainly readable (the value), and nothing competes. This also matches
+      the URL line, where <code>.qv</code> — the part that carries meaning — is full text
+      colour while separators stay quiet.</p>
+  </div>
+
+  <div class="card v-bold">
+    <span class="rank">Bolder</span>
+    <h3>Body bold at 17px</h3>
+    <span class="pv-scheme"><span class="word">mailto<span class="colon">:</span></span></span>
+    <code class="pv-opaque">hello@example.com</code>
+    <span class="pv-scheme" style="margin-top:20px"><span class="word">magnet<span class="colon">:</span></span></span>
+    <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4&amp;dn=ubuntu-24.04</code>
+    <p class="note">Fine for an email address; the magnet hash turns into a slab. If you want
+      more presence, this is the ceiling — past it the mix goes messy again.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · The button label, in two lines</p>
+<p class="mock-note">
+  You're right that "Open magnet: Link" is jargon to anyone who has never met the word
+  <em>scheme</em>. The fix isn't to guess what the device does — it's to use the everyday verb
+  <strong>where the standard names the thing itself</strong>, and fall back to
+  <code>Open …: Link</code> only where no such verb exists.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>Everyday verb where one exists</h3>
+    <div class="stack" style="margin-top:4px">
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Email hello@example.com</span>
+        <span class="what">An email address</span></a>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Call +47 800 12 345</span>
+        <span class="what">A phone number</span></a>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Open magnet: Link</span>
+        <span class="what">A file identified by its hash</span></a>
+    </div>
+    <p class="note"><b>"Email hello@example.com" is not a prediction.</b> It names what the
+      link is <i>for</i> — RFC 6068 defines <code>mailto:</code> as an email address — and it
+      says nothing about which app appears. The hedge line below the button is what covers the
+      device. Where no plain verb is defined (<code>magnet</code>, <code>ftp</code>,
+      <code>irc</code>), <code>Open …: Link</code> is honest rather than awkward: there
+      genuinely is no everyday word for it.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Uniform</span>
+    <h3>Open …: Link throughout</h3>
+    <div class="stack" style="margin-top:4px">
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Open mailto: Link</span>
+        <span class="what">An email address</span></a>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Open tel: Link</span>
+        <span class="what">A phone number</span></a>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Open magnet: Link</span>
+        <span class="what">A file identified by its hash</span></a>
+    </div>
+    <p class="note">One template, nothing to get wrong — but it asks every visitor to learn
+      the word <i>scheme</i> in order to read a button, and the second line is already doing
+      the teaching.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Verb only</span>
+    <h3>No scheme word at all</h3>
+    <div class="stack" style="margin-top:4px">
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Email hello@example.com</span>
+        <span class="what">An email address</span></a>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Call +47 800 12 345</span>
+        <span class="what">A phone number</span></a>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Open This File Link</span>
+        <span class="what">A file identified by its hash</span></a>
+    </div>
+    <p class="note">Friendliest, and the least true: "Open This File Link" is a paraphrase we
+      invented, and <code>magnet:</code> does not have to point at a file. The scheme word is
+      the one label that is guaranteed accurate.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · Yes — this is where the boxed arrow belongs</p>
+<p class="mock-note">
+  You asked, and it resolves the thing that was bothering me about it. <code>openIcon</code>'s
+  comment in <code>app.js</code> says "<em>opens elsewhere</em>", which I narrowed to "new tab"
+  last round. <strong>Elsewhere is the better reading</strong>, and it splits cleanly.
+</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <h3>Bare arrow — another site, same browser</h3>
+    <span class="sub">Tier 1 · <code>http</code> / <code>https</code></span>
+    <code class="pv-url" style="display:block;text-align:center">
+      <span class="sch">https://</span><span class="reg">example.com</span><span class="seg">/products/keycaps</span>
+    </code>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:20px">
+      Continue to example.com
+      <svg class="glyph" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M5 11L11 5M11 5H6M11 5V10" stroke="currentColor" stroke-width="1.9"
+              stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <p class="note">You stay in the browser and arrive somewhere you can read. The plain
+      external-link arrow, and the page you land on is still a page.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank pick">Pick</span>
+    <h3>Boxed arrow — out of the browser entirely</h3>
+    <span class="sub">Tier 2 · everything else on the allowlist</span>
+    <span class="pv-scheme"><span class="word">mailto<span class="colon">:</span></span></span>
+    <code class="pv-opaque">hello@example.com</code>
+    <a class="btn btn--go btn-2 btn-block btn-link" href="#" style="margin-top:20px">
+      <span class="lead">Email hello@example.com
+        <svg class="glyph" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M12.4 9.1v3.4c0 .9-.7 1.6-1.6 1.6H4.1c-.9 0-1.6-.7-1.6-1.6V5.9c0-.9.7-1.6 1.6-1.6h3.4"
+                stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M10.2 2.3h3.5v3.5M13.7 2.3 8.3 7.7" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="what">An email address</span>
+    </a>
+    <p class="note">The arrow leaving a frame says the destination is not a page in this
+      browser — which is exactly the distinction the whole tier exists for.
+      <b>One honest tension:</b> the history row uses this glyph for a
+      <code>target="_blank"</code> link, which is still the browser. The common thread is
+      "somewhere other than here", which is what the comment already says, but the two uses are
+      not identical.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">4 · The lid, landing the button in its own place</p>
+<p class="mock-note">
+  Click one. Lid and button share a single grid cell and are both 54px, so the button appears
+  <strong>exactly where the lid was</strong> — the pointer is already on it. Still a plain
+  <code>&lt;details&gt;</code>, still no JavaScript, and the anchor is genuinely out of the
+  tab order while the lid is down.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>Not a web address</h3>
+    <span class="pv-scheme"><span class="word">mailto<span class="colon">:</span></span></span>
+    <code class="pv-opaque">hello@example.com</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Not a web address<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Email hello@example.com
+          <svg class="glyph" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M12.4 9.1v3.4c0 .9-.7 1.6-1.6 1.6H4.1c-.9 0-1.6-.7-1.6-1.6V5.9c0-.9.7-1.6 1.6-1.6h3.4"
+                  stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M10.2 2.3h3.5v3.5M13.7 2.3 8.3 7.7" stroke="currentColor" stroke-width="1.6"
+                  stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="what">An email address</span>
+      </a>
+    </details>
+    <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+    <p class="note">Plainly true, and it names the surprise directly — a shortener is a web
+      thing, and this one isn't. Earlier I ruled this phrase out, but that was for the
+      <i>refusal</i> panel, where it would have implied <code>mailto:</code> is unwelcome.
+      Here it is simply the fact.</p>
+  </div>
+
+  <div class="card">
+    <h3>Leaves the browser</h3>
+    <span class="pv-scheme"><span class="word">tel<span class="colon">:</span></span></span>
+    <code class="pv-opaque">+47 800 12 345</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Leaves the browser<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Call +47 800 12 345
+          <svg class="glyph" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M12.4 9.1v3.4c0 .9-.7 1.6-1.6 1.6H4.1c-.9 0-1.6-.7-1.6-1.6V5.9c0-.9.7-1.6 1.6-1.6h3.4"
+                  stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M10.2 2.3h3.5v3.5M13.7 2.3 8.3 7.7" stroke="currentColor" stroke-width="1.6"
+                  stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="what">A phone number</span>
+      </a>
+    </details>
+    <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+    <p class="note">Stronger about consequence, weaker about fact — on a device with nothing
+      registered, pressing leaves nothing at all. "Not a web address" cannot be wrong.</p>
+  </div>
+
+  <div class="card">
+    <h3>Unusual scheme</h3>
+    <span class="pv-scheme"><span class="word">magnet<span class="colon">:</span></span></span>
+    <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4&amp;dn=ubuntu-24.04</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Unusual scheme<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Open magnet: Link
+          <svg class="glyph" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M12.4 9.1v3.4c0 .9-.7 1.6-1.6 1.6H4.1c-.9 0-1.6-.7-1.6-1.6V5.9c0-.9.7-1.6 1.6-1.6h3.4"
+                  stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M10.2 2.3h3.5v3.5M13.7 2.3 8.3 7.7" stroke="currentColor" stroke-width="1.6"
+                  stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="what">A file identified by its hash</span>
+      </a>
+    </details>
+    <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+    <p class="note">Names your reason exactly — you don't expect these in a shortener.
+      <b>Against:</b> "unusual" is a judgement about the visitor's world, and
+      <code>mailto:</code> is not unusual to anyone.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">5 · The whole page, three schemes</p>
+
+<div class="mock-row">
+  <div class="card">
+    <h3>mailto</h3>
+    <p style="text-align:center;margin:0 0 10px"><span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span></p>
+    <span class="pv-scheme"><span class="word">mailto<span class="colon">:</span></span></span>
+    <code class="pv-opaque">hello@example.com</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Not a web address<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Email hello@example.com</span>
+        <span class="what">An email address</span></a>
+    </details>
+    <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
+      else later. <strong>Always check the destination.</strong></span>
+  </div>
+
+  <div class="card">
+    <h3>tel</h3>
+    <p style="text-align:center;margin:0 0 10px"><span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span></p>
+    <span class="pv-scheme"><span class="word">tel<span class="colon">:</span></span></span>
+    <code class="pv-opaque">+47 800 12 345</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Not a web address<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Call +47 800 12 345</span>
+        <span class="what">A phone number</span></a>
+    </details>
+    <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
+      else later. <strong>Always check the destination.</strong></span>
+  </div>
+
+  <div class="card">
+    <h3>magnet</h3>
+    <p style="text-align:center;margin:0 0 10px"><span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span></p>
+    <span class="pv-scheme"><span class="word">magnet<span class="colon">:</span></span></span>
+    <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4&amp;dn=ubuntu-24.04</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Not a web address<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Open magnet: Link</span>
+        <span class="what">A file identified by its hash</span></a>
+    </details>
+    <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
+      else later. <strong>Always check the destination.</strong></span>
+  </div>
+</div>
+
+</body>
+</html>

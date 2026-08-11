@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Scheme text colour</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1120px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-note { max-width: 1120px; margin: 0 auto 18px; padding: 0 20px;
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .mock-note strong { color: var(--text); font-weight: 600; }
+    .mock-note code { font-family: var(--font-mono); font-size: .92em; }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .card { width: 340px; background: var(--card-bg); border: .5px solid var(--card-border);
+      border-radius: var(--radius-window); box-shadow: var(--card-shadow); padding: 20px; }
+    .card.wide { width: 470px; }
+    .card h3 { margin: 0 0 3px; font: 600 15px/1.3 var(--font); }
+    .card .sub { display: block; font: 400 12.5px/1.5 var(--font); color: var(--text-secondary);
+      margin-bottom: 16px; }
+    .card .note { margin: 16px 0 0; font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .card .note b { color: var(--text); font-weight: 600; }
+    .rank { float: right; font: 700 11px/1 var(--font); letter-spacing: .04em;
+      text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+      background: var(--bg-2); border: .5px solid var(--card-border); color: var(--text-tertiary); }
+    .rank.pick { background: color-mix(in srgb, var(--switch-on) 18%, transparent);
+      border-color: color-mix(in srgb, var(--switch-on) 42%, transparent); color: #1a7a35; }
+    .rank.nope { background: color-mix(in srgb, var(--danger) 12%, transparent);
+      border-color: color-mix(in srgb, var(--danger) 34%, transparent); color: var(--danger); }
+    @media (prefers-color-scheme: dark) { .rank.pick { color: #4ede78; } }
+    .fixnote { max-width: 1120px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.6 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .stack > * + * { margin-top: 13px; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+
+    /* The scheme plate, iconless. One line, centred, the colon dimmed so the
+       scheme word itself is what the eye takes. */
+    .pv-scheme { display: block; text-align: center; margin-top: 4px;
+      font-family: var(--font-mono); font-size: clamp(19px, 5vw, 24px);
+      font-weight: 700; letter-spacing: -.01em; line-height: 1.35; }
+    .pv-scheme .colon { opacity: .45; }
+    .pv-opaque { display: block; margin-top: 8px; font-family: var(--font-mono);
+      font-size: 14px; line-height: 1.5; word-break: break-all; color: var(--text-secondary);
+      text-align: center; }
+
+    /* A — amber text (round 5) */
+    .pv-scheme.a { color: #8a5a00; }
+    @media (prefers-color-scheme: dark) { .pv-scheme.a { color: #ffc266; } }
+
+    /* B — the .reg treatment, exactly: dark text on an accent highlight */
+    .pv-scheme.b .word { color: var(--text); padding: 2px 8px; border-radius: 6px;
+      background: color-mix(in srgb, var(--accent) 13%, transparent); }
+
+    /* C — the .reg construction, amber highlight */
+    .pv-scheme.c .word { color: var(--text); padding: 2px 8px; border-radius: 6px;
+      background: color-mix(in srgb, #ff9f0a 20%, transparent); }
+
+    /* D — plain text, no treatment at all */
+    .pv-scheme.d { color: var(--text); }
+
+    /* E — amber text on amber highlight */
+    .pv-scheme.e .word { color: #8a5a00; padding: 2px 8px; border-radius: 6px;
+      background: color-mix(in srgb, #ff9f0a 20%, transparent); }
+    @media (prefers-color-scheme: dark) { .pv-scheme.e .word { color: #ffc266; } }
+
+    /* F — dimmed scheme, emphasised body (inverts which half matters) */
+    .pv-scheme.f { color: var(--text-tertiary); font-size: 15px; }
+    .pv-opaque.strong { color: var(--text); font-weight: 700; font-size: 19px; margin-top: 4px; }
+
+    /* --- lid --- */
+    .pv-cover { display: grid; margin-top: 24px; }
+    .pv-cover > * { grid-area: 1 / 1; }
+    .pv-cover-lid { display: flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 46px; padding: 10px 16px; border-radius: var(--radius-control);
+      cursor: pointer; list-style: none; font: 400 14px/1.3 var(--font); color: #8a5a00;
+      background: repeating-linear-gradient(135deg,
+        color-mix(in srgb, #ff9f0a 15%, transparent) 0 7px,
+        color-mix(in srgb, #ff9f0a 7%, transparent) 7px 14px);
+      border: 1.5px solid color-mix(in srgb, #ff9f0a 55%, transparent);
+      transform-origin: top center;
+      transition: transform .28s cubic-bezier(.2,.8,.3,1), opacity .28s ease; }
+    .pv-cover-lid::-webkit-details-marker { display: none; }
+    .pv-cover-lid::marker { content: ""; }
+    .pv-cover[open] .pv-cover-lid { transform: perspective(420px) rotateX(-88deg); opacity: 0;
+      pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { .pv-cover-lid { transition: none; } }
+    @media (prefers-color-scheme: dark) { .pv-cover-lid { color: #ffc266; } }
+    .pv-cover-lid .sep { flex: none; width: 3px; height: 3px; border-radius: 50%;
+      background: currentColor; opacity: .5; }
+    .pv-cover-lid .act { font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 7</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Scheme text colour, without icons</h1>
+</div>
+
+<div class="fixnote">
+  <b>Copy fixed:</b> "Hands this to a torrent app" was wrong. A magnet URI names a resource by
+  cryptographic hash rather than by location — BitTorrent is its most common consumer, not its
+  definition. The lid now says <b>"Hands this to another app"</b>, which is true whatever is
+  registered for the scheme.
+  <br><br>
+  <b>Icons dropped</b>, so the scheme word is now the entire identity of the destination —
+  which makes its colour the question below. Section 4 has the magnet glyph you asked for,
+  parked rather than shipped.
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · Six treatments</p>
+<p class="mock-note">
+  One thing worth having in hand first: for a hostless URL, <code>card_domain()</code> already
+  falls back to the scheme. The scheme <em>is</em> this link's domain — the one string that
+  says where you are going. So the strongest candidates are the ones that give it the same
+  treatment <code>.pv-url .reg</code> gives a real domain.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank">A</span>
+    <h3>Amber text</h3>
+    <span class="sub">As built in round 5</span>
+    <div class="stack">
+      <div><span class="pv-scheme a"><span class="word">mailto<span class="colon">:</span></span></span>
+        <code class="pv-opaque">hello@example.com</code></div>
+      <div><span class="pv-scheme a"><span class="word">tel<span class="colon">:</span></span></span>
+        <code class="pv-opaque">+47 800 12 345</code></div>
+      <div><span class="pv-scheme a"><span class="word">magnet<span class="colon">:</span></span></span>
+        <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4</code></div>
+    </div>
+    <p class="note">Ties the plate to the amber button below it. <b>Against:</b> amber is the
+      colour of the <i>control</i> here — of pressing and leaving. Spending it on a static
+      string means the page has two amber objects and only one of them does anything.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank pick">B · Pick</span>
+    <h3>Dark text, accent highlight</h3>
+    <span class="sub">Identical to <code>.pv-url .reg</code></span>
+    <div class="stack">
+      <div><span class="pv-scheme b"><span class="word">mailto<span class="colon">:</span></span></span>
+        <code class="pv-opaque">hello@example.com</code></div>
+      <div><span class="pv-scheme b"><span class="word">tel<span class="colon">:</span></span></span>
+        <code class="pv-opaque">+47 800 12 345</code></div>
+      <div><span class="pv-scheme b"><span class="word">magnet<span class="colon">:</span></span></span>
+        <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4</code></div>
+    </div>
+    <p class="note">The same object as a highlighted domain, because it plays the same part.
+      A visitor who has seen one preview reads this one for free. Note this does <b>not</b>
+      break the colour rule: the accent tint marks <i>the part that matters</i> in a block of
+      text — it is already used this way behind <code>example.com</code> on links that take
+      you away. Only <b>buttons</b> carry the where-do-I-end-up meaning.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">C</span>
+    <h3>Dark text, amber highlight</h3>
+    <span class="sub">Same construction, tier colour</span>
+    <div class="stack">
+      <div><span class="pv-scheme c"><span class="word">mailto<span class="colon">:</span></span></span>
+        <code class="pv-opaque">hello@example.com</code></div>
+      <div><span class="pv-scheme c"><span class="word">tel<span class="colon">:</span></span></span>
+        <code class="pv-opaque">+47 800 12 345</code></div>
+      <div><span class="pv-scheme c"><span class="word">magnet<span class="colon">:</span></span></span>
+        <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4</code></div>
+    </div>
+    <p class="note">Keeps full legibility and still marks the tier. <b>Against:</b> it says
+      "this scheme is the warning", when what deserves marking is the same thing as on any
+      other preview — where you are going. The lid is already the tier's voice.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">D</span>
+    <h3>Plain text</h3>
+    <span class="sub">No colour, no highlight</span>
+    <div class="stack">
+      <div><span class="pv-scheme d"><span class="word">mailto<span class="colon">:</span></span></span>
+        <code class="pv-opaque">hello@example.com</code></div>
+      <div><span class="pv-scheme d"><span class="word">tel<span class="colon">:</span></span></span>
+        <code class="pv-opaque">+47 800 12 345</code></div>
+      <div><span class="pv-scheme d"><span class="word">magnet<span class="colon">:</span></span></span>
+        <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4</code></div>
+    </div>
+    <p class="note">Calm and completely legible. <b>Against:</b> with icons gone this is the
+      only distinguishing mark a non-web destination has, and plain 24px mono is what the
+      whole page is set in. Nothing says "this one is different in kind".</p>
+  </div>
+
+  <div class="card">
+    <span class="rank nope">E</span>
+    <h3>Amber on amber</h3>
+    <span class="sub">Text and highlight both</span>
+    <div class="stack">
+      <div><span class="pv-scheme e"><span class="word">mailto<span class="colon">:</span></span></span>
+        <code class="pv-opaque">hello@example.com</code></div>
+      <div><span class="pv-scheme e"><span class="word">tel<span class="colon">:</span></span></span>
+        <code class="pv-opaque">+47 800 12 345</code></div>
+      <div><span class="pv-scheme e"><span class="word">magnet<span class="colon">:</span></span></span>
+        <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4</code></div>
+    </div>
+    <p class="note">Fails contrast before it fails taste: amber text on an amber wash is the
+      one combination in this set that cannot reach 4.5:1 at any tint that still reads as
+      amber. <code>mailto:</code> does not warrant the loudest object on the page either.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">F</span>
+    <h3>Dim scheme, loud body</h3>
+    <span class="sub">Inverts which half matters</span>
+    <div class="stack">
+      <div><span class="pv-scheme f"><span class="word">mailto<span class="colon">:</span></span></span>
+        <code class="pv-opaque strong">hello@example.com</code></div>
+      <div><span class="pv-scheme f"><span class="word">tel<span class="colon">:</span></span></span>
+        <code class="pv-opaque strong">+47 800 12 345</code></div>
+      <div><span class="pv-scheme f"><span class="word">magnet<span class="colon">:</span></span></span>
+        <code class="pv-opaque strong">?xt=urn:btih:c12fe3…9ab4</code></div>
+    </div>
+    <p class="note">Arguably the honest emphasis for <code>mailto:</code> and <code>tel:</code>
+      — the address and the number are what a person checks. <b>Against:</b> it collapses for
+      <code>magnet:</code>, whose body is an unreadable hash, and it hides the one word that
+      says which kind of app is about to open.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · B, in full context</p>
+
+<div class="mock-row">
+  <div class="card">
+    <h3>mailto · no lid</h3>
+    <span class="sub">Nothing commits</span>
+    <span class="pv-scheme b"><span class="word">mailto<span class="colon">:</span></span></span>
+    <code class="pv-opaque">hello@example.com</code>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:24px">Write to hello@example.com</a>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+  </div>
+
+  <div class="card">
+    <h3>tel · lid</h3>
+    <span class="sub">Placing a call commits</span>
+    <span class="pv-scheme b"><span class="word">tel<span class="colon">:</span></span></span>
+    <code class="pv-opaque">+47 800 12 345</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Dials a number<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">Call +47 800 12 345</a>
+    </details>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+  </div>
+
+  <div class="card">
+    <h3>magnet · lid</h3>
+    <span class="sub">Corrected copy</span>
+    <span class="pv-scheme b"><span class="word">magnet<span class="colon">:</span></span></span>
+    <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4&amp;dn=ubuntu-24.04</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Hands this to another app<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">Open in Another App</a>
+    </details>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · Every lid, in one place</p>
+<div class="mock-note" style="max-width:1120px">
+  <table style="width:100%;border-collapse:collapse;font:400 13px/1.5 var(--font);
+                background:var(--card-bg);border:.5px solid var(--card-border);
+                border-radius:var(--radius-control);overflow:hidden">
+    <tr><th style="text-align:left;padding:10px 13px;border-bottom:.5px solid var(--card-border);
+        font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-tertiary)">Scheme</th>
+      <th style="text-align:left;padding:10px 13px;border-bottom:.5px solid var(--card-border);
+        font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-tertiary)">Lid</th>
+      <th style="text-align:left;padding:10px 13px;border-bottom:.5px solid var(--card-border);
+        font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-tertiary)">Button</th></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>tel</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Dials a number</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Call +47 800 12 345</td></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>magnet</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Hands this to another app</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Open in Another App</td></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>ftp</code> / <code>ftps</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Starts a file transfer</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Connect to files.example.com</td></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>spotify</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Opens Spotify and plays</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Open in Spotify</td></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>mailto</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border);color:var(--text-tertiary)">none — drafts only</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Write to hello@example.com</td></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>sms</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border);color:var(--text-tertiary)">none — drafts only</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Message +47 800 12 345</td></tr>
+    <tr><td style="padding:9px 13px"><code>xmpp</code> / <code>irc</code> / <code>ircs</code> / <code>matrix</code></td>
+      <td style="padding:9px 13px;color:var(--text-tertiary)">none — joining is reversible</td>
+      <td style="padding:9px 13px">Open in Your Chat App</td></tr>
+  </table>
+</div>
+
+</body>
+</html>

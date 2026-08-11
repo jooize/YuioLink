@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Scheme refinements</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1120px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-note { max-width: 1120px; margin: 0 auto 18px; padding: 0 20px;
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .mock-note strong { color: var(--text); font-weight: 600; }
+    .mock-note code { font-family: var(--font-mono); font-size: .92em; }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .card { width: 340px; background: var(--card-bg); border: .5px solid var(--card-border);
+      border-radius: var(--radius-window); box-shadow: var(--card-shadow); padding: 20px; }
+    .card.wide { width: 470px; }
+    .card h3 { margin: 0 0 3px; font: 600 15px/1.3 var(--font); }
+    .card .sub { display: block; font: 400 12.5px/1.5 var(--font); color: var(--text-secondary);
+      margin-bottom: 14px; }
+    .card .note { margin: 14px 0 0; font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .card .note b { color: var(--text); font-weight: 600; }
+    .rank { float: right; font: 700 11px/1 var(--font); letter-spacing: .04em;
+      text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+      background: var(--bg-2); border: .5px solid var(--card-border); color: var(--text-tertiary); }
+    .rank.pick { background: color-mix(in srgb, var(--switch-on) 18%, transparent);
+      border-color: color-mix(in srgb, var(--switch-on) 42%, transparent); color: #1a7a35; }
+    .rank.nope { background: color-mix(in srgb, var(--danger) 12%, transparent);
+      border-color: color-mix(in srgb, var(--danger) 34%, transparent); color: var(--danger); }
+    @media (prefers-color-scheme: dark) { .rank.pick { color: #4ede78; } }
+    .fixnote { max-width: 1120px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.6 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+    .btn .glyph { flex: none; opacity: .72; }
+
+    /* --- scheme plate: bare glyph, no tile ------------------------------
+       The tile was a second rounded rectangle stacked inside a rounded card,
+       competing with the button below it. The glyph alone sits on the same
+       optical line as the scheme word and reads as one object. */
+    .pv-scheme { display: flex; align-items: center; justify-content: center; gap: 9px;
+      margin-top: 4px; color: #8a5a00; }
+    .pv-scheme .mark { flex: none; display: block; }
+    .pv-scheme .word { font-family: var(--font-mono); font-size: clamp(19px, 5vw, 24px);
+      font-weight: 700; letter-spacing: -.01em; }
+    .pv-scheme .word .colon { opacity: .45; }
+    @media (prefers-color-scheme: dark) { .pv-scheme { color: #ffc266; } }
+    .pv-scheme.calm { color: var(--accent); }
+    .pv-opaque { display: block; margin-top: 8px; font-family: var(--font-mono);
+      font-size: 14px; line-height: 1.5; word-break: break-all; color: var(--text-secondary);
+      text-align: center; }
+
+    /* --- insecure http --------------------------------------------------
+       Colour is never the only carrier: the chip states it in words, so the
+       warning survives a colourblind reader and a monochrome print. */
+    .pv-url .sch.insecure { color: var(--danger); font-weight: 700; }
+    .pv-insecure { display: inline-flex; align-items: center; gap: 5px; margin-top: 9px;
+      padding: 3px 9px; border-radius: 999px; font: 600 11px/1.45 var(--font);
+      color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--danger) 38%, transparent); }
+    .pv-insecure svg { flex: none; }
+
+    /* --- cover ---------------------------------------------------------- */
+    .pv-cover { display: grid; margin-top: 24px; }
+    .pv-cover > * { grid-area: 1 / 1; }
+    .pv-cover-lid { display: flex; align-items: center; justify-content: center; gap: 9px;
+      min-height: 46px; padding: 10px 16px; border-radius: var(--radius-control);
+      cursor: pointer; list-style: none; font: 600 14px/1.3 var(--font); color: #8a5a00;
+      background: repeating-linear-gradient(135deg,
+        color-mix(in srgb, #ff9f0a 15%, transparent) 0 7px,
+        color-mix(in srgb, #ff9f0a 7%, transparent) 7px 14px);
+      border: 1.5px solid color-mix(in srgb, #ff9f0a 55%, transparent);
+      transform-origin: top center;
+      transition: transform .28s cubic-bezier(.2,.8,.3,1), opacity .28s ease; }
+    .pv-cover-lid::-webkit-details-marker { display: none; }
+    .pv-cover[open] .pv-cover-lid { transform: perspective(420px) rotateX(-88deg); opacity: 0;
+      pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { .pv-cover-lid { transition: none; } }
+    @media (prefers-color-scheme: dark) { .pv-cover-lid { color: #ffc266; } }
+    .pv-cover-lid .hint { display: inline-flex; align-items: center; gap: 4px;
+      font-weight: 700; opacity: .9; }
+
+    /* --- refusal alert, with the symbol locked to the heading's line -----
+       The symbol box is given the heading's exact line box and centres its
+       glyph inside it, so the two share an optical baseline at any text size
+       — margin nudges drift the moment the type scales. */
+    .pv-refuse-alert { display: grid; grid-template-columns: auto 1fr; gap: 11px;
+      margin: 14px auto 0; max-width: 94%; padding: 12px 14px; border-radius: 10px;
+      text-align: left; background: var(--field-bg); border: .5px solid var(--card-border); }
+    .pv-refuse-alert .sym { display: grid; place-items: center; height: 19px; width: 16px;
+      color: var(--danger); }
+    .pv-refuse-alert .msg { font-size: 11.5px; line-height: 1.55; color: var(--text-secondary); }
+    .pv-refuse-alert .msg b { display: block; font-size: 12.5px; line-height: 19px;
+      font-weight: 700; color: var(--text); margin-bottom: 2px; }
+    .pv-url.inert { opacity: .7; }
+
+    /* Mockup-only: the old misalignment, for comparison. */
+    .was .sym { display: block; height: auto; width: auto; margin-top: 1px; place-items: initial; }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 5</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Refinements: alignment, http, "Proceed", and the blue question</h1>
+</div>
+
+<div class="fixnote">
+  <b>A correction to round 4.</b> I wrote that a <code>tel:</code> link is "one accidental tap
+  from being dialled". That overstates it: iOS Safari interposes a confirmation sheet, and
+  Android generally opens the dialer pre-filled rather than placing the call. The premium-rate
+  risk is real, but a browser confirmation usually stands between the tap and the charge — so
+  the cover is a second seatbelt, not the only one. That changes how hard the cover has to
+  work, and it is why section 4 below proposes covering fewer schemes than round 4 did.
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · The symbol, aligned</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <span class="rank nope">Was</span>
+    <h3>Nudged by margin</h3>
+    <div class="pv-refuse-alert was" style="margin-top:0">
+      <svg class="sym" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+      <p class="msg"><b>No Button for This One</b>The address stored here would tell your
+        browser to do something rather than go somewhere, so YuioLink shows it and stops
+        there.</p>
+    </div>
+    <p class="note">A 1px margin against an implicit line box. The glyph sits high, and the
+      error grows with the type scale.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank pick">Now</span>
+    <h3>Locked to the heading's line box</h3>
+    <div class="pv-refuse-alert" style="margin-top:0">
+      <svg class="sym" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+      <p class="msg"><b>No Button for This One</b>The address stored here would tell your
+        browser to do something rather than go somewhere, so YuioLink shows it and stops
+        there.</p>
+    </div>
+    <p class="note">The heading gets an explicit <code>line-height: 19px</code> and the symbol
+      box is given that same height with <code>place-items: center</code>. They now share an
+      optical centre at any size, with no magic numbers to re-tune.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · Marking insecure http</p>
+<p class="mock-note">
+  Worth doing — this is the one place YuioLink knows something the visitor's browser will only
+  tell them <em>after</em> they've arrived. The constraint: colour must never be the only
+  carrier, or the warning vanishes for a colourblind reader.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank nope">Colour only</span>
+    <h3>Red scheme, nothing else</h3>
+    <code class="pv-url" style="display:block;text-align:center">
+      <span class="sch insecure">http://</span><span class="reg">example.com</span><span class="seg">/page</span>
+    </code>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:20px">Continue to example.com</a>
+    <p class="note">Reads as decoration to anyone who doesn't already know the convention, and
+      disappears entirely for the readers most likely to need it. Red also collides with the
+      lookalike-domain panel, which is a genuinely adversarial warning.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>Red scheme + a chip that says it</h3>
+    <code class="pv-url" style="display:block;text-align:center">
+      <span class="sch insecure">http://</span><span class="reg">example.com</span><span class="seg">/page</span>
+    </code>
+    <div style="text-align:center">
+      <span class="pv-insecure">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M4.4 7.2V5.1a3.6 3.6 0 0 1 6.4-2.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <rect x="3.1" y="7.2" width="9.8" height="6.4" rx="1.8" stroke="currentColor" stroke-width="1.5"/></svg>
+        Not Encrypted
+      </span>
+    </div>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:18px">Continue to example.com</a>
+    <p class="note">The colour draws the eye, the words carry the meaning, the open padlock
+      carries it a third way. <b>"Not Encrypted" over "Not Secure"</b>: it is the precise
+      claim, and it doesn't imply we have judged the site itself — which we haven't, and say
+      so two lines below.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Softer</span>
+    <h3>Chip only, scheme left dim</h3>
+    <code class="pv-url" style="display:block;text-align:center">
+      <span class="sch">http://</span><span class="reg">example.com</span><span class="seg">/page</span>
+    </code>
+    <div style="text-align:center">
+      <span class="pv-insecure">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M4.4 7.2V5.1a3.6 3.6 0 0 1 6.4-2.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <rect x="3.1" y="7.2" width="9.8" height="6.4" rx="1.8" stroke="currentColor" stroke-width="1.5"/></svg>
+        Not Encrypted
+      </span>
+    </div>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:18px">Continue to example.com</a>
+    <p class="note">Keeps the URL rendering untouched — one fewer colour in a line that is
+      already doing part-by-part colouring. <b>Against:</b> the chip floats free of the thing
+      it describes; tying red to the four characters that are the problem is the clearer
+      teach.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · The lid, in title case</p>
+<p class="mock-note">
+  "— lift to continue" is out. Each lid states the consequence, then the word you press.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>Consequence · Proceed</h3>
+    <div class="pv-scheme">
+      <svg class="mark" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <rect x="2.4" y="4.4" width="15.2" height="11.2" rx="2.2" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M3.2 6.2 10 10.8l6.8-4.6" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="word">mailto<span class="colon">:</span></span>
+    </div>
+    <code class="pv-opaque">hello@example.com</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Opens Your Mail App
+        <span class="hint">Proceed
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M6 3.5 10.5 8 6 12.5" stroke="currentColor" stroke-width="1.9"
+                  stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </summary>
+      <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">Write to hello@example.com</a>
+    </details>
+    <p class="note">The lid names what happens; "Proceed" with a chevron is unmistakably the
+      control. Two registers, one line.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Barest</span>
+    <h3>Consequence only</h3>
+    <div class="pv-scheme">
+      <svg class="mark" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M5 15V9a5 5 0 0 1 10 0v6M5 15h3.2M11.8 15H15M5 11.6h3.2M11.8 11.6H15"
+              stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span class="word">magnet<span class="colon">:</span></span>
+    </div>
+    <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Hands This to a Torrent App</summary>
+      <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">Open in Your Torrent App</a>
+    </details>
+    <p class="note">Cleanest line, but nothing says it is pressable except the hatching. On a
+      phone, where there is no hover, that is a real gap.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Verb-first</span>
+    <h3>Proceed · consequence</h3>
+    <div class="pv-scheme">
+      <svg class="mark" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M6.3 3.4 8 6.2 6.4 7.9c.8 1.8 2 3 3.7 3.7l1.7-1.6 2.8 1.7-.4 2.4c-.1.6-.7 1-1.3.9C8.2 14.3 5 11.1 4.2 5.3c-.1-.6.3-1.2.9-1.3l1.2-.6Z"
+              stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      <span class="word">tel<span class="colon">:</span></span>
+    </div>
+    <code class="pv-opaque">+47 800 12 345</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid"><span class="hint">Proceed</span> — Dials a Number</summary>
+      <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">Call +47 800 12 345</a>
+    </details>
+    <p class="note">Puts the control word first, where the eye lands. <b>Against:</b> it reads
+      as an instruction to proceed, which is advice we don't want to be giving.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">4 · Why not blue for mailto and tel?</p>
+<p class="mock-note">
+  Because blue on this site means <strong>you stay on YuioLink</strong>, and a
+  <code>mailto:</code> does not — it hands your address book an addressee. But your instinct
+  that these are not all equally alarming is right, and there is a better lever for it than
+  colour.
+</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <span class="rank nope">Blue</span>
+    <h3>Blue plate and button</h3>
+    <div class="pv-scheme calm">
+      <svg class="mark" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <rect x="2.4" y="4.4" width="15.2" height="11.2" rx="2.2" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M3.2 6.2 10 10.8l6.8-4.6" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="word">mailto<span class="colon">:</span></span>
+    </div>
+    <code class="pv-opaque">hello@example.com</code>
+    <a class="btn btn-block btn-link" href="#" style="margin-top:20px">Write to hello@example.com</a>
+    <p class="note">It looks calm, and that is the problem: it is the same blue as
+      <b>Reveal Destination</b>, which is the site's promise that pressing keeps you here.
+      Once one blue button launches an external app, the visitor can no longer read colour to
+      know whether they are about to leave — and that inference is the only thing the palette
+      was buying.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank pick">Pick</span>
+    <h3>Amber throughout — cover only what commits</h3>
+    <div class="pv-scheme">
+      <svg class="mark" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <rect x="2.4" y="4.4" width="15.2" height="11.2" rx="2.2" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M3.2 6.2 10 10.8l6.8-4.6" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="word">mailto<span class="colon">:</span></span>
+    </div>
+    <code class="pv-opaque">hello@example.com</code>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:20px">Write to hello@example.com</a>
+    <p class="note">Same amber, <b>no cover</b>. <code>mailto:</code>, <code>sms:</code>,
+      <code>xmpp:</code>, <code>irc:</code>, <code>ircs:</code> and <code>matrix:</code> all
+      open a <i>draft</i> — an app appears with a blank waiting for you, and nothing is sent
+      until you send it. Nothing commits, so nothing needs a lid.
+      <br><br>
+      The lid stays on <code>tel:</code>, <code>magnet:</code>, <code>ftp:</code> and
+      <code>spotify:</code> — the ones where the app starts <i>doing</i> something on arrival:
+      placing a call, joining a swarm, fetching, playing. <b>Colour keeps saying where you go;
+      the cover now says whether it commits.</b> Two signals, two questions, neither
+      overloaded.</p>
+  </div>
+</div>
+
+<p class="mock-note" style="margin-top:6px">
+  This also settles the round-4 worry honestly. With the correction at the top — browsers
+  usually confirm before dialling — a lid on every non-web scheme was friction charged to six
+  harmless ones to slow down four. Covering only what commits keeps the protection where the
+  risk is.
+</p>
+
+</body>
+</html>

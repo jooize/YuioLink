@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Weight, motion, hazards, numbers</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-note { max-width: 1160px; margin: 0 auto 18px; padding: 0 20px;
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .mock-note strong { color: var(--text); font-weight: 600; }
+    .mock-note code { font-family: var(--font-mono); font-size: .92em; }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .card { width: 340px; background: var(--card-bg); border: .5px solid var(--card-border);
+      border-radius: var(--radius-window); box-shadow: var(--card-shadow); padding: 20px; }
+    .card.wide { width: 470px; }
+    .card h3 { margin: 0 0 3px; font: 600 15px/1.3 var(--font); }
+    .card .sub2 { display: block; font: 400 12.5px/1.5 var(--font); color: var(--text-secondary);
+      margin-bottom: 16px; }
+    .card .note { margin: 16px 0 0; font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .card .note b { color: var(--text); font-weight: 600; }
+    .rank { float: right; font: 700 10.5px/1 var(--font); letter-spacing: .04em;
+      text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+      background: var(--bg-2); border: .5px solid var(--card-border); color: var(--text-tertiary); }
+    .rank.pick { background: color-mix(in srgb, var(--switch-on) 18%, transparent);
+      border-color: color-mix(in srgb, var(--switch-on) 42%, transparent); color: #1a7a35; }
+    .rank.nope { background: color-mix(in srgb, var(--danger) 12%, transparent);
+      border-color: color-mix(in srgb, var(--danger) 34%, transparent); color: var(--danger); }
+    @media (prefers-color-scheme: dark) { .rank.pick { color: #4ede78; } }
+    .rules { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); }
+    .rules b { color: var(--text); }
+    .rules code { font-family: var(--font-mono); font-size: .92em; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+    .btn .glyph { flex: none; opacity: .72; }
+
+    .pv-scheme { display: block; text-align: center; margin-top: 4px;
+      font-family: var(--font-mono); font-weight: 700; letter-spacing: -.01em;
+      line-height: 1.35; font-size: clamp(19px, 5vw, 24px); color: var(--text); }
+    .pv-scheme .colon { opacity: .45; }
+
+    .pv-opaque { display: block; margin-top: 10px; font-family: var(--font-mono);
+      font-size: 15px; line-height: 1.65; letter-spacing: .01em; word-break: break-all;
+      text-align: center; color: var(--text); }
+    .pv-opaque .dl { color: var(--text-tertiary); }
+    .pv-opaque .seg { color: var(--text-secondary); }
+    .pv-opaque .qv { color: var(--text); }
+    .pv-opaque .reg { color: var(--text); font-weight: 700; padding: 1px 4px;
+      border-radius: 4px; background: color-mix(in srgb, var(--accent) 13%, transparent); }
+    /* Digits in a phone number: same glyph width, so groups line up without
+       anyone regrouping them. */
+    .pv-opaque .num { font-variant-numeric: tabular-nums; }
+    /* A run of spaces, tinted not replaced — ⌘C still copies the real string. */
+    .pv-opaque .ws { border-radius: 3px;
+      background: color-mix(in srgb, var(--danger) 26%, transparent);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 40%, transparent); }
+    /* An escape that decodes to something invisible. Ordinary escapes are left alone. */
+    .pv-opaque .pct { color: var(--danger); opacity: .85; }
+
+    /* Weight variants, section 2 only */
+    .w-dn .pv-opaque .v-dn { font-weight: 700; }
+    .w-xt .pv-opaque .v-xt { font-weight: 700; }
+    .w-key .pv-opaque .seg { font-weight: 700; color: var(--text-secondary); }
+
+    /* --- hazard chips: the "Not Encrypted" construction, reused ---------- */
+    .pv-flag { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px;
+      padding: 3px 9px; border-radius: 999px; font: 600 11px/1.45 var(--font);
+      color: var(--text-secondary); background: var(--field-bg);
+      border: .5px solid var(--card-border); }
+    .pv-flag svg { flex: none; color: var(--danger); }
+    .pv-flags { text-align: center; }
+
+    /* --- two-line button + lid ------------------------------------------
+       No transform anywhere. The lid and the button occupy the same cell and
+       the same 54px; lifting is a change of state in place, never a thing
+       that travels. */
+    .btn.btn-2 { flex-direction: column; gap: 2px; padding-top: 9px; padding-bottom: 9px;
+      min-height: 54px; line-height: 1.25; }
+    .btn.btn-2 .lead { display: inline-flex; align-items: center; gap: 7px; }
+    .btn.btn-2 .what { font-size: 11.5px; font-weight: 500; opacity: .82; letter-spacing: 0; }
+    .btn .sch-tag { font-family: var(--font-mono); font-weight: 700; opacity: .72; }
+    .btn .mid { opacity: .45; }
+
+    .pv-cover { display: grid; margin-top: 22px; }
+    .pv-cover > * { grid-area: 1 / 1; }
+    .pv-cover-lid { list-style: none; cursor: pointer; filter: saturate(.12) opacity(.72); }
+    .pv-cover-lid::-webkit-details-marker { display: none; }
+    .pv-cover-lid::marker { content: ""; }
+    .pv-cover[open] .pv-cover-lid { display: none; }
+
+    /* Motion variants, section 1 only. */
+    .m-fade .pv-cover-lid { transition: opacity .16s ease; }
+    .m-fade .pv-cover[open] .pv-cover-lid { display: block; opacity: 0; pointer-events: none; }
+    .m-color .pv-cover-lid { transition: filter .22s ease; }
+    .m-color .pv-cover[open] .pv-cover-lid { display: block; filter: saturate(1) opacity(0);
+      pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .m-fade .pv-cover-lid, .m-color .pv-cover-lid { transition: none; }
+    }
+
+    .pv-hedge { display: block; max-width: 92%; margin: 12px auto 0; text-align: center;
+      font: 400 11.5px/1.55 var(--font); color: var(--text-tertiary); }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 12</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Weight, motion, hazard chips, phone numbers</h1>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · The lid no longer goes anywhere</p>
+<p class="mock-note">
+  The 3D flip is gone — no <code>transform</code>, no <code>transform-origin</code>, no
+  perspective. Three ways to end the lid, none of which move it. Click each.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>A · Instant</h3>
+    <span class="sub2">Lid is <code>display: none</code> when open</span>
+    <span class="pv-scheme">tel<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="qv num">+47 800 12 345</span></code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid btn btn--go btn-2 btn-block">
+        <span class="lead">Show…</span><span class="what">A phone number</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Call +47 800 12 345</span><span class="what">A phone number</span></a>
+    </details>
+    <p class="note">The button is simply there, in the place the pointer already is. Nothing
+      to wait for and nothing to watch. A cover is a gate, not an event.</p>
+  </div>
+
+  <div class="card m-fade">
+    <h3>B · Cross-fade</h3>
+    <span class="sub2">160ms opacity, no transform</span>
+    <span class="pv-scheme">tel<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="qv num">+47 800 12 345</span></code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid btn btn--go btn-2 btn-block">
+        <span class="lead">Show…</span><span class="what">A phone number</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Call +47 800 12 345</span><span class="what">A phone number</span></a>
+    </details>
+    <p class="note">Softer, and the box never travels. <b>Against:</b> for 160ms both labels
+      are legible at once, which is the one moment the control is ambiguous.</p>
+  </div>
+
+  <div class="card m-color">
+    <h3>C · Colour arrives</h3>
+    <span class="sub2">Saturation and opacity together</span>
+    <span class="pv-scheme">tel<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="qv num">+47 800 12 345</span></code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid btn btn--go btn-2 btn-block">
+        <span class="lead">Show…</span><span class="what">A phone number</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Call +47 800 12 345</span><span class="what">A phone number</span></a>
+    </details>
+    <p class="note">Reads as the same button waking up, which is the truest description of
+      what happened. <b>Against:</b> the most machinery for the least difference, and it still
+      has the double-label moment.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · Which part of a magnet deserves the weight?</p>
+<p class="mock-note">
+  Good question, and I think the intuitive answer is the wrong one.
+</p>
+
+<div class="mock-row">
+  <div class="card wide w-dn">
+    <span class="rank nope">Tempting</span>
+    <h3>Bold the display name</h3>
+    <span class="pv-scheme">magnet<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="dl">?</span><span class="seg">xt</span><span class="dl">=</span><span class="qv v-xt">urn<span class="dl">:</span>btih<span class="dl">:</span>c12fe3a94b81d7e05f2c6a9048bb3e1d7f4a2c60</span><span class="dl">&amp;</span><span class="seg">dn</span><span class="dl">=</span><span class="qv v-dn">ubuntu-24.04-desktop-amd64.iso</span></code>
+    <p class="note"><b><code>dn</code> is the least trustworthy string on the page.</b> It is
+      free text the creator typed — a label, not an identity. A magnet whose
+      <code>dn</code> says <code>ubuntu-24.04-desktop-amd64.iso</code> can point at absolutely
+      anything; the hash is what decides what arrives. Bolding it puts the page's strongest
+      emphasis on the one field an attacker fully controls, on a page whose whole job is
+      telling people which parts to believe.</p>
+  </div>
+
+  <div class="card wide w-xt">
+    <span class="rank">Honest but unreadable</span>
+    <h3>Bold the hash</h3>
+    <span class="pv-scheme">magnet<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="dl">?</span><span class="seg">xt</span><span class="dl">=</span><span class="qv v-xt">urn<span class="dl">:</span>btih<span class="dl">:</span>c12fe3a94b81d7e05f2c6a9048bb3e1d7f4a2c60</span><span class="dl">&amp;</span><span class="seg">dn</span><span class="dl">=</span><span class="qv v-dn">ubuntu-24.04-desktop-amd64.iso</span></code>
+    <p class="note">Correct about what matters, useless in practice: nobody verifies forty hex
+      characters by eye, and forty bold ones are harder to read than forty plain ones. Weight
+      spent where it cannot be used.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank pick">Pick</span>
+    <h3>Nothing bold — colour does it</h3>
+    <span class="pv-scheme">magnet<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="dl">?</span><span class="seg">xt</span><span class="dl">=</span><span class="qv">urn<span class="dl">:</span>btih<span class="dl">:</span>c12fe3a94b81d7e05f2c6a9048bb3e1d7f4a2c60</span><span class="dl">&amp;</span><span class="seg">dn</span><span class="dl">=</span><span class="qv">ubuntu-24.04-desktop-amd64.iso</span><span class="dl">&amp;</span><span class="seg">tr</span><span class="dl">=</span><span class="qv">udp<span class="dl">://</span>tracker.example.org<span class="dl">:</span>6969</span></code>
+    <p class="note">Three levels of colour are already three levels of hierarchy — keys quiet,
+      values full, delimiters faint. Bold would be a fourth, and the only string that deserves
+      it (the domain) is not present in a magnet at all. <b>This keeps bold meaning exactly one
+      thing site-wide: a registrable domain.</b></p>
+  </div>
+
+  <div class="card wide w-key">
+    <h3>Bold the keys instead</h3>
+    <span class="pv-scheme">magnet<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="dl">?</span><span class="seg">xt</span><span class="dl">=</span><span class="qv">urn<span class="dl">:</span>btih<span class="dl">:</span>c12fe3a94b81d7e05f2c6a9048bb3e1d7f4a2c60</span><span class="dl">&amp;</span><span class="seg">dn</span><span class="dl">=</span><span class="qv">ubuntu-24.04-desktop-amd64.iso</span></code>
+    <p class="note">Your other suggestion, and it does help long bodies break into readable
+      chunks — <code>xt</code>, <code>dn</code>, <code>tr</code> become signposts. <b>Against:</b>
+      it emphasises the scaffolding over the contents, and the keys are the one part of a
+      magnet nobody needs to read.</p>
+  </div>
+</div>
+
+<div class="rules">
+  <b>The underlying rule, if you want one:</b> a value is either an <b>identifier</b> (a hash,
+  a number, an address — it <i>is</i> the thing) or a <b>claim</b> (a display name, a subject,
+  a message body — free text the creator wrote <i>about</i> the thing). Identifiers can be
+  verified; claims cannot. Nothing on this page should give a claim more visual authority than
+  an identifier, which rules out bolding <code>dn</code>, <code>subject</code> and
+  <code>body</code> — the three most tempting strings in the whole set.
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · Hazard chips, and when they may fire</p>
+<p class="mock-note">
+  Same construction as "Not Encrypted": neutral pill, red symbol, words carrying the meaning.
+  The rules matter more than the pills — a warning that fires on ordinary URLs is a warning
+  nobody reads.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">Fires</span>
+    <h3>Padded with spaces</h3>
+    <span class="pv-scheme">mailto<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="seg">billing</span><span class="dl">@</span><span class="reg">example.com</span><span class="ws">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</span><span class="seg">attacker</span><span class="dl">@</span><span class="reg">evil.test</span></code>
+    <div class="pv-flags">
+      <span class="pv-flag">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+        Padded with Spaces
+      </span>
+    </div>
+    <p class="note">Fires on a <b>run of two or more spaces</b>, or a leading or trailing one.
+      A single space inside a subject line is ordinary and stays silent.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank pick">Fires</span>
+    <h3>Hidden characters</h3>
+    <span class="pv-scheme">mailto<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="seg">hello</span><span class="dl">@</span><span class="reg">example.com</span><span class="dl">?</span><span class="seg">subject</span><span class="dl">=</span><span class="qv">Invoice<span class="pct">%E2%80%AE</span>fdp.exe</span></code>
+    <div class="pv-flags">
+      <span class="pv-flag">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+        Hidden Characters
+      </span>
+    </div>
+    <p class="note">Fires only when an escape decodes to something <b>invisible or
+      direction-changing</b> — a bidi control, a zero-width character, a format character.
+      <code>%20</code>, <code>%2F</code> and the rest of everyday encoding stay silent and
+      unmarked.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank nope">Must not fire</span>
+    <h3>An ordinary URL</h3>
+    <span class="pv-scheme">mailto<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="seg">sales</span><span class="dl">@</span><span class="reg">example.com</span><span class="dl">?</span><span class="seg">subject</span><span class="dl">=</span><span class="qv">Order 4192</span><span class="dl">&amp;</span><span class="seg">body</span><span class="dl">=</span><span class="qv">Please send a quote</span></code>
+    <p class="note">Single spaces throughout, no escapes worth naming, no chip. If this ever
+      shows a warning the whole system is worthless — which is why both rules above are
+      written to be narrow rather than cautious.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">4 · Phone numbers: don't reformat them</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <span class="rank pick">Pick</span>
+    <h3>Exactly as stored, tabular digits</h3>
+    <div style="margin-bottom:14px">
+      <span class="pv-scheme">tel<span class="colon">:</span></span>
+      <code class="pv-opaque"><span class="qv num">+4780012345</span></code>
+    </div>
+    <div>
+      <span class="pv-scheme">tel<span class="colon">:</span></span>
+      <code class="pv-opaque"><span class="qv num">+47 800 12 345</span></code>
+    </div>
+    <p class="note">Two different stored strings, shown as two different strings — because
+      they are. <b>Reformatting would change the thing the visitor is checking</b>, and this
+      page exists so that what is on screen is what is stored. <code>font-variant-numeric:
+      tabular-nums</code> is the free part: every digit takes the same width, so the number
+      reads evenly without anyone regrouping it.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank nope">Against</span>
+    <h3>Grouped by country</h3>
+    <div style="margin-bottom:14px">
+      <span class="pv-scheme">tel<span class="colon">:</span></span>
+      <code class="pv-opaque"><span class="qv num">+47 800 12 345</span></code>
+    </div>
+    <p class="note">Nicer, and three separate problems. It needs per-country metadata — the
+      libphonenumber tables, which are large and go stale. Country codes are one to three
+      digits with no way to tell which without that table. And <code>tel:</code> bodies carry
+      more than digits: extensions (<code>;ext=</code>), <code>;phone-context=</code> for local
+      numbers, letters in vanity numbers. <b>The deciding one is none of those:</b> grouping
+      digits makes two different numbers look alike, and looking alike is the attack this
+      whole page defends against.</p>
+  </div>
+</div>
+
+</body>
+</html>

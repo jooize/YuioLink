@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — What we can honestly say about a scheme</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1120px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-note { max-width: 1120px; margin: 0 auto 18px; padding: 0 20px;
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .mock-note strong { color: var(--text); font-weight: 600; }
+    .mock-note code { font-family: var(--font-mono); font-size: .92em; }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .card { width: 340px; background: var(--card-bg); border: .5px solid var(--card-border);
+      border-radius: var(--radius-window); box-shadow: var(--card-shadow); padding: 20px; }
+    .card.wide { width: 470px; }
+    .card h3 { margin: 0 0 3px; font: 600 15px/1.3 var(--font); }
+    .card .sub { display: block; font: 400 12.5px/1.5 var(--font); color: var(--text-secondary);
+      margin-bottom: 16px; }
+    .card .note { margin: 16px 0 0; font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .card .note b { color: var(--text); font-weight: 600; }
+    .rank { float: right; font: 700 11px/1 var(--font); letter-spacing: .04em;
+      text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+      background: var(--bg-2); border: .5px solid var(--card-border); color: var(--text-tertiary); }
+    .rank.pick { background: color-mix(in srgb, var(--switch-on) 18%, transparent);
+      border-color: color-mix(in srgb, var(--switch-on) 42%, transparent); color: #1a7a35; }
+    .rank.nope { background: color-mix(in srgb, var(--danger) 12%, transparent);
+      border-color: color-mix(in srgb, var(--danger) 34%, transparent); color: var(--danger); }
+    @media (prefers-color-scheme: dark) { .rank.pick { color: #4ede78; } }
+    .fixnote { max-width: 1120px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.6 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .claims { max-width: 1120px; margin: 0 auto 20px; padding: 0 20px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .claims > div { padding: 14px 16px; border-radius: var(--radius-control);
+      background: var(--card-bg); border: .5px solid var(--card-border);
+      font: 400 12.5px/1.6 var(--font); color: var(--text-secondary); }
+    .claims b { display: block; font-size: 13px; color: var(--text); margin-bottom: 6px; }
+    .claims li { margin: 3px 0; }
+    .claims ul { margin: 0; padding-left: 18px; }
+    @media (max-width: 820px) { .claims { grid-template-columns: 1fr; } }
+    .stack > * + * { margin-top: 15px; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+    .btn .glyph { flex: none; opacity: .72; }
+
+    /* Scheme plate. `.word` takes the domain's own treatment: dark text on an
+       accent highlight, because for a hostless URL the scheme is what
+       `card_domain()` returns — it plays the domain's part. */
+    .pv-scheme { display: block; text-align: center; margin-top: 4px;
+      font-family: var(--font-mono); font-weight: 700; letter-spacing: -.01em;
+      line-height: 1.35; }
+    .pv-scheme .word { color: var(--text); padding: 2px 8px; border-radius: 6px;
+      background: color-mix(in srgb, var(--accent) 13%, transparent); }
+    .pv-scheme .colon { opacity: .45; }
+
+    .pv-opaque { display: block; font-family: var(--font-mono); line-height: 1.45;
+      word-break: break-all; text-align: center; }
+
+    /* Mix 1 — equal billing: both at the same size, scheme marked. */
+    .m1 .pv-scheme { font-size: clamp(17px, 4.4vw, 21px); }
+    .m1 .pv-opaque { margin-top: 9px; font-size: clamp(17px, 4.4vw, 21px); font-weight: 700;
+      color: var(--text); }
+
+    /* Mix 2 — body leads, scheme is a marked prefix above it. */
+    .m2 .pv-scheme { font-size: 15px; }
+    .m2 .pv-opaque { margin-top: 8px; font-size: clamp(18px, 5vw, 23px); font-weight: 700;
+      color: var(--text); }
+
+    /* Mix 3 — one line: scheme and body set together, only the scheme marked.
+       The construction the http preview already uses, applied to a hostless URL. */
+    .m3 .oneline { display: block; text-align: center; font-family: var(--font-mono);
+      font-size: clamp(15px, 4vw, 19px); line-height: 1.9; letter-spacing: .03em;
+      word-break: break-all; }
+    .m3 .oneline .word { color: var(--text); font-weight: 700; padding: 2px 6px;
+      border-radius: 5px; background: color-mix(in srgb, var(--accent) 13%, transparent); }
+    .m3 .oneline .body { color: var(--text); font-weight: 700; }
+
+    /* What the scheme is — a fact about the scheme, never about the device. */
+    .pv-what { display: block; text-align: center; margin-top: 10px;
+      font: 400 13px/1.5 var(--font); color: var(--text-secondary); }
+
+    /* The single hedge, stated once, in the page's caution voice. */
+    .pv-hedge { display: block; max-width: 92%; margin: 12px auto 0; text-align: center;
+      font: 400 11.5px/1.55 var(--font); color: var(--text-tertiary); }
+
+    /* --- lid (shown only in section 4) --- */
+    .pv-cover { display: grid; margin-top: 24px; }
+    .pv-cover > * { grid-area: 1 / 1; }
+    .pv-cover-lid { display: flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 46px; padding: 10px 16px; border-radius: var(--radius-control);
+      cursor: pointer; list-style: none; font: 400 14px/1.3 var(--font); color: #8a5a00;
+      background: repeating-linear-gradient(135deg,
+        color-mix(in srgb, #ff9f0a 15%, transparent) 0 7px,
+        color-mix(in srgb, #ff9f0a 7%, transparent) 7px 14px);
+      border: 1.5px solid color-mix(in srgb, #ff9f0a 55%, transparent);
+      transform-origin: top center;
+      transition: transform .28s cubic-bezier(.2,.8,.3,1), opacity .28s ease; }
+    .pv-cover-lid::-webkit-details-marker { display: none; }
+    .pv-cover-lid::marker { content: ""; }
+    .pv-cover[open] .pv-cover-lid { transform: perspective(420px) rotateX(-88deg); opacity: 0;
+      pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { .pv-cover-lid { transition: none; } }
+    @media (prefers-color-scheme: dark) { .pv-cover-lid { color: #ffc266; } }
+    .pv-cover-lid .sep { flex: none; width: 3px; height: 3px; border-radius: 50%;
+      background: currentColor; opacity: .5; }
+    .pv-cover-lid .act { font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 8</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Say what the scheme is, not what the device will do</h1>
+</div>
+
+<div class="fixnote">
+  <b>You've found the flaw in every lid I've written.</b> "Opens your mail app", "Hands this to
+  another app", "Starts a file transfer" — all four are predictions about a machine we cannot
+  see. A <code>magnet:</code> link on a laptop with no client registered does <em>nothing</em>.
+  A <code>mailto:</code> may open Gmail in a tab, a native client, or a "choose an app" sheet.
+  A site whose entire pitch is "we show you what the link really is" cannot be the one making
+  up the ending. Magnet SVGs binned, as asked.
+</div>
+
+<div class="claims">
+  <div><b>What we actually know</b>
+    <ul>
+      <li>The scheme, exactly as stored.</li>
+      <li>The body after <code>scheme:</code>, verbatim.</li>
+      <li>What the scheme <i>means</i> — it is a published standard.</li>
+      <li>That we will hand it to the browser unchanged.</li>
+    </ul>
+  </div>
+  <div><b>What we're guessing at</b>
+    <ul>
+      <li>Whether anything is registered to handle it.</li>
+      <li>Which app, if any, takes it.</li>
+      <li>Whether that app acts, drafts, or just opens.</li>
+      <li>Whether the OS asks first.</li>
+    </ul>
+  </div>
+</div>
+
+<p class="mock-note">
+  So the description line describes the <strong>scheme</strong>, which is a fact, and the
+  button says <strong>Open</strong>, which is all we are actually doing. One hedge line covers
+  the rest, stated once and quietly.
+</p>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · The B / F mix you asked for</p>
+<p class="mock-note">
+  B marked the scheme; F gave the body the weight. Three ways to have both — each shown with
+  <code>tel:</code> (short body) and <code>magnet:</code> (a body that punishes big type).
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank">Mix 1</span>
+    <h3>Equal billing</h3>
+    <span class="sub">Same size, only the scheme marked</span>
+    <div class="m1 stack">
+      <div>
+        <span class="pv-scheme"><span class="word">tel<span class="colon">:</span></span></span>
+        <code class="pv-opaque">+47 800 12 345</code>
+      </div>
+      <div>
+        <span class="pv-scheme"><span class="word">magnet<span class="colon">:</span></span></span>
+        <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4&amp;dn=ubuntu-24.04</code>
+      </div>
+    </div>
+    <p class="note">Balanced for <code>tel:</code>. <b>Against:</b> two 21px bold objects
+      stacked reads as two headings, and the magnet hash becomes a wall.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank pick">Mix 2 · Pick</span>
+    <h3>Body leads, scheme marked above</h3>
+    <span class="sub">Scheme 15px, body up to 23px</span>
+    <div class="m2 stack">
+      <div>
+        <span class="pv-scheme"><span class="word">tel<span class="colon">:</span></span></span>
+        <code class="pv-opaque">+47 800 12 345</code>
+      </div>
+      <div>
+        <span class="pv-scheme"><span class="word">magnet<span class="colon">:</span></span></span>
+        <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4&amp;dn=ubuntu-24.04</code>
+      </div>
+    </div>
+    <p class="note">The destination is the thing a person checks, so it takes the size — your
+      F instinct — while the scheme keeps the domain's highlight so it is still marked as the
+      kind. It also mirrors the <code>https</code> preview's shape, where the small dim scheme
+      sits ahead of the emphasised host.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Mix 3</span>
+    <h3>One line, as a URL</h3>
+    <span class="sub">Exactly the <code>.pv-url</code> construction</span>
+    <div class="m3 stack">
+      <div><code class="oneline"><span class="word">tel:</span><span class="body">+47 800 12 345</span></code></div>
+      <div><code class="oneline"><span class="word">magnet:</span><span class="body">?xt=urn:btih:c12fe3…9ab4&amp;dn=ubuntu-24.04</span></code></div>
+    </div>
+    <p class="note">The most consistent of the three — a hostless URL rendered as a URL, no
+      new layout at all. <b>Against:</b> a long magnet body wraps around the highlighted
+      scheme and the marking gets lost mid-paragraph.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · Where the description goes</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>Under the body, above the button</h3>
+    <div class="m2">
+      <span class="pv-scheme"><span class="word">magnet<span class="colon">:</span></span></span>
+      <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4&amp;dn=ubuntu-24.04</code>
+    </div>
+    <span class="pv-what">A file identified by its hash, not by a location</span>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:18px">
+      Open magnet: Link
+      <svg class="glyph" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M5 11L11 5M11 5H6M11 5V10" stroke="currentColor" stroke-width="1.9"
+              stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <p class="note">Reads top-down as one sentence: <i>this scheme, this value, this is what
+      that kind of value is, here is the button.</i> The hedge sits after the control, where
+      it qualifies the outcome rather than delaying the read.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Alt</span>
+    <h3>As a second line on the button</h3>
+    <div class="m2">
+      <span class="pv-scheme"><span class="word">magnet<span class="colon">:</span></span></span>
+      <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4&amp;dn=ubuntu-24.04</code>
+    </div>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:20px;flex-direction:column;gap:1px;padding-top:9px;padding-bottom:9px;min-height:54px;line-height:1.25">
+      <span>Open magnet: Link</span>
+      <span style="font-size:11.5px;font-weight:500;opacity:.85">A file identified by its hash</span>
+    </a>
+    <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <p class="note">Compact, and the explanation travels with the control. <b>Against:</b> we
+      removed the two-line button once already because it made the press feel heavier —
+      and a neutral fact does not belong inside an amber control.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Alt</span>
+    <h3>Beside the scheme</h3>
+    <div class="m2">
+      <span class="pv-scheme"><span class="word">magnet<span class="colon">:</span></span>
+        <span style="font-family:var(--font);font-size:13px;font-weight:400;color:var(--text-secondary);margin-left:8px">a file identified by its hash</span>
+      </span>
+      <code class="pv-opaque">?xt=urn:btih:c12fe3…9ab4&amp;dn=ubuntu-24.04</code>
+    </div>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:20px">Open magnet: Link</a>
+    <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <p class="note">Glosses the scheme right where it appears, like a dictionary entry.
+      <b>Against:</b> mixes proportional and mono type on one line and breaks badly on a
+      phone, where the two halves wrap apart.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · What the button says</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>Uniform: Open <i>scheme</i>: Link</h3>
+    <div class="stack" style="margin-top:4px">
+      <a class="btn btn--go btn-block btn-link" href="#">Open mailto: Link</a>
+      <a class="btn btn--go btn-block btn-link" href="#">Open tel: Link</a>
+      <a class="btn btn--go btn-block btn-link" href="#">Open magnet: Link</a>
+      <a class="btn btn--go btn-block btn-link" href="#">Open ftp: Link</a>
+    </div>
+    <p class="note">Claims exactly what we do and nothing more. The scheme keeps its lowercase
+      because it is an identifier, not a word — the same rule the rest of the codebase
+      follows. One template, no per-scheme copy to get wrong, and it never lies on a device we
+      have not met.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Hybrid</span>
+    <h3>Colloquial where the spec is explicit</h3>
+    <div class="stack" style="margin-top:4px">
+      <a class="btn btn--go btn-block btn-link" href="#">Write to hello@example.com</a>
+      <a class="btn btn--go btn-block btn-link" href="#">Call +47 800 12 345</a>
+      <a class="btn btn--go btn-block btn-link" href="#">Open magnet: Link</a>
+      <a class="btn btn--go btn-block btn-link" href="#">Open ftp: Link</a>
+    </div>
+    <p class="note">Friendlier, and you're right that "Call +47 800 12 345" is the clearest
+      thing that line could say — RFC 3966 defines <code>tel:</code> as a phone number, so the
+      noun is safe even if the verb is a guess. <b>Against:</b> it splits the family in two,
+      and a visitor cannot tell why some buttons speak plainly and others don't.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Barest</span>
+    <h3>Just "Open Link"</h3>
+    <div class="stack" style="margin-top:4px">
+      <a class="btn btn--go btn-block btn-link" href="#">Open Link</a>
+      <a class="btn btn--go btn-block btn-link" href="#">Open Link</a>
+      <a class="btn btn--go btn-block btn-link" href="#">Open Link</a>
+      <a class="btn btn--go btn-block btn-link" href="#">Open Link</a>
+    </div>
+    <p class="note">Nothing to disprove. <b>Against:</b> the button is the last thing read
+      before a decision, and this one carries no information at all — everything it might have
+      said is now several lines above it.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">4 · Do we still want the lid?</p>
+<p class="mock-note">
+  The lid was justified by "this commits something". We just agreed we don't know that. So the
+  honest question is whether <em>not knowing</em> is itself worth a second click.
+</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <span class="rank pick">Pick · No lid</span>
+    <h3>One press, everything said</h3>
+    <div class="m2">
+      <span class="pv-scheme"><span class="word">tel<span class="colon">:</span></span></span>
+      <code class="pv-opaque">+47 800 12 345</code>
+    </div>
+    <span class="pv-what">A phone number</span>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:18px">Open tel: Link</a>
+    <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+    <p class="note">The visitor already has the scheme, the value, what that kind of value is,
+      and an explicit statement that we don't know the ending — <b>more than any browser gives
+      them</b>. A cover on top of that is friction with no claim left behind it, and its own
+      label would have to be a guess. It also drops a <code>&lt;details&gt;</code>, a stacked
+      grid and a 3D transform from the stylesheet.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank">Keep it</span>
+    <h3>Cover the unknown</h3>
+    <div class="m2">
+      <span class="pv-scheme"><span class="word">tel<span class="colon">:</span></span></span>
+      <code class="pv-opaque">+47 800 12 345</code>
+    </div>
+    <span class="pv-what">A phone number</span>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Leaves the browser<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">Open tel: Link</a>
+    </details>
+    <p class="note">"Leaves the browser" is the one lid label that survives the honesty test —
+      it is true of every non-web scheme and predicts nothing. <b>For:</b> a mis-tap on a phone
+      is cheap to make and, for <code>tel:</code>, potentially expensive to undo. <b>Against:</b>
+      it taxes <code>mailto:</code> — far and away the most common of these — to slow down a
+      case that is rare and that the OS usually confirms anyway.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">5 · Every description</p>
+<p class="mock-note">
+  Each is a statement about the scheme's own definition, checkable against its RFC. None
+  mentions an app, a device, or an outcome.
+</p>
+
+<div class="mock-note" style="max-width:1120px">
+  <table style="width:100%;border-collapse:collapse;font:400 13px/1.5 var(--font);
+                background:var(--card-bg);border:.5px solid var(--card-border);
+                border-radius:var(--radius-control);overflow:hidden">
+    <tr>
+      <th style="text-align:left;padding:10px 13px;border-bottom:.5px solid var(--card-border);
+        font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-tertiary)">Scheme</th>
+      <th style="text-align:left;padding:10px 13px;border-bottom:.5px solid var(--card-border);
+        font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-tertiary)">Description</th>
+      <th style="text-align:left;padding:10px 13px;border-bottom:.5px solid var(--card-border);
+        font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-tertiary)">Button</th>
+    </tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>mailto</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">An email address</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Open mailto: Link</td></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>tel</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">A phone number</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Open tel: Link</td></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>sms</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">A phone number, for a text message</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Open sms: Link</td></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>magnet</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">A file identified by its hash, not by a location</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Open magnet: Link</td></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>ftp</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">An address on a file server</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Open ftp: Link</td></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>ftps</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">An address on a file server, encrypted</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Open ftps: Link</td></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>spotify</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Something in Spotify's catalogue</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Open spotify: Link</td></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>xmpp</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">An XMPP chat address</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Open xmpp: Link</td></tr>
+    <tr><td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)"><code>irc</code> / <code>ircs</code></td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">An IRC server or channel</td>
+      <td style="padding:9px 13px;border-bottom:.5px solid var(--card-border)">Open irc: Link</td></tr>
+    <tr><td style="padding:9px 13px"><code>matrix</code></td>
+      <td style="padding:9px 13px">A room, user, or event on Matrix</td>
+      <td style="padding:9px 13px">Open matrix: Link</td></tr>
+  </table>
+</div>
+
+<p class="mock-note">
+  And the hedge, once, under the button: <strong>"What opens it, if anything, is up to your
+  device."</strong> The "if anything" is the load-bearing half — it is the only line on the
+  page that prepares a visitor for the very common case where pressing appears to do nothing
+  at all.
+</p>
+
+</body>
+</html>

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Badge wording and the refusal panel</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1120px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-note { max-width: 1120px; margin: 0 auto 18px; padding: 0 20px;
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .mock-note strong { color: var(--text); font-weight: 600; }
+    .mock-note code { font-family: var(--font-mono); font-size: .92em; }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .card { width: 340px; background: var(--card-bg); border: .5px solid var(--card-border);
+      border-radius: var(--radius-window); box-shadow: var(--card-shadow); padding: 20px; }
+    .card.wide { width: 460px; }
+    .card h3 { margin: 0 0 3px; font: 600 15px/1.3 var(--font); }
+    .card .sub { display: block; font: 400 12.5px/1.5 var(--font); color: var(--text-secondary);
+      margin-bottom: 14px; }
+    .card .note { margin: 14px 0 0; font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .card .note b { color: var(--text); font-weight: 600; }
+    .rank { float: right; font: 700 11px/1 var(--font); letter-spacing: .04em;
+      text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+      background: var(--bg-2); border: .5px solid var(--card-border); color: var(--text-tertiary); }
+    .rank.pick { background: color-mix(in srgb, var(--switch-on) 18%, transparent);
+      border-color: color-mix(in srgb, var(--switch-on) 42%, transparent); color: #1a7a35; }
+    .rank.nope { background: color-mix(in srgb, var(--danger) 12%, transparent);
+      border-color: color-mix(in srgb, var(--danger) 34%, transparent); color: var(--danger); }
+    @media (prefers-color-scheme: dark) { .rank.pick { color: #4ede78; } }
+    .pair { display: flex; gap: 10px; justify-content: center; margin: 4px 0 2px; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+
+    /* The One-Time pill, outlined in the colour the create picker and the stats
+       page already give this type. Tint stays faint: the pill is recognition, not
+       an alarm. */
+    .pv-badge.once {
+      color: var(--c-once);
+      background: color-mix(in srgb, var(--c-once) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--c-once) 45%, transparent);
+    }
+
+    /* --- refusal panel treatments --- */
+
+    /* A · the page's own voice: no box at all, same as .pv-caution */
+    .pv-refuse-bare { display: block; max-width: 92%; margin: 14px auto 0; text-align: center;
+      font-size: 12px; line-height: 1.55; color: var(--text-secondary); }
+    .pv-refuse-bare strong { color: var(--text); font-weight: 700; }
+
+    /* B · quiet glass: the site's field surface, hairline edge, no colour fill */
+    .pv-refuse-glass { margin: 14px auto 0; max-width: 94%; padding: 12px 14px; border-radius: 10px;
+      text-align: left; font-size: 11.5px; line-height: 1.55; color: var(--text-secondary);
+      background: var(--field-bg); border: .5px solid var(--card-border); }
+    .pv-refuse-glass p { margin: 0; max-width: none; text-align: left; font-size: inherit; color: inherit; }
+    .pv-refuse-glass strong { color: var(--text); font-weight: 700; }
+
+    /* C · native alert: symbol carries the colour, the surface stays neutral */
+    .pv-refuse-alert { display: grid; grid-template-columns: auto 1fr; gap: 11px;
+      margin: 14px auto 0; max-width: 94%; padding: 12px 14px; border-radius: 10px;
+      text-align: left; background: var(--field-bg); border: .5px solid var(--card-border); }
+    .pv-refuse-alert .sym { flex: none; color: var(--danger); margin-top: 1px; }
+    .pv-refuse-alert .msg { font-size: 11.5px; line-height: 1.55; color: var(--text-secondary); }
+    .pv-refuse-alert .msg b { display: block; font-size: 12.5px; font-weight: 700;
+      color: var(--text); margin-bottom: 3px; }
+
+    /* The destination printed but deliberately inert: no anchor, no button. */
+    .pv-url.inert { opacity: .7; }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 3</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Badge wording, and a refusal that doesn't shout</h1>
+  <p class="mock-note" style="padding-left:0;padding-right:0">
+    Settled from round 2: <strong>no subline</strong> (the button stays one line),
+    <strong>"Reveal Destination"</strong> kept, badge stays <strong>below the button</strong>
+    in the One-Time purple, and the multi-use code paths <strong>stay</strong> for a future
+    where a link can open more than once.
+  </p>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · What the pill should say</p>
+<p class="mock-note">
+  Since multi-use is coming back, the pair has to survive N &gt; 1. Each option is shown as
+  the one-time case beside the case it grows into.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank">Today</span>
+    <h3>Opens Once / Limited Use</h3>
+    <span class="sub">A name for one, a category for the other</span>
+    <div class="pair">
+      <span class="pv-badge once">Opens Once</span>
+      <span class="pv-badge once">Limited Use</span>
+    </div>
+    <p class="note">"Opens Once" is excellent — concrete, and it answers the question a visitor
+      actually has. "Limited Use" answers nothing: limited to <i>what</i>? It is the only
+      badge on the site that describes a category instead of a behaviour, and a visitor
+      cannot act on it.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Your idea</span>
+    <h3>Reveals Once / Limited Reveals</h3>
+    <span class="sub">Borrows the button's verb</span>
+    <div class="pair">
+      <span class="pv-badge once">Reveals Once</span>
+      <span class="pv-badge once">Limited Reveals</span>
+    </div>
+    <p class="note"><b>More precise, and you are right that it is.</b> What the limit governs
+      is the reveal, not the opening — once revealed, that visitor can follow the destination
+      as often as they like. <b>Against:</b> "reveals" is our verb for our mechanism, and it
+      makes the link the actor ("the link reveals") when the visitor is. "Limited Reveals"
+      also inherits the vagueness of "Limited Use".</p>
+  </div>
+
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>Opens Once / Opens 3 Times</h3>
+    <span class="sub">One sentence, N substituted</span>
+    <div class="pair">
+      <span class="pv-badge once">Opens Once</span>
+      <span class="pv-badge once">Opens 3 Times</span>
+    </div>
+    <p class="note">The one-time badge stops being a special word and becomes the N=1 case of
+      a single template — which is exactly what a future multi-use needs, with no new
+      vocabulary to invent. It is also the only option that tells a visitor a <b>number</b>,
+      and the number is the link's total, never its remainder, so it discloses nothing about
+      whether someone got there first.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Also good</span>
+    <h3>One Reveal / 3 Reveals</h3>
+    <span class="sub">Count, in the button's verb</span>
+    <div class="pair">
+      <span class="pv-badge once">One Reveal</span>
+      <span class="pv-badge once">3 Reveals</span>
+    </div>
+    <p class="note">Combines the precision of your version with the count of the pick above,
+      and pairs tightly with the button directly over it. <b>Against:</b> a bare noun-phrase
+      is a label where the others are statements, and "One Reveal" is measurably weaker than
+      "Opens Once" at conveying finality — it sounds like an allowance, not a limit.</p>
+  </div>
+</div>
+
+<p class="mock-note" style="margin-top:6px">
+  Worth noting either way: the creator's word for this is <strong>"One-Time"</strong> (the
+  create picker, the stats page). The badge deliberately says something else because it
+  addresses a different person — the creator picks a <em>type</em>, the visitor needs a
+  <em>behaviour</em>. That split holds for multi-use too: the picker would say "Limited", the
+  badge would say "Opens 3 Times".
+</p>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · In place</p>
+
+<div class="mock-row">
+  <div class="card">
+    <h3>One-time redirect</h3>
+    <span class="sub">Pre-reveal, as shipped</span>
+    <span class="pv-host plain" style="display:block;text-align:center">example.com</span>
+    <button class="btn btn-block pv-btn" style="margin-top:18px">Reveal Destination</button>
+    <div class="pv-badge-wrap"><span class="pv-badge once">Opens Once</span></div>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <span class="pv-caution single">If this page says the link is gone (410), someone already opened it.</span>
+  </div>
+
+  <div class="card">
+    <h3>One-time text</h3>
+    <span class="sub">Pre-reveal, as shipped</span>
+    <span class="pv-host plain" style="display:block;text-align:center">A text snippet</span>
+    <button class="btn btn-block pv-btn" style="margin-top:18px">Reveal Text</button>
+    <div class="pv-badge-wrap"><span class="pv-badge once">Opens Once</span></div>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <span class="pv-caution single">If this page says the link is gone (410), someone already opened it.</span>
+  </div>
+
+  <div class="card">
+    <h3>Multi-use redirect</h3>
+    <span class="sub">The future the wording has to fit</span>
+    <span class="pv-host plain" style="display:block;text-align:center">example.com</span>
+    <button class="btn btn-block pv-btn" style="margin-top:18px">Reveal Destination</button>
+    <div class="pv-badge-wrap"><span class="pv-badge once">Opens 3 Times</span></div>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <span class="pv-caution">A limited link shows only the domain until you reveal it.
+      <strong>Always check the destination.</strong></span>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · The refusal, without the red box</p>
+<p class="mock-note">
+  The red fill was borrowed from <code>.pv-idn</code>, where it belongs — a lookalike domain
+  is an <em>active deception aimed at you</em>. This is a stored value failing validation:
+  serious, but not an attack in progress, and nothing bad can happen from here because the
+  button is simply gone. Same content, four temperatures.
+</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <span class="rank pick">Pick</span>
+    <h3>C · Native alert</h3>
+    <span class="sub">Symbol carries the colour; the surface stays neutral</span>
+    <code class="pv-url inert" style="display:block;text-align:center">
+      <span class="sch">javascript:</span><span class="seg">alert(1)</span>
+    </code>
+    <div class="pv-refuse-alert">
+      <svg class="sym" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="8" cy="11.2" r=".95" fill="currentColor"/>
+      </svg>
+      <p class="msg"><b>No button for this one</b>The address stored here would tell your
+        browser to do something rather than go somewhere, so YuioLink shows it and stops
+        there.</p>
+    </div>
+    <p class="note">This is how macOS states a refusal: a symbol, a bold headline, a secondary
+      line — on the ordinary surface, not a coloured one. The red is concentrated in the one
+      element small enough to carry it without shouting, and the headline does the work the
+      fill was doing.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank">Minimal</span>
+    <h3>A · The page's own voice</h3>
+    <span class="sub">No box, same as <code>.pv-caution</code></span>
+    <code class="pv-url inert" style="display:block;text-align:center">
+      <span class="sch">javascript:</span><span class="seg">alert(1)</span>
+    </code>
+    <span class="pv-refuse-bare"><strong>No button for this one.</strong> The address stored
+      here would tell your browser to do something rather than go somewhere, so YuioLink
+      shows it and stops there.</span>
+    <p class="note">Nothing new enters the stylesheet — this is exactly the treatment the
+      page already gives its cautions. <b>Against:</b> it reads as one more advisory line on
+      a page that already has two, when it is actually reporting that something is wrong.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank">Neutral</span>
+    <h3>B · Quiet glass</h3>
+    <span class="sub">Field surface, hairline edge, no colour at all</span>
+    <code class="pv-url inert" style="display:block;text-align:center">
+      <span class="sch">javascript:</span><span class="seg">alert(1)</span>
+    </code>
+    <div class="pv-refuse-glass">
+      <p><strong>No button for this one.</strong> The address stored here would tell your
+        browser to do something rather than go somewhere, so YuioLink shows it and stops
+        there.</p>
+    </div>
+    <p class="note">The most "Liquid Glass" of the four and the calmest. <b>Against:</b> with
+      no colour and no symbol it is indistinguishable at a glance from a help panel, and this
+      one deserves to be noticed.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank nope">Today</span>
+    <h3>D · Red fill</h3>
+    <span class="sub">Borrowed from the lookalike-domain panel</span>
+    <code class="pv-url inert" style="display:block;text-align:center">
+      <span class="sch">javascript:</span><span class="seg">alert(1)</span>
+    </code>
+    <div class="pv-idn">
+      <p><strong>YuioLink won't open this.</strong> The address stored for this name isn't a
+        web address — it's an instruction for your browser, which a link should never be.</p>
+    </div>
+    <p class="note">Spends the page's loudest signal on its rarest state, and devalues it for
+      the lookalike-domain warning, which is the one a visitor will actually meet and the one
+      where getting it wrong costs them something.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">4 · Four ways to word it</p>
+<p class="mock-note">
+  All shown in treatment C. The constraint that shapes them: the allowlist is broad
+  (<code>http</code>, <code>https</code>, <code>mailto</code>, <code>tel</code>,
+  <code>sms</code>, <code>ftp</code>, <code>magnet</code>, <code>spotify</code>,
+  <code>xmpp</code>, <code>irc</code>, <code>matrix</code>), so no sentence may claim this is
+  "not a web address" — <code>mailto:</code> isn't either, and it is perfectly welcome.
+</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <span class="rank pick">Pick</span>
+    <h3>P1 · Do something / go somewhere</h3>
+    <div class="pv-refuse-alert" style="margin-top:0">
+      <svg class="sym" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="8" cy="11.2" r=".95" fill="currentColor"/>
+      </svg>
+      <p class="msg"><b>No button for this one</b>The address stored here would tell your
+        browser to do something rather than go somewhere, so YuioLink shows it and stops
+        there.</p>
+    </div>
+    <p class="note">Draws the line where the code draws it, in words with no jargon in them.
+      "Shows it and stops there" states the whole policy in five words, and the headline
+      answers the question the visitor is actually asking — <b>where is my button</b>.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank">Tightest</span>
+    <h3>P2 · Shown, not linked</h3>
+    <div class="pv-refuse-alert" style="margin-top:0">
+      <svg class="sym" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="8" cy="11.2" r=".95" fill="currentColor"/>
+      </svg>
+      <p class="msg"><b>Shown, not linked</b>This address isn't one YuioLink will hand to a
+        browser. You can read it above exactly as it was stored — we just won't make it
+        clickable.</p>
+    </div>
+    <p class="note">Shortest of the four and the headline is almost a slogan. <b>Against:</b>
+      "won't hand to a browser" is a mechanism a visitor has no model for, and it never says
+      why.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank">Protective</span>
+    <h3>P3 · We didn't decide for you</h3>
+    <div class="pv-refuse-alert" style="margin-top:0">
+      <svg class="sym" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="8" cy="11.2" r=".95" fill="currentColor"/>
+      </svg>
+      <p class="msg"><b>This one we won't click for you</b>What's stored under this name isn't
+        a place — it's something for a browser to run. It's printed above, exactly as stored,
+        so you can see what was here and judge it yourself.</p>
+    </div>
+    <p class="note">The most in-character for a site whose whole premise is "we show you what
+      the link is and you decide". <b>Against:</b> "we won't click it for you" is a little
+      arch, and the longest of the four.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank">Blunt</span>
+    <h3>P4 · Something is wrong here</h3>
+    <div class="pv-refuse-alert" style="margin-top:0">
+      <svg class="sym" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="8" cy="11.2" r=".95" fill="currentColor"/>
+      </svg>
+      <p class="msg"><b>This link shouldn't exist</b>YuioLink refuses addresses like this one
+        when a link is created, so finding it here means something went wrong. It's printed
+        above, unchanged, and there's deliberately nothing to press.</p>
+    </div>
+    <p class="note">The only version that is <b>honest about the anomaly</b> — this state is
+      unreachable through the front door, so a visitor seeing it has found a bug or a tampered
+      row. <b>Against:</b> "shouldn't exist" invites alarm the visitor can do nothing with,
+      and quietly admits a compromise to whoever caused it.</p>
+  </div>
+</div>
+
+</body>
+</html>

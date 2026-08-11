@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Scheme tiers and the eject cover</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1120px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-note { max-width: 1120px; margin: 0 auto 18px; padding: 0 20px;
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .mock-note strong { color: var(--text); font-weight: 600; }
+    .mock-note code { font-family: var(--font-mono); font-size: .92em; }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .card { width: 340px; background: var(--card-bg); border: .5px solid var(--card-border);
+      border-radius: var(--radius-window); box-shadow: var(--card-shadow); padding: 20px; }
+    .card.wide { width: 470px; }
+    .card h3 { margin: 0 0 3px; font: 600 15px/1.3 var(--font); }
+    .card .sub { display: block; font: 400 12.5px/1.5 var(--font); color: var(--text-secondary);
+      margin-bottom: 14px; }
+    .card .note { margin: 14px 0 0; font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .card .note b { color: var(--text); font-weight: 600; }
+    .rank { float: right; font: 700 11px/1 var(--font); letter-spacing: .04em;
+      text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+      background: var(--bg-2); border: .5px solid var(--card-border); color: var(--text-tertiary); }
+    .rank.pick { background: color-mix(in srgb, var(--switch-on) 18%, transparent);
+      border-color: color-mix(in srgb, var(--switch-on) 42%, transparent); color: #1a7a35; }
+    .rank.nope { background: color-mix(in srgb, var(--danger) 12%, transparent);
+      border-color: color-mix(in srgb, var(--danger) 34%, transparent); color: var(--danger); }
+    @media (prefers-color-scheme: dark) { .rank.pick { color: #4ede78; } }
+    .tierbar { max-width: 1120px; margin: 0 auto 20px; padding: 0 20px; display: grid;
+      grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .tierbar div { padding: 14px 16px; border-radius: var(--radius-control);
+      background: var(--card-bg); border: .5px solid var(--card-border);
+      font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .tierbar b { display: block; font-size: 13.5px; color: var(--text); margin-bottom: 4px; }
+    .tierbar code { font-family: var(--font-mono); font-size: .92em; }
+    @media (max-width: 820px) { .tierbar { grid-template-columns: 1fr; } }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+    .btn .glyph { flex: none; opacity: .72; }
+
+    /* --- the scheme plate: what a hostless destination shows instead of a host --- */
+    .pv-scheme { display: flex; align-items: center; justify-content: center; gap: 10px;
+      margin-top: 4px; }
+    .pv-scheme .mark { flex: none; display: inline-flex; align-items: center;
+      justify-content: center; width: 34px; height: 34px; border-radius: 9px;
+      color: #7a4a00; background: color-mix(in srgb, #ff9f0a 22%, transparent);
+      border: .5px solid color-mix(in srgb, #ff9f0a 45%, transparent); }
+    .pv-scheme .word { font-family: var(--font-mono); font-size: clamp(19px, 5vw, 24px);
+      font-weight: 700; letter-spacing: -.01em; color: #8a5a00; }
+    .pv-scheme .word .colon { opacity: .45; }
+    @media (prefers-color-scheme: dark) {
+      .pv-scheme .mark { color: #ffc266; }
+      .pv-scheme .word { color: #ffc266; }
+    }
+    /* The opaque remainder under the scheme: the address, number, or magnet body. */
+    .pv-opaque { display: block; margin-top: 8px; font-family: var(--font-mono);
+      font-size: 14px; line-height: 1.5; word-break: break-all; color: var(--text-secondary); }
+
+    /* --- per-scheme colour, shown only to argue against it (section 3) --- */
+    .pv-scheme.c-mail .mark { color: #0a5ec4; background: color-mix(in srgb, #007aff 18%, transparent);
+      border-color: color-mix(in srgb, #007aff 42%, transparent); }
+    .pv-scheme.c-mail .word { color: #0a5ec4; }
+    .pv-scheme.c-tel .mark { color: #1a7a35; background: color-mix(in srgb, #34c759 20%, transparent);
+      border-color: color-mix(in srgb, #34c759 45%, transparent); }
+    .pv-scheme.c-tel .word { color: #1a7a35; }
+    .pv-scheme.c-mag .mark { color: #7d28b8; background: color-mix(in srgb, #af52de 18%, transparent);
+      border-color: color-mix(in srgb, #af52de 42%, transparent); }
+    .pv-scheme.c-mag .word { color: #7d28b8; }
+    @media (prefers-color-scheme: dark) {
+      .pv-scheme.c-mail .mark, .pv-scheme.c-mail .word { color: #6cb3ff; }
+      .pv-scheme.c-tel .mark, .pv-scheme.c-tel .word { color: #4ede78; }
+      .pv-scheme.c-mag .mark, .pv-scheme.c-mag .word { color: #d08bf5; }
+    }
+
+    /* --- the cover: a real <details>, dressed as a hatch ------------------
+       Semantics come from <details>/<summary>: keyboard-operable, announced as
+       a disclosure, and — the part that matters — the <a> inside is genuinely
+       not focusable while closed, so the two-step is two steps for everyone.
+       No script anywhere. The lid and the button share one grid cell, so
+       lifting the lid does not move the page under the pointer. */
+    .pv-cover { display: grid; margin-top: 24px; }
+    .pv-cover > * { grid-area: 1 / 1; }
+
+    .pv-cover-lid { display: flex; align-items: center; justify-content: center; gap: 9px;
+      min-height: 46px; padding: 10px 16px; border-radius: var(--radius-control);
+      cursor: pointer; list-style: none;
+      font: 600 14px/1.3 var(--font); color: #8a5a00;
+      background: repeating-linear-gradient(135deg,
+        color-mix(in srgb, #ff9f0a 15%, transparent) 0 7px,
+        color-mix(in srgb, #ff9f0a 7%, transparent) 7px 14px);
+      border: 1.5px solid color-mix(in srgb, #ff9f0a 55%, transparent);
+      transform-origin: top center;
+      transition: transform .28s cubic-bezier(.2,.8,.3,1), opacity .28s ease;
+    }
+    .pv-cover-lid::-webkit-details-marker { display: none; }
+    .pv-cover[open] .pv-cover-lid { transform: perspective(420px) rotateX(-88deg); opacity: 0;
+      pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { .pv-cover-lid { transition: none; } }
+    @media (prefers-color-scheme: dark) { .pv-cover-lid { color: #ffc266; } }
+    .pv-cover-lid .hint { font-weight: 500; opacity: .75; }
+
+    /* --- refusal (treatment C, settled) --- */
+    .pv-refuse-alert { display: grid; grid-template-columns: auto 1fr; gap: 11px;
+      margin: 14px auto 0; max-width: 94%; padding: 12px 14px; border-radius: 10px;
+      text-align: left; background: var(--field-bg); border: .5px solid var(--card-border); }
+    .pv-refuse-alert .sym { flex: none; color: var(--danger); margin-top: 1px; }
+    .pv-refuse-alert .msg { font-size: 11.5px; line-height: 1.55; color: var(--text-secondary); }
+    .pv-refuse-alert .msg b { display: block; font-size: 12.5px; font-weight: 700;
+      color: var(--text); margin-bottom: 3px; }
+    .pv-url.inert { opacity: .7; }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 4</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Three tiers, by what pressing actually does</h1>
+  <p class="mock-note" style="padding-left:0;padding-right:0">
+    Also settled here: <strong>multi-use is dropped</strong> — one-time only, so the badge is
+    just "Opens Once" and the unreachable "Limited Use" branches come out rather than staying
+    as dead code.
+  </p>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · The line the tiers are drawn on</p>
+<p class="mock-note">
+  Not "web address / not a web address" — <code>mailto:</code> isn't one and is perfectly
+  welcome. The question a visitor actually faces is <strong>what happens on my device when I
+  press this</strong>, and there are exactly three answers.
+</p>
+
+<div class="tierbar">
+  <div><b>Tier 1 — a website opens</b>
+    <code>http</code>, <code>https</code>.<br>
+    Familiar, reversible, contained in the browser. One press, the amber Continue anchor.</div>
+  <div><b>Tier 2 — an app on your device acts</b>
+    <code>mailto</code>, <code>tel</code>, <code>sms</code>, <code>ftp</code>,
+    <code>magnet</code>, <code>spotify</code>, <code>xmpp</code>, <code>irc</code>,
+    <code>ircs</code>, <code>matrix</code>.<br>
+    Leaves the browser's sandbox. Gets the cover.</div>
+  <div><b>Tier 3 — nothing, ever</b>
+    <code>javascript</code>, <code>data</code>, <code>vbscript</code>, and anything else off
+    the allowlist.<br>
+    Printed, never linked. No control at all.</div>
+</div>
+
+<p class="mock-note">
+  <strong>Tier 2 earns its cover on the facts, not on a hunch.</strong> A <code>tel:</code>
+  link can put a premium-rate number one accidental tap from being dialled — the classic
+  charge-fraud vector on a phone, and the tap target on a phone is a thumb. A
+  <code>magnet:</code> hands a payload to a torrent client that may start fetching before
+  anyone reads anything. <code>sms:</code> can pre-fill a message to a shortcode. In every
+  case the action lands <em>outside</em> the browser, where the back button does not reach.
+  That is a different risk in kind from "this website might be junk", and it is the one place
+  on this site where a deliberate second act is worth the friction.
+</p>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · The three tiers in place</p>
+
+<div class="mock-row">
+  <div class="card">
+    <h3>Tier 1 · https</h3>
+    <span class="sub">One press, as designed</span>
+    <code class="pv-url" style="display:block;text-align:center">
+      <span class="sch">https://</span><span class="reg">example.com</span><span class="seg">/products/keycaps</span>
+    </code>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:24px">
+      Continue to example.com
+      <svg class="glyph" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M5 11L11 5M11 5H6M11 5V10" stroke="currentColor" stroke-width="1.9"
+              stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+  </div>
+
+  <div class="card">
+    <h3>Tier 2 · mailto</h3>
+    <span class="sub">Lift the cover, then press</span>
+    <div class="pv-scheme">
+      <span class="mark">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <rect x="2.4" y="4.4" width="15.2" height="11.2" rx="2.2" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M3.2 6.2 10 10.8l6.8-4.6" stroke="currentColor" stroke-width="1.5"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="word">mailto<span class="colon">:</span></span>
+    </div>
+    <code class="pv-opaque" style="text-align:center">hello@example.com</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Opens your mail app <span class="hint">— lift to continue</span></summary>
+      <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">
+        Write to hello@example.com
+        <svg class="glyph" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M5 11L11 5M11 5H6M11 5V10" stroke="currentColor" stroke-width="1.9"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </details>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+  </div>
+
+  <div class="card">
+    <h3>Tier 2 · tel</h3>
+    <span class="sub">The one that can cost money</span>
+    <div class="pv-scheme">
+      <span class="mark">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M6.3 3.4 8 6.2 6.4 7.9c.8 1.8 2 3 3.7 3.7l1.7-1.6 2.8 1.7-.4 2.4c-.1.6-.7 1-1.3.9C8.2 14.3 5 11.1 4.2 5.3c-.1-.6.3-1.2.9-1.3l1.2-.6Z"
+                stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="word">tel<span class="colon">:</span></span>
+    </div>
+    <code class="pv-opaque" style="text-align:center">+47 800 12 345</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Dials a number <span class="hint">— lift to continue</span></summary>
+      <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">
+        Call +47 800 12 345
+        <svg class="glyph" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M5 11L11 5M11 5H6M11 5V10" stroke="currentColor" stroke-width="1.9"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </details>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+  </div>
+
+  <div class="card">
+    <h3>Tier 2 · magnet</h3>
+    <span class="sub">Opaque body, truncated</span>
+    <div class="pv-scheme">
+      <span class="mark">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M5 15V9a5 5 0 0 1 10 0v6" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round"/>
+          <path d="M5 15h3.2M11.8 15H15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M5 11.6h3.2M11.8 11.6H15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </span>
+      <span class="word">magnet<span class="colon">:</span></span>
+    </div>
+    <code class="pv-opaque" style="text-align:center">?xt=urn:btih:c12fe3…9ab4&amp;dn=ubuntu-24.04</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Hands this to a torrent app <span class="hint">— lift to continue</span></summary>
+      <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">
+        Open in your torrent app
+        <svg class="glyph" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M5 11L11 5M11 5H6M11 5V10" stroke="currentColor" stroke-width="1.9"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </details>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+  </div>
+
+  <div class="card">
+    <h3>Tier 3 · refused</h3>
+    <span class="sub">Treatment C, no control</span>
+    <code class="pv-url inert" style="display:block;text-align:center">
+      <span class="sch">javascript:</span><span class="seg">alert(1)</span>
+    </code>
+    <div class="pv-refuse-alert">
+      <svg class="sym" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+      <p class="msg"><b>No button for this one</b>The address stored here would tell your
+        browser to do something rather than go somewhere, so YuioLink shows it and stops
+        there.</p>
+    </div>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+  </div>
+</div>
+
+<p class="mock-note" style="margin-top:6px">
+  The covers above are live — click one. It is a plain <code>&lt;details&gt;</code> with the
+  lid and the button stacked in a single grid cell, so lifting it does not shove the page
+  under your pointer. <strong>No JavaScript</strong>, and the anchor is genuinely
+  unreachable by keyboard while the lid is down, because a closed <code>&lt;details&gt;</code>
+  takes its contents out of the tab order. If transforms are unsupported the lid degrades to
+  an ordinary disclosure — still two deliberate acts.
+</p>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · One colour for the tier, or one per scheme?</p>
+<p class="mock-note">
+  You suggested per-scheme colour. It looks good, and I think it breaks the rule that has
+  been holding the palette together.
+</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <span class="rank pick">Pick</span>
+    <h3>Tier colour, per-scheme icon</h3>
+    <span class="sub">Amber throughout; the glyph carries the specifics</span>
+    <div class="pv-scheme" style="margin-bottom:14px">
+      <span class="mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <rect x="2.4" y="4.4" width="15.2" height="11.2" rx="2.2" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M3.2 6.2 10 10.8l6.8-4.6" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="word">mailto<span class="colon">:</span></span>
+    </div>
+    <div class="pv-scheme" style="margin-bottom:14px">
+      <span class="mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M6.3 3.4 8 6.2 6.4 7.9c.8 1.8 2 3 3.7 3.7l1.7-1.6 2.8 1.7-.4 2.4c-.1.6-.7 1-1.3.9C8.2 14.3 5 11.1 4.2 5.3c-.1-.6.3-1.2.9-1.3l1.2-.6Z"
+              stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
+      <span class="word">tel<span class="colon">:</span></span>
+    </div>
+    <div class="pv-scheme">
+      <span class="mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M5 15V9a5 5 0 0 1 10 0v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M5 15h3.2M11.8 15H15M5 11.6h3.2M11.8 11.6H15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+      <span class="word">magnet<span class="colon">:</span></span>
+    </div>
+    <p class="note">Colour on this site answers <b>"where do I end up"</b>, and for every one
+      of these the answer is the same: off YuioLink, into something we don't control. The
+      decision is identical, so the colour is identical — and the icon, which answers the
+      different question ("into <i>what</i>?"), is what varies. Ten schemes also means ten
+      colours, several of which would have to be invented, and three of which already mean
+      something else here (blue = stay, green = copied, purple = One-Time).</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank nope">Against</span>
+    <h3>Per-scheme colour</h3>
+    <span class="sub">Mail blue, phone green, magnet purple</span>
+    <div class="pv-scheme c-mail" style="margin-bottom:14px">
+      <span class="mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <rect x="2.4" y="4.4" width="15.2" height="11.2" rx="2.2" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M3.2 6.2 10 10.8l6.8-4.6" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="word">mailto<span class="colon">:</span></span>
+    </div>
+    <div class="pv-scheme c-tel" style="margin-bottom:14px">
+      <span class="mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M6.3 3.4 8 6.2 6.4 7.9c.8 1.8 2 3 3.7 3.7l1.7-1.6 2.8 1.7-.4 2.4c-.1.6-.7 1-1.3.9C8.2 14.3 5 11.1 4.2 5.3c-.1-.6.3-1.2.9-1.3l1.2-.6Z"
+              stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
+      <span class="word">tel<span class="colon">:</span></span>
+    </div>
+    <div class="pv-scheme c-mag">
+      <span class="mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M5 15V9a5 5 0 0 1 10 0v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M5 15h3.2M11.8 15H15M5 11.6h3.2M11.8 11.6H15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+      <span class="word">magnet<span class="colon">:</span></span>
+    </div>
+    <p class="note">Prettier in a row like this, and worse on the page. A green
+      <code>tel:</code> plate reads as <b>safe</b> — green means "copied, done, fine"
+      everywhere else here — and <code>tel:</code> is the single most expensive mistake on the
+      list. Per-scheme colour makes the palette describe <i>the destination's brand</i>
+      instead of <i>the visitor's risk</i>.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">4 · Is the cover worth it? The honest alternative</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <span class="rank pick">With cover</span>
+    <h3>Two deliberate acts</h3>
+    <div class="pv-scheme" style="margin-bottom:8px">
+      <span class="mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M6.3 3.4 8 6.2 6.4 7.9c.8 1.8 2 3 3.7 3.7l1.7-1.6 2.8 1.7-.4 2.4c-.1.6-.7 1-1.3.9C8.2 14.3 5 11.1 4.2 5.3c-.1-.6.3-1.2.9-1.3l1.2-.6Z"
+              stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
+      <span class="word">tel<span class="colon">:</span></span>
+    </div>
+    <code class="pv-opaque" style="text-align:center">+47 800 12 345</code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Dials a number <span class="hint">— lift to continue</span></summary>
+      <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:0">Call +47 800 12 345</a>
+    </details>
+    <p class="note">The cover's real value is not the extra click — it is that the lid states
+      the <b>consequence</b> ("dials a number") in the place a button label would otherwise
+      state the <b>destination</b>. A visitor who lifts it has read a verb.</p>
+  </div>
+
+  <div class="card wide">
+    <span class="rank">Without</span>
+    <h3>One press, consequence in the label</h3>
+    <div class="pv-scheme" style="margin-bottom:8px">
+      <span class="mark"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M6.3 3.4 8 6.2 6.4 7.9c.8 1.8 2 3 3.7 3.7l1.7-1.6 2.8 1.7-.4 2.4c-.1.6-.7 1-1.3.9C8.2 14.3 5 11.1 4.2 5.3c-.1-.6.3-1.2.9-1.3l1.2-.6Z"
+              stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
+      <span class="word">tel<span class="colon">:</span></span>
+    </div>
+    <code class="pv-opaque" style="text-align:center">+47 800 12 345</code>
+    <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:24px">Call +47 800 12 345</a>
+    <p class="note">Simpler, and most of the protection is already here: the scheme plate is
+      large, the verb is in the label, and nothing is one accidental tap from happening that
+      was not also announced. <b>If you decide the cover is too clever, this is the version I
+      would ship</b> — it is not a weak fallback.</p>
+  </div>
+</div>
+
+</body>
+</html>

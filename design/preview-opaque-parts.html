@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Colouring a hostless URL</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1120px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-note { max-width: 1120px; margin: 0 auto 18px; padding: 0 20px;
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .mock-note strong { color: var(--text); font-weight: 600; }
+    .mock-note code { font-family: var(--font-mono); font-size: .92em; }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .card { width: 340px; background: var(--card-bg); border: .5px solid var(--card-border);
+      border-radius: var(--radius-window); box-shadow: var(--card-shadow); padding: 20px; }
+    .card.wide { width: 470px; }
+    .card h3 { margin: 0 0 3px; font: 600 15px/1.3 var(--font); }
+    .card .sub2 { display: block; font: 400 12.5px/1.5 var(--font); color: var(--text-secondary);
+      margin-bottom: 16px; }
+    .card .note { margin: 16px 0 0; font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .card .note b { color: var(--text); font-weight: 600; }
+    .rank { float: right; font: 700 11px/1 var(--font); letter-spacing: .04em;
+      text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+      background: var(--bg-2); border: .5px solid var(--card-border); color: var(--text-tertiary); }
+    .rank.pick { background: color-mix(in srgb, var(--switch-on) 18%, transparent);
+      border-color: color-mix(in srgb, var(--switch-on) 42%, transparent); color: #1a7a35; }
+    @media (prefers-color-scheme: dark) { .rank.pick { color: #4ede78; } }
+    .fixnote { max-width: 1120px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.6 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .stack > * + * { margin-top: 18px; }
+    .legend { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px;
+      font: 400 12px/1.5 var(--font); color: var(--text-secondary); margin-top: 4px; }
+    .legend code { font-family: var(--font-mono); }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+    .btn .glyph { flex: none; opacity: .72; }
+
+    .pv-scheme { display: block; text-align: center; margin-top: 4px;
+      font-family: var(--font-mono); font-weight: 700; letter-spacing: -.01em;
+      line-height: 1.35; font-size: clamp(19px, 5vw, 24px); }
+    .pv-scheme .word { color: var(--text); padding: 2px 8px; border-radius: 6px;
+      background: color-mix(in srgb, var(--accent) 13%, transparent); }
+    .pv-scheme .colon { opacity: .45; }
+
+    /* --- the opaque body, coloured by part ------------------------------
+       The same grammar `.pv-url` uses on an http URL, applied to what comes
+       after `scheme:`. Every class below already exists and already means
+       this — only the parser feeding them is new. */
+    .pv-opaque { display: block; margin-top: 10px; font-family: var(--font-mono);
+      font-size: 15px; line-height: 1.6; letter-spacing: .01em; word-break: break-all;
+      text-align: center; color: var(--text); }
+    /* Delimiters: @ ? & = : — structure, not content. */
+    .pv-opaque .dl { color: var(--text-tertiary); }
+    /* A key, a local part, a path segment: names the value, isn't the value. */
+    .pv-opaque .seg { color: var(--text-secondary); }
+    /* The value a person is actually checking. */
+    .pv-opaque .qv { color: var(--text); }
+    /* A registrable domain, wherever one appears — including inside an
+       address. Same highlight as `.pv-url .reg`, because it is the same claim:
+       this is the part that decides who you are really dealing with. */
+    .pv-opaque .reg { color: var(--text); font-weight: 700;
+      padding: 1px 4px; border-radius: 4px;
+      background: color-mix(in srgb, var(--accent) 13%, transparent); }
+
+    .btn.btn-2 { flex-direction: column; gap: 2px; padding-top: 9px; padding-bottom: 9px;
+      min-height: 54px; line-height: 1.25; }
+    .btn.btn-2 .lead { display: inline-flex; align-items: center; gap: 7px; }
+    .btn.btn-2 .what { font-size: 11.5px; font-weight: 500; opacity: .82; letter-spacing: 0; }
+    /* The scheme, riding along on a fallback label. Mono so it reads as the
+       identifier it is, and dimmed so the verb still leads. */
+    .btn .sch-tag { font-family: var(--font-mono); font-weight: 700; opacity: .72; }
+    .btn .mid { opacity: .45; }
+
+    .pv-hedge { display: block; max-width: 92%; margin: 12px auto 0; text-align: center;
+      font: 400 11.5px/1.55 var(--font); color: var(--text-tertiary); }
+
+    .pv-cover { display: grid; margin-top: 22px; }
+    .pv-cover > * { grid-area: 1 / 1; }
+    .pv-cover-lid { display: flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 54px; padding: 10px 16px; border-radius: var(--radius-control);
+      cursor: pointer; list-style: none; font: 400 14px/1.3 var(--font); color: #8a5a00;
+      background: repeating-linear-gradient(135deg,
+        color-mix(in srgb, #ff9f0a 15%, transparent) 0 7px,
+        color-mix(in srgb, #ff9f0a 7%, transparent) 7px 14px);
+      border: 1.5px solid color-mix(in srgb, #ff9f0a 55%, transparent);
+      transform-origin: top center;
+      transition: transform .28s cubic-bezier(.2,.8,.3,1), opacity .22s ease; }
+    .pv-cover-lid::-webkit-details-marker { display: none; }
+    .pv-cover-lid::marker { content: ""; }
+    .pv-cover[open] .pv-cover-lid { transform: perspective(460px) rotateX(-90deg); opacity: 0;
+      pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { .pv-cover-lid { transition: none; } }
+    @media (prefers-color-scheme: dark) { .pv-cover-lid { color: #ffc266; } }
+    .pv-cover-lid .sep { flex: none; width: 3px; height: 3px; border-radius: 50%;
+      background: currentColor; opacity: .5; }
+    .pv-cover-lid .act { font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 10</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">A hostless URL, coloured like a URL</h1>
+</div>
+
+<div class="fixnote">
+  <b>You're right about the arrow, and I had it wrong twice.</b> <code>openIcon</code>'s path is
+  <code>M2.5 10.5 10.5 2.5</code> — a diagonal shaft — plus <code>M4 2.5h6.5V9</code>, which is
+  a corner <i>arrowhead</i>, not a box. The comment above it ("the arrow out of a box's
+  corner") describes the arrowhead's shape and misled me; I should have read the path the
+  first time. So the history row uses a <b>bare arrow</b>, the boxed glyph is
+  <b>unused anywhere in the codebase</b>, and tier 2 can claim it with no conflict at all —
+  cleaner than the "honest tension" I talked myself into last round.
+  <br><br>
+  <b>"Write to" over "Email"</b>, applied throughout.
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · The same grammar, after the colon</p>
+<p class="mock-note">
+  An <code>http</code> preview already grades a URL by part: scheme tertiary, domain
+  highlighted, path and query values distinguished. Everything after <code>scheme:</code> has
+  the same kind of structure — <strong>delimiters, keys, values, and sometimes a domain</strong>
+  — so it gets the same four classes rather than new ones.
+</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <h3>The parts</h3>
+    <span class="sub2">All four already exist in <code>app.css</code></span>
+    <div class="legend">
+      <code class="pv-opaque" style="display:inline;margin:0"><span class="dl">@ ? &amp; = :</span></code>
+      <span>Delimiters — structure, tertiary</span>
+      <code class="pv-opaque" style="display:inline;margin:0"><span class="seg">xt</span></code>
+      <span>Keys, local parts, segments — secondary</span>
+      <code class="pv-opaque" style="display:inline;margin:0"><span class="qv">urn:btih:c12fe3…</span></code>
+      <span>The value being checked — full text</span>
+      <code class="pv-opaque" style="display:inline;margin:0"><span class="reg">example.com</span></code>
+      <span>A registrable domain — accent highlight</span>
+    </div>
+    <p class="note"><b>The domain rule is the one that earns its keep.</b> An address in a
+      <code>mailto:</code> has a registrable domain in it, and a lookalike there does exactly
+      what a lookalike in a host does — decides who you are really writing to. Highlighting it
+      in both places means a visitor learns to check one thing, not two.</p>
+  </div>
+
+  <div class="card wide">
+    <h3>What it costs to build</h3>
+    <span class="sub2">Less than it looks</span>
+    <p class="note" style="margin-top:0">The <code>url</code> crate already splits a hostless
+      URL for us: <code>Url::parse("magnet:?xt=…&amp;dn=…")</code> hands back
+      <code>query()</code> ready to iterate as key/value pairs, and
+      <code>mailto:hello@example.com</code> puts the address in <code>path()</code>. The only
+      new logic is a <code>rsplit_once('@')</code> for address-shaped bodies and the existing
+      registrable-domain lookup, which <code>urlview</code> already performs for hosts.
+      <br><br>
+      Nothing here needs a new stylesheet rule either — <code>.dl</code> is the one addition,
+      and it could equally reuse <code>.sch</code>'s tertiary colour.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · Every shape of body</p>
+
+<div class="mock-row">
+  <div class="card">
+    <h3>mailto</h3>
+    <span class="sub2">Local part, domain, query</span>
+    <div class="stack">
+      <div>
+        <span class="pv-scheme"><span class="word">mailto<span class="colon">:</span></span></span>
+        <code class="pv-opaque"><span class="seg">hello</span><span class="dl">@</span><span class="reg">example.com</span></code>
+      </div>
+      <div>
+        <span class="pv-scheme"><span class="word">mailto<span class="colon">:</span></span></span>
+        <code class="pv-opaque"><span class="seg">sales</span><span class="dl">@</span><span class="reg">example.com</span><span class="dl">?</span><span class="seg">subject</span><span class="dl">=</span><span class="qv">Order 4192</span></code>
+      </div>
+    </div>
+    <p class="note">The domain is the only highlighted thing, exactly as on a web preview.
+      A subject line is a value, so it reads at full strength — it is content someone is about
+      to send in your name.</p>
+  </div>
+
+  <div class="card">
+    <h3>magnet</h3>
+    <span class="sub2">Query pairs, no host at all</span>
+    <div class="stack">
+      <div>
+        <span class="pv-scheme"><span class="word">magnet<span class="colon">:</span></span></span>
+        <code class="pv-opaque"><span class="dl">?</span><span class="seg">xt</span><span class="dl">=</span><span class="qv">urn<span class="dl">:</span>btih<span class="dl">:</span>c12fe3…9ab4</span><span class="dl">&amp;</span><span class="seg">dn</span><span class="dl">=</span><span class="qv">ubuntu-24.04</span></code>
+      </div>
+    </div>
+    <p class="note">The wall of hash finally has shape: <code>xt</code> and <code>dn</code>
+      recede as the labels they are, and <code>dn</code> — the display name, the only
+      human-readable claim a magnet makes about itself — stands out where it always
+      deserved to.</p>
+  </div>
+
+  <div class="card">
+    <h3>tel · sms</h3>
+    <span class="sub2">One value, nothing to grade</span>
+    <div class="stack">
+      <div>
+        <span class="pv-scheme"><span class="word">tel<span class="colon">:</span></span></span>
+        <code class="pv-opaque"><span class="qv">+47 800 12 345</span></code>
+      </div>
+      <div>
+        <span class="pv-scheme"><span class="word">sms<span class="colon">:</span></span></span>
+        <code class="pv-opaque"><span class="qv">+47 800 12 345</span><span class="dl">?</span><span class="seg">body</span><span class="dl">=</span><span class="qv">STOP</span></code>
+      </div>
+    </div>
+    <p class="note">Degrades to plain text when there is no structure, which is correct — the
+      colouring must never invent divisions that are not there. The <code>sms:</code> body is
+      worth surfacing: a pre-filled message is the closest thing on this list to something
+      being sent in your name.</p>
+  </div>
+
+  <div class="card">
+    <h3>spotify · matrix</h3>
+    <span class="sub2">Colon-separated segments</span>
+    <div class="stack">
+      <div>
+        <span class="pv-scheme"><span class="word">spotify<span class="colon">:</span></span></span>
+        <code class="pv-opaque"><span class="seg">track</span><span class="dl">:</span><span class="qv">4uLU6hMCjMI75M1A2tKUQC</span></code>
+      </div>
+      <div>
+        <span class="pv-scheme"><span class="word">matrix<span class="colon">:</span></span></span>
+        <code class="pv-opaque"><span class="seg">r</span><span class="dl">/</span><span class="qv">rust</span><span class="dl">:</span><span class="reg">matrix.org</span></code>
+      </div>
+    </div>
+    <p class="note">A <code>matrix:</code> address carries a homeserver, which is a registrable
+      domain and gets the highlight — the same question again, in a fourth place.</p>
+  </div>
+
+  <div class="card">
+    <h3>xmpp · irc</h3>
+    <span class="sub2">Address- and host-shaped</span>
+    <div class="stack">
+      <div>
+        <span class="pv-scheme"><span class="word">xmpp<span class="colon">:</span></span></span>
+        <code class="pv-opaque"><span class="seg">jooize</span><span class="dl">@</span><span class="reg">example.org</span></code>
+      </div>
+      <div>
+        <span class="pv-scheme"><span class="word">irc<span class="colon">:</span></span></span>
+        <code class="pv-opaque"><span class="dl">//</span><span class="reg">irc.libera.chat</span><span class="dl">/</span><span class="qv">#rust</span></code>
+      </div>
+    </div>
+    <p class="note"><code>irc:</code> and <code>ftp:</code> have real hosts, so they already
+      flow through the existing host path — they are hostless only in the sense that they are
+      not <code>http</code>. Nothing special needed.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · The fallback label</p>
+<p class="mock-note">
+  For schemes with no everyday verb. Your format, plus the neighbours worth seeing next to it.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>Open Link · magnet:</h3>
+    <a class="btn btn--go btn-2 btn-block btn-link" href="#" style="margin-top:0">
+      <span class="lead">Open Link <span class="mid">·</span> <span class="sch-tag">magnet:</span>
+        <svg class="glyph" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M12.4 9.1v3.4c0 .9-.7 1.6-1.6 1.6H4.1c-.9 0-1.6-.7-1.6-1.6V5.9c0-.9.7-1.6 1.6-1.6h3.4"
+                stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M10.2 2.3h3.5v3.5M13.7 2.3 8.3 7.7" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="what">A file identified by its hash</span>
+    </a>
+    <p class="note">The action leads, the scheme trails as a tag in mono — an identifier
+      styled as one, not a word in a sentence. It also matches the lid's separator, so the
+      middot means the same thing in both places: <i>here is the qualifier</i>.</p>
+  </div>
+
+  <div class="card">
+    <h3>Open Special Link · magnet:</h3>
+    <a class="btn btn--go btn-2 btn-block btn-link" href="#" style="margin-top:0">
+      <span class="lead">Open Special Link <span class="mid">·</span> <span class="sch-tag">magnet:</span></span>
+      <span class="what">A file identified by its hash</span>
+    </a>
+    <p class="note">Yours as written. <b>Against:</b> "Special" is a judgement without content
+      — and the lid directly above has already said "Not a web address", which is the same
+      claim made precisely. Two hedges before the verb.</p>
+  </div>
+
+  <div class="card">
+    <h3>Open · magnet:</h3>
+    <a class="btn btn--go btn-2 btn-block btn-link" href="#" style="margin-top:0">
+      <span class="lead">Open <span class="mid">·</span> <span class="sch-tag">magnet:</span></span>
+      <span class="what">A file identified by its hash</span>
+    </a>
+    <p class="note">Tightest. <b>Against:</b> "Open" alone leaves the button without an object,
+      and every other button on the site names what it acts on.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">4 · Assembled</p>
+
+<div class="mock-row">
+  <div class="card">
+    <h3>mailto</h3>
+    <p style="text-align:center;margin:0 0 10px"><span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span></p>
+    <span class="pv-scheme"><span class="word">mailto<span class="colon">:</span></span></span>
+    <code class="pv-opaque"><span class="seg">hello</span><span class="dl">@</span><span class="reg">example.com</span></code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Not a web address<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Write to hello@example.com
+          <svg class="glyph" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M12.4 9.1v3.4c0 .9-.7 1.6-1.6 1.6H4.1c-.9 0-1.6-.7-1.6-1.6V5.9c0-.9.7-1.6 1.6-1.6h3.4"
+                  stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M10.2 2.3h3.5v3.5M13.7 2.3 8.3 7.7" stroke="currentColor" stroke-width="1.6"
+                  stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="what">An email address</span></a>
+    </details>
+    <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+  </div>
+
+  <div class="card">
+    <h3>tel</h3>
+    <p style="text-align:center;margin:0 0 10px"><span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span></p>
+    <span class="pv-scheme"><span class="word">tel<span class="colon">:</span></span></span>
+    <code class="pv-opaque"><span class="qv">+47 800 12 345</span></code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Not a web address<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Call +47 800 12 345
+          <svg class="glyph" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M12.4 9.1v3.4c0 .9-.7 1.6-1.6 1.6H4.1c-.9 0-1.6-.7-1.6-1.6V5.9c0-.9.7-1.6 1.6-1.6h3.4"
+                  stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M10.2 2.3h3.5v3.5M13.7 2.3 8.3 7.7" stroke="currentColor" stroke-width="1.6"
+                  stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="what">A phone number</span></a>
+    </details>
+    <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+  </div>
+
+  <div class="card">
+    <h3>magnet</h3>
+    <p style="text-align:center;margin:0 0 10px"><span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span></p>
+    <span class="pv-scheme"><span class="word">magnet<span class="colon">:</span></span></span>
+    <code class="pv-opaque"><span class="dl">?</span><span class="seg">xt</span><span class="dl">=</span><span class="qv">urn<span class="dl">:</span>btih<span class="dl">:</span>c12fe3…9ab4</span><span class="dl">&amp;</span><span class="seg">dn</span><span class="dl">=</span><span class="qv">ubuntu-24.04</span></code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid">Not a web address<span class="sep"></span><span class="act">Show…</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Open Link <span class="mid">·</span> <span class="sch-tag">magnet:</span>
+          <svg class="glyph" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M12.4 9.1v3.4c0 .9-.7 1.6-1.6 1.6H4.1c-.9 0-1.6-.7-1.6-1.6V5.9c0-.9.7-1.6 1.6-1.6h3.4"
+                  stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M10.2 2.3h3.5v3.5M13.7 2.3 8.3 7.7" stroke="currentColor" stroke-width="1.6"
+                  stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="what">A file identified by its hash</span></a>
+    </details>
+    <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+  </div>
+</div>
+
+</body>
+</html>

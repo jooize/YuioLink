@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Labels, disclaimers, numbers</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-note { max-width: 1160px; margin: 0 auto 18px; padding: 0 20px;
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .mock-note strong { color: var(--text); font-weight: 600; }
+    .mock-note code { font-family: var(--font-mono); font-size: .92em; }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .card { width: 340px; background: var(--card-bg); border: .5px solid var(--card-border);
+      border-radius: var(--radius-window); box-shadow: var(--card-shadow); padding: 20px; }
+    .card.wide { width: 470px; }
+    .card h3 { margin: 0 0 3px; font: 600 15px/1.3 var(--font); }
+    .card .sub2 { display: block; font: 400 12.5px/1.5 var(--font); color: var(--text-secondary);
+      margin-bottom: 16px; }
+    .card .note { margin: 16px 0 0; font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .card .note b { color: var(--text); font-weight: 600; }
+    .rank { float: right; font: 700 10.5px/1 var(--font); letter-spacing: .04em;
+      text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+      background: var(--bg-2); border: .5px solid var(--card-border); color: var(--text-tertiary); }
+    .rank.pick { background: color-mix(in srgb, var(--switch-on) 18%, transparent);
+      border-color: color-mix(in srgb, var(--switch-on) 42%, transparent); color: #1a7a35; }
+    .rank.nope { background: color-mix(in srgb, var(--danger) 12%, transparent);
+      border-color: color-mix(in srgb, var(--danger) 34%, transparent); color: var(--danger); }
+    @media (prefers-color-scheme: dark) { .rank.pick { color: #4ede78; } }
+    .fixnote { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+    .btn .glyph { flex: none; opacity: .72; }
+
+    .pv-scheme { display: block; text-align: center; margin-top: 4px;
+      font-family: var(--font-mono); font-weight: 700; letter-spacing: -.01em;
+      line-height: 1.35; font-size: clamp(19px, 5vw, 24px); color: var(--text); }
+    .pv-scheme .colon { opacity: .45; }
+
+    .pv-opaque { display: block; margin-top: 10px; font-family: var(--font-mono);
+      font-size: 15px; line-height: 1.7; letter-spacing: .01em; word-break: break-all;
+      text-align: center; color: var(--text); }
+    .pv-opaque .dl { color: var(--text-tertiary); }
+    /* Keys, bolded: they are the signposts through a long body. Weight here is
+       navigation, not authority — see .pv-note for who to believe. */
+    .pv-opaque .seg { color: var(--text-secondary); font-weight: 700; }
+    .pv-opaque .qv { color: var(--text); }
+    .pv-opaque .reg { color: var(--text); font-weight: 700; padding: 1px 4px;
+      border-radius: 4px; background: color-mix(in srgb, var(--accent) 13%, transparent); }
+    .pv-opaque .num { font-variant-numeric: tabular-nums; }
+    .pv-opaque .ws { border-radius: 3px;
+      background: color-mix(in srgb, var(--danger) 26%, transparent);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 40%, transparent); }
+    .pv-opaque .pct { color: var(--danger); opacity: .85; }
+
+    /* Visual-only digit grouping: a margin, never a character. The text node is
+       untouched, so ⌘C copies exactly what is stored. Applied only when the
+       stored body has no literal spaces of its own. */
+    .pv-opaque .grp + .grp { margin-left: .42em; }
+
+    /* A fact about the scheme that a visitor cannot be expected to know, stated
+       without a verdict. Only some schemes have one. */
+    .pv-note { display: block; max-width: 94%; margin: 12px auto 0; text-align: center;
+      font: 400 12px/1.55 var(--font); color: var(--text-secondary); }
+    .pv-note code { font-family: var(--font-mono); font-size: .95em;
+      color: var(--text); font-weight: 700; }
+
+    .pv-flags { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center;
+      margin-top: 11px; }
+    .pv-flag { display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px; border-radius: 999px; font: 600 11px/1.45 var(--font);
+      color: var(--text-secondary); background: var(--field-bg);
+      border: .5px solid var(--card-border); }
+    .pv-flag svg { flex: none; color: var(--danger); }
+
+    .btn.btn-2 { flex-direction: column; gap: 2px; padding-top: 9px; padding-bottom: 9px;
+      min-height: 54px; line-height: 1.25; }
+    .btn.btn-2 .lead { display: inline-flex; align-items: center; gap: 7px; }
+    .btn.btn-2 .what { font-size: 11.5px; font-weight: 500; opacity: .82; letter-spacing: 0; }
+    .btn .sch-tag { font-family: var(--font-mono); font-weight: 700; opacity: .72; }
+    .btn .mid { opacity: .45; }
+
+    .pv-cover { display: grid; margin-top: 22px; }
+    .pv-cover > * { grid-area: 1 / 1; }
+    .pv-cover-lid { list-style: none; cursor: pointer; filter: saturate(.12) opacity(.72); }
+    .pv-cover-lid::-webkit-details-marker { display: none; }
+    .pv-cover-lid::marker { content: ""; }
+    .pv-cover[open] .pv-cover-lid { display: none; }
+
+    /* Motion variants, corrected: the override now restores `flex`, which is
+       what `.btn-block` sets. `display: block` was the bug — it re-laid the lid
+       out as two stacked blocks, changing its height and so the grid row's, and
+       that is what shoved the button. */
+    .m-fade .pv-cover-lid { transition: opacity .16s ease; }
+    .m-fade .pv-cover[open] .pv-cover-lid { display: flex; opacity: 0; pointer-events: none; }
+    .m-color .pv-cover-lid { transition: filter .22s ease; }
+    .m-color .pv-cover[open] .pv-cover-lid { display: flex; filter: saturate(1) opacity(0);
+      pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .m-fade .pv-cover-lid, .m-color .pv-cover-lid { transition: none; }
+    }
+
+    .pv-hedge { display: block; max-width: 92%; margin: 12px auto 0; text-align: center;
+      font: 400 11.5px/1.55 var(--font); color: var(--text-tertiary); }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 13</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Bold labels, a stated fact, and grouped digits</h1>
+</div>
+
+<div class="fixnote">
+  <b>The lid bug was mine, and it is one word.</b> My open-state override said
+  <code>display: block</code> — needed only to undo the base <code>display: none</code> — but
+  <code>.btn-block</code> sets <code>display: flex</code>. Blocking the lid re-laid it out as
+  two stacked blocks, which changed its height, which changed the grid row's height, which
+  shoved the button. The overrides now say <code>display: flex</code>. All three endings in
+  section 1 hold the button perfectly still.
+  <br><br>
+  <b>"Padded With Spaces"</b> — you're right, Apple's style capitalises prepositions of four
+  letters or more, so <code>With</code> takes the capital. Fixed everywhere.
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · All three, now motionless</p>
+<p class="mock-note">Click each. The button should not shift by a pixel.</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">A · Instant</span>
+    <h3>Lid removed</h3>
+    <span class="pv-scheme">tel<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="qv num">+47 800 12 345</span></code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid btn btn--go btn-2 btn-block">
+        <span class="lead">Show…</span><span class="what">A phone number</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Call +47 800 12 345</span><span class="what">A phone number</span></a>
+    </details>
+  </div>
+  <div class="card m-fade">
+    <span class="rank">B · Cross-fade</span>
+    <h3>160ms opacity</h3>
+    <span class="pv-scheme">tel<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="qv num">+47 800 12 345</span></code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid btn btn--go btn-2 btn-block">
+        <span class="lead">Show…</span><span class="what">A phone number</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Call +47 800 12 345</span><span class="what">A phone number</span></a>
+    </details>
+  </div>
+  <div class="card m-color">
+    <span class="rank">C · Colour arrives</span>
+    <h3>220ms saturation</h3>
+    <span class="pv-scheme">tel<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="qv num">+47 800 12 345</span></code>
+    <details class="pv-cover">
+      <summary class="pv-cover-lid btn btn--go btn-2 btn-block">
+        <span class="lead">Show…</span><span class="what">A phone number</span></summary>
+      <a class="btn btn--go btn-2 btn-block btn-link" href="#">
+        <span class="lead">Call +47 800 12 345</span><span class="what">A phone number</span></a>
+    </details>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · Bold labels, plus the fact that outranks them</p>
+<p class="mock-note">
+  <strong>Yes — and it is a better answer than mine.</strong> Bolding the keys makes weight
+  mean <em>navigation</em> rather than authority, which frees the page to settle authority in
+  words instead of typography. Typography can only ever imply "trust this"; a sentence can say
+  which part is checkable and which part is somebody's assertion. We inform, we don't judge.
+</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <span class="rank pick">Pick</span>
+    <h3>Labels bold, note beneath</h3>
+    <span class="pv-scheme">magnet<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="dl">?</span><span class="seg">xt</span><span class="dl">=</span><span class="qv">urn<span class="dl">:</span>btih<span class="dl">:</span>c12fe3a94b81d7e05f2c6a9048bb3e1d7f4a2c60</span><span class="dl">&amp;</span><span class="seg">dn</span><span class="dl">=</span><span class="qv">ubuntu-24.04-desktop-amd64.iso</span><span class="dl">&amp;</span><span class="seg">tr</span><span class="dl">=</span><span class="qv">udp<span class="dl">://</span>tracker.example.org<span class="dl">:</span>6969</span></code>
+    <span class="pv-note">Only <code>xt</code> identifies the data. <code>dn</code> is a name
+      the link's creator chose, and it does not have to match what arrives.</span>
+    <p class="note">Two sentences, no verdict. It states what the standard says and stops —
+      it never claims the file is bad, only that the name is not evidence. A visitor who reads
+      it can decide for themselves; one who doesn't is no worse off than before.</p>
+  </div>
+
+  <div class="card wide">
+    <h3>Longer, more explicit</h3>
+    <span class="pv-scheme">magnet<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="dl">?</span><span class="seg">xt</span><span class="dl">=</span><span class="qv">urn<span class="dl">:</span>btih<span class="dl">:</span>c12fe3a94b81d7e05f2c6a9048bb3e1d7f4a2c60</span><span class="dl">&amp;</span><span class="seg">dn</span><span class="dl">=</span><span class="qv">ubuntu-24.04-desktop-amd64.iso</span></code>
+    <span class="pv-note">A magnet names data by its hash, so <code>xt</code> is the only
+      field that decides what you get. <code>dn</code> is a display name written by whoever
+      made the link, and <code>tr</code> lists trackers to ask. YuioLink cannot check any of
+      them.</span>
+    <p class="note">Teaches the whole format. <b>Against:</b> four lines of prose on a page
+      that already carries a hedge and a caution, for a scheme most visitors will meet once.
+      The short version says the load-bearing half.</p>
+  </div>
+</div>
+
+<p class="mock-note">
+  Worth saying which schemes get a note at all: <strong>only where the standard creates a gap
+  between what is shown and what is true.</strong> <code>magnet</code> has one (name versus
+  hash). <code>mailto</code> with a <code>subject</code> or <code>body</code> has a smaller
+  one — those are pre-written words that would be sent in your name. <code>tel</code>,
+  <code>sms</code>, <code>xmpp</code>, <code>irc</code>, <code>matrix</code> have none: the
+  value is the thing. A note that appears on every page is furniture; one that appears on two
+  is information.
+</p>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · Both chips at once</p>
+
+<div class="mock-row">
+  <div class="card wide">
+    <h3>Padded and hidden together</h3>
+    <span class="sub2">The flags wrap as a set</span>
+    <span class="pv-scheme">mailto<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="seg">billing</span><span class="dl">@</span><span class="reg">example.com</span><span class="ws">&nbsp; &nbsp; &nbsp; &nbsp;</span><span class="seg">a</span><span class="dl">@</span><span class="reg">evil.test</span><span class="dl">?</span><span class="seg">subject</span><span class="dl">=</span><span class="qv">Invoice<span class="pct">%E2%80%AE</span>fdp.exe</span></code>
+    <div class="pv-flags">
+      <span class="pv-flag">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+        Padded With Spaces</span>
+      <span class="pv-flag">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+        Hidden Characters</span>
+    </div>
+    <span class="pv-note">The <code>subject</code> is text that would be sent in your name.</span>
+    <p class="note">A flex row that wraps, so two or three chips stack cleanly on a phone.
+      They are independent tests and both can be true at once — as here, where the body is
+      padded <i>and</i> carries a direction-changing escape.</p>
+  </div>
+
+  <div class="card wide">
+    <h3>With "Not Encrypted", for scale</h3>
+    <span class="sub2">All three, worst case</span>
+    <code class="pv-url" style="display:block;text-align:center">
+      <span class="sch" style="color:var(--danger);font-weight:700">http://</span><span class="reg">example.com</span><span class="seg">/pay</span>
+    </code>
+    <div class="pv-flags">
+      <span class="pv-flag">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M4.4 7.2V5.1a3.6 3.6 0 0 1 6.4-2.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <rect x="3.1" y="7.2" width="9.8" height="6.4" rx="1.8" stroke="currentColor" stroke-width="1.5"/></svg>
+        Not Encrypted</span>
+      <span class="pv-flag">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+        Hidden Characters</span>
+    </div>
+    <p class="note">The chips share one construction, so a page with three is still one
+      object to read rather than three competing panels. This is also the argument for keeping
+      them quiet: at full red, this card would be unreadable.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">4 · Formatting numbers — there is a safe way</p>
+
+<div class="fixnote">
+  <b>My "deciding reason" last round was wrong.</b> I said grouping digits makes two different
+  numbers look alike. It doesn't — grouping removes nothing, and
+  <code>+47 800 123 45</code> is exactly as distinguishable from
+  <code>+47 800 123 46</code> as the ungrouped pair. The real objection is narrower, and it
+  survives: <b>a literal space is a hazard we now mark, and any display that normalises
+  spacing would erase the tell.</b>
+</div>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank">A</span>
+    <h3>As stored, tabular digits</h3>
+    <span class="pv-scheme">tel<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="qv num">+4780012345</span></code>
+    <p class="note">Truthful and slightly hostile to read. Eleven digits with no rhythm is
+      exactly the string people mis-scan.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank pick">B · Pick</span>
+    <h3>Grouped with margins, not characters</h3>
+    <span class="pv-scheme">tel<span class="colon">:</span></span>
+    <code class="pv-opaque"><span class="qv num"><span class="grp">+47</span><span class="grp">800</span><span class="grp">123</span><span class="grp">45</span></span></code>
+    <p class="note"><b>The text node is untouched</b> — the gaps are <code>margin-left</code>
+      on spans, so the DOM still reads <code>+4780012345</code> and ⌘C copies exactly that.
+      Nothing is inserted, nothing is hidden, and the string on screen is character-for-character
+      the string in the database. <b>Guard:</b> apply it only when the stored body contains no
+      literal spaces of its own, so grouping can never disguise padding.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank nope">C</span>
+    <h3>Formatted, with the true string beneath</h3>
+    <span class="pv-scheme">tel<span class="colon">:</span></span>
+    <code class="pv-opaque" style="font-size:19px"><span class="qv num">+47 800 12 345</span></code>
+    <span class="pv-note" style="font-family:var(--font-mono);font-size:12px">stored as
+      <code>+4780012345</code></span>
+    <p class="note">Shows both, so nothing is hidden — but it needs the country tables to know
+      that Norway groups 8 digits as 3-2-3, and those tables are large, go stale, and would be
+      the first per-country data in the codebase. It also puts two versions of one fact on the
+      page and makes the visitor decide which to check.</p>
+  </div>
+</div>
+
+<p class="mock-note">
+  <strong>On the grouping itself:</strong> B groups from the left in threes, which is a rhythm
+  rather than a claim — it does not assert that <code>800</code> is an area code, because
+  nothing tells the reader it is. That's the honest ceiling without country data. If you want
+  real per-country grouping later, C is the shape it takes, and the "stored as" line is what
+  keeps it truthful.
+</p>
+
+</body>
+</html>

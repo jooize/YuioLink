@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Reveal copy, badge, and the refusal state</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1120px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-note { max-width: 1120px; margin: 0 auto 18px; padding: 0 20px;
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .mock-note strong { color: var(--text); font-weight: 600; }
+    .mock-note code { font-family: var(--font-mono); font-size: .92em; }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+
+    .card { width: 340px; background: var(--card-bg); border: .5px solid var(--card-border);
+      border-radius: var(--radius-window); box-shadow: var(--card-shadow); padding: 20px; }
+    .card h3 { margin: 0 0 3px; font: 600 15px/1.3 var(--font); }
+    .card .sub { display: block; font: 400 12.5px/1.5 var(--font); color: var(--text-secondary);
+      margin-bottom: 14px; }
+    .card .note { margin: 14px 0 0; font: 400 12.5px/1.55 var(--font); color: var(--text-secondary); }
+    .card .note b { color: var(--text); font-weight: 600; }
+    .rank { float: right; font: 700 11px/1 var(--font); letter-spacing: .04em;
+      text-transform: uppercase; padding: 5px 8px; border-radius: 999px;
+      background: var(--bg-2); border: .5px solid var(--card-border); color: var(--text-tertiary); }
+    .rank.pick { background: color-mix(in srgb, var(--switch-on, #34c759) 18%, transparent);
+      border-color: color-mix(in srgb, var(--switch-on, #34c759) 42%, transparent);
+      color: #1a7a35; }
+    .rank.nope { background: color-mix(in srgb, var(--danger) 12%, transparent);
+      border-color: color-mix(in srgb, var(--danger) 34%, transparent); color: var(--danger); }
+    @media (prefers-color-scheme: dark) { .rank.pick { color: #4ede78; } }
+
+    .finding { max-width: 1120px; margin: 0 auto 22px; padding: 16px 20px;
+      border-radius: var(--radius-control);
+      background: color-mix(in srgb, var(--danger) 9%, var(--card-bg));
+      border: .5px solid color-mix(in srgb, var(--danger) 38%, transparent);
+      font: 400 13.5px/1.6 var(--font); color: var(--text-secondary); }
+    .finding strong { color: var(--danger); font-weight: 700; }
+    .finding code { font-family: var(--font-mono); font-size: .92em; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+    .btn .glyph { flex: none; opacity: .72; }
+
+    /* Two-line button: the label over the price of pressing it. */
+    .btn.btn-2 { flex-direction: column; gap: 1px; padding-top: 9px; padding-bottom: 9px;
+      min-height: 52px; line-height: 1.25; }
+    .btn.btn-2 .cost { font-size: 11.5px; font-weight: 500; opacity: .82; letter-spacing: 0; }
+
+    /* Badge in the One-Time type colour the rest of the site already uses for
+       this shape of link (create picker, stats), rather than a neutral pill. */
+    .pv-badge.once {
+      color: var(--c-once);
+      background: color-mix(in srgb, var(--c-once) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--c-once) 42%, transparent);
+    }
+
+    /* Badge lifted above the button, so the link's shape is known before the
+       decision rather than after it. */
+    .pv-badge-wrap.above { margin-top: 18px; margin-bottom: -6px; }
+
+    /* Refusal panel: same construction as .pv-idn, different sentence. */
+    .pv-refuse { margin: 13px auto 0; max-width: 94%; padding: 11px 14px; border-radius: 10px;
+      text-align: left; font-size: 11.5px; line-height: 1.5; color: var(--text-secondary);
+      background: color-mix(in srgb, var(--danger) 9%, var(--field-bg));
+      border: .5px solid color-mix(in srgb, var(--danger) 38%, transparent); }
+    .pv-refuse p { margin: 0; max-width: none; text-align: left; font-size: inherit; color: inherit; }
+    .pv-refuse p strong { color: var(--danger); font-weight: 700; }
+    /* The destination printed but deliberately inert: no anchor, no button. */
+    .pv-url.inert { opacity: .72; }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 2</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Reveal: naming, subline, badge, refusal</h1>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">0 · A finding that rewrites the copy</p>
+<div class="finding">
+  <strong>Every limited link is a one-time link.</strong> The API rejects any
+  <code>max_uses</code> other than <code>1</code> (<code>web.rs:264</code>: "A link is either
+  unlimited or single-use"), and the create form only offers Public / Secret / One-Time
+  (<code>web.rs:353</code>). So <code>max_uses</code> is only ever <code>NULL</code> or
+  <code>Some(1)</code>, and a subline reading "Spends 1 of 3 views" describes a state your
+  system cannot produce. Every option below is written for the one-time reality.
+  <br><br>
+  Two consequences fall out of the same fact: <code>badge_text(false)</code> → "Limited Use"
+  is <strong>unreachable</strong>, as is the non-one-time <code>@else</code> caution in both
+  <code>limited_redirect_block</code> and <code>text_snippet_block</code>
+  (<code>views.rs:959</code>, <code>:977</code>) — <code>limited</code> and
+  <code>one_time</code> are the same condition. And <code>reveal_and_redact</code> blanking
+  the content on the first render is <em>correct</em>, not a multi-use bug, precisely because
+  there is never a second use to serve.
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · "Reveal Destination" or "Reveal Redirect"?</p>
+<p class="mock-note">
+  The consistency you're reaching for is real, but it points the other way.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">Keep</span>
+    <h3>Reveal Destination</h3>
+    <span class="sub">Names what appears</span>
+    <button class="btn btn-block" style="margin-top:0">Reveal Destination</button>
+    <button class="btn btn-block" style="margin-top:10px">Reveal Text</button>
+    <p class="note">Both buttons name <b>the thing that appears when you press</b>. For a Text
+      link that is the text; for a Redirect it is the destination. They are already the
+      consistent pair — the noun is the payload, in both.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank nope">Reject</span>
+    <h3>Reveal Redirect</h3>
+    <span class="sub">Names the link's kind</span>
+    <button class="btn btn-block" style="margin-top:0">Reveal Redirect</button>
+    <button class="btn btn-block" style="margin-top:10px">Reveal Text</button>
+    <p class="note">Now the pair is inconsistent in a way that is easy to miss: "Text" is a
+      payload, "Redirect" is a kind. And it is not true — pressing does not reveal a redirect,
+      it reveals where one goes. The kind is already stated once, in the kicker above
+      ("YuioLink Redirect"); saying it twice on one page spends the word without adding
+      anything.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · The subline — six ways to say the price</p>
+<p class="mock-note">
+  The label says what you get; the subline says what it costs. It has one shot at the
+  strongest true sentence, so the candidates below trade off <strong>finality</strong>
+  (it will not open again), <strong>exclusivity</strong> (nobody else gets one), and
+  <strong>mechanism</strong> (the server deletes it as you read).
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">Pick</span>
+    <h3>1 · Mechanism</h3>
+    <span class="sub">States what the server does</span>
+    <button class="btn btn-2 btn-block" style="margin-top:0">
+      <span>Reveal Destination</span>
+      <span class="cost">Deleted from our server as it opens</span>
+    </button>
+    <button class="btn btn-2 btn-block" style="margin-top:10px">
+      <span>Reveal Text</span>
+      <span class="cost">Deleted from our server as it opens</span>
+    </button>
+    <p class="note">The only line that is a <b>promise rather than a restriction</b>. It is
+      also literally what happens (<code>reveal_and_redact</code>), and it pre-echoes the
+      revealed page's own "Deleted from the server on this view" — one claim, made twice,
+      kept once. Best fit for a product whose pitch is ephemerality.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Strong</span>
+    <h3>2 · Finality</h3>
+    <span class="sub">Short, blunt, memorable</span>
+    <button class="btn btn-2 btn-block" style="margin-top:0">
+      <span>Reveal Destination</span>
+      <span class="cost">Opens once. This is that once.</span>
+    </button>
+    <button class="btn btn-2 btn-block" style="margin-top:10px">
+      <span>Reveal Text</span>
+      <span class="cost">Opens once. This is that once.</span>
+    </button>
+    <p class="note">The one people will quote back. Two sentences in a subline is unusual and
+      that is why it lands. <b>Risk:</b> it is a slogan, and slogans age faster than
+      statements of fact.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Strong</span>
+    <h3>3 · Exclusivity</h3>
+    <span class="sub">Frames it as yours</span>
+    <button class="btn btn-2 btn-block" style="margin-top:0">
+      <span>Reveal Destination</span>
+      <span class="cost">The only view — nobody else gets one</span>
+    </button>
+    <button class="btn btn-2 btn-block" style="margin-top:10px">
+      <span>Reveal Text</span>
+      <span class="cost">The only view — nobody else gets one</span>
+    </button>
+    <p class="note">Turns a limit into a guarantee, which is the honest reading: the sender
+      chose one-time <b>so that</b> exactly one person would see it. <b>Risk:</b> a visitor
+      who arrives second has already been told 410, so the claim is only ever read by the
+      person for whom it is true.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">OK</span>
+    <h3>4 · Plain cost</h3>
+    <span class="sub">The literal accounting</span>
+    <button class="btn btn-2 btn-block" style="margin-top:0">
+      <span>Reveal Destination</span>
+      <span class="cost">Spends the only view</span>
+    </button>
+    <button class="btn btn-2 btn-block" style="margin-top:10px">
+      <span>Reveal Text</span>
+      <span class="cost">Spends the only view</span>
+    </button>
+    <p class="note">Correct and unmemorable. "Spends" is the internal verb (<code>hits</code>,
+      <code>max_uses</code>) leaking into visitor copy — nobody outside the codebase thinks of
+      a link as having a balance.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">OK</span>
+    <h3>5 · Consequence</h3>
+    <span class="sub">What you must do about it</span>
+    <button class="btn btn-2 btn-block" style="margin-top:0">
+      <span>Reveal Destination</span>
+      <span class="cost">Copy it now — refreshing won't bring it back</span>
+    </button>
+    <button class="btn btn-2 btn-block" style="margin-top:10px">
+      <span>Reveal Text</span>
+      <span class="cost">Copy it now — refreshing won't bring it back</span>
+    </button>
+    <p class="note">The only option that tells the visitor what to <b>do</b>, and the refresh
+      trap is the one way people actually lose content here. <b>Risk:</b> it is an instruction
+      before the fact, on a button they have not pressed — mild pressure, and slightly long.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank nope">Reject</span>
+    <h3>6 · Counted</h3>
+    <span class="sub">The one you asked for</span>
+    <button class="btn btn-2 btn-block" style="margin-top:0">
+      <span>Reveal Destination</span>
+      <span class="cost">Spends 1 of 3 views</span>
+    </button>
+    <button class="btn btn-2 btn-block" style="margin-top:10px">
+      <span>Reveal Text</span>
+      <span class="cost">Spends 1 of 3 views</span>
+    </button>
+    <p class="note">Unshippable: multi-use links do not exist (see finding above). It would
+      also leak whether someone got there first, which the 410 currently reveals only after
+      the fact.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · What happens to "Opens Once"</p>
+<p class="mock-note">
+  Your two instincts — drop it, or keep it and colour it — are both live. Shown in full
+  context so the repetition (or its absence) is visible.
+</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank">A</span>
+    <h3>Badge dropped</h3>
+    <span class="sub">Subline is the only statement</span>
+    <span class="pv-host plain" style="display:block;text-align:center">example.com</span>
+    <button class="btn btn-2 btn-block" style="margin-top:18px">
+      <span>Reveal Destination</span>
+      <span class="cost">Deleted from our server as it opens</span>
+    </button>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <p class="note">Cleanest. <b>Loses:</b> the link's shape is now only legible to someone who
+      reads the button's second line — there is no at-a-glance mark, and nothing for the eye
+      to catch before the decision.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">B</span>
+    <h3>Badge kept, neutral</h3>
+    <span class="sub">Today's pill, below the button</span>
+    <span class="pv-host plain" style="display:block;text-align:center">example.com</span>
+    <button class="btn btn-2 btn-block" style="margin-top:18px">
+      <span>Reveal Destination</span>
+      <span class="cost">Deleted from our server as it opens</span>
+    </button>
+    <div class="pv-badge-wrap"><span class="pv-badge">Opens Once</span></div>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <p class="note">Says the same thing twice, three lines apart, in a quieter voice the second
+      time. <b>This is the weakest option</b> — repetition without emphasis reads as
+      redundancy, not reinforcement.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank pick">C</span>
+    <h3>Badge coloured, above</h3>
+    <span class="sub">One-Time purple, before the button</span>
+    <span class="pv-host plain" style="display:block;text-align:center">example.com</span>
+    <div class="pv-badge-wrap above"><span class="pv-badge once">Opens Once</span></div>
+    <button class="btn btn-2 btn-block" style="margin-top:18px">
+      <span>Reveal Destination</span>
+      <span class="cost">Deleted from our server as it opens</span>
+    </button>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <p class="note">The colour is not new: <code>--c-once</code> is what the create picker and
+      the stats page already use for One-Time. Borrowing it makes the badge <b>recognition</b>
+      rather than decoration, and above the button it arrives <b>before</b> the decision.
+      The subline then explains what the badge asserts, instead of echoing it.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">D</span>
+    <h3>Badge into the kicker</h3>
+    <span class="sub">Folded into the page heading</span>
+    <p style="text-align:center;margin:0 0 14px">
+      <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span>
+        <span style="color:var(--c-once)">· Opens Once</span></span>
+    </p>
+    <span class="pv-host plain" style="display:block;text-align:center">example.com</span>
+    <button class="btn btn-2 btn-block" style="margin-top:18px">
+      <span>Reveal Destination</span>
+      <span class="cost">Deleted from our server as it opens</span>
+    </button>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <p class="note">Most economical — no extra element at all. <b>Loses:</b> the kicker is
+      deliberately quiet (14px, secondary), and one-time-ness is the loudest fact on the page.
+      Putting it there files it as metadata.</p>
+  </div>
+</div>
+
+<p class="mock-note" style="margin-top:8px">
+  <strong>Recommended: C.</strong> It answers your "coloured border for attention" directly,
+  but takes the colour from the system instead of inventing one — and moving the badge above
+  the button converts the duplication into a sequence: <em>what this link is</em> (badge),
+  then <em>what pressing does</em> (subline).
+</p>
+
+<!-- ================================================================== -->
+<p class="mock-h">4 · When the stored destination fails validation</p>
+<p class="mock-note">
+  The state you asked to see. It should be unreachable — creation validates — so this is what
+  a bug, a bad migration, or a hand-edited row would surface as. The rule: <strong>printing a
+  URL is always safe, linking it is not</strong>, so the address stays on screen and only the
+  control goes away.
+</p>
+
+<div class="mock-row">
+  <div class="card" style="width:400px">
+    <span class="rank pick">Recommended</span>
+    <h3>Print it, inert</h3>
+    <span class="sub">No anchor, no button, address still shown</span>
+    <code class="pv-url inert" style="display:block;text-align:center">
+      <span class="sch">javascript:</span><span class="seg">alert(1)</span>
+    </code>
+    <div class="pv-refuse">
+      <p><strong>YuioLink won't open this.</strong> The address stored for this name isn't a
+        web address — it's an instruction for your browser, which a link should never be.
+        It's printed above so you can see exactly what was here.</p>
+    </div>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <p class="note">No Continue button at all — not a disabled one. A disabled button implies
+      "not yet"; this is <b>never</b>. The visitor loses nothing: they can still read, select
+      and copy the address, and decide for themselves.</p>
+  </div>
+
+  <div class="card" style="width:400px">
+    <span class="rank nope">Rejected</span>
+    <h3>Withhold it</h3>
+    <span class="sub">Refuse and show nothing</span>
+    <div class="pv-refuse" style="margin-top:0">
+      <p><strong>YuioLink won't open this.</strong> The address stored for this name isn't a
+        web address that can be opened.</p>
+    </div>
+    <p class="pv-meta" style="margin-top:14px">Expires in 6 days</p>
+    <p class="note">Hides evidence from the one person positioned to report it, and the whole
+      page exists to show people what a link really is. Withholding here contradicts that on
+      the single occasion it matters most. <b>Note the asymmetry:</b> a limited link withholds
+      its destination because it is <em>secret</em>; this one would be withheld because it is
+      <em>dangerous</em> — and danger is the case for showing, not hiding.</p>
+  </div>
+</div>
+
+</body>
+</html>
