@@ -1959,6 +1959,14 @@ html.history-collapsed .history-body {
     display: block;
 }
 
+/* The can hangs its mass under a lid drawn at the very top of the viewBox, so
+   against the copy sheets and the open arrow — both of which fill their box —
+   it reads a pixel high. Nudge the glyph, not the button: the padding stays put
+   and the hit area does not move. */
+.history-remove svg {
+    transform: translateY(1px);
+}
+
 .history-show:hover,
 .history-copy:hover,
 .history-remove:hover {

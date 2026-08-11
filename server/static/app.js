@@ -83,7 +83,7 @@
     // The can the result panel's Delete draws too, so the two places a link can be
     // removed from show one icon.
     const trashIcon = () =>
-        icon(15, "0 0 14 14", [
+        icon(16, "0 0 14 14", [
             [
                 "path",
                 {
