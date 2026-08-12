@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Loud labels</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .cap { display: block; text-align: center; margin: 0 0 10px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .note { max-width: 400px; margin: 12px auto 0; font: 400 12.5px/1.55 var(--font);
+      color: var(--text-secondary); text-align: left; }
+    .note b { color: var(--text); font-weight: 600; }
+    .note code { font-family: var(--font-mono); font-size: .95em; }
+    .fixnote { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .win { width: min(100%, 400px); }
+    .app-window.win { margin: 0; padding: 30px 26px 26px; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+
+    .pv-scheme { display: block; text-align: center; margin-top: 4px;
+      font-family: var(--font-mono); font-weight: 700; letter-spacing: -.01em;
+      line-height: 1.35; font-size: clamp(19px, 5vw, 24px); color: var(--text); }
+    .pv-scheme .colon { opacity: .45; }
+
+    .pv-facts { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center;
+      margin-top: 10px; }
+    .pv-fact { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px;
+      border-radius: 999px; font: 600 11px/1.45 var(--font);
+      color: var(--text-secondary); background: var(--field-bg);
+      border: .5px solid var(--card-border); }
+    .pv-fact svg { flex: none; color: var(--danger); }
+    .pv-fact.warn { color: var(--danger); }
+
+    /* --- our labels become pills -----------------------------------------
+       The italic voice was a whisper; the pill is the same statement at a
+       readable volume. It reuses the card's one chip construction (facts,
+       and once upon a time the round-15 tags), sentence-case per house
+       style. The rule is unchanged, only louder: mono text = the stored
+       string talking; a pill = us talking. Literal keys (?cc, &subject,
+       ;sid) stay bare mono — they need no costume, they are quotes. */
+    .pv-params { width: 100%; margin-top: 14px; border-collapse: collapse;
+      font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; }
+    .pv-params td { padding: 7px 0; vertical-align: top;
+      border-top: .5px solid var(--card-border); text-align: left; }
+    .pv-params tr:first-child td { border-top: none; }
+    .pv-params .k { width: 1%; white-space: nowrap; padding-right: 12px;
+      font-weight: 700; color: var(--text-secondary); }
+    .pv-params .k .mark { color: var(--text-tertiary); font-weight: 400; }
+    .pv-params .k .pill { display: inline-block; padding: 1px 8px;
+      border-radius: 999px; font: 600 10.5px/1.65 var(--font);
+      color: var(--text-secondary); background: var(--field-bg);
+      border: .5px solid var(--card-border); vertical-align: 1px; }
+    .pv-params .v { color: var(--text); word-break: break-all; }
+    .pv-params .v .dl { color: var(--accent); }
+    .pv-params .v .reg { font-weight: 700; }
+    .pv-params .v .lp { font-weight: 700; }
+    /* variant B only: the label trails the value instead */
+    .pv-params .v .tag { display: inline-block; margin-left: 7px; padding: 1px 8px;
+      border-radius: 999px; font: 600 10.5px/1.65 var(--font);
+      color: var(--text-secondary); background: var(--field-bg);
+      border: .5px solid var(--card-border); vertical-align: 1px; }
+
+    .pv-exact { display: block; margin-top: 14px; padding-top: 11px;
+      border-top: .5px solid var(--card-border); font-family: var(--font-mono);
+      font-size: 11.5px; line-height: 1.65; word-break: break-all; text-align: left;
+      color: var(--text); }
+    .pv-exact .lbl { display: block; font-family: var(--font); font-size: 11px;
+      font-weight: 500; font-style: italic; color: var(--text-tertiary);
+      margin-bottom: 3px; }
+    .pv-exact .sch { color: var(--text-tertiary); }
+    .pv-exact .dl { color: var(--accent); }
+    .pv-exact .k { color: var(--text-secondary); font-weight: 700; }
+    .pv-exact .reg { font-weight: 700; }
+    .pv-exact .pct { color: var(--text-tertiary); }
+    .pv-exact .usr { color: var(--danger); font-weight: 700; }
+
+    .pv-note { display: block; max-width: 96%; margin: 12px auto 0; text-align: center;
+      font: 400 12px/1.55 var(--font); color: var(--text-secondary); }
+    .pv-note code { font-family: var(--font-mono); font-size: .95em; color: var(--text);
+      font-weight: 700; }
+
+    .btn.btn-2 { flex-direction: column; gap: 2px; padding-top: 9px; padding-bottom: 9px;
+      min-height: 54px; line-height: 1.25; }
+    .btn.btn-2 .lead { display: inline-flex; align-items: center; gap: 7px; }
+    .btn.btn-2 .what { font-size: 11.5px; font-weight: 500; opacity: .82; letter-spacing: 0; }
+    .pv-open { margin-top: 22px; }
+
+    .pv-parts { display: block; margin-top: 12px; }
+    .pv-parts-lid { list-style: none; cursor: pointer; text-align: center;
+      font: 600 12px/1.4 var(--font); color: var(--text-secondary); padding: 6px; }
+    .pv-parts-lid::-webkit-details-marker { display: none; }
+    .pv-parts-lid::marker { content: ""; }
+    .pv-parts-lid .chev { color: var(--text-tertiary); margin-right: 4px; }
+    .pv-parts .when-open { display: none; }
+    .pv-parts[open] .when-open { display: inline; }
+    .pv-parts[open] .when-closed { display: none; }
+
+    .pv-url .usr { color: var(--danger); font-weight: 700; }
+
+    .pv-hedge { display: block; max-width: 92%; margin: 12px auto 0; text-align: center;
+      font: 400 11.5px/1.55 var(--font); color: var(--text-tertiary); }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 19</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Loud labels</h1>
+</div>
+
+<div class="fixnote">
+  <b>The italic was a whisper; the pill is the same sentence at a readable volume.</b>
+  Round 15's tags failed for a specific reason — they were <em>judgements</em>
+  ("identifies", "sent as you") shouting in uppercase what the notes say better. What they
+  had right was the costume: a pill is unmistakably a piece of UI, not a piece of the
+  stored string. So the round-18 voice rule keeps its meaning and changes clothes: <b>our
+  labels (<code>to</code>, <code>user</code>, <code>port</code>, <code>path</code>) become
+  sentence-case pills; literal keys (<code>?cc</code>, <code>&amp;subject</code>,
+  <code>;sid</code>) stay bare mono</b> — they are quotes and need no costume. The comma
+  still sits outside the pill: it is the URL's character, not ours.
+  <br><br>
+  Both placements are mocked below. My call is the <b>key column</b>: labels and keys are
+  the same kind of answer ("what is this row?") and belong in the same place; the trailing
+  tag re-creates the empty-key hole that made <code>join</code> look broken, and on a long
+  wrapped value it dangles mid-text where the eye reads it as part of the value.
+  <br><br>
+  <b>And spotify on one line: keep it.</b> The difference from the other cards is earned,
+  not arbitrary — that headline <em>is</em> the stored string, verbatim, so it may sit as
+  one run (and copy as one string); tel and mailto keep the separate plate because their
+  headlines are formatted renderings. On a narrow screen the run wraps after
+  <code>spotify:</code> and looks exactly like everyone else; on a wide one it earns its
+  single line by being true.
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · Two placements, one winner</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">A · pills in the key column (my pick)</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">merry</span><span class="nwg nw-1">GECKO</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">mailto<span class="colon">:</span></span>
+      <table class="pv-params">
+        <tr><td class="k"><span class="pill">to</span></td><td class="v"><span class="lp">sales</span><span class="dl">@</span><span class="reg">example.com</span></td></tr>
+        <tr><td class="k"><span class="mark">,</span> <span class="pill">to</span></td><td class="v"><span class="lp">support</span><span class="dl">@</span><span class="reg">example.com</span></td></tr>
+        <tr><td class="k"><span class="mark">?</span>cc</td><td class="v"><span class="lp">archive</span><span class="dl">@</span><span class="reg">records.example</span></td></tr>
+        <tr><td class="k"><span class="mark">&amp;</span>subject</td><td class="v">Order 4192</td></tr>
+      </table>
+      <span class="pv-note">Every address listed receives the message, and each can see the
+        others. The <code>subject</code> is pre-written by the link's creator.</span>
+      <code class="pv-exact"><span class="lbl">Exactly as stored</span><span class="sch">mailto:</span>sales<span class="dl">@</span><span class="reg">example.com</span><span class="dl">,</span>support<span class="dl">@</span><span class="reg">example.com</span><span class="dl">?</span><span class="k">cc</span><span class="dl">=</span>archive<span class="dl">@</span><span class="reg">records.example</span><span class="dl">&amp;</span><span class="k">subject</span><span class="dl">=</span>Order<span class="pct">%20</span>4192</code>
+      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
+        <span class="lead">Write to 3 addresses</span>
+        <span class="what">Email addresses</span></a>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note">Every row still answers "what is this?" in the same column — two of them
+      in quoted mono, two of them in our pill — and the comma stays a bare mono mark
+      because it is the URL's own character introducing the second recipient. The pill is
+      impossible to mistake for stored text at a glance, which is everything the italic
+      failed to do.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">B · tags trailing the value (your round-15 echo)</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">merry</span><span class="nwg nw-1">GECKO</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">mailto<span class="colon">:</span></span>
+      <table class="pv-params">
+        <tr><td class="k"></td><td class="v"><span class="lp">sales</span><span class="dl">@</span><span class="reg">example.com</span><span class="tag">to</span></td></tr>
+        <tr><td class="k"><span class="mark">,</span></td><td class="v"><span class="lp">support</span><span class="dl">@</span><span class="reg">example.com</span><span class="tag">to</span></td></tr>
+        <tr><td class="k"><span class="mark">?</span>cc</td><td class="v"><span class="lp">archive</span><span class="dl">@</span><span class="reg">records.example</span></td></tr>
+        <tr><td class="k"><span class="mark">&amp;</span>subject</td><td class="v">Order 4192</td></tr>
+      </table>
+      <span class="pv-note">Every address listed receives the message, and each can see the
+        others. The <code>subject</code> is pre-written by the link's creator.</span>
+      <code class="pv-exact"><span class="lbl">Exactly as stored</span><span class="sch">mailto:</span>sales<span class="dl">@</span><span class="reg">example.com</span><span class="dl">,</span>support<span class="dl">@</span><span class="reg">example.com</span><span class="dl">?</span><span class="k">cc</span><span class="dl">=</span>archive<span class="dl">@</span><span class="reg">records.example</span><span class="dl">&amp;</span><span class="k">subject</span><span class="dl">=</span>Order<span class="pct">%20</span>4192</code>
+      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
+        <span class="lead">Write to 3 addresses</span>
+        <span class="what">Email addresses</span></a>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note">The honest rendering of the trailing-tag idea, faults included: the
+      first row's key cell is empty (the hole that made <code>join</code> look broken), the
+      second row's lone comma dangles, and the two <code>to</code> tags sit at different
+      distances from the left edge, so the eye cannot scan "what is each row?" down one
+      column anymore. On a value long enough to wrap, the tag lands mid-paragraph. It
+      also mixes registers — a UI pill living inside the value's mono text.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · The pills reach https</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">the fold, same costume</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">zesty</span><span class="nwg nw-1">KOALA</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="usr">alice@</span><span class="sub">login.</span><span class="reg">example.co.uk</span><span class="pn">:</span><span class="seg">8443</span><span class="pn">/</span><span class="seg">reset</span><span class="pn">?</span><span class="seg">next</span><span class="pn">=</span><span class="qv">https://<span style="font-weight:700">example-mail.com</span>/</span></code>
+      <div class="pv-facts">
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Username in the Address</span>
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Carries Another Address</span>
+      </div>
+      <details class="pv-parts" open>
+        <summary class="pv-parts-lid"><span class="chev">▸</span><span class="when-closed">Show the parts</span><span class="when-open">Hide the parts</span></summary>
+        <table class="pv-params">
+          <tr><td class="k"><span class="pill">user</span></td><td class="v">alice</td></tr>
+          <tr><td class="k"><span class="pill">port</span></td><td class="v">8443</td></tr>
+          <tr><td class="k"><span class="pill">path</span></td><td class="v"><span class="dl">/</span>reset</td></tr>
+          <tr><td class="k"><span class="mark">?</span>next</td><td class="v">https<span class="dl">://</span><span class="reg">example-mail.com</span><span class="dl">/</span></td></tr>
+        </table>
+        <span class="pv-note">Text before the <code>@</code> is a login name, not part of the
+          address — this page is on <code>example.co.uk</code>. And <code>next</code> is
+          itself a complete web address, on a different domain.</span>
+      </details>
+      <code class="pv-exact"><span class="lbl">Exactly as stored</span><span class="sch">https://</span><span class="usr">alice@</span>login.<span class="reg">example.co.uk</span><span class="dl">:</span>8443<span class="dl">/</span>reset<span class="dl">?</span><span class="k">next</span><span class="dl">=</span>https<span class="pct">%3A%2F%2F</span>example-mail.com<span class="pct">%2F</span></code>
+      <a class="btn btn--go btn-block pv-btn btn-link pv-open" href="#">Continue to example.co.uk</a>
+      <p class="pv-meta">Expires in 6 days</p>
+      <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
+        else later. <strong>Always check the destination.</strong></span>
+    </div>
+    <p class="note">Read the key column: <b>three pills, one quote</b> — the parts we named
+      versus the key the URL wrote, distinguishable from across the room now. This is the
+      full https assembly as of this round: red <code>alice@</code> with its chip, decoded
+      <code>next</code> in the line, pills in the fold, and the conditional exact line
+      carrying the raw string and ⌘C.</p>
+  </div>
+</div>
+
+</body>
+</html>
