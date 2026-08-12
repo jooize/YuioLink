@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Slices and spaces</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .cap { display: block; text-align: center; margin: 0 0 10px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .note { max-width: 400px; margin: 12px auto 0; font: 400 12.5px/1.55 var(--font);
+      color: var(--text-secondary); text-align: left; }
+    .note b { color: var(--text); font-weight: 600; }
+    .note code { font-family: var(--font-mono); font-size: .95em; }
+    .fixnote { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .win { width: min(100%, 400px); }
+    .app-window.win { margin: 0; padding: 30px 26px 26px; }
+    /* compact comparison panels: just the fold's table, no full card */
+    .mini { width: min(100%, 340px); padding: 16px 18px 18px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); }
+    .mini .cap { margin-bottom: 2px; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+
+    .pv-scheme { display: block; text-align: center; margin-top: 4px;
+      font-family: var(--font-mono); font-weight: 700; letter-spacing: -.01em;
+      line-height: 1.35; font-size: clamp(19px, 5vw, 24px); color: var(--text); }
+    .pv-scheme .colon { opacity: .45; }
+
+    /* --- the recipient list is the headline, and one text run ------------
+       Dropping "to" all the way: recipients are not parameters, they are
+       what the link IS, so they live in the headline — as ONE inline run,
+       commas dim, <wbr> after each, wrapping one address per line on a
+       narrow card. Character-identical to the stored to-list, so selecting
+       it copies sales@example.com,support@example.com unbroken. */
+    .pv-list { display: block; margin-top: 9px; font-family: var(--font-mono);
+      font-size: clamp(15px, 4vw, 18px); font-weight: 400; line-height: 1.55;
+      word-break: normal; overflow-wrap: break-word; text-align: center;
+      color: var(--text); }
+    .pv-list .dl { color: var(--text-tertiary); }
+    .pv-list .reg { font-weight: 700; padding: 1px 4px; border-radius: 4px;
+      background: color-mix(in srgb, var(--accent) 13%, transparent); }
+
+    /* Address shading: the two sides of the @ now differ — local part
+       regular weight, domain bold (bold = a registrable domain, site-wide).
+       Full colour on both; the @ recedes. Round 16 made both sides bold,
+       which read as noise and diluted the bold-means-domain rule. */
+    .pv-value { display: block; margin-top: 9px; font-family: var(--font-mono);
+      font-size: clamp(17px, 4.6vw, 21px); font-weight: 700; line-height: 1.4;
+      word-break: normal; overflow-wrap: break-word; text-align: center;
+      color: var(--text); }
+    .pv-value .reg { padding: 1px 5px; border-radius: 5px;
+      background: color-mix(in srgb, var(--accent) 13%, transparent); }
+    .pv-value .dl { color: var(--text-tertiary); font-weight: 400; }
+    .pv-value .lp { color: var(--text); font-weight: 400; }
+
+    .pv-params { width: 100%; margin-top: 14px; border-collapse: collapse;
+      font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; }
+    .pv-params td { padding: 7px 0; vertical-align: top;
+      border-top: .5px solid var(--card-border); text-align: left; }
+    .pv-params tr:first-child td { border-top: none; }
+    .pv-params .k { width: 1%; white-space: nowrap; padding-right: 12px;
+      font-weight: 700; color: var(--text-secondary); }
+    .pv-params .k .mark { color: var(--text-tertiary); font-weight: 400; }
+    .pv-params .v { color: var(--text); word-break: break-all; }
+    .pv-params .v .dl { color: var(--accent); }
+    .pv-params .v .reg { font-weight: 700; }
+    .pv-params .v .lp { font-weight: 400; }
+    .pv-params td.lone { font-weight: 700; color: var(--text-secondary);
+      white-space: normal; word-break: break-all; }
+    .pv-params td.lone.usr { color: var(--danger); }
+    /* variant D: the gloss — our word, off to the right, unmistakably UI */
+    .pv-params .gloss { width: 1%; white-space: nowrap; padding-left: 12px;
+      text-align: right; font: italic 500 11px/1.6 var(--font);
+      color: var(--text-tertiary); vertical-align: middle; }
+    /* variants A/B: pill strengths */
+    .pv-params .k .pill-a { display: inline-block; padding: 1px 8px;
+      border-radius: 999px; font: 600 10.5px/1.65 var(--font);
+      color: var(--text); border: .5px solid var(--card-border);
+      background: color-mix(in srgb, var(--text) 9%, transparent);
+      vertical-align: 1px; }
+    .pv-params .k .pill-b { display: inline-block; padding: 1px 8px;
+      border-radius: 999px; font: 600 10.5px/1.65 var(--font);
+      color: var(--bg-1); background: var(--text-secondary);
+      vertical-align: 1px; }
+
+    /* --- a space that was an escape wears a dotted shadow of it ----------
+       In decoded text (URL line, table values) a space produced from %20
+       gets a faint dotted underline; a space that is literally stored (only
+       possible in mailto:/tel:/sms:) is bare. Suspicious runs keep their
+       danger tint. The exact line remains the arbiter either way. */
+    .dsp { border-bottom: 1px dotted var(--text-tertiary); }
+
+    .pv-exact { display: block; margin-top: 14px; padding-top: 11px;
+      border-top: .5px solid var(--card-border); font-family: var(--font-mono);
+      font-size: 11.5px; line-height: 1.65; word-break: break-all; text-align: left;
+      color: var(--text); }
+    .pv-exact .lbl { display: block; font-family: var(--font); font-size: 11px;
+      font-weight: 500; font-style: italic; color: var(--text-tertiary);
+      margin-bottom: 3px; }
+    .pv-exact .sch { color: var(--text-tertiary); }
+    .pv-exact .dl { color: var(--accent); }
+    .pv-exact .k { color: var(--text-secondary); font-weight: 700; }
+    .pv-exact .reg { font-weight: 700; }
+    .pv-exact .pct { color: var(--text-tertiary); }
+
+    .pv-note { display: block; max-width: 96%; margin: 12px auto 0; text-align: center;
+      font: 400 12px/1.55 var(--font); color: var(--text-secondary); }
+    .pv-note code { font-family: var(--font-mono); font-size: .95em; color: var(--text);
+      font-weight: 700; }
+
+    .btn.btn-2 { flex-direction: column; gap: 2px; padding-top: 9px; padding-bottom: 9px;
+      min-height: 54px; line-height: 1.25; }
+    .btn.btn-2 .lead { display: inline-flex; align-items: center; gap: 7px; }
+    .btn.btn-2 .what { font-size: 11.5px; font-weight: 500; opacity: .82; letter-spacing: 0; }
+    .pv-open { margin-top: 22px; }
+    .pv-hedge { display: block; max-width: 92%; margin: 12px auto 0; text-align: center;
+      font: 400 11.5px/1.55 var(--font); color: var(--text-tertiary); }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 20</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Slices and spaces</h1>
+</div>
+
+<div class="fixnote">
+  <b>Dropping "to" pulls a thread, and the whole label problem unravels nicely.</b> If the
+  addresses need no label — and they don't; an email address announces itself — then
+  recipients are not table rows at all: <b>they are what the link is, so they move up into
+  the headline</b>, as one comma-joined text run identical to the stored list (selection
+  copies it unbroken, the spotify trick). The table keeps only the URL's own keyed
+  parameters, <code>?cc</code> and <code>&amp;subject</code>, which self-describe. That
+  leaves exactly three labels in the whole design — <code>user</code>, <code>port</code>,
+  <code>path</code> in the https fold — and section 2 shows four ways to dress them,
+  including your grey-background pill. My pick is <b>D</b>: stop labelling and start
+  <em>slicing</em> — every row is a verbatim slice of the URL (<code>alice@</code>,
+  <code>:8443</code>, <code>/reset</code>), and our word moves to the right edge as a
+  small italic gloss. The mono column is then 100% stored characters top to bottom, and
+  the gloss is unmistakably ours — which is also your "right side" idea from last round,
+  landed where it works: on short slices, not on long values.
+  <br><br>
+  <b>And yes on shading the two sides of the @.</b> Round 16 made both sides bold, which
+  read as noise and quietly diluted the site rule that bold means a registrable domain.
+  Now: local part regular weight, full colour; <code>@</code> dim; domain bold. Each side
+  different, nothing dimmed to grey, and the bold rule is pure again.
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · mailto without "to" — recipients are the headline</p>
+
+<div class="mock-row">
+  <div class="win">
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">merry</span><span class="nwg nw-1">GECKO</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">mailto<span class="colon">:</span></span>
+      <code class="pv-list"><span class="lp">sales</span><span class="dl">@</span><span class="reg">example.com</span><span class="dl">,</span><wbr><span class="lp">support</span><span class="dl">@</span><span class="reg">example.com</span></code>
+      <table class="pv-params">
+        <tr><td class="k"><span class="mark">?</span>cc</td><td class="v"><span class="lp">archive</span><span class="dl">@</span><span class="reg">records.example</span></td></tr>
+        <tr><td class="k"><span class="mark">&amp;</span>subject</td><td class="v">Order<span class="dsp"> </span>4192</td></tr>
+      </table>
+      <span class="pv-note">Every address listed receives the message, and each can see the
+        others. The <code>subject</code> is pre-written by the link's creator.</span>
+      <code class="pv-exact"><span class="lbl">Exactly as stored</span><span class="sch">mailto:</span>sales<span class="dl">@</span><span class="reg">example.com</span><span class="dl">,</span>support<span class="dl">@</span><span class="reg">example.com</span><span class="dl">?</span><span class="k">cc</span><span class="dl">=</span>archive<span class="dl">@</span><span class="reg">records.example</span><span class="dl">&amp;</span><span class="k">subject</span><span class="dl">=</span>Order<span class="pct">%20</span>4192</code>
+      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
+        <span class="lead">Write to 3 addresses</span>
+        <span class="what">Email addresses</span></a>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note">No "to" anywhere, because nothing needs it: the headline <b>is</b> the
+      recipient list — one text run, commas dim, wrapping one address per line on a phone,
+      and selecting it copies <code>sales@example.com,support@example.com</code> exactly.
+      The two sides of each <code>@</code> now differ: <code>sales</code> regular,
+      <code>example.com</code> bold — scan the list and the domains pop out of the noise.
+      In <code>&amp;subject</code>, note the faint dotted line under the space: section 3.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · user, port, path — four costumes</p>
+
+<div class="mock-row">
+  <div class="mini">
+    <span class="cap">A · grey-fill pill</span>
+    <table class="pv-params">
+      <tr><td class="k"><span class="pill-a">user</span></td><td class="v">alice</td></tr>
+      <tr><td class="k"><span class="pill-a">port</span></td><td class="v">8443</td></tr>
+      <tr><td class="k"><span class="pill-a">path</span></td><td class="v"><span class="dl">/</span>reset</td></tr>
+      <tr><td class="k"><span class="mark">?</span>next</td><td class="v">https<span class="dl">://</span><span class="reg">example-mail.com</span><span class="dl">/</span></td></tr>
+    </table>
+    <p class="note" style="max-width:none">Your suggestion: the round-19 pill with a real
+      grey fill instead of the near-invisible field tint. Honest verdict: better, and
+      still a word pretending to sit where keys sit.</p>
+  </div>
+
+  <div class="mini">
+    <span class="cap">B · solid pill</span>
+    <table class="pv-params">
+      <tr><td class="k"><span class="pill-b">user</span></td><td class="v">alice</td></tr>
+      <tr><td class="k"><span class="pill-b">port</span></td><td class="v">8443</td></tr>
+      <tr><td class="k"><span class="pill-b">path</span></td><td class="v"><span class="dl">/</span>reset</td></tr>
+      <tr><td class="k"><span class="mark">?</span>next</td><td class="v">https<span class="dl">://</span><span class="reg">example-mail.com</span><span class="dl">/</span></td></tr>
+    </table>
+    <p class="note" style="max-width:none">Maximum contrast — nothing could miss it. But
+      three filled buttons now outshout the one row that matters
+      (<code>?next</code>), and the fold starts looking like controls.</p>
+  </div>
+
+  <div class="mini">
+    <span class="cap">C · slices, no labels at all</span>
+    <table class="pv-params">
+      <tr><td class="lone usr" colspan="2">alice@</td></tr>
+      <tr><td class="lone" colspan="2">:8443</td></tr>
+      <tr><td class="lone" colspan="2">/reset</td></tr>
+      <tr><td class="k"><span class="mark">?</span>next</td><td class="v">https<span class="dl">://</span><span class="reg">example-mail.com</span><span class="dl">/</span></td></tr>
+    </table>
+    <p class="note" style="max-width:none">The mark rule taken to its conclusion: every row
+      a verbatim slice of the URL, cut at its joints — <code>alice@</code> red with its
+      chip, nothing invented anywhere. Purest, but ":8443" explains nothing to someone who
+      has never heard of a port.</p>
+  </div>
+
+  <div class="mini">
+    <span class="cap">D · slices, glossed (my pick)</span>
+    <table class="pv-params">
+      <tr><td class="lone usr">alice@</td><td class="gloss">username</td></tr>
+      <tr><td class="lone">:8443</td><td class="gloss">port</td></tr>
+      <tr><td class="lone">/reset</td><td class="gloss">path</td></tr>
+      <tr><td class="k"><span class="mark">?</span>next</td><td class="v">https<span class="dl">://</span><span class="reg">example-mail.com</span><span class="dl">/</span></td></tr>
+    </table>
+    <p class="note" style="max-width:none">C's truth plus the missing word: the slice owns
+      the left column like every other row, and our word sits at the right edge, italic and
+      small — your "right side" idea, landed where it works, on short slices where it can
+      never tangle with a wrapped value. The mono column is now 100% stored characters,
+      top to bottom.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · A space, or a %20?</p>
+
+<div class="fixnote">
+  <b>The reader can't tell — so the space that was an escape keeps a shadow of it.</b>
+  A space produced by decoding <code>%20</code> wears a faint dotted underline; a space
+  that is literally in the stored string (possible only in <code>mailto:</code> /
+  <code>tel:</code> / <code>sms:</code> — the https canonicaliser never lets one survive)
+  is bare. Suspicious runs and edge-spaces keep their danger tint as before, and the
+  exact line stays the arbiter of record. The dot-line is deliberately the quietest mark
+  on the card: it answers the question when you ask it and vanishes when you don't.
+  One more corner pinned down: <code>%25</code> is one of the four structure escapes we
+  never decode, so a visible <code>%20</code> in decoded text simply cannot occur — dotted
+  space means "was <code>%20</code>", visible dim <code>%NN</code> means "still an
+  escape", bare space means "really a space". Three appearances, three meanings, no
+  overlap.
+</div>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">both kinds in one card</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">plain</span><span class="nwg nw-1">MARTEN</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">mailto<span class="colon">:</span></span>
+      <span class="pv-value"><span class="lp">ella.storli</span><span class="dl">@</span><span class="reg">gmail.com</span></span>
+      <table class="pv-params">
+        <tr><td class="k"><span class="mark">?</span>subject</td><td class="v">Order<span class="dsp"> </span>4192</td></tr>
+        <tr><td class="k"><span class="mark">&amp;</span>body</td><td class="v">call me</td></tr>
+      </table>
+      <span class="pv-note">The <code>subject</code> and <code>body</code> are pre-written
+        by the link's creator. A message sent from here goes out as you.</span>
+      <code class="pv-exact"><span class="lbl">Exactly as stored</span><span class="sch">mailto:</span>ella.storli<span class="dl">@</span><span class="reg">gmail.com</span><span class="dl">?</span><span class="k">subject</span><span class="dl">=</span>Order<span class="pct">%20</span>4192<span class="dl">&amp;</span><span class="k">body</span><span class="dl">=</span>call me</code>
+      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
+        <span class="lead">Write to ella.storli@gmail.com</span>
+        <span class="what">An email address</span></a>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note">Same card, both answers: the subject's space is dotted (stored as
+      <code>%20</code>), the body's is bare (stored as a real space — find it verbatim in
+      the exact line). The headline also shows the new address shading:
+      <code>ella.storli</code> regular, <code>gmail.com</code> bold and washed, the
+      <code>@</code> receding — different darkness on each side, as asked.</p>
+  </div>
+</div>
+
+</body>
+</html>
