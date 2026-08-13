@@ -1569,6 +1569,735 @@ html.js .custom-field:not(.open) {
     margin: 0;
 }
 
+/* --------------------------------------------------------------------------
+   The card: three registers.
+   Headline = what the link IS, slices = what it CARRIES, "Exactly as stored" =
+   what is STORED. One syntax palette across all three, differing only in
+   emphasis: delimiters accent, keys bold, percent escapes dimmed to the
+   encoding noise they are, registrable domains bold — and the accent WASH
+   exactly once per page, on the headline's domain, because that is who you are
+   actually dealing with.
+   -------------------------------------------------------------------------- */
+
+/* An anchor wearing a button's clothes. */
+.btn-link {
+    text-decoration: none;
+}
+
+.btn--go.btn-link {
+    color: #241a05;
+}
+
+/* The scheme plate. It does NOT take the wash — a scheme is not who you are
+   dealing with — so size is its emphasis and the colour stays plain. */
+.pv-scheme {
+    display: block;
+    text-align: center;
+    margin-top: 4px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.35;
+    font-size: clamp(19px, 5vw, 24px);
+    color: var(--text);
+}
+
+.pv-scheme .colon {
+    opacity: 0.45;
+}
+
+/* One-run headline: the scheme and the body share a single inline text run,
+   soft-wrapping at the <wbr>s. Soft wraps are layout, not characters, so a
+   selection across both lines pastes `spotify:track:…` unbroken. This is also
+   why these cards carry no "Exactly as stored": the headline already is it. */
+.pv-line {
+    display: block;
+    text-align: center;
+    margin-top: 4px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    line-height: 1.4;
+    word-break: normal;
+    overflow-wrap: break-word;
+    color: var(--text);
+    font-size: clamp(17px, 4.6vw, 21px);
+}
+
+.pv-line .sch-big {
+    font-size: clamp(19px, 5vw, 24px);
+    letter-spacing: -0.01em;
+}
+
+.pv-line .colon {
+    opacity: 0.45;
+}
+
+.pv-line .seg {
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+.pv-line .dl {
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
+
+.pv-line .reg {
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+}
+
+/* The one-run headline is a copy target too, so it takes the URL line's own
+   green check (see .pv-url::after). Space is reserved, so nothing reflows. */
+.pv-line::after {
+    content: "\2713";
+    margin-left: 0.4em;
+    font-weight: 700;
+    color: var(--switch-on);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+.pv-line.copied::after {
+    opacity: 1;
+}
+
+/* Formatted headline (a phone number, one address): a rendering, not the
+   record — which is exactly why these cards always keep the exact line. */
+.pv-value {
+    display: block;
+    margin-top: 9px;
+    font-family: var(--font-mono);
+    font-size: clamp(17px, 4.6vw, 21px);
+    font-weight: 700;
+    line-height: 1.4;
+    word-break: normal;
+    overflow-wrap: break-word;
+    text-align: center;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.pv-value .reg {
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+}
+
+.pv-value .dl {
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
+
+/* On a freemail domain the local part IS the identity, so it reads at full
+   colour — but regular weight, because bold means one thing site-wide. */
+.pv-value .lp {
+    color: var(--text);
+    font-weight: 400;
+}
+
+/* Phone dress: recede what routes, bold what identifies. The country code goes
+   regular secondary, the separators tertiary, the national digits keep the
+   bold. Every one of those separators is its own country's, out of
+   libphonenumber's tables. */
+.pv-value .cc {
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+.pv-value .sep {
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
+
+/* libphonenumber's own rendering of an extension, riding the number rather
+   than sitting in a table of its own. */
+.pv-value .ext {
+    margin-left: 0.55em;
+    font-size: 0.66em;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0;
+}
+
+/* Recipients as the headline: one comma-joined inline run, character-identical
+   to the stored list, wrapping one address per line on a phone. */
+.pv-list {
+    display: block;
+    margin-top: 9px;
+    font-family: var(--font-mono);
+    font-size: clamp(15px, 4vw, 18px);
+    font-weight: 400;
+    line-height: 1.55;
+    word-break: normal;
+    overflow-wrap: break-word;
+    text-align: center;
+    color: var(--text);
+}
+
+.pv-list .dl {
+    color: var(--text-tertiary);
+}
+
+.pv-list .lp {
+    color: var(--text);
+}
+
+.pv-list .reg {
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+}
+
+/* Several numbers, one per line — a comma-joined run of digits reads as mess.
+   A centred block with two columns inside: country codes right-aligned into
+   the seam, national numbers sharing a left edge, tabular digits under each
+   other. Each number's facts ride beside it, because a Premium Rate warning
+   has to point at ITS number. */
+.pv-stack2 {
+    display: grid;
+    grid-template-columns: auto auto;
+    justify-content: center;
+    column-gap: 0.45em;
+    row-gap: 3px;
+    margin-top: 9px;
+    font-family: var(--font-mono);
+    font-size: clamp(16px, 4.2vw, 19px);
+    font-weight: 700;
+    line-height: 1.45;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.pv-stack2 .cc {
+    text-align: right;
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+.pv-stack2 .nn {
+    text-align: left;
+}
+
+.pv-stack2 .nn .sep {
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
+
+.pv-stack2 .facts {
+    grid-column: 2;
+    text-align: left;
+    margin: -1px 0 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 10px;
+}
+
+.pv-stack2 .facts:last-child {
+    margin-bottom: 0;
+}
+
+/* A number the reader has unticked dims, and its facts leave with it. */
+.pv-stack2 .off {
+    opacity: 0.3;
+}
+
+/* Facts keep the pill; a warning is the card speaking plainly — bare red icon
+   and words, no fill. The contrast is what carries the difference. */
+.pv-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px 14px;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.pv-fact {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.45;
+    color: var(--text-secondary);
+    background: var(--field-bg);
+    border: 0.5px solid var(--card-border);
+}
+
+.pv-fact .flag {
+    font-size: 13px;
+    line-height: 1;
+}
+
+.pv-fact.warn {
+    background: transparent;
+    border: none;
+    padding: 3px 0;
+    color: var(--danger);
+}
+
+.pv-fact svg {
+    flex: none;
+    color: var(--danger);
+}
+
+/* One step smaller beside a number, so the digits stay the loudest thing. */
+.pv-stack2 .pv-fact {
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 10.5px;
+}
+
+.pv-stack2 .pv-fact.warn {
+    padding: 2px 0;
+}
+
+/* Slices: every row a verbatim cut of the stored string, one cell each. The
+   checkbox preview.js injects is the browser's own, re-inked grey with
+   accent-color rather than replaced — native focus, keyboard, and screen
+   reader all survive. */
+.pv-slices {
+    margin-top: 14px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+.pv-slice {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    padding: 7px 0;
+    border-top: 0.5px solid var(--card-border);
+    text-align: left;
+}
+
+.pv-slice:first-child {
+    border-top: none;
+}
+
+.pv-slice input {
+    flex: none;
+    align-self: center;
+    margin: 0;
+    accent-color: var(--text-tertiary);
+}
+
+/* Clicking anywhere on a removable row flips its box (preview.js), so the row
+   takes the pointer — but the text keeps the caret, because selecting a value
+   is the other thing a reader does here. */
+.pv-slice.togglable {
+    cursor: pointer;
+}
+
+.pv-slice.togglable:hover {
+    background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+
+.pv-slice.togglable .txt {
+    cursor: text;
+}
+
+.pv-slice .txt {
+    color: var(--text);
+    word-break: break-all;
+    min-width: 0;
+}
+
+.pv-slice .txt .dl {
+    color: var(--accent);
+}
+
+.pv-slice .txt .k {
+    color: var(--text-secondary);
+    font-weight: 700;
+}
+
+.pv-slice .txt .reg {
+    font-weight: 700;
+}
+
+.pv-slice .txt .lp {
+    font-weight: 400;
+}
+
+.pv-slice .txt .pct {
+    color: var(--text-tertiary);
+}
+
+.pv-slice .txt .bad {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+/* Userinfo goes danger red in its slice and on the URL line, co-firing with
+   its chip. Not amber: amber is the button language for "you leave". */
+.pv-slice.usr .txt {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+.pv-slice.off .txt {
+    opacity: 0.38;
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
+/* The last sms recipient locks: RFC 5724's grammar needs at least one. */
+.pv-slice.locked {
+    cursor: default;
+}
+
+.pv-slice.locked:hover {
+    background: transparent;
+}
+
+/* A space that was stored as %20. Three appearances, three meanings, no
+   overlap: dotted = it was an escape, dim %NN = it still is one, bare space =
+   it really is a space. */
+.dsp {
+    border-bottom: 1px dotted var(--text-tertiary);
+}
+
+/* The fold, for http(s) only: the everyday page stays one quiet line and the
+   parts are an offer. The chevron is generated content, so a selection or a
+   copy never picks it up — it used to arrive in the clipboard as "Show". */
+.pv-parts {
+    display: block;
+    margin-top: 12px;
+}
+
+.pv-parts-lid {
+    list-style: none;
+    cursor: pointer;
+    text-align: center;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    padding: 6px;
+}
+
+.pv-parts-lid::-webkit-details-marker {
+    display: none;
+}
+
+.pv-parts-lid::marker {
+    content: "";
+}
+
+.pv-parts-lid::before {
+    content: "\25b8";
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--text-tertiary);
+    transition: transform 0.18s ease;
+}
+
+.pv-parts[open] .pv-parts-lid::before {
+    transform: rotate(90deg);
+}
+
+.pv-parts .when-open {
+    display: none;
+}
+
+.pv-parts[open] .when-open {
+    display: inline;
+}
+
+.pv-parts[open] .when-closed {
+    display: none;
+}
+
+/* The two raw lines share one dress. "Exactly as stored" is the record and
+   never collapses; "After your edits" is the tool and appears only when the
+   rebuilt string differs. Both are copied by explicit buttons — there are no
+   selection tricks anywhere on this page. */
+.rawline {
+    display: block;
+    margin-top: 14px;
+    padding-top: 11px;
+    border-top: 0.5px solid var(--card-border);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.65;
+    word-break: break-all;
+    text-align: left;
+    color: var(--text);
+}
+
+.rawline .lbl {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 500;
+    font-style: italic;
+    color: var(--text-tertiary);
+    margin-bottom: 3px;
+}
+
+.rawline .sch {
+    color: var(--text-tertiary);
+}
+
+.rawline .dl {
+    color: var(--accent);
+}
+
+.rawline .k {
+    color: var(--text-secondary);
+    font-weight: 700;
+}
+
+.rawline .reg {
+    font-weight: 700;
+}
+
+.rawline .pct {
+    color: var(--text-tertiary);
+}
+
+.rawline .usr {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+/* JS-injected and JS-shown: without a script this element never exists, so
+   nothing here reveals or hides anything on load. */
+.rawline.edited {
+    border-top-style: dashed;
+    display: none;
+}
+
+.rawline.edited .lbl {
+    color: var(--accent);
+}
+
+.rawline.edited.show {
+    display: block;
+}
+
+.copybtn {
+    font-family: var(--font);
+    font-size: 10.5px;
+    font-weight: 600;
+    font-style: normal;
+    line-height: 1.6;
+    padding: 1px 9px;
+    border-radius: 999px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 0.5px solid var(--card-border);
+}
+
+.copybtn:hover {
+    color: var(--text);
+}
+
+.copybtn.done {
+    color: var(--switch-on);
+    border-color: transparent;
+}
+
+/* A note appears only where the standard opens a gap between what is shown and
+   what is true. A sentence under every card would train the eye to skip the
+   ones that matter. */
+.pv-note {
+    display: block;
+    max-width: 96%;
+    margin: 12px auto 0;
+    text-align: center;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.55;
+    color: var(--text-secondary);
+}
+
+.pv-note code {
+    font-family: var(--font-mono);
+    font-size: 0.95em;
+    color: var(--text);
+    font-weight: 700;
+}
+
+/* The two-line handoff button: a lead verb over the scheme's own definition. */
+.btn.btn-2 {
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 9px;
+    padding-bottom: 9px;
+    min-height: 54px;
+    line-height: 1.25;
+}
+
+.btn.btn-2 .lead {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.btn.btn-2 .what {
+    font-size: 11.5px;
+    font-weight: 500;
+    opacity: 0.82;
+    letter-spacing: 0;
+}
+
+.btn .sch-tag {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    opacity: 0.72;
+}
+
+.btn .mid {
+    opacity: 0.45;
+}
+
+/* The split: act, or take it with you. Amber (or blue) action, blue Copy —
+   blue because copying leaves you here. preview.js builds it; without a script
+   the action stays one full-width button and the page is complete. */
+.pv-split {
+    display: flex;
+    gap: 2px;
+    margin-top: 22px;
+}
+
+.pv-split .btn {
+    margin-top: 0;
+}
+
+.pv-split .go {
+    flex: 1;
+    border-radius: var(--radius-control) 0 0 var(--radius-control);
+}
+
+.pv-split .splitcopy {
+    flex: none;
+    padding: 0 18px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 0 var(--radius-control) var(--radius-control) 0;
+}
+
+/* One hedge, once, under the handoff button. "If anything" is load-bearing. */
+.pv-hedge {
+    display: block;
+    max-width: 92%;
+    margin: 12px auto 0;
+    text-align: center;
+    font-family: var(--font);
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.55;
+    color: var(--text-tertiary);
+}
+
+/* A one-time link discloses nothing before its use is spent. The line says
+   what will happen, not that something is being withheld — the server really
+   has not given anything away yet. */
+.pv-blind {
+    display: block;
+    margin-top: 10px;
+    text-align: center;
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.5;
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+/* "Opens Once" in the create picker's own purple, so the badge and the type
+   segment that made the link are visibly the same fact. */
+.pv-badge.once {
+    color: var(--c-once);
+    background: color-mix(in srgb, var(--c-once) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--c-once) 45%, transparent);
+}
+
+/* Plain http: red on the scheme characters, and the chip says it in words for
+   anyone who cannot see the red. No green ever appears on https — encryption
+   is the norm, and its absence is the only thing worth a signal. */
+.pv-url .sch.insecure {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+.pv-url .usr {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+/* Ordinary escapes are encoding noise; ones that decode to something invisible
+   or direction-changing are not, and go red with their chip. */
+.pv-url .pe {
+    color: var(--text-tertiary);
+}
+
+.pv-url .bad {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+/* Tier 3: printed, never linked, and given no control at all — not a disabled
+   one. The panel stays neutral ground; red lives only in the 16px symbol,
+   because the red fill belongs to .pv-idn, where an actual attack is on the
+   page. */
+.pv-url.inert {
+    opacity: 0.7;
+    text-align: center;
+}
+
+.pv-refuse-alert {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 11px;
+    margin: 14px auto 0;
+    max-width: 94%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    text-align: left;
+    background: var(--field-bg);
+    border: 0.5px solid var(--card-border);
+}
+
+.pv-refuse-alert .sym {
+    display: grid;
+    place-items: center;
+    height: 19px;
+    width: 16px;
+    color: var(--danger);
+}
+
+.pv-refuse-alert .msg {
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.pv-refuse-alert .msg b {
+    display: block;
+    font-size: 12.5px;
+    line-height: 19px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 2px;
+}
+
 /* Split storage pill near the top, always shown. Two butted segments clipped to a
    pill: left = status (links to the list), right = local-persistence toggle in its
    own colour, for a clean colour cut between them. */
