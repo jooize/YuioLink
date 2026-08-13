@@ -4,8 +4,13 @@
 //! Rust, no system libraries (it builds `default-features = false, features =
 //! ["text"]`, so the SVG-embedded-raster decoders and system-font loading are
 //! dropped). Two DejaVu fonts are embedded so the card renders identically with no
-//! system fonts installed, e.g. in a slim container. The card always shows the
+//! system fonts installed, e.g. in a slim container. An ordinary card shows the
 //! destination domain — decided, so a shared link reads as trustworthy.
+//!
+//! A **one-time** link's card shows no destination at all. The preview page is
+//! blind until the use is spent, and an unfurl that named the domain would hand
+//! it to every chat server the link passed through without spending anything —
+//! which is precisely the disclosure the blind card exists to prevent.
 //!
 //! The wordmark carries the only brand colour — "Link" in the accent blue, with no
 //! separate mark beside it — so the card holds one accent, not three. The greys are
@@ -31,10 +36,16 @@ const PAD: f32 = 96.0;
 
 /// What a share card states. All plaintext.
 pub struct Card<'a> {
-    /// "Ephemeral redirect" or "One-time redirect".
+    /// "Ephemeral redirect" or "One-time link".
     pub kicker: &'a str,
-    /// The destination's registrable domain, shown big.
-    pub domain: &'a str,
+    /// The line under the kicker: a destination's registrable domain, or --
+    /// for a one-time link, which has disclosed nothing yet -- what will
+    /// happen instead.
+    pub hero: &'a str,
+    /// True when `hero` is a sentence rather than an address. It then reads in
+    /// the UI font, and the kicker drops its arrow: there is no destination
+    /// for the arrow to point at.
+    pub blind: bool,
     /// e.g. "expires Jun 29, 2026 · 14:30 UTC".
     pub foot: &'a str,
 }
@@ -68,10 +79,21 @@ fn fontdb() -> Arc<usvg::fontdb::Database> {
 }
 
 fn build_svg(card: &Card) -> String {
-    let domain = xml_escape(&fit_domain(card.domain));
+    let hero = xml_escape(&fit_hero(card.hero));
     let kicker = xml_escape(card.kicker);
     let foot = xml_escape(card.foot);
-    let dest_size = dest_font_size(card.domain);
+    let hero_size = hero_font_size(card.hero, card.blind);
+    let hero_font = if card.blind {
+        "DejaVu Sans"
+    } else {
+        "DejaVu Sans Mono"
+    };
+    // The arrow promises a destination, so a blind card does not draw one.
+    let arrow = if card.blind {
+        String::new()
+    } else {
+        " <tspan fill=\"#007aff\">&#8594;</tspan>".to_string()
+    };
     format!(
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{HEIGHT}" viewBox="0 0 {WIDTH} {HEIGHT}">
   <defs>
@@ -87,23 +109,29 @@ fn build_svg(card: &Card) -> String {
   <rect width="{WIDTH}" height="{HEIGHT}" fill="url(#bg)"/>
   <rect width="{WIDTH}" height="{HEIGHT}" fill="url(#glow)"/>
   <text x="96" y="117" font-family="DejaVu Sans" font-weight="bold" font-size="44" fill="#1d1d1f">Yuio<tspan fill="#007aff">Link</tspan></text>
-  <text x="96" y="338" font-family="DejaVu Sans" font-size="35" fill="#55555c">{kicker} <tspan fill="#007aff">&#8594;</tspan></text>
-  <text x="94" y="432" font-family="DejaVu Sans Mono" font-weight="bold" font-size="{dest_size}" fill="#1d1d1f">{domain}</text>
+  <text x="96" y="338" font-family="DejaVu Sans" font-size="35" fill="#55555c">{kicker}{arrow}</text>
+  <text x="94" y="432" font-family="{hero_font}" font-weight="bold" font-size="{hero_size}" fill="#1d1d1f">{hero}</text>
   <text x="96" y="566" font-family="DejaVu Sans" font-size="33" fill="#55555c">{foot}</text>
 </svg>"##
     )
 }
 
-/// Shrink the destination font so even a long domain stays on one line. DejaVu
-/// Sans Mono advances ~0.6 em per glyph; 0.62 leaves a little slack.
-fn dest_font_size(domain: &str) -> f32 {
-    let len = domain.chars().count().max(1) as f32;
+/// Shrink the hero font so even a long line stays on one line. DejaVu Sans Mono
+/// advances ~0.6 em per glyph (0.62 leaves a little slack); the proportional
+/// face is narrower, so a sentence gets a tighter factor and a lower ceiling --
+/// it is a phrase, not the address the card is about.
+fn hero_font_size(hero: &str, blind: bool) -> f32 {
+    let len = hero.chars().count().max(1) as f32;
     let avail = WIDTH as f32 - 2.0 * PAD;
-    (avail / (0.62 * len)).clamp(28.0, 92.0)
+    if blind {
+        (avail / (0.52 * len)).clamp(28.0, 72.0)
+    } else {
+        (avail / (0.62 * len)).clamp(28.0, 92.0)
+    }
 }
 
-/// Guard against an absurdly long registrable domain overflowing the card.
-fn fit_domain(domain: &str) -> String {
+/// Guard against an absurdly long hero line overflowing the card.
+fn fit_hero(domain: &str) -> String {
     const MAX: usize = 40;
     if domain.chars().count() > MAX {
         let mut s: String = domain.chars().take(MAX - 1).collect();
@@ -130,7 +158,8 @@ mod tests {
     fn renders_a_nonempty_png() {
         let png = render_png(&Card {
             kicker: "Ephemeral redirect",
-            domain: "example.com",
+            hero: "example.com",
+            blind: false,
             foot: "expires Jun 29, 2026 · 14:30 UTC",
         })
         .expect("render");
@@ -140,17 +169,43 @@ mod tests {
     }
 
     #[test]
+    fn a_blind_card_draws_no_destination_and_no_arrow() {
+        let svg = build_svg(&Card {
+            kicker: "One-time link",
+            hero: "Shown when revealed",
+            blind: true,
+            foot: "expires Jun 29, 2026",
+        });
+        assert!(svg.contains("Shown when revealed"));
+        // The arrow promises a destination; a blind card has none to point at.
+        assert!(!svg.contains("8594"), "{svg}");
+        // A sentence reads in the UI face, not the address face.
+        assert!(!svg.contains("DejaVu Sans Mono"), "{svg}");
+        // And it still rasterises.
+        assert!(
+            render_png(&Card {
+                kicker: "One-time link",
+                hero: "Shown when revealed",
+                blind: true,
+                foot: "expires Jun 29, 2026",
+            })
+            .is_some()
+        );
+    }
+
+    #[test]
     fn long_domain_is_truncated() {
         let long = "a".repeat(60);
-        let out = fit_domain(&long);
+        let out = fit_hero(&long);
         assert_eq!(out.chars().count(), 40);
         assert!(out.ends_with('…'));
     }
 
     #[test]
     fn dest_font_shrinks_for_long_domains() {
-        assert!(dest_font_size("example.com") > dest_font_size(&"x".repeat(30)));
-        assert!(dest_font_size("x") <= 92.0);
+        assert!(hero_font_size("example.com", false) > hero_font_size(&"x".repeat(30), false));
+        assert!(hero_font_size("x", false) <= 92.0);
+        assert!(hero_font_size("x", true) <= 72.0);
     }
 
     #[test]

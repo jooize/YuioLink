@@ -208,6 +208,15 @@ The **"Opens Once"** badge sits below the blue Reveal button in the create
 picker's own purple, so the badge and the type segment that made the link are
 visibly the same fact.
 
+**The unfurl is blind too.** An unfurl runs on every chat server a link passes
+through and costs nothing, so `og:title` would have handed the domain to all of
+them for free — and the recipient's 410 would have stopped meaning "someone
+opened it", because nobody had to. A one-time link's og tags say "One-time link
+on YuioLink" plus the expiry and the same blind line, and its `card.png` draws
+"Shown when revealed" where an ordinary card draws the domain, with the arrow
+dropped (there is no destination for it to point at). Unlimited links still name
+theirs, which is the whole point of a trustworthy unfurl.
+
 ---
 
 ## 7. Flows
@@ -280,8 +289,9 @@ reveals go to the aggregate `stats` table as the day-granular `previewed` and
 
 The card `<head>` emits `og:site_name`, `og:title`, `og:description`,
 `og:image` (-> `GET /:name/card.png`, rendered with `resvg` on
-`spawn_blocking`), `twitter:card`, and `theme-color`. The card always shows the
-destination domain, and fetching it spends no use — crawlers fetch it.
+`spawn_blocking`), `twitter:card`, and `theme-color`. An **unlimited** card
+shows the destination domain; a **one-time** card shows nothing about it (§6).
+Fetching a card spends no use — crawlers fetch it.
 
 ---
 

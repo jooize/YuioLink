@@ -656,8 +656,14 @@ fn cookie_secure(state: &AppState) -> &'static str {
     }
 }
 
-/// `GET /:name/card.png` — the og:image share card for a live redirect. Spends no
-/// use (crawlers fetch it). The card always shows the destination domain.
+/// `GET /:name/card.png` — the og:image share card for a live redirect. Spends
+/// no use (crawlers fetch it).
+///
+/// An ordinary card shows the destination domain. A **one-time** card shows no
+/// destination at all: the preview page is blind until the use is spent, and an
+/// unfurl that named the domain would hand it to every chat server the link
+/// passed through, for free — which is exactly the disclosure the blind card
+/// exists to prevent.
 pub async fn card_image(State(state): State<AppState>, Path(name): Path<String>) -> Response {
     let d = match db::get_link_live(&state.pool, &name).await {
         Ok(Some(d)) if d.kind == "redirect" => d,
@@ -666,28 +672,16 @@ pub async fn card_image(State(state): State<AppState>, Path(name): Path<String>)
         Err(e) => return AppError::internal(e).into_response(),
     };
 
-    let uri = urlview::parse_uri(&d.content);
-    let kicker = if d.max_uses == Some(1) {
-        "One-time redirect"
-    } else {
-        "Ephemeral redirect"
-    };
-    let domain = uri.card_domain();
-    // Date and clock, no "may change after" tail: the expiry is the fact worth
-    // the space, and an hour-long link needs the minute to mean anything.
-    let date = views::format_card_date(&d.expires_at);
-    let foot = match views::format_card_time(&d.expires_at) {
-        Some(time) => format!("expires {date} · {time}"),
-        None => format!("expires {date}"),
-    };
+    let text = card_content(&d);
 
     // Rasterizing is synchronous CPU work; keep it off the async workers so a
     // burst of crawler card fetches cannot stall every other request.
     let png = tokio::task::spawn_blocking(move || {
         card::render_png(&card::Card {
-            kicker,
-            domain: &domain,
-            foot: &foot,
+            kicker: text.kicker,
+            hero: &text.hero,
+            blind: text.blind,
+            foot: &text.foot,
         })
     })
     .await
@@ -711,6 +705,42 @@ pub async fn card_image(State(state): State<AppState>, Path(name): Path<String>)
         )
             .into_response(),
         None => AppError::internal("card render failed").into_response(),
+    }
+}
+
+/// The words a link's share card states.
+///
+/// Split out from [`card_image`] so the one disclosure decision it makes --
+/// whether the destination is named at all -- can be checked without
+/// rasterising anything.
+struct CardText {
+    kicker: &'static str,
+    hero: String,
+    blind: bool,
+    foot: String,
+}
+
+fn card_content(d: &LinkDetail) -> CardText {
+    let blind = d.max_uses.is_some();
+    // Date and clock, no "may change after" tail: the expiry is the fact worth
+    // the space, and an hour-long link needs the minute to mean anything.
+    let date = views::format_card_date(&d.expires_at);
+    CardText {
+        kicker: if blind {
+            "One-time link"
+        } else {
+            "Ephemeral redirect"
+        },
+        hero: if blind {
+            views::BLIND_HERO.to_string()
+        } else {
+            urlview::parse_uri(&d.content).card_domain()
+        },
+        blind,
+        foot: match views::format_card_time(&d.expires_at) {
+            Some(time) => format!("expires {date} · {time}"),
+            None => format!("expires {date}"),
+        },
     }
 }
 
@@ -1594,6 +1624,58 @@ mod tests {
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("An Instruction, Not an Address"), "{body}");
         assert!(!body.contains("href=\"javascript:"), "{body}");
+    }
+
+    /// An unfurl runs on every chat server a link passes through, and it costs
+    /// nothing. If the og tags or the card named the destination, a one-time
+    /// link's domain would be handed to all of them for free -- and the
+    /// recipient's 410 would no longer mean "someone opened it", because
+    /// nobody had to.
+    #[tokio::test]
+    async fn a_one_time_link_tells_an_unfurler_nothing() {
+        let st = test_state().await;
+        let l = db::insert_link(
+            &st.pool,
+            redirect("https://zzz-gated-domain.example/deep/path", Some(1)),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+
+        let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
+        assert_eq!(s, StatusCode::OK);
+        // Not in the og tags, the twitter tags, the title, or the page.
+        assert!(!body.contains("zzz-gated-domain"), "{body}");
+        assert!(!body.contains("deep/path"), "{body}");
+        assert!(body.contains("One-time link on YuioLink"), "{body}");
+        assert!(body.contains(views::BLIND_LINE), "{body}");
+        // The card is still offered -- it just has nothing to disclose.
+        assert!(body.contains("card.png"));
+
+        // The image carries no destination either. It is rasterised text, so
+        // the check is on the words that go into it.
+        let resp = router(st.clone())
+            .oneshot(get(&format!("/{}/card.png", l.name)))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let row = db::get_link_live(&st.pool, &l.name).await.unwrap().unwrap();
+        let text = card_content(&row);
+        assert!(text.blind);
+        assert!(!text.hero.contains("zzz-gated-domain"));
+        assert_eq!(text.hero, views::BLIND_HERO);
+
+        // An unlimited link still names its destination, which is the whole
+        // point of a trustworthy unfurl.
+        let open = db::insert_link(
+            &st.pool,
+            redirect("https://shown-domain.example/x", None),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+        let (_, _, body) = send(&st, get(&format!("/{}", open.name))).await;
+        assert!(body.contains("Redirect to shown-domain.example"), "{body}");
     }
 
     #[tokio::test]

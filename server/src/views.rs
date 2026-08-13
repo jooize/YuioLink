@@ -851,17 +851,26 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
 fn interstitial_head(i: &Interstitial, one_time: bool) -> Markup {
     match &i.target {
         Target::Redirect { uri, .. } => {
-            let domain = uri.card_domain();
+            // A one-time link names no destination here either. The page is
+            // blind until the use is spent, and an unfurl runs on every chat
+            // server the link passes through: naming the domain in an og tag
+            // would disclose it to all of them, for free, and leave the
+            // recipient's 410 no longer meaning "someone opened it".
             let title = if one_time {
-                format!("One-time link to {domain}")
+                "One-time link on YuioLink".to_string()
             } else {
-                format!("Redirect to {domain}")
+                format!("Redirect to {}", uri.card_domain())
             };
-            let kind = if one_time { "Single-use" } else { "Ephemeral" };
             let date = format_card_date(i.expires_at);
-            let desc = match format_card_time(i.expires_at) {
+            let kind = if one_time { "Single-use" } else { "Ephemeral" };
+            let expiry = match format_card_time(i.expires_at) {
                 Some(time) => format!("{kind} redirect that expires {date} at {time}."),
                 None => format!("{kind} redirect that expires {date}."),
+            };
+            let desc = if one_time {
+                format!("{expiry} {BLIND_LINE}")
+            } else {
+                expiry
             };
             let card = format!("{}/card.png", i.short_url);
             html! {
@@ -940,6 +949,14 @@ impl Kind {
     }
 }
 
+/// What a one-time link says instead of a destination, on the page and in the
+/// unfurl. It states what will happen rather than that something is being
+/// withheld, because the server genuinely has not disclosed anything yet.
+pub const BLIND_LINE: &str = "The destination is shown when revealed.";
+
+/// The same, shortened for the share card's hero line.
+pub const BLIND_HERO: &str = "Shown when revealed";
+
 /// The one-time card, for both kinds. It discloses nothing — not the domain,
 /// not the scheme — because disclosing it without spending the use would let
 /// anyone holding the link learn where it points invisibly, and the spent use
@@ -952,7 +969,7 @@ fn blind_reveal_block(i: &Interstitial) -> Markup {
         @if text { span.pv-host.plain { "A text snippet" } }
         span.pv-blind {
             @if text { "The text is shown when revealed." }
-            @else { "The destination is shown when revealed." }
+            @else { (BLIND_LINE) }
         }
         (consume_form(
             &format!("/{}/reveal", i.name),
