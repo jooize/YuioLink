@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Flags and flashes</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .cap { display: block; text-align: center; margin: 0 0 10px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .note { max-width: 420px; margin: 12px auto 0; font: 400 12.5px/1.55 var(--font);
+      color: var(--text-secondary); text-align: left; }
+    .note b { color: var(--text); font-weight: 600; }
+    .note code { font-family: var(--font-mono); font-size: .95em; }
+    .fixnote { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .fixnote ul { margin: 6px 0 0; padding-left: 20px; }
+    .fixnote li { margin: 3px 0; }
+    .win { width: min(100%, 420px); }
+    .app-window.win { margin: 0; padding: 30px 26px 26px; }
+    .card { width: min(100%, 460px); padding: 18px 18px 16px; border-radius: 16px;
+      background: var(--card-bg); border: .5px solid var(--card-border); }
+    .card h3 { margin: 0 0 2px; font: 600 15px/1.3 var(--font); color: var(--text); }
+    .card .sub { display: block; margin-bottom: 10px; font: 400 11.5px/1.4 var(--font);
+      color: var(--text-tertiary); }
+    .spec { width: 100%; border-collapse: collapse; font-family: var(--font-mono);
+      font-size: 14px; line-height: 1.5; }
+    .spec td { padding: 6px 0; border-top: .5px solid var(--card-border);
+      vertical-align: baseline; }
+    .spec tr:first-child td { border-top: none; }
+    .spec .who { font-family: var(--font); font-size: 11.5px; font-weight: 600;
+      color: var(--text-secondary); padding-right: 14px; white-space: nowrap; }
+    .spec .who .flag { font-size: 13px; margin-right: 4px; }
+    .spec .num { font-weight: 700; color: var(--text);
+      font-variant-numeric: tabular-nums; }
+    .spec .num .cc { color: var(--text-secondary); font-weight: 400; }
+    .spec .num .sep { color: var(--text-tertiary); font-weight: 400; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .pv-scheme { display: block; text-align: center; margin-top: 4px;
+      font-family: var(--font-mono); font-weight: 700; letter-spacing: -.01em;
+      line-height: 1.35; font-size: clamp(19px, 5vw, 24px); color: var(--text); }
+    .pv-scheme .colon { opacity: .45; }
+
+    /* --- the number stack, aligned at the country-code seam ---------------
+       A centred block, but inside it a two-column grid: country codes
+       right-aligned, national numbers left-aligned, so every national number
+       starts at the same x and the digits (tabular) line up under each
+       other. The per-number facts ride each row, small, in the chips'
+       own costume — a Premium Rate warning now points at ITS number. */
+    .pv-stack2 { display: grid; grid-template-columns: auto auto;
+      justify-content: center; column-gap: .45em; row-gap: 3px; margin-top: 9px;
+      font-family: var(--font-mono); font-size: clamp(16px, 4.2vw, 19px);
+      font-weight: 700; line-height: 1.45; color: var(--text);
+      font-variant-numeric: tabular-nums; }
+    .pv-stack2 .cc { text-align: right; color: var(--text-secondary);
+      font-weight: 400; }
+    .pv-stack2 .nn { text-align: left; }
+    .pv-stack2 .nn .sep { color: var(--text-tertiary); font-weight: 400; }
+    .pv-stack2 .facts { grid-column: 2; text-align: left; margin: -1px 0 4px;
+      display: flex; flex-wrap: wrap; gap: 5px 10px; }
+    .pv-stack2 .facts:last-child { margin-bottom: 0; }
+    .pv-fact { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+      border-radius: 999px; font: 600 10.5px/1.45 var(--font);
+      color: var(--text-secondary); background: var(--field-bg);
+      border: .5px solid var(--card-border); }
+    .pv-fact .flag { font-size: 12px; line-height: 1; }
+    .pv-fact.warn { background: transparent; border: none; padding: 2px 0;
+      color: var(--danger); }
+    .pv-fact svg { flex: none; color: var(--danger); }
+
+    .pv-slices { margin-top: 14px; font-family: var(--font-mono);
+      font-size: 12.5px; line-height: 1.5; }
+    .pv-slice { display: flex; align-items: baseline; gap: 9px;
+      padding: 7px 0; border-top: .5px solid var(--card-border);
+      text-align: left; }
+    .pv-slice:first-child { border-top: none; }
+    .pv-slice input { flex: none; align-self: center; margin: 0;
+      accent-color: var(--text-tertiary); }
+    .pv-slice.togglable { cursor: pointer; }
+    .pv-slice.togglable:hover { background: color-mix(in srgb, var(--text) 3%, transparent); }
+    .pv-slice.togglable .txt { cursor: text; }
+    .pv-slice .txt { color: var(--text); word-break: break-all; min-width: 0; }
+    .pv-slice .txt .dl { color: var(--accent); }
+    .pv-slice .txt .k { color: var(--text-secondary); font-weight: 700; }
+    .pv-slice.off .txt { opacity: .38; text-decoration: line-through;
+      text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent); }
+    .pv-slice.locked { cursor: default; }
+    .pv-slice.locked:hover { background: transparent; }
+    .dsp { border-bottom: 1px dotted var(--text-tertiary); }
+    .rawline { display: block; margin-top: 14px; padding-top: 11px;
+      border-top: .5px solid var(--card-border); font-family: var(--font-mono);
+      font-size: 11.5px; line-height: 1.65; word-break: break-all; text-align: left;
+      color: var(--text); }
+    .rawline .lbl { display: flex; align-items: center; justify-content: space-between;
+      font-family: var(--font); font-size: 11px; font-weight: 500; font-style: italic;
+      color: var(--text-tertiary); margin-bottom: 3px; }
+    .rawline .sch { color: var(--text-tertiary); }
+    .rawline .dl { color: var(--accent); }
+    .rawline .k { color: var(--text-secondary); font-weight: 700; }
+    .rawline .pct { color: var(--text-tertiary); }
+    .rawline.edited { border-top-style: dashed; display: none; }
+    .rawline.edited .lbl { color: var(--accent); }
+    .rawline.edited.show { display: block; }
+    .copybtn { font: 600 10.5px/1.6 var(--font); font-style: normal;
+      padding: 1px 9px; border-radius: 999px; cursor: pointer;
+      color: var(--text-secondary); background: transparent;
+      border: .5px solid var(--card-border); }
+    .copybtn:hover { color: var(--text); }
+    .copybtn.done { color: var(--switch-on); border-color: transparent; }
+    .pv-note { display: block; max-width: 96%; margin: 12px auto 0; text-align: center;
+      font: 400 12px/1.55 var(--font); color: var(--text-secondary); }
+    .pv-note code { font-family: var(--font-mono); font-size: .95em; color: var(--text);
+      font-weight: 700; }
+    .btn.btn-2 { flex-direction: column; gap: 2px; padding-top: 9px; padding-bottom: 9px;
+      min-height: 54px; line-height: 1.25; }
+    .btn.btn-2 .lead { display: inline-flex; align-items: center; gap: 7px; }
+    .btn.btn-2 .what { font-size: 11.5px; font-weight: 500; opacity: .82; letter-spacing: 0; }
+    .pv-open { margin-top: 22px; }
+    .pv-hedge { display: block; max-width: 92%; margin: 12px auto 0; text-align: center;
+      font: 400 11.5px/1.55 var(--font); color: var(--text-tertiary); }
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+    .pv-split { display: flex; gap: 2px; margin-top: 22px; }
+    .pv-split .btn { margin-top: 0; }
+    .pv-split .go { flex: 1; border-radius: var(--radius-control) 0 0 var(--radius-control); }
+    .pv-split .splitcopy { flex: none; padding: 0 18px; font-size: 13px; font-weight: 600;
+      border-radius: 0 var(--radius-control) var(--radius-control) 0; }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 27 · interactive</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Flags and flashes</h1>
+</div>
+
+<div class="fixnote">
+  <b>Your round-26 review, applied and answered.</b>
+  <ul>
+    <li><b>Refusal heading: your pick, with the button mentioned.</b> Now in the gallery:
+      heading <b>"An Instruction, Not an Address"</b>, body "What is stored here would
+      tell your browser to do something rather than go somewhere, so YuioLink shows it,
+      <b>gives it no button</b>, and stops there." The diagnosis leads, the consequence
+      rides the same sentence.</li>
+    <li><b>"What did Copy copy?" — the card points at it.</b> No tooltip (touch and
+      screen readers lose those), no extra caption line. Instead the site's existing
+      confirmation does the pointing: press the blue Copy and <b>the line it took from
+      lights the green ✓</b> — "After your edits" when your edits are live (its own Copy
+      button flips to "Copied ✓"), otherwise "Exactly as stored", otherwise the URL line
+      or one-run headline itself, which already had ⌘C's check. The answer to "what was
+      copied" is the same as the answer to "what would the button open", and now both are
+      visible on press. Live in every gallery card.</li>
+    <li><b>Phone dress A: applied</b> to the gallery's tel and sms cards.</li>
+    <li><b>The hyphen is not Swedish special-casing</b> — section 1. Every region's
+      punctuation ships in libphonenumber's metadata; we render the international format
+      verbatim, so each country arrives wearing its own habits without a line of
+      per-country code in YuioLink.</li>
+    <li><b>Number alignment + your chips question — section 2.</b> The stack now aligns
+      at the country-code seam, and yes: the region/type facts move <b>next to their
+      numbers</b>. You found the real flaw in the pooled chips row — on a two-country
+      card, "Sweden · Norway · Mobile" cannot say <em>which</em> number is which, and a
+      Premium Rate warning that doesn't point at its number is a warning wasted. Pooled
+      chips survive only where there is one number (nothing to disambiguate).</li>
+  </ul>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · One renderer, every country's own punctuation</p>
+
+<div class="mock-row">
+  <div class="card">
+    <h3>The tables dress each number themselves</h3>
+    <span class="sub">libphonenumber international format, verbatim · dress A on top</span>
+    <table class="spec">
+      <tr><td class="who"><span class="flag">🇸🇪</span>Sweden</td>
+        <td class="num"><span class="cc">+46</span> 70<span class="sep">-</span>123 45 67</td></tr>
+      <tr><td class="who"><span class="flag">🇳🇴</span>Norway</td>
+        <td class="num"><span class="cc">+47</span> 991 23 456</td></tr>
+      <tr><td class="who"><span class="flag">🇺🇸</span>United States</td>
+        <td class="num"><span class="cc">+1</span> 415<span class="sep">-</span>555<span class="sep">-</span>2671</td></tr>
+      <tr><td class="who"><span class="flag">🇫🇷</span>France</td>
+        <td class="num"><span class="cc">+33</span> 1 42 68 53 00</td></tr>
+      <tr><td class="who"><span class="flag">🇩🇪</span>Germany</td>
+        <td class="num"><span class="cc">+49</span> 171 1234567</td></tr>
+    </table>
+    <p class="note"><b>No per-country code in YuioLink, ever.</b> Each region's format
+      patterns — including whether a hyphen, a space, or nothing separates the groups —
+      are data in libphonenumber's metadata, maintained by Google against each country's
+      numbering plan. Sweden gets its hyphen, Norway its spaces, the US its hyphens,
+      France its pairs, Germany its long run, all from
+      <code>format(number, International)</code> verbatim. Dress A then colours what is
+      already there: the country code recedes, separators go tertiary, national digits
+      keep the bold. When the tables change, our rendering changes with the dependency
+      bump — that staleness cost was priced in back in round 14.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · The stack aligned, the facts beside their numbers</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">sms · two countries, one premium — every fact points</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">eager</span><span class="nwg nw-1">TAPIR</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">sms<span class="colon">:</span></span>
+      <div class="pv-stack2">
+        <span class="cc">+46</span><span class="nn">70<span class="sep">-</span>123 45 67</span>
+        <span class="facts">
+          <span class="pv-fact"><span class="flag">🇸🇪</span> Sweden</span>
+          <span class="pv-fact">Mobile</span>
+        </span>
+        <span class="cc">+47</span><span class="nn">820 12 345</span>
+        <span class="facts">
+          <span class="pv-fact"><span class="flag">🇳🇴</span> Norway</span>
+          <span class="pv-fact warn">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+            Premium Rate</span>
+        </span>
+      </div>
+      <div class="pv-slices" id="s-sms4">
+        <div class="pv-slice" data-id="n1" data-addr="+46 70-123 45 67">
+          <input type="checkbox" checked aria-label="Keep +46 70-123 45 67">
+          <span class="txt">+46701234567</span>
+        </div>
+        <div class="pv-slice" data-id="n2" data-addr="+47 820 12 345">
+          <input type="checkbox" checked aria-label="Keep +47 820 12 345">
+          <span class="txt"><span class="dl">,</span>+4782012345</span>
+        </div>
+        <div class="pv-slice" data-id="body">
+          <input type="checkbox" checked aria-label="Keep body">
+          <span class="txt"><span class="dl">?</span><span class="k">body</span><span class="dl">=</span>JOIN<span class="dsp"> </span>LIST</span>
+        </div>
+      </div>
+      <span class="pv-note">One message goes to every number listed — anything sent goes out
+        from your number.</span>
+      <code class="rawline" id="stored-sms4"><span class="lbl">Exactly as stored
+        <button class="copybtn" data-copy="stored" data-card="sms4">Copy</button></span><span class="str"><span class="sch">sms:</span>+46701234567<span class="dl">,</span>+4782012345<span class="dl">?</span><span class="k">body</span><span class="dl">=</span>JOIN<span class="pct">%20</span>LIST</span></code>
+      <code class="rawline edited" id="edited-sms4"><span class="lbl">After your edits
+        <button class="copybtn" data-copy="edited" data-card="sms4">Copy</button></span><span class="str"></span></code>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go btn-2 btn-link go" href="#" id="go-sms4" style="margin-top:0">
+          <span class="lead">Message 2 numbers</span>
+          <span class="what">Phone numbers, for one message</span></a>
+        <button class="btn splitcopy" data-card="sms4" aria-label="Copy the numbers">Copy</button>
+      </div>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note"><b>Aligned at the seam, and every fact next to its number.</b> The
+      stack is a centred block with two columns inside: country codes right-aligned into
+      the seam, national numbers all starting at the same x, tabular digits lining up
+      beneath each other. Under each number, its own facts — and that is the payoff of
+      your question: <b>Premium Rate now points at the Norwegian number</b>, not at the
+      card. The chips shrink one step so the numbers stay the loudest thing. Single-number
+      cards keep the centred chips row (nothing to disambiguate); the multi-number stack
+      is where per-number placement earns its keep. Untick the premium number and its
+      facts row dims with it — the warning leaves with the number it warned about.</p>
+  </div>
+</div>
+
+<script>
+/* MOCKUP-ONLY. Real build: preview.js (progressive enhancement). */
+(function () {
+  var CARD = {
+    prefix: { raw: 'sms:', html: '<span class="sch">sms:</span>' },
+    parts: [
+      { id: 'n1', kind: 'to', raw: '+46701234567', html: '+46701234567' },
+      { id: 'n2', kind: 'to', raw: '+4782012345', html: '+4782012345' },
+      { id: 'body', kind: 'query', raw: 'body=JOIN%20LIST',
+        html: '<span class="k">body</span><span class="dl">=</span>JOIN<span class="pct">%20</span>LIST' }
+    ]
+  };
+
+  function build(on) {
+    var raw = CARD.prefix.raw, html = CARD.prefix.html;
+    var tos = [], queries = [];
+    CARD.parts.forEach(function (p) {
+      if (!on(p)) return;
+      (p.kind === 'to' ? tos : queries).push(p);
+    });
+    tos.forEach(function (p, i) {
+      var d = i === 0 ? '' : ',';
+      raw += d + p.raw;
+      html += (d ? '<span class="dl">,</span>' : '') + p.html;
+    });
+    queries.forEach(function (p, i) {
+      var d = i === 0 ? '?' : '&';
+      raw += d + p.raw;
+      html += '<span class="dl">' + (d === '&' ? '&amp;' : d) + '</span>' + p.html;
+    });
+    return { raw: raw, html: html };
+  }
+
+  var rows = document.querySelectorAll('#s-sms4 .pv-slice');
+  var boxes = {};
+  rows.forEach(function (r) {
+    boxes[r.getAttribute('data-id')] = { row: r, cb: r.querySelector('input') };
+  });
+  function isOn(p) {
+    var b = boxes[p.id];
+    return !b || !b.cb || b.cb.disabled || b.cb.checked;
+  }
+  var stored = build(function () { return true; }).raw;
+  var editedEl = document.getElementById('edited-sms4');
+  var go = document.getElementById('go-sms4');
+  var stack = document.querySelector('.pv-stack2');
+
+  function refresh() {
+    rows.forEach(function (r) {
+      var cb = r.querySelector('input');
+      r.classList.toggle('off', !!cb && !cb.checked);
+    });
+    /* sms floor: RFC 5724 requires >= 1 recipient — the last number locks */
+    var tos = ['n1', 'n2'].map(function (k) { return boxes[k]; });
+    var kept = tos.filter(function (b) { return b.cb.checked; });
+    tos.forEach(function (b) { b.cb.disabled = false; });
+    if (kept.length === 1) kept[0].cb.disabled = true;
+    tos.forEach(function (b) { b.row.classList.toggle('locked', b.cb.disabled); });
+    /* the stack row and its facts dim with their number */
+    ['n1', 'n2'].forEach(function (k, i) {
+      var on = boxes[k].cb.checked;
+      var ccs = stack.querySelectorAll('.cc'), nns = stack.querySelectorAll('.nn'),
+          fts = stack.querySelectorAll('.facts');
+      [ccs[i], nns[i], fts[i]].forEach(function (el) {
+        if (el) el.style.opacity = on ? '' : '.3';
+      });
+    });
+    var lead = go.querySelector('.lead'), what = go.querySelector('.what');
+    if (kept.length === 1) {
+      lead.textContent = 'Message ' + kept[0].row.getAttribute('data-addr');
+      what.textContent = 'A phone number, for a message';
+    } else {
+      lead.textContent = 'Message ' + kept.length + ' numbers';
+      what.textContent = 'Phone numbers, for one message';
+    }
+    var now = build(isOn);
+    editedEl.classList.toggle('show', now.raw !== stored);
+    editedEl.querySelector('.str').innerHTML = now.html;
+    go.setAttribute('data-href', now.raw);
+    return now.raw;
+  }
+
+  Object.keys(boxes).forEach(function (k) {
+    boxes[k].cb.addEventListener('change', refresh);
+  });
+  rows.forEach(function (r) {
+    var cb = r.querySelector('input');
+    if (!cb) return;
+    r.classList.add('togglable');
+    var pending = null;
+    r.addEventListener('click', function (e) {
+      if (e.target === cb) return;
+      if (cb.disabled) return;
+      if (e.detail > 1) return;
+      clearTimeout(pending);
+      pending = setTimeout(function () {
+        var sel = window.getSelection();
+        if (sel && !sel.isCollapsed) return;
+        if (cb.disabled) return;
+        cb.checked = !cb.checked;
+        refresh();
+      }, 180);
+    });
+    r.addEventListener('dblclick', function () { clearTimeout(pending); });
+  });
+  refresh();
+
+  document.querySelectorAll('.copybtn[data-card="sms4"], .splitcopy[data-card="sms4"]')
+    .forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var text = btn.getAttribute('data-copy') === 'stored' ? stored : refresh();
+        copyText(text, btn);
+        if (btn.classList.contains('splitcopy')) flashSource(btn);
+      });
+    });
+
+  function flashSource(btn) {
+    var card = btn.closest('.app-window');
+    var target = card.querySelector('.rawline.edited.show .copybtn')
+      || card.querySelector('.rawline:not(.edited) .copybtn');
+    if (!target) return;
+    target.classList.add('done'); target.textContent = 'Copied ✓';
+    setTimeout(function () {
+      target.classList.remove('done'); target.textContent = 'Copy';
+    }, 1300);
+  }
+
+  function copyText(text, btn) {
+    var ok = function () {
+      btn.classList.add('done'); btn.textContent = 'Copied ✓';
+      setTimeout(function () {
+        btn.classList.remove('done'); btn.textContent = 'Copy';
+      }, 1300);
+    };
+    function fallback(t) {   /* file:// mock safety net only */
+      var ta = document.createElement('textarea');
+      ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(ok, function () { fallback(text); ok(); });
+    } else { fallback(text); ok(); }
+  }
+})();
+</script>
+
+</body>
+</html>

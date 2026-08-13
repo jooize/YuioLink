@@ -76,6 +76,10 @@
     /* round-20 shading, restored per round-25 review: local part regular
        weight at full colour — bold stays the domain's mark */
     .pv-value .lp { color: var(--text); font-weight: 400; }
+    /* phone dress A (round 27): the routing recedes — country code regular
+       secondary, separators tertiary, national digits keep the bold */
+    .pv-value .cc { color: var(--text-secondary); font-weight: 400; }
+    .pv-value .sep { color: var(--text-tertiary); font-weight: 400; }
     .pv-value .grp + .grp { margin-left: .4em; }
     .pv-value .ext { margin-left: .55em; font-size: .66em; font-weight: 500;
       color: var(--text-secondary); letter-spacing: 0; }
@@ -153,6 +157,13 @@
     .pv-split .go { flex: 1; border-radius: var(--radius-control) 0 0 var(--radius-control); }
     .pv-split .splitcopy { flex: none; padding: 0 18px; font-size: 13px; font-weight: 600;
       border-radius: 0 var(--radius-control) var(--radius-control) 0; }
+
+    /* the split's Copy answers "copied what?" by pointing: the line it took
+       from lights the site's green check — the URL line's ⌘C convention
+       (app.css pv-url.copied), extended to one-run headlines here */
+    .pv-line::after { content: "\2713"; margin-left: .4em; font-weight: 700;
+      color: var(--switch-on); opacity: 0; transition: opacity .18s ease; }
+    .pv-line.copied::after { opacity: 1; }
 
     /* the two raw lines share one syntax dress; explicit Copy, no magic */
     .rawline { display: block; margin-top: 14px; padding-top: 11px;
@@ -261,7 +272,8 @@
   </ul>
   Everything else is the settled record: blue = you stay, amber = you leave — and since
   round 26 every action button is a split, amber-or-blue action plus a blue Copy segment
-  that copies exactly what the button would open, edits included; the accent wash
+  that copies exactly what the button would open, edits included — and answers "copied
+  what?" by pointing: the line it took from lights the site's green check (round 27); the accent wash
   exactly once per page on the registrable domain; bold = a registrable domain (and key
   signposts); warnings are bare red icon + words, facts keep the pill; describe the scheme,
   never predict the outcome; one hedge line, once; "Exactly as stored" never collapses and
@@ -612,7 +624,7 @@
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       <span class="pv-scheme">tel<span class="colon">:</span></span>
-      <span class="pv-value">+47 820 12 345<span class="ext">ext. 4021</span></span>
+      <span class="pv-value"><span class="cc">+47</span> 820 12 345<span class="ext">ext. 4021</span></span>
       <div class="pv-facts">
         <span class="pv-fact"><span class="flag">🇳🇴</span> Norway</span>
         <span class="pv-fact warn">
@@ -657,7 +669,7 @@
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       <span class="pv-scheme">sms<span class="colon">:</span></span>
-      <span class="pv-value">+47 991 23 456</span>
+      <span class="pv-value"><span class="cc">+47</span> 991 23 456</span>
       <div class="pv-facts">
         <span class="pv-fact"><span class="flag">🇳🇴</span> Norway</span>
         <span class="pv-fact">Mobile</span>
@@ -944,9 +956,9 @@
           <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
           <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
           <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
-        <p class="msg"><b>No Button for This One</b>The address stored here would tell your
-          browser to do something rather than go somewhere, so YuioLink shows it and stops
-          there.</p>
+        <p class="msg"><b>An Instruction, Not an Address</b>What is stored here would tell
+          your browser to do something rather than go somewhere, so YuioLink shows it,
+          gives it no button, and stops there.</p>
       </div>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
@@ -955,8 +967,9 @@
       printed and refused at render time (the same check the revealed page gets — both gaps
       close together). The panel stays neutral: red lives only in the 16px symbol, because
       the red fill belongs to the lookalike-domain warning, where an actual attack is on the
-      page. The heading names the missing thing, the body says why, and nothing here can be
-      pressed, tabbed to, or copied into acting.</p>
+      page. The heading names the diagnosis — an instruction, not an address — and the body
+      carries both the why and the consequence in one breath: no button, full stop. Nothing
+      here can be pressed, tabbed to, or copied into acting.</p>
   </div>
 </div>
 
@@ -1187,11 +1200,13 @@
           copyText(text, btn);
         });
       });
-    /* the split's Copy segment: copies what the button would open */
+    /* the split's Copy segment: copies what the button would open,
+       and lights the line it took from */
     document.querySelectorAll('.splitcopy[data-card="' + name + '"]')
       .forEach(function (btn) {
         btn.addEventListener('click', function () {
           copyText(refresh(), btn);
+          flashSource(btn);
         });
       });
   }
@@ -1209,8 +1224,30 @@
   document.querySelectorAll('[data-static]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       copyText(btn.getAttribute('data-static'), btn);
+      if (btn.classList.contains('splitcopy')) flashSource(btn);
     });
   });
+
+  /* point at what was copied: the edited line if the edits are live, else
+     the stored line, else the headline that IS the stored string */
+  function flashSource(btn) {
+    var card = btn.closest('.app-window');
+    if (!card) return;
+    var target = card.querySelector('.rawline.edited.show .copybtn')
+      || card.querySelector('.rawline:not(.edited) .copybtn');
+    if (target) {
+      target.classList.add('done'); target.textContent = 'Copied ✓';
+      setTimeout(function () {
+        target.classList.remove('done'); target.textContent = 'Copy';
+      }, 1300);
+      return;
+    }
+    var line = card.querySelector('.pv-url, .pv-line');
+    if (line) {
+      line.classList.add('copied');
+      setTimeout(function () { line.classList.remove('copied'); }, 1300);
+    }
+  }
 
   function copyText(text, btn) {
     var ok = function () {
