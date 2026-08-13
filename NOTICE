@@ -31,6 +31,24 @@ bitcoin/bips repository under the MIT License.
   Source:  https://github.com/bitcoin/bips/blob/master/bip-0039/english.txt
 
 
+libphonenumber, via the phonenumber crate
+-----------------------------------------
+
+The `tel:` and `sms:` previews classify numbers with the `phonenumber` crate,
+a Rust port of Google's libphonenumber. The crate compiles libphonenumber's
+numbering-plan metadata into the server binary, so a redistributed binary
+carries both.
+
+  Crate:    https://crates.io/crates/phonenumber
+  Source:   https://github.com/whisperfish/rust-phonenumber
+  Upstream: https://github.com/google/libphonenumber
+  License:  Apache License 2.0 (both)
+
+Apache-2.0 is one of the two licences YuioLink itself is offered under, so
+taking the Apache side of the dual grant covers the combined work. YuioLink's
+own code stays dual MIT/Apache-2.0.
+
+
 DejaVu fonts
 ------------
 

@@ -1459,6 +1459,23 @@ pub fn colophon_page() -> Markup {
             "."
         }
 
+        h3.help-h #numbers { "The numbers" }
+        p.help-p {
+            "A preview of a phone link says which country a number belongs to, and whether "
+            "it is a mobile, a toll-free, or a premium-rate line — facts read off Google's "
+            a.ext href="https://github.com/google/libphonenumber" {
+                "libphonenumber" (external_mark())
+            }
+            " numbering plans through the "
+            a.ext href="https://github.com/whisperfish/rust-phonenumber" {
+                "phonenumber" (external_mark())
+            }
+            " crate, both Apache-2.0. The tables are compiled into the binary, so reading a "
+            "number asks nothing of anyone: no lookup leaves this server. The way each "
+            "country groups its digits comes from the same tables, which is why a Swedish "
+            "number arrives wearing its hyphen and a French one its pairs."
+        }
+
         h3.help-h #type { "The type" }
         p.help-p {
             "The share-card images are drawn server-side with the "

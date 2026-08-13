@@ -28,6 +28,14 @@ idna = "1"
 unicode-security = "0.1"
 psl = "2"
 
+# Phone-number classification for `tel:` and `sms:` previews: the Rust port of
+# Google's libphonenumber (Whisperfish). It is here for PhoneNumberType, not for
+# formatting -- PremiumRate is the one real `tel:` hazard, and nothing else in
+# the stack can see it. Metadata is parsed in a build script and serialised with
+# postcard, so there is no runtime XML and no network. Apache-2.0; the crate and
+# libphonenumber are credited in NOTICE.
+phonenumber = "0.3"
+
 # Reveal-token signing (stateless HMAC-SHA256). Both are already in the lock as
 # transitive deps, so this pins no new major versions.
 hmac = "0.12"

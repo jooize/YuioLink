@@ -36,6 +36,7 @@ rand.workspace = true
 
 # Share-card image (og:image).
 resvg.workspace = true
+phonenumber.workspace = true
 
 [dev-dependencies]
 # In-process HTTP testing of the axum router (oneshot + body collection).

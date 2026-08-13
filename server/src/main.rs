@@ -2,12 +2,14 @@ mod card;
 mod config;
 mod db;
 mod error;
+// These two are complete and tested, but the cards that draw them land with the
+// view work; until then their types have no caller outside the tests. Drop both
+// attributes when views.rs takes them up.
+#[allow(dead_code)]
+mod phone;
 mod ratelimit;
 mod security;
 mod token;
-// The parts model at the bottom of urlview is complete and tested, but the card
-// that draws it lands with the view work; until then its types have no caller
-// outside the tests. Drop this attribute when views.rs takes them up.
 #[allow(dead_code)]
 mod urlview;
 mod views;
