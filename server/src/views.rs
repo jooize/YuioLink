@@ -2146,13 +2146,18 @@ pub fn help_page(base_url: &str) -> Markup {
             span.c { "# ten minutes instead" } "\n"
             "curl -d url=https://example.com -d ttl=10m " (base_url) "create\n\n"
             span.c { "# a file, as a one-time text link" } "\n"
-            "curl --data-binary @notes.txt -d uses=1 " (base_url) "create\n"
+            "curl --data-binary @notes.txt -d uses=1 " (base_url) "create\n\n"
+            span.c { "# a URL with its own & or = in the query" } "\n"
+            "curl --data-urlencode 'url=https://example.com/?a=1&b=2' " (base_url) "create\n"
         }
         p.help-p.help-note {
             code { "ttl" } " and " code { "uses" } " have to come last: everything before them "
-            "is the content, so a URL keeps its own query string. The reply is the short URL, "
-            "or JSON with " code { "Accept: application/json" } ". This endpoint makes public "
-            "and one-time links — a secret one needs the "
+            "is the content, so a plain URL keeps its own query string. If that query has an "
+            "ampersand of its own, reach for " code { "--data-urlencode" }
+            " — the value is decoded once on arrival, so the link is stored exactly as you "
+            "typed it. A piped file is taken as raw bytes and never decoded. The reply is the "
+            "short URL, or JSON with " code { "Accept: application/json" } ". This endpoint "
+            "makes public and one-time links — a secret one needs the "
             a href="/api/v0/openapi.yaml" { "API" }
             "."
         }

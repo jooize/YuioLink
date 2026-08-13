@@ -33,6 +33,18 @@ off `DEFAULT_ALLOWED_SCHEMES` is printed and given no control.
 |-------|--------|----------|
 | `/create` | POST | `curl -d url=<url> [-d ttl=10m\|2h\|3d] [-d uses=1] https://yuio.link/create` → the short URL as plain text (JSON with `Accept: application/json`). Kind is auto-detected; `--data-binary @file` becomes a Text link. Rate-limited. No delete token is issued. |
 
+`ttl` and `uses` are peeled off the **end** of the body, so an unencoded URL
+keeps its own `?a=1&b=2` query as long as they come last. That leniency cannot
+be perfect — an unencoded URL whose own last parameter is called `ttl` would be
+read as the option — so a value that arrives under a field name (`url=`,
+`text=`, `content=`) is **percent-decoded once**, which makes
+`curl --data-urlencode url=…` the unambiguous way to send anything with an `&`,
+an `=`, or a space in it. `%XX` only: a `+` is left alone, because in an
+unencoded URL it is usually a character somebody typed and curl writes a space
+as `%20` and a plus as `%2B` anyway. A body with **no** field name is
+`--data-binary @file` — raw bytes for a Text link, never decoded, because a log
+full of `%` is not a form.
+
 ## REST API (`/api/v0`, same-origin, no CORS)
 
 | Route | Method | Behavior |

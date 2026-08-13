@@ -777,14 +777,14 @@ pub async fn create_plain(
 
     // Parse failures become Errs that report together with the field checks —
     // a bad ttl AND a bad url come back as two lines of one 400, not two round-trips.
-    let ttl_seconds = match parsed.ttl {
+    let ttl_seconds = match parsed.ttl.as_deref() {
         Some(s) => parse_duration(s).ok_or_else(|| {
             "That expiry is not valid. Try a value like 10m, 2h, or 3d.".to_string()
         }),
         None => Ok(DEFAULT_TTL_SECS),
     };
 
-    let max_uses = match parsed.uses {
+    let max_uses = match parsed.uses.as_deref() {
         Some(s) => s
             .trim()
             .parse::<i64>()
@@ -797,7 +797,7 @@ pub async fn create_plain(
     let inserted = match create_link(
         &state,
         None,
-        parsed.content,
+        &parsed.content,
         ttl_seconds,
         max_uses,
         false,
@@ -844,16 +844,26 @@ pub async fn create_plain(
 }
 
 struct PlainBody<'a> {
-    content: &'a str,
-    ttl: Option<&'a str>,
-    uses: Option<&'a str>,
+    content: Cow<'a, str>,
+    ttl: Option<Cow<'a, str>>,
+    uses: Option<Cow<'a, str>>,
 }
 
 /// Pull optional trailing `&ttl=…` / `&uses=…` params off a `curl -d` body, then
-/// strip a leading `url=`/`text=`/`content=` field name. Only *trailing* option
-/// pairs are consumed, so a redirect URL keeps its own `?a=1&b=2` query string as
-/// long as `ttl`/`uses` come last (as `-d` appends them). The content body is not
-/// trimmed here — text is kept verbatim; the redirect path trims it later.
+/// strip a leading `url=`/`text=`/`content=` field name and percent-decode what
+/// is left.
+///
+/// Only *trailing* option pairs are consumed, so an unencoded redirect URL keeps
+/// its own `?a=1&b=2` query string as long as `ttl`/`uses` come last (as `-d`
+/// appends them). That leniency cannot be perfect — an unencoded URL whose own
+/// last parameter is called `ttl` would be read as the option — which is why
+/// the endpoint decodes: `curl --data-urlencode url=…` removes the ambiguity at
+/// the source, and its `%26` never reaches this scan.
+///
+/// **Decoding only applies to a value that arrived as a named field.** A body
+/// with no field name is `curl --data-binary @file`, which is raw bytes for a
+/// Text link, and a log file full of `%` is not a form. The content is not
+/// trimmed here either — text is kept verbatim; the redirect path trims later.
 fn parse_plain_body(body: &str) -> PlainBody<'_> {
     let mut rest = body;
     let mut ttl = None;
@@ -864,22 +874,64 @@ fn parse_plain_body(body: &str) -> PlainBody<'_> {
         let Some(amp) = trimmed.rfind('&') else { break };
         let last = &trimmed[amp + 1..];
         if let Some(v) = last.strip_prefix("ttl=") {
-            ttl = Some(v.trim());
+            ttl = Some(percent_decode(v.trim()));
         } else if let Some(v) = last.strip_prefix("uses=") {
-            uses = Some(v.trim());
+            uses = Some(percent_decode(v.trim()));
         } else {
             break;
         }
         rest = &trimmed[..amp];
     }
 
-    let content = rest
+    let content = match rest
         .strip_prefix("url=")
         .or_else(|| rest.strip_prefix("text="))
         .or_else(|| rest.strip_prefix("content="))
-        .unwrap_or(rest);
+    {
+        Some(field) => percent_decode(field),
+        None => Cow::Borrowed(rest),
+    };
 
     PlainBody { content, ttl, uses }
+}
+
+/// Percent-decode one form field value.
+///
+/// `%XX` only — a `+` is left alone. Strict `application/x-www-form-urlencoded`
+/// reads `+` as a space, but this endpoint exists for `curl -d url=<url>`, where
+/// a `+` in a query string is usually a real character somebody typed, and
+/// curl's own `--data-urlencode` writes a space as `%20` and a plus as `%2B`.
+/// Decoding `+` here would corrupt the common case to serve one that does not
+/// arise.
+///
+/// A value that is not valid UTF-8 once decoded was not a form field after all,
+/// so it is handed back untouched rather than mangled.
+fn percent_decode(value: &str) -> Cow<'_, str> {
+    if !value.contains('%') {
+        return Cow::Borrowed(value);
+    }
+    let hex = |b: u8| match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
+    };
+    let bytes = value.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let (Some(h), Some(l)) = (hex(bytes[i + 1]), hex(bytes[i + 2]))
+        {
+            out.push(h * 16 + l);
+            i += 3;
+            continue;
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(out).map_or(Cow::Borrowed(value), Cow::Owned)
 }
 
 /// Parse a short duration like `60`, `10m`, `2h`, or `3d` into seconds.
@@ -1321,13 +1373,13 @@ mod tests {
     fn parse_plain_body_extracts_trailing_options() {
         let p = parse_plain_body("url=https://example.com&ttl=15m");
         assert_eq!(p.content, "https://example.com");
-        assert_eq!(p.ttl, Some("15m"));
-        assert_eq!(p.uses, None);
+        assert_eq!(p.ttl.as_deref(), Some("15m"));
+        assert!(p.uses.is_none());
 
         let p = parse_plain_body("url=https://example.com&ttl=1d&uses=1");
         assert_eq!(p.content, "https://example.com");
-        assert_eq!(p.ttl, Some("1d"));
-        assert_eq!(p.uses, Some("1"));
+        assert_eq!(p.ttl.as_deref(), Some("1d"));
+        assert_eq!(p.uses.as_deref(), Some("1"));
     }
 
     #[test]
@@ -1335,7 +1387,41 @@ mod tests {
         // The URL's own &-query survives; only trailing ttl/uses are peeled.
         let p = parse_plain_body("url=https://x.com/?a=1&b=2&ttl=2h");
         assert_eq!(p.content, "https://x.com/?a=1&b=2");
-        assert_eq!(p.ttl, Some("2h"));
+        assert_eq!(p.ttl.as_deref(), Some("2h"));
+    }
+
+    /// `curl --data-urlencode url=<url>` is the correct way to send a URL that
+    /// contains `&`, `=`, or a space, and the endpoint has to be able to read
+    /// what it produces. Before this, the encoded value never looked like a URL
+    /// at all, so it was stored as a double-encoded Text link.
+    #[test]
+    fn a_form_encoded_field_is_decoded_once() {
+        for original in [
+            "https://example.com/?a=1&b=2",
+            "https://example.com/a%20b",
+            "https://example.com/r?next=https%3A%2F%2Fother.example%2F",
+            "mailto:a@b.example?subject=Hi&body=x",
+        ] {
+            // What `--data-urlencode` puts on the wire: encoded exactly once.
+            let body = format!("url={}&ttl=1d", urlencode(original));
+            let p = parse_plain_body(&body);
+            assert_eq!(p.content, original, "round trip of {original}");
+            assert_eq!(p.ttl.as_deref(), Some("1d"));
+        }
+    }
+
+    #[test]
+    fn a_plus_is_left_alone_and_a_bodiless_body_is_untouched() {
+        // A `+` in an unencoded URL is a character somebody typed; curl's own
+        // --data-urlencode writes a space as %20 and a plus as %2B, so nothing
+        // is gained by reading `+` as a space and a real query is lost.
+        let p = parse_plain_body("url=https://example.com/?q=a+b");
+        assert_eq!(p.content, "https://example.com/?q=a+b");
+
+        // `--data-binary @file` has no field name: raw bytes for a Text link,
+        // and a log full of `%` is not a form.
+        let p = parse_plain_body("50%20 done\nnext: 90%");
+        assert_eq!(p.content, "50%20 done\nnext: 90%");
     }
 
     #[test]
@@ -1343,7 +1429,7 @@ mod tests {
         // A file dump keeps its internal newlines; only the trailing ttl is peeled.
         let p = parse_plain_body("just some\nnotes from a file\n&ttl=1d");
         assert_eq!(p.content, "just some\nnotes from a file\n");
-        assert_eq!(p.ttl, Some("1d"));
+        assert_eq!(p.ttl.as_deref(), Some("1d"));
     }
 
     #[test]
@@ -1545,6 +1631,79 @@ mod tests {
         assert_eq!(s, StatusCode::GONE);
         assert!(body.contains("410"));
         assert!(!body.contains("zzz-gated-path"));
+    }
+
+    fn post_body(uri: &str, body: &str) -> Request<Body> {
+        Request::builder()
+            .method("POST")
+            .uri(uri)
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(body.to_string()))
+            .unwrap()
+    }
+
+    /// Percent-encode a value the way `curl --data-urlencode` does: everything
+    /// outside the unreserved set, a space as `%20`, a plus as `%2B`.
+    fn urlencode(value: &str) -> String {
+        value
+            .bytes()
+            .map(|b| match b {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                    (b as char).to_string()
+                }
+                other => format!("%{other:02X}"),
+            })
+            .collect()
+    }
+
+    /// The endpoint advertises `curl -d url=<url>`, so a URL that survives the
+    /// documented way of sending it has to come back out byte for byte -- and
+    /// as a redirect, not as a Text link holding a double-encoded string.
+    #[tokio::test]
+    async fn create_stores_a_form_encoded_url_exactly() {
+        let st = test_state().await;
+        for original in [
+            "https://example.com/?a=1&b=2",
+            "https://example.com/a%20b",
+            "https://example.com/r?next=https%3A%2F%2Fother.example%2F&q=hello%20world",
+        ] {
+            let body = format!("url={}&ttl=1d", urlencode(original));
+            let (s, _, out) = send(&st, post_body("/create", &body)).await;
+            assert_eq!(s, StatusCode::OK, "{original}: {out}");
+            let name = out.trim().rsplit('/').next().unwrap().to_string();
+
+            let d = db::get_link_live(&st.pool, &name)
+                .await
+                .unwrap()
+                .expect("the link exists");
+            assert_eq!(d.kind, "redirect", "{original} became {}", d.kind);
+            assert_eq!(d.content, original, "stored form of {original}");
+        }
+    }
+
+    /// The unencoded shorthand the help page prints still works, including a
+    /// URL that carries its own `&`-query, and a piped file is still raw bytes.
+    #[tokio::test]
+    async fn create_still_takes_an_unencoded_url_and_a_piped_file() {
+        let st = test_state().await;
+        let (s, _, out) = send(
+            &st,
+            post_body("/create", "url=https://example.com/?a=1&b=2&ttl=2h"),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK);
+        let name = out.trim().rsplit('/').next().unwrap().to_string();
+        let d = db::get_link_live(&st.pool, &name).await.unwrap().unwrap();
+        assert_eq!(d.content, "https://example.com/?a=1&b=2");
+
+        // No field name: raw bytes for a Text link, `%` and all.
+        let (s, _, out) = send(&st, post_body("/create", "90%20 of the way\n&uses=1")).await;
+        assert_eq!(s, StatusCode::OK);
+        let name = out.trim().rsplit('/').next().unwrap().to_string();
+        let d = db::get_link_live(&st.pool, &name).await.unwrap().unwrap();
+        assert_eq!(d.kind, "text");
+        assert_eq!(d.content, "90%20 of the way\n");
+        assert_eq!(d.max_uses, Some(1));
     }
 
     /// Write a row straight into the table, past every validator. The create
