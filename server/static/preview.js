@@ -336,12 +336,12 @@
      * has to become the `?`; drop the first recipient and its comma goes with
      * it. Path parameters need no promotion — each brings its own `;`.
      *
-     * The markup half is built from server-rendered fragments, so the edited
-     * line wears exactly the dress the stored line does.
+     * Returns the raw string and the same thing as `(class, text)` runs, so the
+     * edited line wears exactly the dress the stored line does.
      */
     function build(model, kept) {
         let raw = model.prefix;
-        let html = model.prefixHtml;
+        const runs = model.prefixRuns.slice();
         let recipient = false;
         let query = false;
         let fragment = false;
@@ -361,10 +361,20 @@
                 delim = part.d;
             }
             raw += delim + (part.k || "") + (part.e ? "=" : "") + part.v;
-            html += delim ? '<span class="dl">' + escapeHtml(delim) + "</span>" : "";
-            html += part.h;
+            if (delim) runs.push(["dl", delim]);
+            part.p.forEach((run) => runs.push(run));
         });
-        return { raw, html };
+        return { raw, runs };
+    }
+
+    /** One `(class, text)` run as a node. An empty class means bare text. */
+    function runNode(run) {
+        const [className, text] = run;
+        if (!className) return document.createTextNode(text);
+        const span = document.createElement("span");
+        span.className = className;
+        span.textContent = text;
+        return span;
     }
 
     function keepLabel(part) {

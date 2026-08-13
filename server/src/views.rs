@@ -2588,6 +2588,126 @@ mod tests {
         }
     }
 
+    /// The script, as text, so the two ends of the parts model can be checked
+    /// against each other without a browser.
+    const PREVIEW_JS: &str = include_str!("../static/preview.js");
+
+    /// Every `receiver.field` access in `source`, for the receivers named.
+    ///
+    /// A deliberately small scanner: identifier runs, and whatever identifier
+    /// follows the dot. It only has to be right about this one file.
+    fn member_accesses(source: &str, receivers: &[&str]) -> std::collections::BTreeSet<String> {
+        let is_ident = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '$';
+        let chars: Vec<char> = source.chars().collect();
+        let mut out = std::collections::BTreeSet::new();
+        let mut i = 0;
+        while i < chars.len() {
+            if !is_ident(chars[i]) {
+                i += 1;
+                continue;
+            }
+            let start = i;
+            while i < chars.len() && is_ident(chars[i]) {
+                i += 1;
+            }
+            let word: String = chars[start..i].iter().collect();
+            if chars.get(i) != Some(&'.') || !receivers.contains(&word.as_str()) {
+                continue;
+            }
+            let field_start = i + 1;
+            let mut j = field_start;
+            while j < chars.len() && is_ident(chars[j]) {
+                j += 1;
+            }
+            if j > field_start {
+                out.insert(chars[field_start..j].iter().collect());
+            }
+        }
+        out
+    }
+
+    /// The parts model is a contract between two files that cannot see each
+    /// other, and this is the test that would have caught it being half-edited.
+    ///
+    /// It has been broken exactly that way once: a rename shipped on the server
+    /// side (`h` -> `p`, `prefixHtml` -> `prefixRuns`) while `preview.js` still
+    /// read the old names, so `build()` returned a field nothing consumed and
+    /// the "After your edits" line never appeared on any card.
+    #[test]
+    fn the_script_reads_only_fields_the_server_emits() {
+        // Rich enough to carry every kind of part in one model.
+        let model: serde_json::Value = serde_json::from_str(&card_model(&urlview::parse_uri(
+            "https://alice@example.com:8443/a;s=1?next=x&q=y#f",
+        )))
+        .expect("the model is JSON");
+
+        let mut emitted: std::collections::BTreeSet<String> = model
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::from)
+            .collect();
+        for part in model["parts"].as_array().unwrap() {
+            emitted.extend(part.as_object().unwrap().keys().map(String::from));
+        }
+        // Added by readModel once the JSON is parsed.
+        emitted.insert("byIndex".to_string());
+
+        // Ordinary JavaScript, not fields of ours.
+        const BUILTIN: &[&str] = &["forEach", "filter", "map", "slice", "push", "length"];
+
+        for field in member_accesses(PREVIEW_JS, &["model", "part", "p"]) {
+            assert!(
+                emitted.contains(&field) || BUILTIN.contains(&field.as_str()),
+                "preview.js reads `{field}`, which the server does not emit. \
+                 Emitted: {emitted:?}"
+            );
+        }
+    }
+
+    /// The script's code with its comments removed, so a rule about what the
+    /// code may contain is not confused by prose describing that same rule.
+    /// (Good enough for this one file: it has no `//` inside a string literal.)
+    fn code_only(source: &str) -> String {
+        let mut out = String::with_capacity(source.len());
+        let mut rest = source;
+        loop {
+            let block = rest.find("/*");
+            let line = rest.find("//");
+            match (block, line) {
+                (Some(b), l) if l.is_none_or(|l| b < l) => {
+                    out.push_str(&rest[..b]);
+                    rest = rest[b..].find("*/").map_or("", |e| &rest[b + e + 2..]);
+                }
+                (_, Some(l)) => {
+                    out.push_str(&rest[..l]);
+                    rest = rest[l..].find('\n').map_or("", |e| &rest[l + e..]);
+                }
+                _ => {
+                    out.push_str(rest);
+                    return out;
+                }
+            }
+        }
+    }
+
+    /// The other half of the same rule, from the script's side.
+    ///
+    /// The CSP carries `require-trusted-types-for 'script'` with no policy, so
+    /// an innerHTML assignment throws. The half-edited build() gave itself away
+    /// here too: it was still concatenating `'<span class="dl">'`.
+    #[test]
+    fn the_script_never_assembles_markup() {
+        let code = code_only(PREVIEW_JS);
+        for forbidden in ["innerHTML", "outerHTML", "insertAdjacentHTML", "<span"] {
+            assert!(
+                !code.contains(forbidden),
+                "preview.js contains `{forbidden}`; Trusted Types forbids it, so it \
+                 would throw on the first edit"
+            );
+        }
+    }
+
     #[test]
     fn no_markup_crosses_into_the_parts_model() {
         // The site's CSP carries `require-trusted-types-for 'script'` with no
