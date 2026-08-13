@@ -78,6 +78,11 @@
     .pv-slice:first-child { border-top: none; }
     .pv-slice input { flex: none; align-self: center; margin: 0;
       accent-color: var(--text-tertiary); }
+    /* click-to-toggle rows: the row invites the press, the text keeps the
+       selection caret — and JS only toggles when no selection was made */
+    .pv-slice.togglable { cursor: pointer; }
+    .pv-slice.togglable:hover { background: color-mix(in srgb, var(--text) 3%, transparent); }
+    .pv-slice.togglable .txt { cursor: text; }
     .pv-slice .txt { color: var(--text); word-break: break-all; min-width: 0; }
     .pv-slice .txt .dl { color: var(--accent); }
     .pv-slice .txt .k { color: var(--text-secondary); font-weight: 700; }
@@ -151,6 +156,12 @@
     <li><b>Warnings drop the pill.</b> A background made them look like fact chips;
       they are the card speaking plainly, so: bare red icon and words. Facts (Norway,
       Mobile) keep the chip costume — that contrast now carries meaning.</li>
+    <li><b>Whole rows toggle on click — without stealing selection.</b> Click anywhere
+      on a removable slice and its box flips; drag to select text and nothing toggles.
+      The rule: a click only counts if it left no selection behind
+      (<code>getSelection().isCollapsed</code>), and a single click waits ~180ms so a
+      double-click-to-select-a-word cancels it. Native selection, native checkbox, both
+      intact — try both gestures on <code>?next</code> below.</li>
     <li><b>No selection trickery — agreed, and it is gone.</b> Fragile is the right
       instinct: a copy interceptor second-guesses what "select" means, breaks the moment
       someone selects across the card edge, and surprises anyone who wanted the visible
@@ -401,6 +412,27 @@
     Object.keys(boxes).forEach(function (k) {
       var cb = boxes[k].cb;
       if (cb && !cb.disabled) cb.addEventListener('change', refresh);
+    });
+    /* click-to-toggle: whole row flips the box, unless the click made (or
+       was part of making) a selection; single-click debounced so a
+       double-click word-select never toggles */
+    rows.forEach(function (r) {
+      var cb = r.querySelector('input');
+      if (!cb || cb.disabled) return;
+      r.classList.add('togglable');
+      var pending = null;
+      r.addEventListener('click', function (e) {
+        if (e.target === cb) return;          /* the box handles itself */
+        if (e.detail > 1) return;
+        clearTimeout(pending);
+        pending = setTimeout(function () {
+          var sel = window.getSelection();
+          if (sel && !sel.isCollapsed) return; /* they were selecting */
+          cb.checked = !cb.checked;
+          refresh();
+        }, 180);
+      });
+      r.addEventListener('dblclick', function () { clearTimeout(pending); });
     });
     refresh();
     document.querySelectorAll('.copybtn[data-card="' + name + '"]')
