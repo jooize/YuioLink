@@ -20,6 +20,11 @@
 //
 // There is also no selection or clipboard interception, deliberately. Copying
 // is what the Copy buttons do; selecting text does exactly what it looks like.
+//
+// And no HTML is ever assembled as a string here. The site's CSP carries
+// `require-trusted-types-for 'script'` with no policy allowed, so an innerHTML
+// assignment throws; the server hands over `(class, text)` runs and this file
+// builds elements and sets textContent.
 (() => {
     "use strict";
 
@@ -258,7 +263,8 @@
             if (!this.edited) return;
             const changed = built.raw !== this.model.stored;
             this.edited.line.classList.toggle("show", changed);
-            if (changed) this.edited.body.innerHTML = built.html;
+            if (!changed) return;
+            this.edited.body.replaceChildren(...built.runs.map(runNode));
         }
 
         // ------------------------------------------------------------------
@@ -372,10 +378,6 @@
 
     function setText(element, text) {
         if (element.textContent !== text) element.textContent = text;
-    }
-
-    function escapeHtml(text) {
-        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
     /**

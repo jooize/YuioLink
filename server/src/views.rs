@@ -1810,10 +1810,11 @@ fn idn_panel(w: &IdnWarning) -> Markup {
 /// `preview.js` reads it to inject the checkboxes, rebuild the string as they
 /// are unticked, and keep the button honest about what it would open.
 ///
-/// The per-slice `h` field is the stored-syntax markup for that slice, built
-/// here with maud (so it is escaped) and dropped into the edited line by the
-/// script. It is server-authored markup taking a detour through an attribute,
-/// which is the same trust as the rest of this page.
+/// Every slice ships as `(class, text)` runs rather than as markup. The site's
+/// CSP carries `require-trusted-types-for 'script'` with no policy allowed, so
+/// an `innerHTML` assignment would throw outright — the script has to build
+/// elements and set `textContent`. That is the stricter arrangement anyway: no
+/// HTML crosses this boundary at all, in either direction.
 fn card_model(uri: &UriView) -> String {
     let parts: Vec<serde_json::Value> = uri
         .slices
@@ -1830,14 +1831,14 @@ fn card_model(uri: &UriView) -> String {
                 "fixed": !s.removable,
                 "row": s.is_row(),
                 "label": recipient_label(uri, s),
-                "h": stored_slice_markup(s).into_string(),
+                "p": stored_runs(s),
             })
         })
         .collect();
     serde_json::json!({
         "scheme": uri.scheme,
         "prefix": uri.prefix,
-        "prefixHtml": html! { span.sch { (uri.prefix) } }.into_string(),
+        "prefixRuns": [["sch", uri.prefix]],
         // What "After your edits" is compared against before it shows itself.
         "stored": uri.raw(),
         // RFC 5724 needs at least one recipient, so the last number standing
@@ -1875,12 +1876,26 @@ fn recipient_label(uri: &UriView, slice: &urlview::Slice) -> Option<String> {
     })
 }
 
-fn stored_slice_markup(slice: &urlview::Slice) -> Markup {
-    html! {
-        @if let Some(k) = &slice.key { span.k { (k) } }
-        @if slice.equals { span.dl { "=" } }
-        (stored_value(&slice.value, slice.role))
+/// One slice in the exact line's dress, as `(class, text)` runs: a bold key, an
+/// accent `=`, then the value with its percent escapes dimmed to the encoding
+/// noise they are. An empty class means a bare text node.
+fn stored_runs(slice: &urlview::Slice) -> Vec<(&'static str, String)> {
+    let mut out: Vec<(&'static str, String)> = Vec::new();
+    if let Some(k) = &slice.key {
+        out.push(("k", k.clone()));
     }
+    if slice.equals {
+        out.push(("dl", "=".to_string()));
+    }
+    let plain = if slice.role == Role::Userinfo {
+        "usr"
+    } else {
+        ""
+    };
+    for (text, is_escape) in escape_runs(&slice.value) {
+        out.push((if is_escape { "pct" } else { plain }, text));
+    }
+    out
 }
 
 // --------------------------------------------------------------------------
@@ -2571,6 +2586,20 @@ mod tests {
             // The action is a full-width link either way.
             assert!(c.contains("btn-block"), "{stored}: {c}");
         }
+    }
+
+    #[test]
+    fn no_markup_crosses_into_the_parts_model() {
+        // The site's CSP carries `require-trusted-types-for 'script'` with no
+        // policy allowed, so preview.js cannot assign innerHTML at all. The
+        // model therefore ships (class, text) runs; a stray tag in here would
+        // be a string the script could only render as literal text -- or, if
+        // someone "fixed" that with innerHTML, a page that throws in Chrome.
+        let model = card_model(&urlview::parse_uri(
+            "https://alice@example.com/a?q=%3Cscript%3E&r=1#f",
+        ));
+        assert!(!model.contains('<'), "{model}");
+        assert!(!model.contains("span"), "{model}");
     }
 
     #[test]
