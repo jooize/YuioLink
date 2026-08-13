@@ -1250,8 +1250,11 @@
   }
 
   function copyText(text, btn) {
+    /* the split's segment is a button-sized control: bare check, no word;
+       the small raw-line pills keep "Copied ✓" (round 28) */
+    var doneLabel = btn.classList.contains('splitcopy') ? '✓' : 'Copied ✓';
     var ok = function () {
-      btn.classList.add('done'); btn.textContent = 'Copied ✓';
+      btn.classList.add('done'); btn.textContent = doneLabel;
       setTimeout(function () {
         btn.classList.remove('done'); btn.textContent = 'Copy';
       }, 1300);
