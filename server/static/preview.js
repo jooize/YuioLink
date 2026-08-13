@@ -285,10 +285,14 @@
             split.appendChild(action);
             action.classList.remove("btn-block");
 
+            // Two labels in one grid cell: the segment is as wide as the wider
+            // of them, so confirming a copy cannot shove the button it is
+            // attached to. A button-sized control just checks; the word belongs
+            // on the small raw-line pills, where there is room for it.
             const copy = document.createElement("button");
             copy.type = "button";
             copy.className = "btn splitcopy";
-            copy.textContent = "Copy";
+            copy.append(labelSpan("word", "Copy"), labelSpan("tick", "\u2713"));
             copy.setAttribute("aria-label", "Copy the destination address");
             copy.addEventListener("click", () => {
                 copyText(action.getAttribute("href") || "", copy);
@@ -401,7 +405,7 @@
             document.querySelector(".rawline.edited.show .copybtn") ||
             document.querySelector(".rawline:not(.edited) .copybtn");
         if (pill) {
-            confirmOn(pill, "Copied ✓");
+            confirmOn(pill);
             return;
         }
         const line = document.querySelector(".pv-url, .pv-line");
@@ -410,24 +414,34 @@
         setTimeout(() => line.classList.remove("copied"), FEEDBACK_MS);
     }
 
+    function labelSpan(className, text) {
+        const span = document.createElement("span");
+        span.className = className;
+        span.textContent = text;
+        return span;
+    }
+
     /**
-     * A button-sized segment just checks; the small raw-line pills say the
-     * word. The word belongs where there is room for it.
+     * Confirm a copy on the control that was pressed.
+     *
+     * The split's segment already holds both of its labels and only swaps which
+     * one is visible, so nothing about the page moves. A raw-line pill is small
+     * and free-standing, so it says the word.
      */
-    function confirmOn(button, done) {
+    function confirmOn(button) {
         button.classList.add("done");
-        button.textContent = done;
+        const pill = !button.classList.contains("splitcopy");
+        if (pill) button.textContent = "Copied ✓";
         setTimeout(() => {
             button.classList.remove("done");
-            button.textContent = "Copy";
+            if (pill) button.textContent = "Copy";
         }, FEEDBACK_MS);
     }
 
     function copyText(text, button) {
-        const done = button.classList.contains("splitcopy") ? "✓" : "Copied ✓";
         if (!navigator.clipboard || !navigator.clipboard.writeText) return;
         navigator.clipboard.writeText(text).then(
-            () => confirmOn(button, done),
+            () => confirmOn(button),
             () => {
                 // Clipboard unavailable (insecure context) or permission
                 // denied. Say nothing rather than claim a copy that never

@@ -1846,6 +1846,16 @@ html.js .custom-field:not(.open) {
     color: var(--danger);
 }
 
+/* A flag is a region's own mark and already has a shape of its own; a pill
+   around it is a second container for one fact. The name keeps the chip's
+   voice, the type chip beside it keeps the pill, and the difference between a
+   fact and a warning still reads -- warnings are red. */
+.pv-fact.region {
+    background: transparent;
+    border: none;
+    padding: 3px 0;
+}
+
 /* One step smaller beside a number, so the digits stay the loudest thing. */
 .pv-stack2 .pv-fact {
     gap: 4px;
@@ -1853,7 +1863,8 @@ html.js .custom-field:not(.open) {
     font-size: 10.5px;
 }
 
-.pv-stack2 .pv-fact.warn {
+.pv-stack2 .pv-fact.warn,
+.pv-stack2 .pv-fact.region {
     padding: 2px 0;
 }
 
@@ -1905,8 +1916,18 @@ html.js .custom-field:not(.open) {
 
 .pv-slice .txt {
     color: var(--text);
-    word-break: break-all;
     min-width: 0;
+    overflow-wrap: break-word;
+}
+
+/* The value is one inline block, so a long one -- a magnet's info hash -- drops
+   to its own line whole rather than orphaning its last three characters after
+   the key, and only breaks inside itself when a full line cannot hold it. */
+.pv-slice .txt .val {
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: top;
+    overflow-wrap: anywhere;
 }
 
 .pv-slice .txt .dl {
@@ -2190,6 +2211,29 @@ html.js .custom-field:not(.open) {
     font-size: 13px;
     font-weight: 600;
     border-radius: 0 var(--radius-control) var(--radius-control) 0;
+    /* Both labels occupy the same cell, so the segment is as wide as the wider
+       of them and confirming a copy cannot move the button it is attached to.
+       Reserving the space beats measuring it: no magic width to go stale when
+       the font, the size, or the word changes. */
+    display: grid;
+    place-items: center;
+}
+
+.pv-split .splitcopy > span {
+    grid-area: 1 / 1;
+    transition: opacity 0.12s ease;
+}
+
+.pv-split .splitcopy .tick {
+    opacity: 0;
+}
+
+.pv-split .splitcopy.done .word {
+    opacity: 0;
+}
+
+.pv-split .splitcopy.done .tick {
+    opacity: 1;
 }
 
 /* One hedge, once, under the handoff button. "If anything" is load-bearing. */

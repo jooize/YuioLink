@@ -1262,8 +1262,14 @@ fn slice_rows(uri: &UriView, rows: &[&urlview::Slice]) -> Markup {
                         @if !slice.delim.is_empty() { span.dl { (slice.delim) } }
                         @if let Some(k) = &slice.key { span.k { (k) } }
                         @if slice.equals { span.dl { "=" } }
-                        @if slice.role == Role::Path { (path_slices_markup(&slice.display)) }
-                        @else { (pieces(&slice.display, PieceStyle::Slice)) }
+                        // The value is one inline block, so a long one (a
+                        // magnet hash) drops to its own line whole instead of
+                        // orphaning its last three characters, and only breaks
+                        // inside itself when a line genuinely cannot hold it.
+                        span.val {
+                            @if slice.role == Role::Path { (path_slices_markup(&slice.display)) }
+                            @else { (pieces(&slice.display, PieceStyle::Slice)) }
+                        }
                     }
                 }
             }
@@ -1388,7 +1394,10 @@ fn chip_row(uri: &UriView, numbers: &[phone::Number]) -> Markup {
 fn number_chips(n: &phone::Number) -> Markup {
     html! {
         @if let Some(r) = &n.region {
-            span.pv-fact { span.flag { (r.flag) } " " (r.name) }
+            // A flag is a region's own mark, and it carries its own shape --
+            // boxing it in a pill as well reads as two containers around one
+            // fact. The chip stands bare; the type chip beside it keeps the pill.
+            span.pv-fact.region { span.flag { (r.flag) } " " (r.name) }
         }
         @if let Some(class) = n.class {
             @if class.is_warning() {
@@ -1936,7 +1945,7 @@ pub fn revealed_page(r: RevealedView) -> Markup {
                 // A one-time link is spent to LOOK, never to be thrown: what
                 // arrives here is the whole card, with the button waiting.
                 @if linkable { (card_body(uri, href)) } @else { (refusal_block(uri)) }
-                p.pv-revealed { "Deleted from the server on this view — refreshing won't bring it back." }
+                p.pv-revealed { "Deleted from the server on this view. Refreshing won't bring it back." }
                 p.pv-meta { "Expires in " (humanize_expires_in(r.expires_at)) }
                 @if linkable {
                     span.pv-caution.single { strong { "Always check the destination." } }
@@ -1952,7 +1961,7 @@ pub fn revealed_page(r: RevealedView) -> Markup {
         RevealedTarget::Text(text) => {
             let body = html! {
                 (link_heading(Kind::Text, r.name, r.base_host, back))
-                p.pv-revealed { "Deleted from the server on this view — refreshing won't bring it back." }
+                p.pv-revealed { "Deleted from the server on this view. Refreshing won't bring it back." }
                 (text_body(text))
             };
             document_link(
@@ -2720,6 +2729,44 @@ mod tests {
         ));
         assert!(!model.contains('<'), "{model}");
         assert!(!model.contains("span"), "{model}");
+    }
+
+    #[test]
+    fn a_slice_value_is_one_wrappable_unit_in_its_own_dress() {
+        // The value is its own inline block, so a long one drops to its own
+        // line whole instead of orphaning its tail after the key.
+        let magnet = card(
+            "magnet:?xt=urn:btih:c12fe3a94b81d7e05f2c6a9048bb3e1d7f4a2c60&tr=udp%3A%2F%2Ftracker.example.org%3A6969",
+        );
+        assert!(
+            magnet.contains(r#"<span class="val">urn:btih:c12fe"#),
+            "{magnet}"
+        );
+        // A tracker reads as the address it is: dim punctuation, bold domain,
+        // and no wash -- that is spent once per page, on the headline.
+        assert!(
+            magnet.contains(
+                r#"udp<span class="dl">://</span>tracker.<span class="reg">example.org</span>"#
+            ),
+            "{magnet}"
+        );
+        // ...and no chip: a tracker is what a magnet is made of.
+        assert!(!magnet.contains("Carries Another Address"), "{magnet}");
+
+        // A cc address wears the dress its recipients wear.
+        let mail = card("mailto:sales@example.com?cc=archive@records.example");
+        assert!(
+            mail.contains(r#"<span class="lp">archive</span><span class="dl">@</span><span class="reg">records.example</span>"#),
+            "{mail}"
+        );
+    }
+
+    #[test]
+    fn the_region_chip_stands_bare_beside_a_pill() {
+        let c = card("tel:+4782012345");
+        assert!(c.contains(r#"<span class="pv-fact region">"#), "{c}");
+        // The type chip keeps the pill, and a warning is still a warning.
+        assert!(c.contains("Premium Rate"));
     }
 
     #[test]

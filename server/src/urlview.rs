@@ -558,7 +558,7 @@ fn query_slices(query: &str, lead: &str) -> Vec<Slice> {
                 },
                 key: Some(key.to_string()),
                 equals,
-                display: decode_for_reading(value),
+                display: structure_value(decode_for_reading(value)),
                 value: value.to_string(),
                 removable: true,
             }
@@ -622,6 +622,13 @@ fn mailto(stored: &str, scheme: &str) -> UriView {
     };
     let mut slices = recipient_slices(body, Role::Recipient);
     slices.extend(query_slices(query, "?"));
+    // An address is an address wherever it appears, so `cc` and `bcc` read the
+    // way the recipients beside them do.
+    for slice in &mut slices {
+        if matches!(slice.key.as_deref(), Some("to" | "cc" | "bcc")) {
+            slice.display = address_list_pieces(&slice.value);
+        }
+    }
     UriView {
         scheme: scheme.to_string(),
         tier: Tier::Handoff,
@@ -835,6 +842,80 @@ fn address_pieces(value: &str) -> Vec<Piece> {
         }
         _ => decode_for_reading(value),
     }
+}
+
+/// Addresses in a header field (`cc`, `bcc`), read the way the recipient list
+/// is. An address is an address wherever it appears, so `?cc=archive@…` wears
+/// the same dress as the `to` beside it rather than reading as opaque text.
+fn address_list_pieces(value: &str) -> Vec<Piece> {
+    let mut out = Vec::new();
+    for (n, one) in value.split(',').enumerate() {
+        if n > 0 {
+            out.push(Piece::Delim(",".to_string()));
+        }
+        out.extend(address_pieces(one));
+    }
+    out
+}
+
+/// Re-read a value that is itself a URI, so one palette really does cover the
+/// URL line, the slices, and the exact line: the scheme's punctuation recedes
+/// and the registrable domain takes the site's bold.
+///
+/// No accent wash — that is spent once per page, on the headline — and no
+/// warning of any kind. A tracker in a magnet is the structure that scheme is
+/// made of, not a hazard; whether an address inside a value is worth a chip is
+/// decided separately, and only for an http(s) query value.
+///
+/// Returns `None` unless the whole thing really is `scheme://host…`, and the
+/// pieces always spell the input back exactly.
+fn uri_value_pieces(text: &str) -> Option<Vec<Piece>> {
+    let (scheme, rest) = text.split_once("://")?;
+    let scheme_ok = scheme.starts_with(|c: char| c.is_ascii_alphabetic())
+        && scheme
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '-'));
+    if !scheme_ok {
+        return None;
+    }
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let (authority, tail) = rest.split_at(end);
+    let (host, port) = match authority.rsplit_once(':') {
+        Some((h, p)) if !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()) => (h, Some(p)),
+        _ => (authority, None),
+    };
+    if host.is_empty() {
+        return None;
+    }
+    let mut out = vec![
+        Piece::Text(scheme.to_string()),
+        Piece::Delim("://".to_string()),
+    ];
+    out.extend(host_pieces(host));
+    if let Some(p) = port {
+        out.push(Piece::Delim(":".to_string()));
+        out.push(Piece::Text(p.to_string()));
+    }
+    for (n, segment) in tail.split('/').enumerate() {
+        if n > 0 {
+            out.push(Piece::Delim("/".to_string()));
+        }
+        if !segment.is_empty() {
+            out.push(Piece::Text(segment.to_string()));
+        }
+    }
+    Some(out)
+}
+
+/// Give a decoded value its structure back, where it turns out to have some.
+/// Only when nothing needed marking: an escape that stayed escaped, or a space
+/// worth pointing at, is the more important thing to say about the value.
+fn structure_value(pieces: Vec<Piece>) -> Vec<Piece> {
+    if !pieces.iter().all(|p| matches!(p, Piece::Text(_))) {
+        return pieces;
+    }
+    let text: String = pieces.iter().map(Piece::text).collect();
+    uri_value_pieces(&text).unwrap_or(pieces)
 }
 
 /// A body no standard structures for us, given the little shape its scheme
@@ -1441,6 +1522,70 @@ mod tests {
         let join = x.param("join").unwrap();
         assert!(!join.equals, "?join has no '=' and we must not invent one");
         assert!(join.removable);
+    }
+
+    #[test]
+    fn a_value_that_is_itself_a_uri_gets_its_structure_back() {
+        // One palette across the URL line, the slices, and the exact line
+        // (round 18), so a tracker in a magnet reads as the address it is.
+        let v = parse_uri("magnet:?xt=urn:btih:abc&tr=udp%3A%2F%2Ftracker.example.org%3A6969");
+        let tr = v
+            .slices
+            .iter()
+            .find(|s| s.key.as_deref() == Some("tr"))
+            .unwrap();
+        assert!(tr.display.contains(&Piece::Delim("://".to_string())));
+        // Bold marks the registrable domain, not the whole host, exactly as it
+        // does on the URL line above.
+        assert!(tr.display.contains(&Piece::Text("tracker.".to_string())));
+        assert!(
+            tr.display
+                .contains(&Piece::Domain("example.org".to_string()))
+        );
+        assert!(tr.display.contains(&Piece::Delim(":".to_string())));
+        // A tracker is the structure a magnet is made of, not a hazard: no chip.
+        assert!(!v.has(Hazard::CarriesAnotherAddress));
+        // Reading it changed nothing but the escapes, so the pieces still spell
+        // the decoded value exactly.
+        let read: String = tr.display.iter().map(Piece::text).collect();
+        assert_eq!(read, "udp://tracker.example.org:6969");
+
+        // The same treatment on the web tier, where it DOES earn the chip.
+        let w = parse_uri("https://example.com/r?next=https%3A%2F%2Fother.example%2Fx");
+        let next = w.param("next").unwrap();
+        assert!(
+            next.display
+                .contains(&Piece::Domain("other.example".to_string()))
+        );
+        assert!(w.has(Hazard::CarriesAnotherAddress));
+
+        // A value that only looks a bit like one is left alone.
+        let plain = parse_uri("https://example.com/?q=not://a-uri");
+        let q = plain.param("q").unwrap();
+        assert_eq!(
+            q.display.iter().map(Piece::text).collect::<String>(),
+            "not://a-uri"
+        );
+    }
+
+    #[test]
+    fn mailto_header_addresses_read_like_the_recipients_beside_them() {
+        let v = parse_uri("mailto:a@b.example?cc=archive@records.example,two@b.example&subject=Hi");
+        let cc = v.param("cc").unwrap();
+        assert!(cc.display.contains(&Piece::Local("archive".to_string())));
+        assert!(
+            cc.display
+                .contains(&Piece::Domain("records.example".to_string()))
+        );
+        // A comma-joined cc keeps its comma as a delimiter, like the to-list.
+        assert!(cc.display.contains(&Piece::Delim(",".to_string())));
+        assert_eq!(
+            cc.display.iter().map(Piece::text).collect::<String>(),
+            "archive@records.example,two@b.example"
+        );
+        // An ordinary hfield is still ordinary text.
+        let subject = v.param("subject").unwrap();
+        assert_eq!(subject.display, vec![Piece::Text("Hi".to_string())]);
     }
 
     #[test]
