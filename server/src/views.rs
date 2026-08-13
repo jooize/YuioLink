@@ -8,7 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use maud::{DOCTYPE, Markup, PreEscaped, html};
 
-use crate::urlview::{IdnWarning, UrlView};
+use crate::phone;
+use crate::urlview::{self, Hazard, IdnWarning, Piece, Role, Tier, UriView};
 
 /// The crate version, shown in the footer and linked to its release tag.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -791,9 +792,9 @@ pub fn result_page(
 
 /// What the interstitial is gating.
 pub enum Target<'a> {
-    /// A redirect, with its destination already parsed for display and the
-    /// canonical stored string that an `href` would carry.
-    Redirect { url: &'a UrlView, href: &'a str },
+    /// A redirect, with its destination already cut into parts for display and
+    /// the canonical stored string that an `href` would carry.
+    Redirect { uri: &'a UriView, href: &'a str },
     /// A limited Text link — only its existence is shown until revealed.
     TextSnippet,
 }
@@ -827,7 +828,7 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
         (pv_arrow())
         @match &i.target {
             _ if one_time => (blind_reveal_block(&i)),
-            Target::Redirect { url, href } => (unlimited_redirect_block(&i, url, href)),
+            Target::Redirect { uri, href } => (redirect_card(&i, uri, href)),
             Target::TextSnippet => (blind_reveal_block(&i)),
         }
     };
@@ -838,7 +839,7 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
         (interstitial_head(&i, one_time))
     };
     let title = match &i.target {
-        Target::Redirect { url, .. } => link_title("Redirect", i.name, Some(&url.card_domain())),
+        Target::Redirect { uri, .. } => link_title("Redirect", i.name, Some(&uri.card_domain())),
         Target::TextSnippet => link_title("Text", i.name, None),
     };
     // preview.js only wires ⌘C to the destination, and no-ops when there is no
@@ -849,8 +850,8 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
 /// `<head>` Open Graph / theme-color tags so a shared link unfurls trustworthily.
 fn interstitial_head(i: &Interstitial, one_time: bool) -> Markup {
     match &i.target {
-        Target::Redirect { url, .. } => {
-            let domain = url.card_domain();
+        Target::Redirect { uri, .. } => {
+            let domain = uri.card_domain();
             let title = if one_time {
                 format!("One-time link to {domain}")
             } else {
@@ -939,26 +940,6 @@ impl Kind {
     }
 }
 
-fn unlimited_redirect_block(i: &Interstitial, url: &UrlView, href: &str) -> Markup {
-    // Render-time allowlist check. It is the only thing standing between a
-    // stored string and an `href`, on this page and on the revealed one, so it
-    // runs where the markup is written rather than in a handler that a future
-    // route could bypass.
-    if !is_linkable(href) {
-        return refusal_block(i, url);
-    }
-    html! {
-        (render_url(url))
-        @if let Some(w) = idn_warning(url) { (idn_panel(w)) }
-        (go_anchor(href, &continue_label(url)))
-        p.pv-meta { "Expires in " (humanize_expires_in(i.expires_at)) }
-        span.pv-caution {
-            "YuioLinks expire and are reused, so a link can point somewhere else later. "
-            strong { "Always check the destination." }
-        }
-    }
-}
-
 /// The one-time card, for both kinds. It discloses nothing — not the domain,
 /// not the scheme — because disclosing it without spending the use would let
 /// anyone holding the link learn where it points invisibly, and the spent use
@@ -984,23 +965,73 @@ fn blind_reveal_block(i: &Interstitial) -> Markup {
     }
 }
 
-/// Tier 3: a stored string whose scheme is off the allowlist. It is printed and
-/// given no control at all — not a disabled one — because the thing it would do
-/// is not "go somewhere".
-fn refusal_block(i: &Interstitial, url: &UrlView) -> Markup {
+// --------------------------------------------------------------------------
+// The redirect card
+// --------------------------------------------------------------------------
+//
+// Three registers, and every character of the stored string appears in at
+// least one of them:
+//
+//   headline    what the link IS, formatted for reading
+//   slices      what it CARRIES, each row a verbatim cut
+//   exact line  what is STORED, character for character
+//
+// The headline may be formatted precisely because the exact line sits
+// underneath; where the headline already is the stored string, character for
+// character, there is nothing to prove and no exact line appears.
+
+/// The whole card for a live redirect, from the tier down to the caution.
+fn redirect_card(i: &Interstitial, uri: &UriView, href: &str) -> Markup {
+    // Render-time allowlist check. It is the only thing standing between a
+    // stored string and an `href`, on this page and on the revealed one, so it
+    // runs where the markup is written rather than in a handler that a future
+    // route could bypass.
+    if uri.tier == Tier::Refused || !is_linkable(href) {
+        return html! {
+            (refusal_block(uri))
+            p.pv-meta { "Expires in " (humanize_expires_in(i.expires_at)) }
+        };
+    }
     html! {
-        (render_url_inert(url))
-        (refuse_alert())
+        (card_body(uri, href))
         p.pv-meta { "Expires in " (humanize_expires_in(i.expires_at)) }
+        span.pv-caution {
+            "YuioLinks expire and are reused, so a link can point somewhere else later. "
+            strong { "Always check the destination." }
+        }
     }
 }
 
-/// The refusal panel. Neutral ground, red only in the 16px symbol: the red fill
-/// belongs to `.pv-idn`, where a lookalike domain is an actual attack in
-/// progress. The heading names the diagnosis and the body carries the
-/// consequence in the same breath.
-fn refuse_alert() -> Markup {
+/// Everything between the arrow and the expiry line, shared by the preview page
+/// and the revealed page so a one-time link's second screen is the same card.
+fn card_body(uri: &UriView, href: &str) -> Markup {
+    let numbers = phone_numbers(uri);
     html! {
+        (headline(uri, &numbers))
+        @if let Some(w) = uri.idn_warning() { (idn_panel(w)) }
+        // Warn chips live OUTSIDE the fold, always: a warning that needs a
+        // click is a warning that was not made.
+        (chip_row(uri, &numbers))
+        (slice_section(uri))
+        (notes(uri))
+        (exact_line(uri))
+        (action_button(uri, href, &numbers))
+        @if uri.tier == Tier::Handoff {
+            // The one hedge, once. "If anything" is load-bearing: a magnet
+            // with nothing registered does nothing at all, and we cannot see
+            // the reader's machine to know.
+            span.pv-hedge { "What opens it, if anything, is up to your device." }
+        }
+    }
+}
+
+/// Tier 3: printed, never linked, and given no control at all — not a disabled
+/// one. The panel stays neutral; red lives only in the 16px symbol, because the
+/// red fill belongs to the lookalike-domain warning, where an actual attack is
+/// on the page.
+fn refusal_block(uri: &UriView) -> Markup {
+    html! {
+        code.pv-url.inert { (url_line_parts(uri)) }
         div.pv-refuse-alert {
             svg.sym width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" {
                 circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4" {}
@@ -1018,31 +1049,605 @@ fn refuse_alert() -> Markup {
 
 /// True when a stored destination may be emitted as an `href`. This is the
 /// render-time replacement for the check that used to live in the deleted
-/// `POST /:name/go` handler, and it now covers the revealed page too — that
-/// page emitted `href=(content)` with no check of its own.
+/// `POST /:name/go` handler, and it covers the revealed page too — that page
+/// emitted `href=(content)` with no check of its own.
 fn is_linkable(target: &str) -> bool {
     yuiolink_core::validate_redirect(target, yuiolink_core::DEFAULT_ALLOWED_SCHEMES).is_ok()
 }
 
-/// The amber "Continue" anchor: leaving the site.
-///
-/// A real `<a href>`, not a form that POSTs and redirects. The form was the
-/// original bug — CSP `form-action 'self'` applies to every redirect hop of a
-/// submission in Chrome and Safari, so the 303 to an external destination was
-/// refused and the press went nowhere. A link has nothing for `form-action` to
-/// block, and it brings right-click Copy Link, middle-click, and the browser's
-/// own hover preview with it.
-fn go_anchor(href: &str, label: &str) -> Markup {
-    html! {
-        a class=(GO_BTN) href=(href) rel="noopener noreferrer" { (label) }
+// --------------------------------------------------------------------------
+// Register 1: the headline
+// --------------------------------------------------------------------------
+
+/// Schemes whose headline is the stored string, character for character. They
+/// wear it as one inline run (`.pv-line`) so a selection across a soft wrap
+/// still copies one unbroken string — and they carry no exact line, because
+/// there is nothing about them left to prove.
+fn is_one_run(scheme: &str) -> bool {
+    matches!(
+        scheme,
+        "spotify" | "matrix" | "irc" | "ircs" | "ftp" | "ftps"
+    )
+}
+
+fn headline(uri: &UriView, numbers: &[phone::Number]) -> Markup {
+    match uri.scheme.as_str() {
+        "http" | "https" => html! { code.pv-url #destination { (url_line_parts(uri)) } },
+        _ if is_one_run(&uri.scheme) => html! {
+            code.pv-line #destination {
+                span.sch-big { (uri.scheme) span.colon { ":" } }
+                wbr;
+                (one_run_body(uri))
+            }
+        },
+        // A magnet IS its list, so the slices are the hero and the plate is the
+        // whole headline.
+        "magnet" => scheme_plate(&uri.scheme),
+        "tel" | "sms" => html! {
+            (scheme_plate(&uri.scheme))
+            @if numbers.len() > 1 { (number_stack(uri, numbers)) }
+            @else if let Some(n) = numbers.first() { (number_value(uri, n)) }
+        },
+        "mailto" => html! {
+            (scheme_plate(&uri.scheme))
+            (address_headline(uri))
+        },
+        _ => html! {
+            (scheme_plate(&uri.scheme))
+            @if let Some(body) = uri.first(Role::Opaque).filter(|s| !s.value.is_empty()) {
+                span.pv-value { (pieces(&body.display, PieceStyle::Headline)) }
+            }
+        },
     }
 }
 
-/// Amber "Continue" (leave the site) and blue "Reveal" (stay, spend a use)
+/// The scheme, large and plain bold. It does not take the accent wash: the
+/// wash appears exactly once per page and belongs to the registrable domain,
+/// which is who you are dealing with. Size is this one's emphasis.
+fn scheme_plate(scheme: &str) -> Markup {
+    html! { span.pv-scheme { (scheme) span.colon { ":" } } }
+}
+
+/// The body of a one-run headline, with a `<wbr>` after each delimiter so a
+/// narrow card breaks at the joints rather than mid-token. Soft wraps are
+/// layout, not characters — the clipboard never sees them.
+fn one_run_body(uri: &UriView) -> Markup {
+    html! {
+        @for slice in &uri.slices {
+            @match slice.role {
+                Role::Host => {
+                    span.dl { "//" } wbr;
+                    (pieces(&slice.display, PieceStyle::Headline))
+                }
+                Role::Port => { span.dl { ":" } span.seg { (slice.value) } }
+                Role::Path => (path_run(&slice.value)),
+                _ => {
+                    @if !slice.delim.is_empty() { span.dl { (slice.delim) } wbr; }
+                    @if let Some(k) = &slice.key { span.k { (k) } }
+                    @if slice.equals { span.dl { "=" } }
+                    (pieces(&slice.display, PieceStyle::Headline))
+                }
+            }
+        }
+    }
+}
+
+/// Recipients as the headline. One address reads as a value; several read as a
+/// comma-joined inline run, character-identical to the stored list so a
+/// selection across it copies the list unbroken, wrapping one address per line
+/// on a phone.
+fn address_headline(uri: &UriView) -> Markup {
+    let to: Vec<&urlview::Slice> = uri.recipients().collect();
+    html! {
+        @if to.len() == 1 {
+            span.pv-value { (pieces(&to[0].display, PieceStyle::Headline)) }
+        } @else if to.len() > 1 {
+            code.pv-list {
+                @for (n, slice) in to.iter().enumerate() {
+                    @if n > 0 { span.dl { "," } wbr; }
+                    (pieces(&slice.display, PieceStyle::Headline))
+                }
+            }
+        }
+    }
+}
+
+/// One number, dressed the way its own country's tables dress it: the country
+/// code recedes, the separators go tertiary, the national digits keep the bold.
+/// Recede what routes, bold what identifies.
+fn number_value(uri: &UriView, n: &phone::Number) -> Markup {
+    html! {
+        span.pv-value {
+            @if let Some(cc) = &n.country_code { span.cc { (cc) } " " }
+            (number_parts(&n.national))
+            // libphonenumber's own rendering of an extension, riding the
+            // number rather than sitting in a table of its own.
+            @if let Some(ext) = uri.slices.iter().find(|s| s.key.as_deref() == Some("ext")) {
+                span.ext { "ext. " (ext.value) }
+            }
+        }
+    }
+}
+
+/// Several numbers, one per line. A phone list read as a comma-joined run is
+/// messy, and a stack can align: country codes right into the seam, national
+/// numbers sharing a left edge, tabular digits under each other. Each number
+/// carries its own facts, because a Premium Rate warning has to point at ITS
+/// number — a pooled row cannot say which is which.
+fn number_stack(uri: &UriView, numbers: &[phone::Number]) -> Markup {
+    let to: Vec<&urlview::Slice> = uri.recipients().collect();
+    html! {
+        div.pv-stack2 {
+            @for (n, number) in numbers.iter().enumerate() {
+                @let at = to.get(n).map(|s| index_of(uri, s));
+                span.cc data-slice=[at] { (number.country_code.as_deref().unwrap_or("")) }
+                span.nn data-slice=[at] { (number_parts(&number.national)) }
+                span.facts data-slice=[at] { (number_chips(number)) }
+            }
+        }
+    }
+}
+
+fn number_parts(national: &str) -> Markup {
+    html! {
+        @for part in phone::parts(national) {
+            @match part {
+                phone::Part::Digits(d) => { (d) }
+                phone::Part::Separator(s) => { span.sep { (s) } }
+            }
+        }
+    }
+}
+
+/// Every recipient of a `tel:`/`sms:` URI, read against the numbering plans.
+/// `tel:` has exactly one by RFC 3966, and it is the opaque body rather than a
+/// recipient slice.
+fn phone_numbers(uri: &UriView) -> Vec<phone::Number> {
+    match uri.scheme.as_str() {
+        "tel" => uri
+            .first(Role::Opaque)
+            .map(|s| vec![phone::read(&s.value)])
+            .unwrap_or_default(),
+        "sms" => uri.recipients().map(|s| phone::read(&s.value)).collect(),
+        _ => Vec::new(),
+    }
+}
+
+// --------------------------------------------------------------------------
+// Register 2: the slices
+// --------------------------------------------------------------------------
+
+/// The rows, folded or bare.
+///
+/// http(s) keeps its quiet single-line page and offers the parts behind a
+/// disclosure; every other scheme lists them outright, because on those cards
+/// the parts are most of what there is to read. The fold earns its line: it
+/// appears only when it has something to add — a part that can be unticked, or
+/// a value that reads differently from the way it is stored — so a bare path
+/// never folds. And it arrives open when a warning about the string fired.
+fn slice_section(uri: &UriView) -> Markup {
+    let rows: Vec<&urlview::Slice> = uri.rows().collect();
+    if rows.is_empty() {
+        return html! {};
+    }
+    // The rule follows the parts, never the scheme: a section that could only
+    // restate a row nobody can act on has not earned its line. That is what
+    // leaves the bare-path http card, the plain ftp card, and the tel card with
+    // no rows at all.
+    if !uri.fold_is_worth_it() {
+        return html! {};
+    }
+    let folds = uri.tier == Tier::Web;
+    html! {
+        @if folds {
+            details.pv-parts open[uri.warns_about_the_string()] {
+                summary.pv-parts-lid {
+                    span.when-closed { "Show the parts" }
+                    span.when-open { "Hide the parts" }
+                }
+                (slice_rows(uri, &rows))
+            }
+        } @else {
+            (slice_rows(uri, &rows))
+        }
+    }
+}
+
+fn slice_rows(uri: &UriView, rows: &[&urlview::Slice]) -> Markup {
+    html! {
+        div.pv-slices data-card=(card_model(uri)) {
+            @for slice in rows {
+                div class=(slice_class(slice)) data-slice=(index_of(uri, slice)) {
+                    span.txt {
+                        @if !slice.delim.is_empty() { span.dl { (slice.delim) } }
+                        @if let Some(k) = &slice.key { span.k { (k) } }
+                        @if slice.equals { span.dl { "=" } }
+                        @if slice.role == Role::Path { (path_slices_markup(&slice.display)) }
+                        @else { (pieces(&slice.display, PieceStyle::Slice)) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn slice_class(slice: &urlview::Slice) -> String {
+    let mut c = String::from("pv-slice");
+    if slice.role == Role::Userinfo {
+        c.push_str(" usr");
+    }
+    c
+}
+
+fn index_of(uri: &UriView, slice: &urlview::Slice) -> usize {
+    uri.slices
+        .iter()
+        .position(|s| std::ptr::eq(s, slice))
+        .unwrap_or(0)
+}
+
+// --------------------------------------------------------------------------
+// Register 3: the exact line
+// --------------------------------------------------------------------------
+
+/// "Exactly as stored" — the record, and never collapsed.
+///
+/// It appears wherever the headline is a *rendering*: a formatted number, a
+/// comma-joined address list, a decoded value. On an http(s) card the URL line
+/// already is the stored string, so the exact line appears only when reading
+/// changed something; on a one-run card the headline is the stored string
+/// outright, so it never appears at all.
+fn exact_line(uri: &UriView) -> Markup {
+    let needed = match uri.scheme.as_str() {
+        "http" | "https" => uri.decoding_changed_anything(),
+        s if is_one_run(s) => false,
+        _ => true,
+    };
+    if !needed {
+        return html! {};
+    }
+    html! {
+        code.rawline {
+            span.lbl { "Exactly as stored" }
+            span.str { (stored_markup(uri)) }
+        }
+    }
+}
+
+/// The stored string in the shared syntax dress: scheme tertiary, delimiters
+/// accent, keys bold, percent escapes dimmed to the encoding noise they are,
+/// registrable domains bold but never washed. Nothing here is decoded — this
+/// line's whole job is to be the characters.
+fn stored_markup(uri: &UriView) -> Markup {
+    html! {
+        span.sch { (uri.prefix) }
+        @for slice in &uri.slices {
+            @if !slice.delim.is_empty() { span.dl { (slice.delim) } }
+            @if let Some(k) = &slice.key { span.k { (k) } }
+            @if slice.equals { span.dl { "=" } }
+            (stored_value(&slice.value, slice.role))
+        }
+    }
+}
+
+fn stored_value(value: &str, role: Role) -> Markup {
+    let escapes = escape_runs(value);
+    html! {
+        @for (text, is_escape) in escapes {
+            @if is_escape { span.pct { (text) } }
+            @else if role == Role::Userinfo { span.usr { (text) } }
+            @else { (text) }
+        }
+    }
+}
+
+/// Split a stored value into alternating plain and `%NN`-escape runs.
+fn escape_runs(value: &str) -> Vec<(String, bool)> {
+    let bytes = value.as_bytes();
+    let mut out: Vec<(String, bool)> = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        let escape = bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && bytes[i + 1].is_ascii_hexdigit()
+            && bytes[i + 2].is_ascii_hexdigit();
+        let take = if escape {
+            3
+        } else {
+            value[i..].chars().next().map_or(1, char::len_utf8)
+        };
+        let chunk = &value[i..i + take];
+        match out.last_mut() {
+            Some((prev, was)) if *was == escape => prev.push_str(chunk),
+            _ => out.push((chunk.to_string(), escape)),
+        }
+        i += take;
+    }
+    out
+}
+
+// --------------------------------------------------------------------------
+// Chips
+// --------------------------------------------------------------------------
+
+/// Facts keep the pill; warnings are the card speaking plainly — a bare red
+/// icon and words, no background. The contrast carries the meaning.
+fn chip_row(uri: &UriView, numbers: &[phone::Number]) -> Markup {
+    let pooled = numbers.len() == 1;
+    let chips = html! {
+        @for hazard in &uri.hazards { (warn_chip(*hazard)) }
+        @if pooled { (number_chips(&numbers[0])) }
+    };
+    let empty = uri.hazards.is_empty() && !pooled;
+    html! { @if !empty { div.pv-facts { (chips) } } }
+}
+
+/// A number's own chips: where it is, and what kind of line it is. Premium Rate
+/// is the one that warns — and it warns for `sms:` as well as `tel:`, because
+/// reverse-billed messaging is a real subscription trap.
+fn number_chips(n: &phone::Number) -> Markup {
+    html! {
+        @if let Some(r) = &n.region {
+            span.pv-fact { span.flag { (r.flag) } " " (r.name) }
+        }
+        @if let Some(class) = n.class {
+            @if class.is_warning() {
+                span.pv-fact.warn { (alert_icon()) (class.label()) }
+            } @else {
+                span.pv-fact { (class.label()) }
+            }
+        }
+    }
+}
+
+fn warn_chip(hazard: Hazard) -> Markup {
+    let words = match hazard {
+        Hazard::NotEncrypted => "Not Encrypted",
+        Hazard::UsernameInTheAddress => "Username in the Address",
+        Hazard::HiddenCharacters => "Hidden Characters",
+        Hazard::PaddedWithSpaces => "Padded With Spaces",
+        Hazard::CarriesAnotherAddress => "Carries Another Address",
+    };
+    html! {
+        span.pv-fact.warn {
+            @if hazard == Hazard::NotEncrypted { (open_padlock_icon()) } @else { (alert_icon()) }
+            (words)
+        }
+    }
+}
+
+fn alert_icon() -> Markup {
+    html! {
+        svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true" {
+            circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4" {}
+            path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" {}
+            circle cx="8" cy="11.2" r=".95" fill="currentColor" {}
+        }
+    }
+}
+
+fn open_padlock_icon() -> Markup {
+    html! {
+        svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true" {
+            path d="M4.4 7.2V5.1a3.6 3.6 0 0 1 6.4-2.2" stroke="currentColor"
+                stroke-width="1.5" stroke-linecap="round" {}
+            rect x="3.1" y="7.2" width="9.8" height="6.4" rx="1.8" stroke="currentColor"
+                stroke-width="1.5" {}
+        }
+    }
+}
+
+// --------------------------------------------------------------------------
+// Notes
+// --------------------------------------------------------------------------
+
+/// A note appears only where the standard opens a gap between what is shown and
+/// what is true. Nowhere else: a sentence under every card would train the eye
+/// to skip the ones that matter.
+fn notes(uri: &UriView) -> Markup {
+    let mut out: Vec<Markup> = Vec::new();
+
+    if uri.has(Hazard::UsernameInTheAddress) {
+        let domain = uri.card_domain();
+        out.push(html! {
+            "Text before the " code { "@" } " is a login name, not part of the address — "
+            "this page is on " code { (domain) } "."
+        });
+    }
+    if uri.has(Hazard::CarriesAnotherAddress) {
+        out.push(html! {
+            "One of the parameters is itself a complete web address, on a different domain."
+        });
+    }
+    match uri.scheme.as_str() {
+        "magnet" => out.push(html! {
+            "Only " code { "xt" } " identifies the data. " code { "dn" } " is a name the "
+            "link's creator chose, and it does not have to match what arrives."
+        }),
+        "mailto" => {
+            if uri.recipients().count() > 1 || uri.param("cc").is_some() {
+                out.push(html! {
+                    "Every address listed receives the message, and each can see the others."
+                    @if uri.param("bcc").is_some() {
+                        " A " code { "bcc" } " address receives it hidden from the others."
+                    }
+                });
+            }
+            let subject = uri.param("subject").is_some();
+            let body = uri.param("body").is_some();
+            if subject || body {
+                out.push(html! {
+                    "The "
+                    @if subject { code { "subject" } }
+                    @if subject && body { " and " }
+                    @if body { code { "body" } }
+                    @if subject && body { " are" } @else { " is" }
+                    " pre-written by the link's creator — a message sent from here goes out "
+                    "as you."
+                });
+            }
+        }
+        "sms" => {
+            if uri.recipients().count() > 1 {
+                out.push(html! {
+                    "One message goes to every number listed — anything sent goes out from "
+                    "your number."
+                });
+            } else if uri.param("body").is_some() {
+                out.push(html! {
+                    "The " code { "body" } " is the text of the message, written by the "
+                    "link's creator — anything sent goes out from your number."
+                });
+            }
+        }
+        "tel" => {
+            if let Some(ext) = uri.slices.iter().find(|s| s.key.as_deref() == Some("ext")) {
+                out.push(html! {
+                    "The extension, " (ext.value) ", is dialled after the call connects."
+                });
+            }
+        }
+        _ => {}
+    }
+
+    html! { @for note in out { span.pv-note { (note) } } }
+}
+
+// --------------------------------------------------------------------------
+// The button
+// --------------------------------------------------------------------------
+
+/// The lead verb and the line under it.
+///
+/// The rule the whole tier rests on: **describe the scheme, never predict the
+/// outcome.** We cannot see the reader's machine, so "opens your mail app" is a
+/// claim about an unseen device. "An email address" is a published fact about
+/// the string, and it is true whatever happens next.
+struct Action {
+    lead: String,
+    what: String,
+}
+
+fn action(uri: &UriView, numbers: &[phone::Number]) -> Action {
+    let generic = |what: &str| Action {
+        lead: String::new(),
+        what: what.to_string(),
+    };
+    match uri.scheme.as_str() {
+        "mailto" => {
+            let to: Vec<&urlview::Slice> = uri.recipients().collect();
+            let cc = uri.param("cc").is_some();
+            let count = to.len() + usize::from(cc);
+            match count {
+                0 => Action {
+                    lead: "Draft a Message".into(),
+                    what: "An email with no recipient".into(),
+                },
+                1 => Action {
+                    lead: format!(
+                        "Write to {}",
+                        to.first()
+                            .map(|s| s.value.clone())
+                            .or_else(|| uri.param("cc").map(|s| s.value.clone()))
+                            .unwrap_or_default()
+                    ),
+                    what: "An email address".into(),
+                },
+                n => Action {
+                    lead: format!("Write to {n} addresses"),
+                    what: "Email addresses".into(),
+                },
+            }
+        }
+        "tel" => Action {
+            lead: format!(
+                "Call {}",
+                numbers.first().map(|n| n.headline.as_str()).unwrap_or("")
+            ),
+            what: "A phone number".into(),
+        },
+        // "Message", not "Text": Text is one of this site's two link kinds, and
+        // a button that says it would be naming the wrong thing.
+        "sms" => match numbers.len() {
+            0 | 1 => Action {
+                lead: format!(
+                    "Message {}",
+                    numbers.first().map(|n| n.headline.as_str()).unwrap_or("")
+                ),
+                what: "A phone number, for a message".into(),
+            },
+            n => Action {
+                lead: format!("Message {n} numbers"),
+                what: "Phone numbers, for one message".into(),
+            },
+        },
+        "magnet" => generic("A file identified by its hash"),
+        "ftp" | "ftps" => generic("An address on a file server"),
+        "spotify" => generic(match uri.type_segment.as_deref() {
+            Some("track") => "A track in Spotify's catalogue",
+            Some("album") => "An album in Spotify's catalogue",
+            Some("artist") => "An artist in Spotify's catalogue",
+            Some("playlist") => "A playlist in Spotify's catalogue",
+            Some("show") => "A show in Spotify's catalogue",
+            Some("episode") => "An episode in Spotify's catalogue",
+            _ => "Something in Spotify's catalogue",
+        }),
+        "xmpp" => generic(if uri.param("join").is_some() {
+            "A chat room on XMPP"
+        } else {
+            "An XMPP chat address"
+        }),
+        "matrix" => generic(match uri.type_segment.as_deref() {
+            Some("u") => "A user on Matrix",
+            Some("r") | Some("roomid") => "A room on Matrix",
+            Some("e") => "An event in a Matrix room",
+            _ => "A room, user, or event on Matrix",
+        }),
+        "irc" | "ircs" => generic(
+            if uri
+                .type_segment
+                .as_deref()
+                .is_some_and(|t| t.contains(",isnick"))
+            {
+                "A person on IRC"
+            } else {
+                "An IRC server or channel"
+            },
+        ),
+        _ => generic("An address"),
+    }
+}
+
+/// The action, full width. `preview.js` splits a blue Copy segment off the
+/// right-hand end; without it this stays one button and the page still works.
+fn action_button(uri: &UriView, href: &str, numbers: &[phone::Number]) -> Markup {
+    if uri.tier == Tier::Web {
+        return html! {
+            a class=(GO_BTN) href=(href) rel="noopener noreferrer" { (continue_label(uri)) }
+        };
+    }
+    let a = action(uri, numbers);
+    html! {
+        a class=(GO_BTN_2) href=(href) rel="noopener noreferrer" {
+            span.lead {
+                @if a.lead.is_empty() {
+                    "Open Link " span.mid { "\u{b7}" } " "
+                    span.sch-tag { (uri.scheme) ":" }
+                } @else {
+                    (a.lead)
+                }
+            }
+            span.what { (a.what) }
+        }
+    }
+}
+
+/// Amber "Continue" (leave the site) and blue "Reveal" (stay, spend the use)
 /// button class sets. Continue is an anchor; Reveal stays a POST form
 /// (Post/Redirect/Get), so a link-unfurl crawler — which only GETs — can never
 /// spend a use.
-const GO_BTN: &str = "btn btn--go btn-block pv-btn btn-link";
+const GO_BTN: &str = "btn btn--go btn-block pv-btn btn-link go";
+const GO_BTN_2: &str = "btn btn--go btn-block btn-2 pv-btn btn-link go";
 const REVEAL_BTN: &str = "btn btn-block pv-btn";
 
 fn consume_form(action: &str, btn_class: &str, label: &str) -> Markup {
@@ -1053,81 +1658,128 @@ fn consume_form(action: &str, btn_class: &str, label: &str) -> Markup {
     }
 }
 
-fn continue_label(url: &UrlView) -> String {
+fn continue_label(uri: &UriView) -> String {
     // Never print the deceptive domain on the button; say "Continue Anyway".
-    if url.is_deceptive() {
+    if uri.idn_warning().is_some() {
         "Continue Anyway".to_string()
     } else {
-        format!("Continue to {}", url.card_domain())
+        format!("Continue to {}", uri.card_domain())
     }
 }
 
-fn idn_warning(url: &UrlView) -> Option<&IdnWarning> {
-    url.host.as_ref().and_then(|h| h.warning.as_ref())
+// --------------------------------------------------------------------------
+// Values, in three dresses
+// --------------------------------------------------------------------------
+
+/// Which palette a value is being drawn in. The three registers share one
+/// language and differ only in emphasis.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PieceStyle {
+    /// The URL line: delimiters accent, escapes dim, the host washed once.
+    Url,
+    /// A headline: the local part at full colour, the domain bold and washed.
+    Headline,
+    /// A slice row: the same, one size down and never washed.
+    Slice,
 }
 
-/// The full destination URL, coloured by part: dim scheme/delimiters, the
-/// registrable domain highlighted, path segments and query values distinguished.
-/// The spans concatenate back to the exact URL (no separators are added for
-/// display), so `preview.js` can copy this element's text on ⌘C.
-/// The same line as [`render_url`] with no `#destination` id and an `inert`
-/// class: a refused string is printed to be read, not taken. Selection still
-/// works — what is withheld is every control the page could offer, including
-/// the ⌘C shortcut preview.js binds to `#destination`.
-fn render_url_inert(url: &UrlView) -> Markup {
+fn pieces(parts: &[Piece], style: PieceStyle) -> Markup {
     html! {
-        code.pv-url.inert {
-            (render_url_parts(url))
-        }
-    }
-}
-
-fn render_url(url: &UrlView) -> Markup {
-    html! {
-        code.pv-url #destination {
-            (render_url_parts(url))
-        }
-    }
-}
-
-fn render_url_parts(url: &UrlView) -> Markup {
-    html! {
-            span.sch { (url.scheme) }
-            @match &url.host {
-                Some(h) => {
-                    span.pn { "://" }
-                    @if !h.subdomain.is_empty() { span.sub { (h.subdomain) "." } }
-                    span.reg { (h.registrable) }
-                    (render_path(&url.path))
-                    @if let Some(q) = &url.query { (render_query(q)) }
-                    @if let Some(f) = &url.fragment { span.pn { "#" } span.seg { (f) } }
+        @for p in parts {
+            @match p {
+                Piece::Text(s) => { (s) }
+                // A space that was stored as %20 wears a dotted underline: a
+                // receipt saying "this space is an escape in the link".
+                Piece::DecodedSpace => { span.dsp { " " } }
+                Piece::Padding(s) => { span.bad { (s) } }
+                Piece::Escape(s) => {
+                    @if style == PieceStyle::Url { span.pe { (s) } } @else { span.pct { (s) } }
                 }
-                None => {
-                    span.pn { ":" }
-                    @if let Some(o) = &url.opaque { span.seg { (o) } }
+                Piece::BadEscape(s) => { span.bad { (s) } }
+                Piece::Delim(s) => { span.dl { (s) } }
+                Piece::Local(s) => {
+                    @if style == PieceStyle::Url { (s) } @else { span.lp { (s) } }
+                }
+                Piece::Domain(s) => { span.reg { (s) } }
+            }
+        }
+    }
+}
+
+/// The full destination URL, coloured by part. Built from the same slices the
+/// fold lists, so userinfo and an explicit port can no longer go missing — the
+/// old renderer had no branch for either, which quietly dropped `alice@` and
+/// `:8443` from the line and from its copy.
+fn url_line_parts(uri: &UriView) -> Markup {
+    html! {
+        span class=(if uri.scheme == "http" { "sch insecure" } else { "sch" }) { (uri.scheme) }
+        span.pn { (uri.prefix.trim_start_matches(&uri.scheme)) }
+        @for slice in &uri.slices {
+            @match slice.role {
+                // The username goes danger red here and in its slice, co-firing
+                // with its chip. Not amber: amber is the button language for
+                // "you leave", and this is not that.
+                Role::Userinfo => span.usr { (slice.value) },
+                Role::Host => (host_markup(uri)),
+                Role::Port => { span.pn { ":" } span.seg { (slice.value) } },
+                Role::Path => (path_markup(&slice.display)),
+                Role::Opaque => span.seg { (pieces(&slice.display, PieceStyle::Url)) },
+                // A keyless fragment is one literal segment; a keyed part is a
+                // key, an `=`, and a value.
+                _ if slice.key.is_none() => {
+                    span.pn { (slice.delim) }
+                    span.seg { (pieces(&slice.display, PieceStyle::Url)) }
+                }
+                _ => {
+                    span.pn { (slice.delim) }
+                    @if let Some(k) = &slice.key { span.seg { (k) } }
+                    @if slice.equals { span.pn { "=" } }
+                    span.qv { (pieces(&slice.display, PieceStyle::Url)) }
                 }
             }
+        }
     }
 }
 
-fn render_path(path: &str) -> Markup {
+/// The host, with the accent wash on the registrable domain — the once-per-page
+/// mark saying who you are actually dealing with.
+fn host_markup(uri: &UriView) -> Markup {
     html! {
-        @for part in path.split('/').skip(1) {
-            span.pn { "/" }
+        @if let Some(h) = &uri.host {
+            @if !h.subdomain.is_empty() { span.sub { (h.subdomain) "." } }
+            span.reg { (h.registrable) }
+        }
+    }
+}
+
+/// A path inside a one-run headline: the slashes dim, each segment a token, and
+/// a `<wbr>` at every joint so a narrow card steps down whole tokens.
+fn path_run(path: &str) -> Markup {
+    html! {
+        @for (n, part) in path.split('/').enumerate() {
+            @if n > 0 { span.dl { "/" } wbr; }
             @if !part.is_empty() { span.seg { (part) } }
         }
     }
 }
 
-fn render_query(query: &str) -> Markup {
+/// A path inside a slice row: same idea, the row's own delimiter colour.
+fn path_slices_markup(display: &[Piece]) -> Markup {
+    let text: String = display.iter().map(Piece::text).collect();
     html! {
-        span.pn { "?" }
-        @for (idx, pair) in query.split('&').enumerate() {
-            @if idx > 0 { span.pn { "&" } }
-            @match pair.split_once('=') {
-                Some((k, v)) => { span.seg { (k) } span.pn { "=" } span.qv { (v) } }
-                None => { span.seg { (pair) } }
-            }
+        @for (n, part) in text.split('/').enumerate() {
+            @if n > 0 { span.dl { "/" } }
+            (part)
+        }
+    }
+}
+
+fn path_markup(display: &[Piece]) -> Markup {
+    let text: String = display.iter().map(Piece::text).collect();
+    html! {
+        @for (n, part) in text.split('/').enumerate() {
+            @if n > 0 { span.pn { "/" } }
+            @if !part.is_empty() { span.seg { (part) } }
         }
     }
 }
@@ -1148,13 +1800,97 @@ fn idn_panel(w: &IdnWarning) -> Markup {
 }
 
 // --------------------------------------------------------------------------
+// What preview.js is handed
+// --------------------------------------------------------------------------
+
+/// The parts model, as JSON on the slices container.
+///
+/// A data attribute rather than a `<script>` block: it is data, and putting it
+/// in a script tag would raise a CSP question for something that is not code.
+/// `preview.js` reads it to inject the checkboxes, rebuild the string as they
+/// are unticked, and keep the button honest about what it would open.
+///
+/// The per-slice `h` field is the stored-syntax markup for that slice, built
+/// here with maud (so it is escaped) and dropped into the edited line by the
+/// script. It is server-authored markup taking a detour through an attribute,
+/// which is the same trust as the rest of this page.
+fn card_model(uri: &UriView) -> String {
+    let parts: Vec<serde_json::Value> = uri
+        .slices
+        .iter()
+        .enumerate()
+        .map(|(n, s)| {
+            serde_json::json!({
+                "i": n,
+                "role": role_key(s.role),
+                "d": s.delim,
+                "k": s.key,
+                "e": s.equals,
+                "v": s.value,
+                "fixed": !s.removable,
+                "row": s.is_row(),
+                "label": recipient_label(uri, s),
+                "h": stored_slice_markup(s).into_string(),
+            })
+        })
+        .collect();
+    serde_json::json!({
+        "scheme": uri.scheme,
+        "prefix": uri.prefix,
+        "prefixHtml": html! { span.sch { (uri.prefix) } }.into_string(),
+        // What "After your edits" is compared against before it shows itself.
+        "stored": uri.raw(),
+        // RFC 5724 needs at least one recipient, so the last number standing
+        // locks. RFC 6068 needs none, so a mailto never locks -- empty the list
+        // and the button offers a draft.
+        "floor": u8::from(uri.scheme == "sms"),
+        "parts": parts,
+    })
+    .to_string()
+}
+
+fn role_key(role: Role) -> &'static str {
+    match role {
+        Role::Userinfo => "user",
+        Role::Host => "host",
+        Role::Port => "port",
+        Role::Path => "path",
+        Role::PathParam => "pathparam",
+        Role::Query => "query",
+        Role::Fragment => "fragment",
+        Role::Recipient => "recipient",
+        Role::Opaque => "opaque",
+    }
+}
+
+/// How the button names this recipient when it is the only one left: an address
+/// as itself, a number in its own country's formatting.
+fn recipient_label(uri: &UriView, slice: &urlview::Slice) -> Option<String> {
+    (slice.role == Role::Recipient).then(|| {
+        if uri.scheme == "sms" {
+            phone::read(&slice.value).headline
+        } else {
+            slice.value.clone()
+        }
+    })
+}
+
+fn stored_slice_markup(slice: &urlview::Slice) -> Markup {
+    html! {
+        @if let Some(k) = &slice.key { span.k { (k) } }
+        @if slice.equals { span.dl { "=" } }
+        (stored_value(&slice.value, slice.role))
+    }
+}
+
+// --------------------------------------------------------------------------
 // Revealed view (token-gated, after a use was spent)
 // --------------------------------------------------------------------------
 
 pub enum RevealedTarget<'a> {
     /// A redirect: show the full URL and a plain Continue link (going is free now,
     /// the use was spent at reveal). `href` is the canonical destination.
-    Redirect { url: &'a UrlView, href: &'a str },
+    Redirect { uri: &'a UriView, href: &'a str },
     /// The revealed text body.
     Text(&'a str),
 }
@@ -1172,24 +1908,19 @@ pub struct RevealedView<'a> {
 pub fn revealed_page(r: RevealedView) -> Markup {
     let back = home_chip("/", "Create New Link");
     match r.target {
-        RevealedTarget::Redirect { url, href } => {
+        RevealedTarget::Redirect { uri, href } => {
             // The same render-time allowlist check the interstitial makes. This
             // page used to emit `href=(content)` with no check at all, so an
             // off-allowlist scheme that somehow reached storage would have been
             // handed to the browser as a live link here even while the
             // interstitial refused it. Both gaps close in one place.
-            let linkable = is_linkable(href);
+            let linkable = uri.tier != Tier::Refused && is_linkable(href);
             let body = html! {
                 (link_heading(Kind::Redirect, r.name, r.base_host, back))
                 (pv_arrow())
-                @if linkable {
-                    (render_url(url))
-                    @if let Some(w) = idn_warning(url) { (idn_panel(w)) }
-                    (go_anchor(href, &continue_label(url)))
-                } @else {
-                    (render_url_inert(url))
-                    (refuse_alert())
-                }
+                // A one-time link is spent to LOOK, never to be thrown: what
+                // arrives here is the whole card, with the button waiting.
+                @if linkable { (card_body(uri, href)) } @else { (refusal_block(uri)) }
                 p.pv-revealed { "Deleted from the server on this view — refreshing won't bring it back." }
                 p.pv-meta { "Expires in " (humanize_expires_in(r.expires_at)) }
                 @if linkable {
@@ -1197,7 +1928,7 @@ pub fn revealed_page(r: RevealedView) -> Markup {
                 }
             };
             document_link(
-                &link_title("Redirect", r.name, Some(&url.card_domain())),
+                &link_title("Redirect", r.name, Some(&uri.card_domain())),
                 html! {},
                 body,
                 script_tag("/static/preview.js"),
@@ -1708,5 +2439,127 @@ mod tests {
             "YuioLink Redirect: actSPILTvistaCOUNTY"
         );
         assert_eq!(link_title("Text", "line", None), "YuioLink Text: line");
+    }
+
+    /// The card for a stored string, with no page around it.
+    fn card(stored: &str) -> String {
+        let uri = urlview::parse_uri(stored);
+        card_body(&uri, stored).into_string()
+    }
+
+    #[test]
+    fn the_web_tier_keeps_its_quiet_line_and_offers_the_parts() {
+        let c = card("https://blog.example.com/articles/2026/post?ref=newsletter");
+        assert!(c.contains(r#"<code class="pv-url" id="destination">"#));
+        assert!(c.contains(r#"<span class="reg">example.com</span>"#));
+        // One removable part, so the fold has something to add -- and it is
+        // closed, because nothing warned.
+        assert!(c.contains(r#"<details class="pv-parts">"#), "{c}");
+        assert!(c.contains("Show the parts"));
+        assert!(c.contains("Continue to example.com"));
+        // The URL line already is the stored string, so nothing is restated.
+        assert!(!c.contains("Exactly as stored"), "{c}");
+    }
+
+    #[test]
+    fn a_bare_path_never_folds_and_http_says_so_without_opening_it() {
+        let c = card("http://example.com/pay");
+        assert!(c.contains(r#"<span class="sch insecure">http</span>"#));
+        assert!(c.contains("Not Encrypted"));
+        // The fold would only restate one row nobody can act on.
+        assert!(!c.contains("pv-parts"), "{c}");
+    }
+
+    #[test]
+    fn a_warning_about_the_string_lays_the_parts_flat() {
+        let c = card("https://alice@example.com:8443/reset?next=https%3A%2F%2Fother.example%2F");
+        assert!(c.contains("Username in the Address"));
+        assert!(c.contains("Carries Another Address"));
+        assert!(c.contains(r#"<details class="pv-parts" open>"#), "{c}");
+        // Userinfo and port are back on the line -- the old renderer had no
+        // branch for either and dropped both.
+        assert!(c.contains(r#"<span class="usr">alice@</span>"#));
+        assert!(c.contains(r#"<span class="seg">8443</span>"#));
+        // Decoding changed the `next` value, so the record gets said out loud.
+        assert!(c.contains("Exactly as stored"), "{c}");
+    }
+
+    #[test]
+    fn a_one_run_headline_is_the_stored_string_and_needs_no_record() {
+        for stored in [
+            "spotify:track:6rqhFgbbKwnb9MLmUQDhG6",
+            "matrix:r/keebs:example.org",
+            "ircs://libera.chat/yuiolink",
+            "ftp://files.example.org/pub/notes.txt",
+        ] {
+            let c = card(stored);
+            assert!(c.contains(r#"<code class="pv-line""#), "{stored}: {c}");
+            assert!(!c.contains("Exactly as stored"), "{stored}: {c}");
+            assert!(c.contains("What opens it, if anything"), "{stored}");
+        }
+    }
+
+    #[test]
+    fn a_formatted_headline_always_carries_the_record_underneath() {
+        for stored in [
+            "mailto:a@b.example?subject=Hi",
+            "tel:+47-820-12-345;ext=4021",
+            "sms:+4799123456?body=JOIN",
+            "magnet:?xt=urn:btih:abc&dn=x.iso",
+            "xmpp:lobby@rooms.example.org?join",
+        ] {
+            assert!(card(stored).contains("Exactly as stored"), "{stored}");
+        }
+    }
+
+    #[test]
+    fn the_button_describes_the_scheme_and_never_predicts_the_outcome() {
+        assert!(card("mailto:a@b.example").contains("Write to a@b.example"));
+        assert!(card("mailto:?subject=Hi").contains("Draft a Message"));
+        assert!(card("mailto:a@b.example,c@d.example").contains("Write to 2 addresses"));
+        assert!(card("tel:+4782012345").contains("Call +47 820 12 345"));
+        // "Message", not "Text" -- Text is one of this site's link kinds.
+        assert!(card("sms:+4799123456").contains("Message +47 99 12 34 56"));
+        assert!(card("sms:+4799123456,+4791123456").contains("Message 2 numbers"));
+        assert!(card("spotify:album:x").contains("An album in Spotify's catalogue"));
+        assert!(card("matrix:u/ada:example.org").contains("A user on Matrix"));
+        assert!(card("xmpp:a@b.example").contains("An XMPP chat address"));
+        assert!(card("xmpp:a@b.example?join").contains("A chat room on XMPP"));
+        assert!(card("magnet:?xt=urn:btih:abc").contains("A file identified by its hash"));
+        // The hedge appears once, on every handoff card, and never on the web
+        // tier -- a website opening is not a guess about the device.
+        assert_eq!(
+            card("magnet:?xt=urn:btih:abc")
+                .matches("if anything")
+                .count(),
+            1
+        );
+        assert!(!card("https://example.com/").contains("if anything"));
+    }
+
+    #[test]
+    fn phone_facts_ride_their_own_number_once_there_is_more_than_one() {
+        // One number: the chips pool in a centred row.
+        let one = card("sms:+4782012345");
+        assert!(one.contains(r#"<div class="pv-facts">"#), "{one}");
+        assert!(one.contains("Premium Rate"));
+        // Two numbers: the stack, and a Premium Rate warning that points at ITS
+        // number instead of at the card.
+        let two = card("sms:+46701234567,+4782012345");
+        assert!(two.contains(r#"<div class="pv-stack2">"#), "{two}");
+        assert!(!two.contains(r#"<div class="pv-facts">"#), "{two}");
+        assert!(two.contains("Sweden") && two.contains("Norway"));
+        assert!(two.contains("Premium Rate"));
+    }
+
+    #[test]
+    fn a_note_appears_only_where_the_standard_opens_a_gap() {
+        assert!(card("magnet:?xt=urn:btih:abc&dn=x.iso").contains("Only <code>xt</code>"));
+        assert!(card("mailto:a@b.example?body=hi").contains("goes out as you"));
+        assert!(card("sms:+4799123456?body=hi").contains("goes out from your number"));
+        assert!(card("tel:+4782012345;ext=4021").contains("dialled after the call connects"));
+        // Nothing to explain, nothing said.
+        assert!(!card("tel:+4782012345").contains("pv-note"));
+        assert!(!card("https://example.com/a").contains("pv-note"));
     }
 }

@@ -25,20 +25,6 @@
 use idna::domain_to_unicode;
 use unicode_security::MixedScript;
 
-/// A redirect URL split into displayable, individually styleable parts.
-pub struct UrlView {
-    pub scheme: String,
-    /// The host, decomposed and IDN-classified. `None` for hostless schemes
-    /// (`mailto:`, `tel:`, `magnet:`, …), where [`Self::opaque`] holds the rest.
-    pub host: Option<HostView>,
-    /// Path including its leading `/` (empty for hostless schemes).
-    pub path: String,
-    pub query: Option<String>,
-    pub fragment: Option<String>,
-    /// Everything after `scheme:` for a hostless URL (e.g. `a@b.com` for mailto).
-    pub opaque: Option<String>,
-}
-
 /// A host split at the registrable-domain boundary, in display form.
 pub struct HostView {
     /// Subdomain labels with no trailing dot (`docs`, `a.b`), or empty.
@@ -55,63 +41,6 @@ pub struct IdnWarning {
     pub displays_as: String,
     /// The unambiguous real address shown instead (`xn--pple-43d.com`).
     pub real: String,
-}
-
-impl UrlView {
-    /// True when the host is a deceptive internationalized lookalike.
-    pub fn is_deceptive(&self) -> bool {
-        self.host.as_ref().is_some_and(|h| h.warning.is_some())
-    }
-
-    /// The single line shown for a limited link's domain-only preview, and the
-    /// domain used in share-card / OG copy: the registrable domain for an
-    /// HTTP(S) host, else the scheme as a stand-in.
-    pub fn card_domain(&self) -> String {
-        match &self.host {
-            Some(h) => h.registrable.clone(),
-            None => self.scheme.clone(),
-        }
-    }
-}
-
-/// Parse a canonical (already validated, ASCII) redirect URL into displayable
-/// parts. Falls back to a bare opaque view if parsing somehow fails — the URL was
-/// validated at creation, so this is just defensive.
-pub fn parse(url: &str) -> UrlView {
-    match url::Url::parse(url) {
-        Ok(u) => from_url(&u, url),
-        Err(_) => UrlView {
-            scheme: String::new(),
-            host: None,
-            path: String::new(),
-            query: None,
-            fragment: None,
-            opaque: Some(url.to_string()),
-        },
-    }
-}
-
-fn from_url(u: &url::Url, raw: &str) -> UrlView {
-    let scheme = u.scheme().to_string();
-    match u.host_str() {
-        Some(host) => UrlView {
-            scheme,
-            host: Some(build_host(host)),
-            path: u.path().to_string(),
-            query: u.query().map(str::to_string),
-            fragment: u.fragment().map(str::to_string),
-            opaque: None,
-        },
-        // Hostless scheme (mailto:, tel:, magnet:, …): keep the remainder verbatim.
-        None => UrlView {
-            scheme,
-            host: None,
-            path: String::new(),
-            query: None,
-            fragment: None,
-            opaque: raw.split_once(':').map(|(_, rest)| rest.to_string()),
-        },
-    }
 }
 
 /// Split an ASCII host at the registrable boundary (via the Public Suffix List)
@@ -338,8 +267,6 @@ pub enum Hazard {
 
 /// A stored URI, cut into verbatim slices and classified.
 pub struct UriView {
-    /// The stored string, exactly as it came out of the database.
-    pub stored: String,
     /// Lowercase scheme with no colon.
     pub scheme: String,
     pub tier: Tier,
@@ -357,8 +284,8 @@ pub struct UriView {
 }
 
 impl UriView {
-    /// Reassemble the stored string from the parts. The equality of this and
-    /// [`Self::stored`] is the invariant the whole card rests on.
+    /// Reassemble the stored string from the parts. That this equals the string
+    /// it was parsed from is the invariant the whole card rests on.
     pub fn raw(&self) -> String {
         let mut s = self.prefix.clone();
         for slice in &self.slices {
@@ -369,6 +296,26 @@ impl UriView {
 
     pub fn has(&self, hazard: Hazard) -> bool {
         self.hazards.contains(&hazard)
+    }
+
+    /// The registrable domain for a host-based URI, else the scheme as a
+    /// stand-in. This is what the button, the tab title, and the share card
+    /// name the destination by.
+    pub fn card_domain(&self) -> String {
+        match &self.host {
+            Some(h) => h.registrable.clone(),
+            None => self.scheme.clone(),
+        }
+    }
+
+    /// Set when the host is a deceptive internationalized lookalike.
+    pub fn idn_warning(&self) -> Option<&IdnWarning> {
+        self.host.as_ref().and_then(|h| h.warning.as_ref())
+    }
+
+    /// The first slice with this role, if any.
+    pub fn first(&self, role: Role) -> Option<&Slice> {
+        self.slices.iter().find(|s| s.role == role)
     }
 
     /// True when any warning fired that is about the *string* rather than the
@@ -405,56 +352,6 @@ impl UriView {
     pub fn fold_is_worth_it(&self) -> bool {
         self.rows().any(|s| s.removable) || self.decoding_changed_anything()
     }
-}
-
-/// Rebuild a stored string from the slices that survive `keep`, with the
-/// delimiters promoted.
-///
-/// This is the model `preview.js` implements in the browser; it lives here as
-/// well because the rule is easy to state and easy to get wrong, and a test can
-/// hold it still. Dropping the first query pair promotes the next one's `&` to
-/// a `?`; dropping the first recipient promotes the next one's `,` away. Path
-/// parameters need no promotion at all — each one brings its own `;`.
-///
-/// Removal only, always. Every rebuilt string is a subset of an allowlisted
-/// URI, so it is still allowlisted; nothing here can add a character.
-pub fn rebuild(view: &UriView, keep: impl Fn(usize) -> bool) -> String {
-    let mut out = view.prefix.clone();
-    let mut seen_recipient = false;
-    let mut seen_query = false;
-    let mut seen_fragment = false;
-    for (i, slice) in view.slices.iter().enumerate() {
-        if slice.removable && !keep(i) {
-            continue;
-        }
-        let delim: &str = match slice.role {
-            Role::Recipient => {
-                let d = if seen_recipient { "," } else { "" };
-                seen_recipient = true;
-                d
-            }
-            Role::Query => {
-                let d = if seen_query { "&" } else { "?" };
-                seen_query = true;
-                d
-            }
-            Role::Fragment => {
-                let d = if seen_fragment { "&" } else { "#" };
-                seen_fragment = true;
-                d
-            }
-            _ => &slice.delim,
-        };
-        out.push_str(delim);
-        if let Some(k) = &slice.key {
-            out.push_str(k);
-        }
-        if slice.equals {
-            out.push('=');
-        }
-        out.push_str(&slice.value);
-    }
-    out
 }
 
 /// Which tier a scheme falls in.
@@ -563,7 +460,6 @@ fn hierarchical(stored: &str, scheme: &str) -> UriView {
     slices.extend(fragment_slices(fragment));
 
     UriView {
-        stored: stored.to_string(),
         scheme: scheme.to_string(),
         tier: Tier::Web,
         prefix,
@@ -727,7 +623,6 @@ fn mailto(stored: &str, scheme: &str) -> UriView {
     let mut slices = recipient_slices(body, Role::Recipient);
     slices.extend(query_slices(query, "?"));
     UriView {
-        stored: stored.to_string(),
         scheme: scheme.to_string(),
         tier: Tier::Handoff,
         prefix,
@@ -768,7 +663,6 @@ fn tel(stored: &str, scheme: &str) -> UriView {
         });
     }
     UriView {
-        stored: stored.to_string(),
         scheme: scheme.to_string(),
         tier: Tier::Handoff,
         prefix,
@@ -792,7 +686,6 @@ fn sms(stored: &str, scheme: &str) -> UriView {
     let mut slices = recipient_slices(body, Role::Recipient);
     slices.extend(query_slices(query, "?"));
     UriView {
-        stored: stored.to_string(),
         scheme: scheme.to_string(),
         tier: Tier::Handoff,
         prefix,
@@ -839,7 +732,6 @@ fn magnet(stored: &str, scheme: &str) -> UriView {
         slice.removable = slice.key.as_deref() != Some("xt");
     }
     UriView {
-        stored: stored.to_string(),
         scheme: scheme.to_string(),
         tier: Tier::Handoff,
         prefix,
@@ -871,7 +763,6 @@ fn opaque(stored: &str, scheme: &str) -> UriView {
     }];
     slices.extend(query_slices(query, "?"));
     UriView {
-        stored: stored.to_string(),
         scheme: scheme.to_string(),
         tier: Tier::Handoff,
         prefix,
@@ -1173,8 +1064,58 @@ fn carries_an_address(display: &[Piece]) -> bool {
 mod tests {
     use super::*;
 
+    /// Rebuild a stored string from the slices that survive `keep`, with the
+    /// delimiters promoted.
+    ///
+    /// This is the model `preview.js` implements in the browser; it lives here as
+    /// well because the rule is easy to state and easy to get wrong, and a test can
+    /// hold it still. Dropping the first query pair promotes the next one's `&` to
+    /// a `?`; dropping the first recipient promotes the next one's `,` away. Path
+    /// parameters need no promotion at all — each one brings its own `;`.
+    ///
+    /// Removal only, always. Every rebuilt string is a subset of an allowlisted
+    /// URI, so it is still allowlisted; nothing here can add a character.
+    pub fn rebuild(view: &UriView, keep: impl Fn(usize) -> bool) -> String {
+        let mut out = view.prefix.clone();
+        let mut seen_recipient = false;
+        let mut seen_query = false;
+        let mut seen_fragment = false;
+        for (i, slice) in view.slices.iter().enumerate() {
+            if slice.removable && !keep(i) {
+                continue;
+            }
+            let delim: &str = match slice.role {
+                Role::Recipient => {
+                    let d = if seen_recipient { "," } else { "" };
+                    seen_recipient = true;
+                    d
+                }
+                Role::Query => {
+                    let d = if seen_query { "&" } else { "?" };
+                    seen_query = true;
+                    d
+                }
+                Role::Fragment => {
+                    let d = if seen_fragment { "&" } else { "#" };
+                    seen_fragment = true;
+                    d
+                }
+                _ => &slice.delim,
+            };
+            out.push_str(delim);
+            if let Some(k) = &slice.key {
+                out.push_str(k);
+            }
+            if slice.equals {
+                out.push('=');
+            }
+            out.push_str(&slice.value);
+        }
+        out
+    }
+
     fn host_of(url: &str) -> HostView {
-        parse(url).host.expect("expected a host")
+        parse_uri(url).host.expect("expected a host")
     }
 
     /// Punycode-encode a Unicode host so tests can express the readable form.
@@ -1184,14 +1125,14 @@ mod tests {
 
     #[test]
     fn plain_ascii_url_decomposes() {
-        let v = parse("https://example.com/blog/2026/the-post?ref=share");
+        let v = parse_uri("https://example.com/blog/2026/the-post?ref=share");
         assert_eq!(v.scheme, "https");
-        let h = v.host.unwrap();
+        let h = v.host.as_ref().unwrap();
         assert_eq!(h.subdomain, "");
         assert_eq!(h.registrable, "example.com");
         assert!(h.warning.is_none());
-        assert_eq!(v.path, "/blog/2026/the-post");
-        assert_eq!(v.query.as_deref(), Some("ref=share"));
+        assert_eq!(v.first(Role::Path).unwrap().value, "/blog/2026/the-post");
+        assert_eq!(v.param("ref").unwrap().value, "share");
     }
 
     #[test]
@@ -1253,11 +1194,13 @@ mod tests {
     }
 
     #[test]
-    fn hostless_scheme_keeps_opaque_remainder() {
-        let v = parse("mailto:hi@example.com");
+    fn a_hostless_scheme_names_itself_on_the_card() {
+        let v = parse_uri("mailto:hi@example.com");
         assert_eq!(v.scheme, "mailto");
         assert!(v.host.is_none());
-        assert_eq!(v.opaque.as_deref(), Some("hi@example.com"));
+        assert_eq!(v.recipients().next().unwrap().value, "hi@example.com");
+        // With no host there is no domain to name the link by, so the scheme
+        // stands in on the button, the tab title, and the share card.
         assert_eq!(v.card_domain(), "mailto");
     }
 
@@ -1297,7 +1240,6 @@ mod tests {
         for stored in SPECIMENS {
             let v = parse_uri(stored);
             assert_eq!(&v.raw(), stored, "reassembly differs for {stored}");
-            assert_eq!(v.stored, v.raw());
         }
     }
 

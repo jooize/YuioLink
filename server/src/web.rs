@@ -505,7 +505,7 @@ async fn interstitial_response(state: &AppState, d: &LinkDetail) -> Response {
     let base_host = views::host_from_base(&state.base_url);
     let short_url = format!("{}{}", state.base_url, d.name);
     let markup = if d.kind == "redirect" {
-        let url = urlview::parse(&d.content);
+        let uri = urlview::parse_uri(&d.content);
         views::interstitial_page(Interstitial {
             base_host,
             name: &d.name,
@@ -513,7 +513,7 @@ async fn interstitial_response(state: &AppState, d: &LinkDetail) -> Response {
             expires_at: &d.expires_at,
             max_uses: d.max_uses,
             target: Target::Redirect {
-                url: &url,
+                uri: &uri,
                 href: &d.content,
             },
         })
@@ -608,13 +608,13 @@ async fn revealed_view(state: &AppState, name: &str) -> Response {
     let base_host = views::host_from_base(&state.base_url);
     let markup = match d.kind.as_str() {
         "redirect" => {
-            let url = urlview::parse(&d.content);
+            let uri = urlview::parse_uri(&d.content);
             views::revealed_page(RevealedView {
                 base_host,
                 name: &d.name,
                 expires_at: &d.expires_at,
                 target: RevealedTarget::Redirect {
-                    url: &url,
+                    uri: &uri,
                     href: &d.content,
                 },
             })
@@ -666,13 +666,13 @@ pub async fn card_image(State(state): State<AppState>, Path(name): Path<String>)
         Err(e) => return AppError::internal(e).into_response(),
     };
 
-    let url = urlview::parse(&d.content);
+    let uri = urlview::parse_uri(&d.content);
     let kicker = if d.max_uses == Some(1) {
         "One-time redirect"
     } else {
         "Ephemeral redirect"
     };
-    let domain = url.card_domain();
+    let domain = uri.card_domain();
     // Date and clock, no "may change after" tail: the expiry is the fact worth
     // the space, and an hour-long link needs the minute to mean anything.
     let date = views::format_card_date(&d.expires_at);

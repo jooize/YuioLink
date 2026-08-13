@@ -34,8 +34,6 @@ pub struct Number {
 
 /// A region, named and flagged.
 pub struct Region {
-    /// ISO 3166-1 alpha-2, e.g. `NO`.
-    pub code: &'static str,
     /// The flag as regional-indicator characters. Degrades to the letter pair
     /// on platforms with no flag glyphs, which is exactly the code again -- and
     /// the name beside it carries the content either way.
@@ -157,7 +155,6 @@ fn region_for(code: &str) -> Option<Region> {
     let i = REGION_NAMES.binary_search_by_key(&code, |(c, _)| c).ok()?;
     let (code, name) = REGION_NAMES[i];
     Some(Region {
-        code,
         flag: flag_of(code),
         name,
     })
@@ -451,7 +448,6 @@ mod tests {
         let n = read("+47-820-12-345");
         assert_eq!(n.class, Some(Class::PremiumRate));
         assert!(n.class.unwrap().is_warning());
-        assert_eq!(n.region.as_ref().unwrap().code, "NO");
         assert_eq!(n.region.as_ref().unwrap().name, "Norway");
     }
 
@@ -459,7 +455,7 @@ mod tests {
     fn mobile_toll_free_and_fixed_line_are_facts_not_warnings() {
         let mobile = read("+46701234567");
         assert_eq!(mobile.class, Some(Class::Mobile));
-        assert_eq!(mobile.region.unwrap().code, "SE");
+        assert_eq!(mobile.region.unwrap().name, "Sweden");
         assert!(!Class::Mobile.is_warning());
 
         let toll_free = read("+18002223333");
@@ -467,7 +463,7 @@ mod tests {
 
         let fixed = read("+33142685300");
         assert_eq!(fixed.class, Some(Class::FixedLine));
-        assert_eq!(fixed.region.unwrap().code, "FR");
+        assert_eq!(fixed.region.unwrap().name, "France");
     }
 
     #[test]
