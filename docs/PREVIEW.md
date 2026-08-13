@@ -1,264 +1,314 @@
-# Link preview, trust model, and share cards
+# The preview page
 
-Status: **implemented** (built 2026-06-23, doc updated 2026-07-02 to match the code).
-Visual reference: `design/preview-and-cards.html`. Route reference: `docs/ROUTES.md`.
-The one design change since the original spec: the reveal capability travels in a
-short-lived **cookie** (`yl_reveal`), not a `?t=<token>` URL — there is no `/revealed`
-route; the revealed view renders at the clean `/:name` (see §3).
+Status: **implemented**. Route reference: `docs/ROUTES.md`. Pixel reference:
+`design/preview-all-schemes.html` (the full-cast gallery) with
+`design/preview-flags-and-flashes.html` for multi-number stacks. The decision
+log behind every rule here is `.agents-work/20260811-preview-scheme-design/`.
 
-## Goal
+## Why the page exists
 
-YuioLink names are short, case-insensitive words that **recycle** after a link expires.
-A blind redirect therefore can't be trusted (the same name may point somewhere new later,
-and prefetch bots can burn one-time links). The fix is a mandatory **preview interstitial**
-plus a **tombstone trust model**, so a recipient can always see where a link goes and a
-link can never be silently repurposed within its life.
+YuioLink names are short, case-insensitive words that **recycle** after a link
+expires. A blind redirect therefore cannot be trusted: the same name may point
+somewhere new next month, and a prefetch bot could burn a one-time link before
+its recipient ever sees it. So every link previews first, and nothing is spent
+by looking.
 
-Scope for v1: **plaintext redirect + text links only**. Encryption is dropped (see memory);
-a "Secret" type is deferred. Do not build crypto, the encrypt toggle, or a Secret type.
-
----
-
-## 1. Behavioural model
-
-- **Every redirect shows an interstitial first.** `GET /:name` returns a 200 preview page
-  and spends **no** use. Non-bypassable by the creator (a creator who could skip it is the
-  phishing case).
-- **Unlimited text opens immediately** (no interstitial — there is no external destination
-  to vet). **Limited/one-time text** gets the interstitial (to gate the use).
-- **Consuming is always a POST that 303-redirects** (Post/Redirect/Get). This keeps the
-  back button clean (no "resubmit form?") and means link-unfurl crawlers — which only GET —
-  cannot spend a use.
-- **Buttons by action:** blue = **Reveal** (shows destination/text, you stay on YuioLink);
-  amber (dark text) = **Continue/Go** (you leave to the external site).
-
-### Flows
-
-Unlimited redirect (one step):
-```
-GET  /:name            -> interstitial: full syntax-highlighted URL + amber "Continue to <domain>"
-POST /:name/go         -> consume (hits+1) -> 303 to the destination
-```
-
-Limited / one-time redirect (two steps — the full URL is gated behind a use):
-```
-GET  /:name            -> interstitial: DOMAIN ONLY + blue "Reveal Destination"
-POST /:name/reveal     -> consume (hits+1) -> Set-Cookie: yl_reveal=<HMAC token>
-                          -> 303 back to GET /:name
-GET  /:name            -> valid yl_reveal cookie -> revealed view: full URL + amber
-                          "Continue to <domain>" ("Continue" is a plain link to the
-                          destination; going is free, the use was already spent at reveal)
-```
-
-Unlimited text (no interstitial):
-```
-GET  /:name            -> render the text immediately (inert <pre>); counts a hit
-```
-
-Limited / one-time text:
-```
-GET  /:name            -> interstitial: "A text snippet" + blue "Reveal Text"
-POST /:name/reveal     -> consume -> reveal cookie -> 303 to GET /:name -> renders the text
-```
-
-Why reveal must consume: domain-only for a limited link means the **exact destination is
-the gated resource**. If reveal didn't consume, anyone (or a script) could read the full URL
-without spending a use, making the limit meaningless. Reveal is a POST so crawlers can't
-trigger it.
+The page has one job beyond that: **tell the truth about the stored string,
+without pretending to know what the reader's machine will do with it.**
+Everything below follows from those two sentences.
 
 ---
 
-## 2. Trust model: tombstone + immutability
+## 1. Three tiers, by consequence
 
-Guarantee: **a link's destination is immutable, and its name is reserved until expiry.**
-What the preview shows is what the link is, for its whole stated life. It can degrade to
-"gone", but never silently become a **different** live destination.
+| Tier | Schemes | What the card offers |
+|------|---------|----------------------|
+| Web | `http`, `https` | The URL line and one amber **Continue to `<domain>`** anchor. |
+| Handoff | `mailto`, `tel`, `sms`, `ftp`, `ftps`, `magnet`, `spotify`, `xmpp`, `irc`, `ircs`, `matrix` | A two-line amber button — a lead verb over the scheme's own definition — and one hedge line beneath it. |
+| Refused | anything else (`javascript`, `data`, `vbscript`, …) | The string, printed inert. No control at all — not a disabled one. |
 
-HTTP semantics for `GET /:name` (and the POST consume endpoints):
+**Tier 3 is a render-time decision.** `views::is_linkable` runs where the markup
+is written, on the preview page *and* on the revealed page, so an off-allowlist
+scheme can never be emitted as an `href` anywhere. The refusal reads:
+
+> **An Instruction, Not an Address**
+> What is stored here would tell your browser to do something rather than go
+> somewhere, so YuioLink shows it, gives it no button, and stops there.
+
+**Describe the scheme, never predict the outcome.** We cannot see the reader's
+device, so "opens your mail app" is a claim about an unseen machine; "An email
+address" is a published fact about the string and stays true whatever happens.
+Hence the one hedge, once, under every handoff button:
+
+> What opens it, if anything, is up to your device.
+
+The "if anything" is load-bearing — a `magnet:` with nothing registered does
+nothing at all.
+
+---
+
+## 2. Three registers
+
+| Register | Says | Element |
+|----------|------|---------|
+| Headline | what the link **is**, formatted for reading | `.pv-url`, `.pv-line`, `.pv-value`, `.pv-list`, `.pv-stack2` |
+| Slices | what it **carries**, each row a verbatim cut | `.pv-slices` / `.pv-slice` |
+| Exact line | what is **stored**, character for character | `.rawline` |
+
+Every character of the stored string appears in at least one of them. The
+headline may be formatted precisely *because* "Exactly as stored" sits
+underneath — and where the headline already **is** the stored string, character
+for character (`spotify:`, `matrix:`, `irc:`, `ftp:`), there is nothing left to
+prove and no exact line appears at all. On an http(s) card the URL line is the
+stored string too, so the exact line appears only when decoding for reading
+changed something.
+
+The exact line never collapses. It is the record.
+
+### The invariant
+
+`urlview::parse_uri` cuts the stored string into an ordered list of
+[`Slice`]s. Concatenating `UriView::prefix` with every `Slice::raw()` in order
+reproduces the stored string exactly. This is checked over nineteen specimens by
+`slices_reassemble_the_stored_string`; if it ever fails, "Exactly as stored" has
+stopped being exact.
+
+### Decode for reading
+
+Values decode, **except**:
+
+- the four structure characters `& = # %`, which stay escaped and dim — decoding
+  them would redraw the URI's structure on screen, and a `%26` shown as `&`
+  reads as another parameter starting;
+- anything invisible or direction-changing (bidi controls, zero-width, format
+  characters), which stays escaped and red with its chip.
+
+That leaves three appearances of a space, with no overlap:
+
+| On screen | Means |
+|-----------|-------|
+| space with a dotted underline | it is `%20` in the stored link |
+| dim `%NN` | it is still an escape |
+| bare space | it really is a space (legal only in `mailto:`, `tel:`, `sms:`) |
+
+---
+
+## 3. Chips
+
+**Facts keep the pill; warnings are bare red icon and words.** The contrast
+carries the meaning.
+
+Warnings, all provable from the string or a published table:
+
+| Chip | Fires on |
+|------|----------|
+| Not Encrypted | plain `http`. Not "Not Secure" — this is the transport, not a verdict on the site. |
+| Username in the Address | `alice@` before the host. |
+| Hidden Characters | an escape decoding to something invisible or direction-changing. |
+| Padded With Spaces | a run of two or more spaces, or one at either edge. A single interior space is ordinary English and stays silent. |
+| Carries Another Address | a query value that is itself a complete web address. |
+| Premium Rate | libphonenumber says the number bills at a raised rate. Fires for `sms:` as well as `tel:` — reverse-billed messaging is a real subscription trap. |
+
+Facts: the region (flag + English name) and the line type (Mobile, Toll Free,
+Fixed Line), both from libphonenumber's tables. On a card with several numbers
+the facts move **beside their own number**, because a pooled row cannot say
+which number a Premium Rate warning is about.
+
+**There is no green.** Encryption is the norm; its absence is the signal. A
+padlock on a phishing site is still a padlock, so "Encrypted" would be a verdict
+we cannot stand behind.
+
+---
+
+## 4. The fold
+
+http(s) keeps its quiet single-line page and offers the parts behind
+`<details class="pv-parts">`. Every other scheme lists them outright.
+
+- The fold — and, on the other schemes, the slice list itself — appears **only
+  when it has something to add**: a part that can be unticked, or a value that
+  reads differently from the way it is stored. A bare path never folds; a plain
+  `ftp://` card and a `tel:` card show no rows at all.
+- It arrives **open** when a warning about the *string* fired. "Not Encrypted"
+  does not open it: that one is about the transport and says nothing about the
+  parts.
+- Warn chips always sit **outside** the fold. A warning that needs a click is a
+  warning that was not made.
+- The chevron is `::before` generated content, so a copy of the label never
+  arrives in the clipboard as "Show".
+
+---
+
+## 5. Editing (`server/static/preview.js`)
+
+Without the script the page is complete: every part listed, every value
+readable, the destination a real link, the raw lines selectable text. What the
+script adds is the ability to strip what rides along.
+
+**Removal only.** Nothing in `preview.js` can add a character, so every rebuilt
+string is a subset of the stored one and an allowlisted link cannot be edited
+into one that would not have passed.
+
+**Nothing is revealed or hidden on load.** Every element the script needs is one
+it creates. The served markup has no checkboxes, no Copy buttons, and no split
+segment — a dead control is worse than no control, and un-hiding one after load
+is how this site earned its layout-shift history.
+
+| Fixed (checked + disabled) | Removable |
+|----------------------------|-----------|
+| host, port, path, magnet `xt` | userinfo, path parameters, query parameters, fragment, every mailto address, sms body, magnet `dn`/`tr`, irc `?key`, ftp `;type` |
+
+The path is fixed because the editing strips what rides *along* — trackers,
+session ids, prefills — while the path **is** the destination. And nearly every
+URL has one, so a removable path would put checkboxes on every everyday card.
+
+**Floors, by grammar.** RFC 5724 requires at least one sms recipient, so the
+last number standing locks. RFC 6068 requires none, so `mailto:` never locks:
+empty the list and the button offers **"Draft a Message"** over a legal
+`mailto:?subject=…`.
+
+**Delimiter promotion.** Drop the first query pair and the next one's `&`
+becomes the `?`; drop the first recipient and its comma goes with it. Path
+parameters need no promotion — each brings its own `;`. The rule is stated twice
+on purpose: `preview.js` runs it, and `urlview::rebuild` (in the tests) holds it
+still.
+
+The button follows the edits — the count, the surviving address, the xmpp
+subtitle when `?join` goes — and all of it is still read off the URI's
+structure.
+
+**Copy is explicit, always.** There is no selection or clipboard interception
+anywhere: selecting text does exactly what it looks like. The raw lines get Copy
+pills; the split's blue segment copies what the button would open (edits
+included) and then answers "copied what?" by *pointing* — the line it took from
+lights the site's own green check.
+
+---
+
+## 6. One-time links are blind
+
+A one-time card discloses nothing before its use is spent — not the path, not
+the domain, not the scheme:
+
+> The destination is shown when revealed.
+
+Showing the domain would let anyone holding the link learn where it points
+without burning the use, invisibly, when that burn is the whole tamper-evidence
+a one-time link offers. `POST /:name/reveal` spends the use and the next page is
+the **full card**, with the amber button waiting: you spend the use to *look*,
+never to be thrown somewhere.
+
+The **"Opens Once"** badge sits below the blue Reveal button in the create
+picker's own purple, so the badge and the type segment that made the link are
+visibly the same fact.
+
+---
+
+## 7. Flows
+
+Unlimited redirect — one step, no POST at all:
+```
+GET /:name    -> the card, with Continue as a real <a href> to the destination
+```
+Following it never touches this server. That is also the CSP fix: `form-action
+'self'` is applied to every redirect hop of a form submission in Chrome and
+Safari, so the old `POST /:name/go` -> 303 was refused and the press went
+nowhere. A link has nothing for `form-action` to block.
+
+One-time redirect or text — two steps:
+```
+GET  /:name          -> blind card: "shown when revealed" + blue Reveal + Opens Once
+POST /:name/reveal   -> spend the use, mint yl_reveal, 303 back to GET /:name
+GET  /:name          -> with the cookie: the full card; the row is redacted and
+                        the cookie expired on this same response
+```
+
+Unlimited text — no interstitial, nothing to vet:
+```
+GET /:name    -> the text, in an inert <pre>
+```
+
+### The reveal cookie
+
+`POST /:name/reveal` mints a stateless HMAC token (`server/src/token.rs`, TTL 10
+minutes) and sets `yl_reveal=<token>; Path=/<name>; HttpOnly; SameSite=Lax`
+(+ `Secure` over HTTPS), then 303s back to `/:name`. It exists to survive
+exactly one redirect hop — proving that this GET is the request that spent the
+use — and `revealed_view` expires it (`Max-Age=0`) on the same response that
+redacts the row, so its lifetime is one request.
+
+The 10-minute TTL stays: a stalled radio or a sleeping phone can stretch the
+hop, and the failure mode (use spent, 410, content never seen) is the worst on
+the site.
+
+---
+
+## 8. Trust model: tombstone + immutability
+
+A link's destination is immutable and its name is reserved until expiry. What
+the preview shows is what the link is, for its whole stated life. It can degrade
+to "gone", but never silently become a different live destination.
 
 | State | Condition | Response |
 |-------|-----------|----------|
-| Live | not past `expires_at`, uses left | 200 interstitial (or immediate text) / 303 on consume |
-| Used up | `hits >= max_uses`, not expired | **410 Gone** (tombstone page) |
-| Withdrawn | deleted by creator, not expired | **410 Gone** (tombstone page) |
-| Expired / never existed / recycled | reaped or unknown name | **404 Not Found** |
+| Live | not past `expires_at`, uses left, not withdrawn | 200 card (or immediate text) |
+| Used up | `uses >= max_uses` | **410 Gone** |
+| Withdrawn | creator deleted it, not yet expired | **410 Gone** |
+| Expired / unknown / recycled | reaped or never existed | **404 Not Found** |
 
-- **410 vs 404 matters:** 410 says "this was a real link, now spent/withdrawn" (this is the
-  "someone already opened it" signal for one-time links); 404 says "nothing here". Don't
-  conflate them.
-- **Tombstone = don't hard-delete early.** Exhausted links already persist as rows until the
-  reaper deletes them at expiry, so they are tombstones for free. **Withdraw (creator
-  delete) must stop resolving but NOT free the name** — mark the row instead of deleting it.
-- **Only the clock frees a name.** `reap_expired` (DELETE WHERE expires_at <= now) stays as
-  is; that is the single path that recycles a name. After expiry, always-preview protects
-  the next clicker.
-- **Immutability** is already true (content is set at insert, never updated). Keep it that
-  way — do not add a destination-edit path.
+410 and 404 are not interchangeable: 410 says "this was a real link, now spent
+or withdrawn", which is the *someone already opened it* signal for a one-time
+link. Only the clock frees a name (`reap_expired`).
 
-### DB changes (`server/src/db.rs`)
+### Counting
 
-- Add column `withdrawn INTEGER NOT NULL DEFAULT 0` to `links` (migration).
-- `delete_link`: change from `DELETE` to `UPDATE links SET withdrawn = 1 WHERE name = ? AND
-  delete_token = ?` (keeps the name reserved as a tombstone until expiry).
-- `LIVE_PREDICATE`: add `AND withdrawn = 0`.
-- Add `get_link_any(name)` — SELECT regardless of LIVE/withdrawn — so the resolver can
-  classify 410 vs 404 and the revealed page can read content from a tombstone row.
-- `consume_link` stays (UPDATE hits+1 WHERE LIVE RETURNING). It already returns None for
-  dead links; the caller then uses `get_link_any` to choose 410 vs 404.
-- `reap_expired` unchanged.
+`uses` (renamed from `hits` in migration `0006`) exists to gate a one-time link
+and nothing else. **There is no per-link view counter anywhere**, so there is no
+dedup question to answer and nothing about one link to leak. Previews and
+reveals go to the aggregate `stats` table as the day-granular `previewed` and
+`revealed` metrics, which is where the old counter's job now lives.
 
 ---
 
-## 3. Routes (`server/src/web.rs`)
+## 9. Share cards
 
-As built (full list with semantics: `docs/ROUTES.md`):
-```
-.route("/:name", get(web::resolve))          // -> interstitial / immediate text / revealed view / 410 / 404
-.route("/:name/go", post(web::go))           // unlimited redirect: consume + 303 to the destination
-.route("/:name/reveal", post(web::reveal))   // limited redirect/text: consume + reveal cookie + 303 to /:name
-.route("/:name/card.png", get(web::card_image)) // og:image share card, spends no use
-```
-- There is **no `/revealed` route**. `resolve` checks for a valid `yl_reveal` cookie first
-  and renders the revealed view at the clean `/:name` URL — refresh/back safe, no token in
-  browser history, referrers, or server logs.
-- A trailing `+` on a name is **accepted and ignored** (the bit.ly preview habit): every
-  link already previews, so `/:name+` behaves exactly like `/:name`.
-- API under `/api/v0` is **same-origin** (no `CorsLayer` — decided 2026-06-23; the "host
-  your own browser frontend" rationale died with encryption). The REST read does not
-  consume a use, and — since 2026-07-02 — does not return a limited link's destination or
-  body at all (see §9).
-
-### Reveal capability (cookie)
-
-`POST /:name/reveal` consumes one use, mints a stateless HMAC token
-(`base64(name | exp) . hmac_sha256(secret, name | exp)`, TTL ~10 min; `server/src/token.rs`),
-and sets it as a path-scoped cookie: `yl_reveal=<token>; Path=/<name>; Max-Age=600;
-HttpOnly; SameSite=Lax` (+ `Secure` when served over HTTPS), then 303s back to `/:name`.
-The token authorises **re-rendering without re-consuming** (refresh/back safe): `resolve`
-verifies it and reads the row via `get_link_any` (a tombstone row still holds the content).
-
-The HMAC secret is `YUIOLINK_SECRET` (config.rs); unset means a random per-process secret,
-which invalidates outstanding reveal cookies on restart — acceptable for dev, set it in
-production.
+The card `<head>` emits `og:site_name`, `og:title`, `og:description`,
+`og:image` (-> `GET /:name/card.png`, rendered with `resvg` on
+`spawn_blocking`), `twitter:card`, and `theme-color`. The card always shows the
+destination domain, and fetching it spends no use — crawlers fetch it.
 
 ---
 
-## 4. Views (`server/src/views.rs`)
+## 10. Tests
 
-New / changed:
-- `interstitial_page` — source link, blue down-arrow, destination. Redirect-unlimited: full
-  **syntax-highlighted** URL (registrable domain highlighted). Redirect-limited: domain only.
-  Text-limited: "A text snippet". Meta = **relative expiry only** (no created/hits/uses); a
-  neutral pill for limited (`Limited Use` / `Opens Once`); the recycling caution with
-  **"Always check the destination."** on its own line. Button: amber Continue (unlimited) or
-  blue Reveal (limited/text). Masthead `<h1>` links home (drop "Back to YuioLink").
-- `revealed_page` — full URL + amber Continue (redirect) or the text (text).
-- `gone_page` (410) — "This link has been used or withdrawn" tombstone, expiry-aware,
-  prominent "Create a new link" home CTA.
-- `not_found_page` (404) — "This link has expired or never existed — links on YuioLink are
-  ephemeral", home CTA. Frame expiry as by-design, not a crash.
-- Keep `text_view_page` (unlimited text, immediate). Keep generic 500 `error_page` terse.
-- **Remove** `encrypted_redirect_page` and `encrypted_text_page` (encryption dropped).
-
-### Syntax-highlighted URL + IDN handling
-
-Render the URL in parts (scheme / `://` / subdomain / **registrable domain** / path / query),
-delimiters in accent, registrable domain highlighted. For the host:
-- Decode punycode with the `idna` crate (UTS #46).
-- Classify with `unicode-security` (UTS #39): **single-script** label (incl. Latin +
-  diacritics, all-Cyrillic, CJK, ...) = legit -> show decoded Unicode, **no warning**.
-  **Mixed-script or confusable** = deceptive -> show the **punycode** form in the URL, a red
-  (`--danger`) panel ("Lookalike domain. Domain uses special characters that can deceptively
-  imitate another name." + `displays as <decoded>` / `real address <xn--...>`), and button
-  text **"Continue Anyway"** (do not print the deceptive domain on the button).
-- Crates: `idna`, `unicode-security` (+ maybe `unicode-script`).
+- Render-time refusal: `javascript:`/`data:` are printed and never linked, on
+  the preview page **and** the revealed page (`server/src/web.rs`).
+- Tier assignment per scheme; slice reassembly == stored; repeated query keys;
+  per-segment path parameters; OAuth-shaped fragment unrolling; mailto/sms
+  recipient splitting; delimiter promotion (`server/src/urlview.rs`).
+- Space-run and edge-space padding; escapes decoding to invisibles; the
+  structure characters staying escaped; decode-gating of the exact line.
+- Phone classification fixtures: SE mobile, NO premium 820, US toll-free, FR
+  fixed line, and a number that does not parse (`server/src/phone.rs`).
+- Card composition per tier and per scheme, the hedge appearing once, notes
+  appearing only where a standard opens a gap, and the served markup carrying
+  none of the JS-injected controls (`server/src/views.rs`).
+- Resolve classification, PRG, reveal-token forgery, cookie expiry, and a
+  crawler simulation that spends nothing (`server/src/web.rs`).
 
 ---
 
-## 5. Share cards (Open Graph + og:image)
+## 11. Rejected, on purpose
 
-On the interstitial `GET /:name` response `<head>`, emit (plaintext links only, and the
-card **always shows the domain** — decided, for trustworthiness):
-- `og:site_name` = YuioLink
-- `og:title` = e.g. "Redirect to example.com" / "One-time link to acme.co"
-- `og:description` = prose, e.g. "Ephemeral redirect that expires Jun 29, 2026 at 14:30
-  UTC." (one-time: "Single-use redirect that expires ...")
-- `og:image` = absolute URL to the card endpoint; `twitter:card` = summary_large_image
-- `theme-color` = brand blue (Discord left-rail)
+Multi-use links; per-link view counters; consent or dedup cookies; a lid or
+cover in the common case; key-column parameter tables; uppercase row tags;
+italic key labels; green `https`; red action buttons; "Potentially Risky"
+wording; selection or copy interception; a domain preview on one-time links;
+removable path, port, or host; pooled chips on multi-number cards.
 
-og:image endpoint: `GET /:name/card.png` — render the shared card (brand, kicker
-"Ephemeral redirect"/"One-time redirect", destination domain, foot "expires <date, year> ·
-<HH:MM> UTC" — absolute, because a cached card outlives any relative phrasing, and to the
-minute, because a TTL can be an hour). **No use consumed** (crawlers fetch it). Build an SVG from a template
-and rasterise to PNG with `resvg` + `tiny-skia`; serve `image/png`. Consider caching the
-PNG per name until expiry. The visual spec is the `.ogcard` design in the mockup. Cards are
-identical across platforms — iMessage shows image + title + source domain (`yuio.link`);
-Discord shows the theme-color rail + plain title + prose description + image; we only feed
-the og tags, the chrome is platform-controlled.
+## 12. Known gap
 
----
-
-## 6. CSS
-
-Port the mockup's interstitial styles into `server/static/app.css` (the `pv-*` classes,
-`.btn--go` amber button with dark text, the `.pv-idn` red lookalike panel, the neutral
-`.pv-badge`). The `.ogcard` styles are for the **server-side SVG template**, not app.css.
-Remove `crypto.js` / `redirect.js` references (encryption gone); keep `text.js` (copy).
-
----
-
-## 7. Implementation order
-
-1. **DB**: `withdrawn` column + migration; `LIVE_PREDICATE += withdrawn = 0`; `get_link_any`;
-   `delete_link` -> tombstone UPDATE. Reaper unchanged.
-2. **Resolve refactor**: `GET /:name` classifies live / exhausted / withdrawn / expired /
-   missing -> interstitial / immediate-text / 410 / 404. Drop `+` convention.
-3. **Interstitial view** (redirect unlimited full-URL, limited domain-only, text-limited) +
-   IDN detection + syntax highlighting.
-4. **Consume endpoints**: `POST /:name/go` (unlimited) and `POST /:name/reveal` (limited) +
-   signed reveal token + `GET /:name/revealed`.
-5. **404 / 410 pages** (friendly, expiry-aware); split from generic 500.
-6. **OG tags** on the interstitial + **og:image** endpoint (resvg).
-7. **Port CSS** to app.css; drop encryption views/assets.
-8. **Tests** (see below).
-
----
-
-## 8. Tests
-
-- Resolve classification: live -> 200 interstitial; exhausted -> 410; withdrawn -> 410;
-  expired/missing -> 404.
-- Preview spends no use; `POST /go` and `POST /reveal` each spend exactly one; one-time link
-  is gone (410) after one consume.
-- PRG: consume returns 303; revealed page is a GET and re-rendering it does not consume.
-- Reveal token: valid renders; tampered/expired token -> 404/expired.
-- Withdraw (API delete) -> 410 and the name cannot be re-registered until expiry.
-- IDN: mixed-script host -> warning + punycode; single-script IDN -> decoded, no warning;
-  ASCII -> no warning.
-- Crawler simulation: a GET to `/:name` and `/:name/card.png` never changes `hits`.
-
----
-
-## 9. Decisions (updated as they land)
-
-- **API limited-destination leak — REVERSED (2026-07-02): gate it.** The 2026-06-23
-  decision was to accept that `GET /api/v0/links/:name` returned a limited link's full
-  destination without consuming, relying on future rate limiting. That was wrong: rate
-  limiting bounds *volume*, but interception takes a *single* silent read — anyone who
-  learned a 4-word name could read a one-time link's destination without spending the use,
-  while the legitimate recipient still saw it live, contradicting the promised "410 means
-  someone already opened it" tamper evidence. The API now returns **metadata only** for
-  limited links; disclosing the payload stays exclusive to `POST /:name/reveal`.
-- **HMAC secret lifecycle** — persisted on the droplet (`/etc/yuiolink/yuiolink.env`);
-  per-process random fallback for dev.
-- **og:image rasterisation** — `resvg` with `default-features=false, features=["text"]`,
-  vendored fonts, rendered on `spawn_blocking`, `Cache-Control: max-age=3600`.
-- **Hits semantics** — a hit is counted at `go` (unlimited) or at `reveal` (limited). One
-  use per access either way.
-
-## 10. Post-launch items (status)
-
-- **Rate limiting** — BUILT (2026-07-02): per-client token bucket on the **create path
-  only** (form, `/create`, API create; burst 10, one create per 6 s, fast 429). Resolution
-  is never limited or slowed. Volumetric protection remains the upstream CDN's job (still
-  pending).
+`phonenumber` 0.3.10 compiles only `PhoneNumberMetadata.xml` into its database,
+so `Type::ShortCode` never matches and premium-rate **SMS short codes** are not
+detectable through it. Premium-rate ranges in ordinary numbers are, and the chip
+fires for `sms:` as well as `tel:`.

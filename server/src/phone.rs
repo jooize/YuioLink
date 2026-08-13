@@ -505,6 +505,23 @@ mod tests {
         assert!(n.class.is_none());
     }
 
+    /// The known gap, pinned so it cannot rot into a silent surprise.
+    ///
+    /// The premium-rate chip is meant to fire for paid SMS short codes too, but
+    /// this crate's build script compiles only `PhoneNumberMetadata.xml` into
+    /// its database -- `ShortNumberMetadata.xml` ships in the crate's assets and
+    /// is never loaded -- so `Type::ShortCode` can never match and a short code
+    /// does not classify at all. Premium ranges in ordinary numbers still do,
+    /// which is what the chip fires on today. If a future version loads the
+    /// short-number tables, this test starts failing and the chip gains its
+    /// remaining case.
+    #[test]
+    fn short_codes_do_not_classify_yet() {
+        for code in ["1955", "22000", "60999"] {
+            assert!(read(code).class.is_none(), "{code}");
+        }
+    }
+
     #[test]
     fn a_flag_is_the_region_code_in_regional_indicators() {
         assert_eq!(flag_of("NO"), "\u{1f1f3}\u{1f1f4}");

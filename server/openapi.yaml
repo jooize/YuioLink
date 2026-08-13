@@ -22,10 +22,10 @@ info:
 
     Two things to know before integrating:
 
-    - **GET previews, POST consumes.** Reading a link via this API never
-      spends a use; a limited (single-use) link answers with metadata only,
-      because disclosing the payload without spending the use would defeat
-      its burn-after-read tamper evidence.
+    - **GET previews, POST spends.** Reading a link via this API never
+      spends a use; a one-time link answers with metadata only, because
+      disclosing the payload without spending the use would defeat its
+      burn-after-read tamper evidence.
     - **Validation reports everything at once.** A `400` carries an `errors`
       array with one entry per offending field, alongside the joined `error`
       summary string.
@@ -87,9 +87,10 @@ paths:
       operationId: getLink
       summary: Read a link without consuming it
       description: |
-        Safe and idempotent: never counts a hit or spends a use. A **limited**
-        (single-use) link returns metadata only — no `target`/`content` —
-        since consuming stays exclusive to the site's reveal flow.
+        Safe and idempotent: never spends a use, and there is no per-link view
+        counter for it to move. A **one-time** link returns metadata only — no
+        `target`/`content` — since spending the use stays exclusive to the
+        site's own reveal flow.
       responses:
         "200":
           description: The link.
