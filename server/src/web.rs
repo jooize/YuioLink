@@ -104,7 +104,9 @@ pub fn router(state: AppState) -> Router {
         .nest("/api/v0", api_routes())
         .route("/create", post(create_plain))
         .route("/{name}", get(resolve))
-        .route("/{name}/go", post(go))
+        // No `/{name}/go`: following an unlimited redirect is a plain `<a href>`
+        // on the preview page. It was a POST that 303'd, which CSP
+        // `form-action 'self'` blocks at the redirect hop in Chrome and Safari.
         .route("/{name}/reveal", post(reveal))
         .route("/{name}/card.png", get(card_image))
         .fallback(not_found_fallback)
@@ -510,7 +512,10 @@ async fn interstitial_response(state: &AppState, d: &LinkDetail) -> Response {
             short_url: &short_url,
             expires_at: &d.expires_at,
             max_uses: d.max_uses,
-            target: Target::Redirect(&url),
+            target: Target::Redirect {
+                url: &url,
+                href: &d.content,
+            },
         })
     } else {
         views::interstitial_page(Interstitial {
@@ -544,29 +549,6 @@ async fn tombstone_or_missing(state: &AppState, name: &str) -> Response {
     }
 }
 
-/// `POST /:name/go` — consume an **unlimited** redirect and 303 to its
-/// destination (Post/Redirect/Get keeps the back button clean). The link shape is
-/// immutable, so we verify it before spending a hit: a non-matching shape returns
-/// 404 without consuming.
-pub async fn go(State(state): State<AppState>, Path(name): Path<String>) -> Response {
-    match db::get_link_live(&state.pool, &name).await {
-        Ok(Some(d)) if d.kind == "redirect" && d.max_uses.is_none() => {}
-        Ok(Some(_)) => return AppError::NotFound.into_response(),
-        Ok(None) => return tombstone_or_missing(&state, &name).await,
-        Err(e) => return AppError::internal(e).into_response(),
-    }
-    match db::consume_link(&state.pool, &name).await {
-        Ok(Some(d)) if validate_redirect(&d.content, DEFAULT_ALLOWED_SCHEMES).is_ok() => {
-            Redirect::to(&d.content).into_response()
-        }
-        // Stored an unexpected scheme somehow — refuse rather than reflect it.
-        Ok(Some(_)) => AppError::NotFound.into_response(),
-        // Died between the shape check and the consume.
-        Ok(None) => tombstone_or_missing(&state, &name).await,
-        Err(e) => AppError::internal(e).into_response(),
-    }
-}
-
 /// `POST /:name/reveal` — consume a **limited** link (redirect or Text), then 303
 /// to its token-gated revealed view. The use is spent here; the destination or
 /// content itself is deleted from the server when the revealed GET actually
@@ -584,17 +566,12 @@ pub async fn reveal(State(state): State<AppState>, Path(name): Path<String>) -> 
             let t = token::mint(&state.secret, &d.name, now_unix() + token::TTL_SECS);
             // Carry the reveal capability in a short-lived, path-scoped cookie rather
             // than the URL, so the revealed page has a clean address and the token
-            // never lands in browser history, referrers, or server logs. `Secure`
-            // only when actually served over HTTPS, so local http dev still works.
-            let secure = if state.base_url.starts_with("https") {
-                "; Secure"
-            } else {
-                ""
-            };
+            // never lands in browser history, referrers, or server logs.
             let cookie = format!(
-                "yl_reveal={t}; Path=/{}; Max-Age={}; HttpOnly; SameSite=Lax{secure}",
+                "yl_reveal={t}; Path=/{}; Max-Age={}; HttpOnly; SameSite=Lax{}",
                 d.name,
                 token::TTL_SECS,
+                cookie_secure(&state),
             );
             let mut resp = Redirect::to(&format!("/{}", d.name)).into_response();
             resp.headers_mut().append(
@@ -650,7 +627,33 @@ async fn revealed_view(state: &AppState, name: &str) -> Response {
         }),
         _ => return AppError::NotFound.into_response(),
     };
-    Html(markup.into_string()).into_response()
+    let mut resp = Html(markup.into_string()).into_response();
+    // The cookie existed to survive exactly one redirect hop — the 303 from
+    // `POST /:name/reveal` to this GET — and that hop is now behind us. Expiring
+    // it on the same response that redacts the row makes its lifetime one
+    // request, so a stale capability cannot sit in the jar for ten minutes
+    // pointing at content the server has already deleted.
+    resp.headers_mut().append(
+        header::SET_COOKIE,
+        axum::http::HeaderValue::from_str(&format!(
+            "yl_reveal=; Path=/{}; Max-Age=0; HttpOnly; SameSite=Lax{}",
+            d.name,
+            cookie_secure(state)
+        ))
+        .expect("cleared reveal cookie is ASCII"),
+    );
+    resp
+}
+
+/// `; Secure` only when the site is actually served over HTTPS, so local http
+/// development still keeps its cookie. A cleared cookie has to match the
+/// attributes of the one it replaces or the browser keeps the original.
+fn cookie_secure(state: &AppState) -> &'static str {
+    if state.base_url.starts_with("https") {
+        "; Secure"
+    } else {
+        ""
+    }
 }
 
 /// `GET /:name/card.png` — the og:image share card for a live redirect. Spends no
@@ -1411,7 +1414,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn unlimited_redirect_previews_then_consumes() {
+    async fn unlimited_redirect_previews_and_links_out_directly() {
         let st = test_state().await;
         let l = db::insert_link(
             &st.pool,
@@ -1421,21 +1424,25 @@ mod tests {
         .await
         .unwrap();
 
-        // GET previews: 200 interstitial, no hit, full URL + amber Continue. A
-        // crawler doing exactly this can never spend a use.
+        // GET previews: 200 interstitial, full URL, and Continue is a real
+        // anchor carrying the destination — not a form. The form was what CSP
+        // `form-action 'self'` blocked at the redirect hop.
         let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
         assert_eq!(s, StatusCode::OK);
         assert!(
             body.contains("Continue to example.com"),
             "interstitial body: {body}"
         );
+        assert!(
+            body.contains(r#"href="https://example.com/x""#),
+            "Continue must be an <a href>: {body}"
+        );
+        assert!(!body.contains("/go"), "the consume POST is gone: {body}");
         assert_eq!(uses(&st, &l.name).await, 0);
 
-        // POST /go consumes: 303 straight to the destination, hit counted.
-        let (s, h, _) = send(&st, post(&format!("/{}/go", l.name))).await;
-        assert_eq!(s, StatusCode::SEE_OTHER);
-        assert_eq!(h.get("location").unwrap(), "https://example.com/x");
-        assert_eq!(uses(&st, &l.name).await, 1);
+        // And the route it used to post to no longer exists.
+        let (s, _, _) = send(&st, post(&format!("/{}/go", l.name))).await;
+        assert_eq!(s, StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
@@ -1449,13 +1456,21 @@ mod tests {
         .await
         .unwrap();
 
-        // GET previews domain-only: Reveal button, full path gated, no hit.
+        // GET previews blind: a Reveal button and nothing else. Not the path,
+        // and not the domain either — disclosing the domain would let a holder
+        // learn where the link points without burning the use, and the burn is
+        // the whole tamper-evidence.
         let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("Reveal Destination"));
+        assert!(body.contains("The destination is shown when revealed."));
         assert!(
             !body.contains("zzz-gated-path"),
             "path must be gated: {body}"
+        );
+        assert!(
+            !body.contains("secret.example.com"),
+            "the domain must be gated too: {body}"
         );
         assert_eq!(uses(&st, &l.name).await, 0);
 
@@ -1480,10 +1495,15 @@ mod tests {
                 .body(Body::empty())
                 .unwrap()
         };
-        let (s, _, body) = send(&st, revealed_get(&cookie)).await;
+        let (s, h, body) = send(&st, revealed_get(&cookie)).await;
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("zzz-gated-path"), "revealed body: {body}");
         assert_eq!(uses(&st, &l.name).await, 1);
+        // The cookie's whole job was surviving one redirect hop, so the render
+        // that spends it also expires it: lifetime = one request.
+        let cleared = h.get("set-cookie").unwrap().to_str().unwrap();
+        assert!(cleared.starts_with("yl_reveal=;"), "{cleared}");
+        assert!(cleared.contains("Max-Age=0"), "{cleared}");
 
         let (s, _, body) = send(&st, revealed_get(&cookie)).await;
         assert_eq!(s, StatusCode::GONE, "second render with the same cookie");
@@ -1495,6 +1515,85 @@ mod tests {
         assert_eq!(s, StatusCode::GONE);
         assert!(body.contains("410"));
         assert!(!body.contains("zzz-gated-path"));
+    }
+
+    /// Write a row straight into the table, past every validator. The create
+    /// surfaces reject an off-allowlist scheme, so this is the only way to
+    /// reach the state the render-time check exists for: a string that got into
+    /// storage some other way (an older binary, a hand-edited database, a
+    /// future allowlist that shrinks).
+    async fn insert_raw(
+        st: &AppState,
+        name: &str,
+        kind: &str,
+        content: &str,
+        max_uses: Option<i64>,
+    ) {
+        sqlx::query(
+            "INSERT INTO links (name, kind, content, expires_at, max_uses, words) \
+             VALUES (?, ?, ?, datetime('now', '+1 hour'), ?, 1)",
+        )
+        .bind(name)
+        .bind(kind)
+        .bind(content)
+        .bind(max_uses)
+        .execute(&st.pool)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn off_allowlist_schemes_are_printed_but_never_linked() {
+        let st = test_state().await;
+        for (name, stored) in [
+            ("refuseone", "javascript:alert(document.cookie)"),
+            ("refusetwo", "data:text/html,<script>alert(1)</script>"),
+        ] {
+            insert_raw(&st, name, "redirect", stored, None).await;
+            let (s, _, body) = send(&st, get(&format!("/{name}"))).await;
+            assert_eq!(s, StatusCode::OK);
+            assert!(body.contains("An Instruction, Not an Address"), "{body}");
+            // The string is shown, but never as something the browser could act on.
+            assert!(!body.contains("href=\"javascript:"), "{body}");
+            assert!(!body.contains("href=\"data:"), "{body}");
+            assert!(!body.contains("Continue to"), "{body}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_revealed_page_refuses_off_allowlist_schemes_too() {
+        let st = test_state().await;
+        // The gap this closes: `revealed_page` used to emit href=(content) with
+        // no check of its own, so a string the interstitial refused was still
+        // handed to the browser as a live link one POST later.
+        insert_raw(
+            &st,
+            "refusethree",
+            "redirect",
+            "javascript:alert(1)",
+            Some(1),
+        )
+        .await;
+        let (s, h, _) = send(&st, post("/refusethree/reveal")).await;
+        assert_eq!(s, StatusCode::SEE_OTHER);
+        let cookie = h
+            .get("set-cookie")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap()
+            .to_string();
+        let req = Request::builder()
+            .uri("/refusethree")
+            .header("cookie", cookie)
+            .body(Body::empty())
+            .unwrap();
+        let (s, _, body) = send(&st, req).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(body.contains("An Instruction, Not an Address"), "{body}");
+        assert!(!body.contains("href=\"javascript:"), "{body}");
     }
 
     #[tokio::test]
@@ -1734,7 +1833,9 @@ mod tests {
         )
         .await
         .unwrap();
-        // A preview must not count as an open — only spending a use does.
+        // A preview must not count as an open. Following an unlimited redirect
+        // is now a plain anchor, so the server never learns it happened at all
+        // — the preview tally is what stands in its place.
         let (s, _, _) = send(&st, get(&format!("/{}", l.name))).await;
         assert_eq!(s, StatusCode::OK);
 
@@ -1744,17 +1845,21 @@ mod tests {
         };
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("links created"), "page should render: {body}");
-        // One create, no opens yet.
+        assert!(body.contains("Previews shown"), "{body}");
         assert!(body.contains("Statistics"));
 
-        // Spending the use is what the counter is for.
-        let req = Request::builder()
-            .method("POST")
-            .uri(format!("/{}/go", l.name))
-            .body(Body::empty())
-            .unwrap();
-        let (s, _, _) = send(&st, req).await;
-        assert!(s.is_redirection() || s == StatusCode::OK, "go returned {s}");
+        // Spending the use is what the counter is for, and only a reveal does.
+        let once = db::insert_link(
+            &st.pool,
+            redirect("https://example.com/once", Some(1)),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+        let (s, _, _) = send(&st, get(&format!("/{}", once.name))).await;
+        assert_eq!(s, StatusCode::OK);
+        let (s, _, _) = send(&st, post(&format!("/{}/reveal", once.name))).await;
+        assert_eq!(s, StatusCode::SEE_OTHER);
 
         let totals = db::stat_totals(&st.pool).await.unwrap();
         let get_total = |k: &str| {
@@ -1765,12 +1870,13 @@ mod tests {
                 .unwrap_or(0)
         };
         assert_eq!(get_total("created_public"), 1);
-        assert_eq!(get_total("created_redirect"), 1);
+        assert_eq!(get_total("created_once"), 1);
+        assert_eq!(get_total("created_redirect"), 2);
         assert_eq!(get_total("opened"), 1, "preview must not have counted");
         // The preview render has its own metric — the only place a preview is
         // ever counted, since no per-link counter exists.
-        assert_eq!(get_total("previewed"), 1);
-        assert_eq!(get_total("revealed"), 0, "nothing was revealed here");
+        assert_eq!(get_total("previewed"), 2);
+        assert_eq!(get_total("revealed"), 1);
 
         // The table holds counts and nothing else — no column could carry a name,
         // a destination, or a visitor.

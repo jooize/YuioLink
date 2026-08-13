@@ -791,8 +791,9 @@ pub fn result_page(
 
 /// What the interstitial is gating.
 pub enum Target<'a> {
-    /// A redirect, with its destination already parsed for display.
-    Redirect(&'a UrlView),
+    /// A redirect, with its destination already parsed for display and the
+    /// canonical stored string that an `href` would carry.
+    Redirect { url: &'a UrlView, href: &'a str },
     /// A limited Text link — only its existence is shown until revealed.
     TextSnippet,
 }
@@ -806,25 +807,28 @@ pub struct Interstitial<'a> {
     pub target: Target<'a>,
 }
 
-/// The mandatory preview shown for `GET /:name`. Spends no use; consuming is a
-/// separate POST. Unlimited redirects show the full syntax-highlighted URL and an
-/// amber Continue; limited links show only the domain (or "A text snippet") and a
-/// blue Reveal that spends the use.
+/// The mandatory preview shown for `GET /:name`. Spends no use; revealing is a
+/// separate POST. An unlimited redirect shows the full destination and a real
+/// amber `<a href>` — a link, not a form, so nothing about following it can be
+/// blocked by the CSP's `form-action`; a one-time link discloses nothing at all
+/// until its Reveal button spends the use.
+///
+/// `max_uses` is only ever `None` or `Some(1)` (the create surfaces reject
+/// anything else), so "limited" and "one-time" are the same condition here.
 pub fn interstitial_page(i: Interstitial) -> Markup {
-    let one_time = i.max_uses == Some(1);
-    let limited = i.max_uses.is_some();
+    let one_time = i.max_uses.is_some();
 
     let kind = match &i.target {
-        Target::Redirect(_) => Kind::Redirect,
+        Target::Redirect { .. } => Kind::Redirect,
         Target::TextSnippet => Kind::Text,
     };
     let body = html! {
         (link_heading(kind, i.name, i.base_host, home_chip("/", "Go to YuioLink")))
         (pv_arrow())
         @match &i.target {
-            Target::Redirect(url) if limited => (limited_redirect_block(&i, url, one_time)),
-            Target::Redirect(url) => (unlimited_redirect_block(&i, url)),
-            Target::TextSnippet => (text_snippet_block(&i, one_time)),
+            _ if one_time => (blind_reveal_block(&i)),
+            Target::Redirect { url, href } => (unlimited_redirect_block(&i, url, href)),
+            Target::TextSnippet => (blind_reveal_block(&i)),
         }
     };
     // noindex: link pages must never end up in a search index — a public link
@@ -834,7 +838,7 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
         (interstitial_head(&i, one_time))
     };
     let title = match &i.target {
-        Target::Redirect(url) => link_title("Redirect", i.name, Some(&url.card_domain())),
+        Target::Redirect { url, .. } => link_title("Redirect", i.name, Some(&url.card_domain())),
         Target::TextSnippet => link_title("Text", i.name, None),
     };
     // preview.js only wires ⌘C to the destination, and no-ops when there is no
@@ -845,7 +849,7 @@ pub fn interstitial_page(i: Interstitial) -> Markup {
 /// `<head>` Open Graph / theme-color tags so a shared link unfurls trustworthily.
 fn interstitial_head(i: &Interstitial, one_time: bool) -> Markup {
     match &i.target {
-        Target::Redirect(url) => {
+        Target::Redirect { url, .. } => {
             let domain = url.card_domain();
             let title = if one_time {
                 format!("One-time link to {domain}")
@@ -935,11 +939,18 @@ impl Kind {
     }
 }
 
-fn unlimited_redirect_block(i: &Interstitial, url: &UrlView) -> Markup {
+fn unlimited_redirect_block(i: &Interstitial, url: &UrlView, href: &str) -> Markup {
+    // Render-time allowlist check. It is the only thing standing between a
+    // stored string and an `href`, on this page and on the revealed one, so it
+    // runs where the markup is written rather than in a handler that a future
+    // route could bypass.
+    if !is_linkable(href) {
+        return refusal_block(i, url);
+    }
     html! {
         (render_url(url))
         @if let Some(w) = idn_warning(url) { (idn_panel(w)) }
-        (consume_form(&format!("/{}/go", i.name), GO_BTN, &continue_label(url)))
+        (go_anchor(href, &continue_label(url)))
         p.pv-meta { "Expires in " (humanize_expires_in(i.expires_at)) }
         span.pv-caution {
             "YuioLinks expire and are reused, so a link can point somewhere else later. "
@@ -948,44 +959,90 @@ fn unlimited_redirect_block(i: &Interstitial, url: &UrlView) -> Markup {
     }
 }
 
-fn limited_redirect_block(i: &Interstitial, url: &UrlView, one_time: bool) -> Markup {
+/// The one-time card, for both kinds. It discloses nothing — not the domain,
+/// not the scheme — because disclosing it without spending the use would let
+/// anyone holding the link learn where it points invisibly, and the spent use
+/// is the whole tamper-evidence a one-time link offers. The line says what will
+/// happen rather than that something is being withheld: the server genuinely
+/// has not given anything away yet.
+fn blind_reveal_block(i: &Interstitial) -> Markup {
+    let text = matches!(i.target, Target::TextSnippet);
     html! {
-        (render_host_domain(url))
-        (consume_form(&format!("/{}/reveal", i.name), REVEAL_BTN, "Reveal Destination"))
-        div.pv-badge-wrap { span.pv-badge { (badge_text(one_time)) } }
+        @if text { span.pv-host.plain { "A text snippet" } }
+        span.pv-blind {
+            @if text { "The text is shown when revealed." }
+            @else { "The destination is shown when revealed." }
+        }
+        (consume_form(
+            &format!("/{}/reveal", i.name),
+            REVEAL_BTN,
+            if text { "Reveal Text" } else { "Reveal Destination" },
+        ))
+        div.pv-badge-wrap { span.pv-badge.once { "Opens Once" } }
         p.pv-meta { "Expires in " (humanize_expires_in(i.expires_at)) }
-        @if one_time {
-            span.pv-caution.single { "If this page says the link is gone (410), someone already opened it." }
-        } @else {
-            span.pv-caution {
-                "A limited link shows only the domain until you reveal it. "
-                strong { "Always check the destination." }
+        span.pv-caution.single { "If this page says the link is gone (410), someone already opened it." }
+    }
+}
+
+/// Tier 3: a stored string whose scheme is off the allowlist. It is printed and
+/// given no control at all — not a disabled one — because the thing it would do
+/// is not "go somewhere".
+fn refusal_block(i: &Interstitial, url: &UrlView) -> Markup {
+    html! {
+        (render_url_inert(url))
+        (refuse_alert())
+        p.pv-meta { "Expires in " (humanize_expires_in(i.expires_at)) }
+    }
+}
+
+/// The refusal panel. Neutral ground, red only in the 16px symbol: the red fill
+/// belongs to `.pv-idn`, where a lookalike domain is an actual attack in
+/// progress. The heading names the diagnosis and the body carries the
+/// consequence in the same breath.
+fn refuse_alert() -> Markup {
+    html! {
+        div.pv-refuse-alert {
+            svg.sym width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" {
+                circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4" {}
+                path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" {}
+                circle cx="8" cy="11.2" r=".95" fill="currentColor" {}
+            }
+            p.msg {
+                b { "An Instruction, Not an Address" }
+                "What is stored here would tell your browser to do something rather than go "
+                "somewhere, so YuioLink shows it, gives it no button, and stops there."
             }
         }
     }
 }
 
-fn text_snippet_block(i: &Interstitial, one_time: bool) -> Markup {
+/// True when a stored destination may be emitted as an `href`. This is the
+/// render-time replacement for the check that used to live in the deleted
+/// `POST /:name/go` handler, and it now covers the revealed page too — that
+/// page emitted `href=(content)` with no check of its own.
+fn is_linkable(target: &str) -> bool {
+    yuiolink_core::validate_redirect(target, yuiolink_core::DEFAULT_ALLOWED_SCHEMES).is_ok()
+}
+
+/// The amber "Continue" anchor: leaving the site.
+///
+/// A real `<a href>`, not a form that POSTs and redirects. The form was the
+/// original bug — CSP `form-action 'self'` applies to every redirect hop of a
+/// submission in Chrome and Safari, so the 303 to an external destination was
+/// refused and the press went nowhere. A link has nothing for `form-action` to
+/// block, and it brings right-click Copy Link, middle-click, and the browser's
+/// own hover preview with it.
+fn go_anchor(href: &str, label: &str) -> Markup {
     html! {
-        span.pv-host.plain { "A text snippet" }
-        (consume_form(&format!("/{}/reveal", i.name), REVEAL_BTN, "Reveal Text"))
-        div.pv-badge-wrap { span.pv-badge { (badge_text(one_time)) } }
-        p.pv-meta { "Expires in " (humanize_expires_in(i.expires_at)) }
-        @if one_time {
-            span.pv-caution.single { "If this page says the link is gone (410), someone already opened it." }
-        } @else {
-            span.pv-caution {
-                "YuioLinks expire and are reused, so this name can carry different text later. "
-                strong { "Revealing spends one view." }
-            }
-        }
+        a class=(GO_BTN) href=(href) rel="noopener noreferrer" { (label) }
     }
 }
 
-/// Amber "Continue" (leave the site) and blue "Reveal" (stay, spend a use) button
-/// class sets. Both submit a POST form (Post/Redirect/Get), so a link-unfurl
-/// crawler — which only GETs — can never spend a use.
-const GO_BTN: &str = "btn btn--go btn-block pv-btn";
+/// Amber "Continue" (leave the site) and blue "Reveal" (stay, spend a use)
+/// button class sets. Continue is an anchor; Reveal stays a POST form
+/// (Post/Redirect/Get), so a link-unfurl crawler — which only GETs — can never
+/// spend a use.
+const GO_BTN: &str = "btn btn--go btn-block pv-btn btn-link";
 const REVEAL_BTN: &str = "btn btn-block pv-btn";
 
 fn consume_form(action: &str, btn_class: &str, label: &str) -> Markup {
@@ -993,14 +1050,6 @@ fn consume_form(action: &str, btn_class: &str, label: &str) -> Markup {
         form.pv-form method="post" action=(action) {
             button class=(btn_class) type="submit" { (label) }
         }
-    }
-}
-
-fn badge_text(one_time: bool) -> &'static str {
-    if one_time {
-        "Opens Once"
-    } else {
-        "Limited Use"
     }
 }
 
@@ -1021,9 +1070,28 @@ fn idn_warning(url: &UrlView) -> Option<&IdnWarning> {
 /// registrable domain highlighted, path segments and query values distinguished.
 /// The spans concatenate back to the exact URL (no separators are added for
 /// display), so `preview.js` can copy this element's text on ⌘C.
+/// The same line as [`render_url`] with no `#destination` id and an `inert`
+/// class: a refused string is printed to be read, not taken. Selection still
+/// works — what is withheld is every control the page could offer, including
+/// the ⌘C shortcut preview.js binds to `#destination`.
+fn render_url_inert(url: &UrlView) -> Markup {
+    html! {
+        code.pv-url.inert {
+            (render_url_parts(url))
+        }
+    }
+}
+
 fn render_url(url: &UrlView) -> Markup {
     html! {
         code.pv-url #destination {
+            (render_url_parts(url))
+        }
+    }
+}
+
+fn render_url_parts(url: &UrlView) -> Markup {
+    html! {
             span.sch { (url.scheme) }
             @match &url.host {
                 Some(h) => {
@@ -1039,7 +1107,6 @@ fn render_url(url: &UrlView) -> Markup {
                     @if let Some(o) = &url.opaque { span.seg { (o) } }
                 }
             }
-        }
     }
 }
 
@@ -1061,19 +1128,6 @@ fn render_query(query: &str) -> Markup {
                 Some((k, v)) => { span.seg { (k) } span.pn { "=" } span.qv { (v) } }
                 None => { span.seg { (pair) } }
             }
-        }
-    }
-}
-
-/// Domain-only host for a limited link's pre-reveal view.
-fn render_host_domain(url: &UrlView) -> Markup {
-    html! {
-        @match &url.host {
-            Some(h) => span.pv-host {
-                @if !h.subdomain.is_empty() { span.sub { (h.subdomain) "." } }
-                (h.registrable)
-            },
-            None => span.pv-host.plain { (url.card_domain()) },
         }
     }
 }
@@ -1119,15 +1173,28 @@ pub fn revealed_page(r: RevealedView) -> Markup {
     let back = home_chip("/", "Create New Link");
     match r.target {
         RevealedTarget::Redirect { url, href } => {
+            // The same render-time allowlist check the interstitial makes. This
+            // page used to emit `href=(content)` with no check at all, so an
+            // off-allowlist scheme that somehow reached storage would have been
+            // handed to the browser as a live link here even while the
+            // interstitial refused it. Both gaps close in one place.
+            let linkable = is_linkable(href);
             let body = html! {
                 (link_heading(Kind::Redirect, r.name, r.base_host, back))
                 (pv_arrow())
-                (render_url(url))
-                @if let Some(w) = idn_warning(url) { (idn_panel(w)) }
-                a class=(GO_BTN) href=(href) rel="noopener noreferrer" { (continue_label(url)) }
+                @if linkable {
+                    (render_url(url))
+                    @if let Some(w) = idn_warning(url) { (idn_panel(w)) }
+                    (go_anchor(href, &continue_label(url)))
+                } @else {
+                    (render_url_inert(url))
+                    (refuse_alert())
+                }
                 p.pv-revealed { "Deleted from the server on this view — refreshing won't bring it back." }
                 p.pv-meta { "Expires in " (humanize_expires_in(r.expires_at)) }
-                span.pv-caution.single { strong { "Always check the destination." } }
+                @if linkable {
+                    span.pv-caution.single { strong { "Always check the destination." } }
+                }
             };
             document_link(
                 &link_title("Redirect", r.name, Some(&url.card_domain())),

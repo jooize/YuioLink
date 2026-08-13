@@ -1,8 +1,16 @@
 # Routes
 
 The authoritative route reference, matching `server/src/web.rs::router`.
-Model in one line: **GET previews, POST consumes** (Post/Redirect/Get), so
+Model in one line: **GET previews, POST spends** (Post/Redirect/Get), so
 crawlers and prefetchers can never spend a use.
+
+There is no `POST /:name/go`. Following an unlimited redirect is a plain
+`<a href>` on the preview page: nothing is spent (an unlimited link has no use
+to spend), and a link — unlike a form — has nothing for the CSP's
+`form-action 'self'` to block at the redirect hop. Whether the destination may
+be emitted as an `href` at all is decided at **render time**, in
+`views::is_linkable`, on both the preview page and the revealed page; a scheme
+off `DEFAULT_ALLOWED_SCHEMES` is printed and given no control.
 
 ## Pages
 
@@ -10,15 +18,14 @@ crawlers and prefetchers can never spend a use.
 |-------|--------|----------|
 | `/` | GET | Landing page: the create form (works without JS). |
 | `/` | POST | No-JS create (form-encoded). Renders a server-side result page. Rate-limited. |
-| `/:name` | GET | The always-preview resolver. Spends **no** use. A live redirect (or limited Text) renders the interstitial; unlimited Text renders immediately (counts a hit); a visitor with a valid `yl_reveal` cookie gets the revealed view here; spent/withdrawn is **410 Gone**; expired/unknown is **404**. A trailing `+` is accepted and ignored. |
-| `/:name/go` | POST | Consume an **unlimited redirect**: hits+1, 303 to the destination. |
-| `/:name/reveal` | POST | Consume a **limited** link (redirect or Text): hits+1, set the path-scoped `yl_reveal` HMAC cookie (~10 min), 303 back to `/:name`, which renders the revealed view. Refresh/back re-renders without re-consuming. |
+| `/:name` | GET | The always-preview resolver. Spends **no** use. A live redirect (or one-time Text) renders the interstitial; unlimited Text renders immediately; a visitor with a valid `yl_reveal` cookie gets the revealed view here; spent/withdrawn is **410 Gone**; expired/unknown is **404**. A trailing `+` is accepted and ignored. |
+| `/:name/reveal` | POST | Spend a **one-time** link's use (redirect or Text): `uses`+1, set the path-scoped `yl_reveal` HMAC cookie (~10 min), 303 back to `/:name`, which renders the revealed view. That render redacts the row **and** expires the cookie (`Max-Age=0`), so the capability lives exactly one request. |
 | `/:name/card.png` | GET | The og:image share card (redirects only). Spends no use; `Cache-Control: max-age=3600`. |
 | `/help` | GET | The usage page: why links expire, what the three types and two kinds are for, worked scenarios, and the `curl` endpoint (printed with this instance's base URL, so a copied command targets the host being read). Static — touches no database. |
 | `/healthz` | GET | Deploy/update health probe. Touches the database, so a failed migration reads as unhealthy. |
-| `/stats` | GET | Public aggregate counters: live links, created (by type and kind), opened, expired, and the last 7 UTC days. Reads the `stats` table, which holds nothing but `(day, metric, count)` — no IP, user agent, referrer, link name, or destination, and no per-event row. Degrades to zeroes rather than 500ing. |
+| `/stats` | GET | Public aggregate counters: live links, created (by type and kind), opened, previewed, revealed, expired, and the last 7 UTC days. Reads the `stats` table, which holds nothing but `(day, metric, count)` — no IP, user agent, referrer, link name, or destination, and no per-event row. Degrades to zeroes rather than 500ing. |
 | `/wordlist.txt` | GET | The curated 3,456-word name list as plain text (linked from the landing page's Privacy/Security disclosure — the namespace is public by design). |
-| `/static/app.css`, `/static/app.js`, `/static/text.js` | GET | Embedded assets; `Cache-Control: public, max-age=3600`. |
+| `/static/app.css`, `/static/app.js`, `/static/text.js`, `/static/preview.js` | GET | Embedded assets; `Cache-Control: public, max-age=3600`. |
 
 ## Terminal convenience
 
