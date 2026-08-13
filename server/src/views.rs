@@ -2553,6 +2553,27 @@ mod tests {
     }
 
     #[test]
+    fn the_page_without_a_script_has_no_dead_controls() {
+        // preview.js injects the checkboxes, the Copy pills, and the split's
+        // second segment. None of them may be in the served markup: a control
+        // that does nothing is worse than no control, and un-hiding one after
+        // load is how this site earned its layout-shift history.
+        for stored in [
+            "https://alice@example.com/reset?next=x",
+            "mailto:a@b.example,c@d.example?subject=Hi",
+            "magnet:?xt=urn:btih:abc&dn=x.iso",
+        ] {
+            let c = card(stored);
+            assert!(!c.contains("<input"), "{stored}: {c}");
+            assert!(!c.contains("copybtn"), "{stored}: {c}");
+            assert!(!c.contains("pv-split"), "{stored}: {c}");
+            assert!(!c.contains("After your edits"), "{stored}: {c}");
+            // The action is a full-width link either way.
+            assert!(c.contains("btn-block"), "{stored}: {c}");
+        }
+    }
+
+    #[test]
     fn a_note_appears_only_where_the_standard_opens_a_gap() {
         assert!(card("magnet:?xt=urn:btih:abc&dn=x.iso").contains("Only <code>xt</code>"));
         assert!(card("mailto:a@b.example?body=hi").contains("goes out as you"));
