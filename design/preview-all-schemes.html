@@ -129,16 +129,30 @@
     .pv-slice.locked:hover { background: transparent; }
     .dsp { border-bottom: 1px dotted var(--text-tertiary); }
 
-    /* the optional fold for http(s): closed is today's page plus one line */
+    /* the optional fold for http(s): closed is today's page plus one line.
+       The chevron is generated content, so selection and copy never pick it
+       up (no more "▸Show" in the clipboard); it turns when the fold opens. */
     .pv-parts { display: block; margin-top: 12px; }
     .pv-parts-lid { list-style: none; cursor: pointer; text-align: center;
       font: 600 12px/1.4 var(--font); color: var(--text-secondary); padding: 6px; }
     .pv-parts-lid::-webkit-details-marker { display: none; }
     .pv-parts-lid::marker { content: ""; }
-    .pv-parts-lid .chev { color: var(--text-tertiary); margin-right: 7px; }
+    .pv-parts-lid::before { content: "▸"; display: inline-block; margin-right: 8px;
+      font-size: 14px; line-height: 1; color: var(--text-tertiary);
+      transition: transform .18s ease; }
+    .pv-parts[open] .pv-parts-lid::before { transform: rotate(90deg); }
     .pv-parts .when-open { display: none; }
     .pv-parts[open] .when-open { display: inline; }
     .pv-parts[open] .when-closed { display: none; }
+
+    /* the split: act, or take it with you — the create form's own pattern.
+       Amber segment = you leave; blue Copy segment = you stay. Copies what
+       the button would open, edits included. JS-injected; no JS, full-width. */
+    .pv-split { display: flex; gap: 2px; margin-top: 22px; }
+    .pv-split .btn { margin-top: 0; }
+    .pv-split .go { flex: 1; border-radius: var(--radius-control) 0 0 var(--radius-control); }
+    .pv-split .splitcopy { flex: none; padding: 0 18px; font-size: 13px; font-weight: 600;
+      border-radius: 0 var(--radius-control) var(--radius-control) 0; }
 
     /* the two raw lines share one syntax dress; explicit Copy, no magic */
     .rawline { display: block; margin-top: 14px; padding-top: 11px;
@@ -227,15 +241,13 @@
       <code>,support@example.com</code> wearing its true comma — with the same grey native
       checkbox as every removable row. The old reason recipients could not be rows was the
       empty key column, and costume C abolished columns. Two special rules keep it honest:
-      <b>the floor of one address, anywhere</b> — RFC 6068 allows a to-less mailto
-      (cc-only opens fine), so recipients and <code>cc</code> share one floor: when a single
-      address remains checked, whichever field it lives in, its box flips to
-      checked-and-disabled, the browser's own voice for "not yours to change" (re-tick
-      another and it unlocks);
-      and <b>a single-address mailto shows no recipient slice at all</b> — one address is
-      the link's identity, core like the https host, not an option. The headline stays the
-      untouched record; the strikethrough, the button count, and "After your edits" carry the
-      editing. Try it live below.</li>
+      <b>no floor at all — the Draft rule</b>: RFC 6068 allows a to-less, cc-only, even
+      address-less mailto (a bare compose opens), so every address is a removable slice
+      and nothing ever locks; empty the list entirely and the button offers
+      <b>"Draft a Message"</b> — the rebuilt link still opens a compose, with whatever
+      subject or body survives. The headline stays the untouched record; the
+      strikethrough, the button count, and "After your edits" carry the editing. Try it
+      live below.</li>
     <li><b>Parts unfold themselves when a warning fired.</b> Reading rounds 16 and 20–22
       together: the fold stays the offer on a clean everyday link (closed, one quiet line),
       but a URL that earned a warn chip arrives with its slices already laid flat — a warning
@@ -243,11 +255,13 @@
       confirmation.</li>
     <li><b>Checkboxes reach every keyed tail, one rule.</b> What is removable is what the
       link survives losing: query params, path params, fragments, userinfo, mailto/sms
-      extras, magnet <code>dn</code>/<code>tr</code>. What identifies the resource is fixed
-      — host, port, path, magnet <code>xt</code>, the last recipient — checked and disabled,
+      extras and addresses, magnet <code>dn</code>/<code>tr</code>. What identifies the
+      resource is fixed — host, port, path, magnet <code>xt</code> — checked and disabled,
       same geometry. Removal only, ever: a subset of an allowlisted URL stays allowlisted.</li>
   </ul>
-  Everything else is the settled record: blue = you stay, amber = you leave; the accent wash
+  Everything else is the settled record: blue = you stay, amber = you leave — and since
+  round 26 every action button is a split, amber-or-blue action plus a blue Copy segment
+  that copies exactly what the button would open, edits included; the accent wash
   exactly once per page on the registrable domain; bold = a registrable domain (and key
   signposts); warnings are bare red icon + words, facts keep the pill; describe the scheme,
   never predict the outcome; one hedge line, once; "Exactly as stored" never collapses and
@@ -274,7 +288,7 @@
       </span>
       <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">blog.</span><span class="reg">example.com</span><span class="pn">/</span><span class="seg">articles</span><span class="pn">/</span><span class="seg">2026</span><span class="pn">/</span><span class="seg">preview-design</span><span class="pn">?</span><span class="seg">ref</span><span class="pn">=</span><span class="qv">newsletter</span></code>
       <details class="pv-parts">
-        <summary class="pv-parts-lid"><span class="chev">▸</span><span class="when-closed">Show the parts</span><span class="when-open">Hide the parts</span></summary>
+        <summary class="pv-parts-lid"><span class="when-closed">Show the parts</span><span class="when-open">Hide the parts</span></summary>
         <div class="pv-slices" id="s-blog">
           <div class="pv-slice" data-id="path">
             <input type="checkbox" checked disabled aria-label="Path, fixed">
@@ -288,7 +302,10 @@
       </details>
       <code class="rawline edited" id="edited-blog"><span class="lbl">After your edits
         <button class="copybtn" data-copy="edited" data-card="blog">Copy</button></span><span class="str"></span></code>
-      <a class="btn btn--go btn-block pv-btn btn-link pv-open" href="#" id="go-blog">Continue to example.com</a>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go pv-btn btn-link go" href="#" id="go-blog" style="margin-top:0">Continue to example.com</a>
+        <button class="btn splitcopy" data-card="blog" aria-label="Copy the destination address">Copy</button>
+      </div>
       <p class="pv-meta">Expires in 6 days</p>
       <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
         else later. <strong>Always check the destination.</strong></span>
@@ -366,7 +383,10 @@
         <button class="copybtn" data-copy="stored" data-card="https">Copy</button></span><span class="str"><span class="sch">https://</span><span class="usr">alice@</span>login.<span class="reg">example.co.uk</span><span class="dl">:</span>8443<span class="dl">/</span>reset<span class="dl">;</span><span class="k">sid</span><span class="dl">=</span>9f2c<span class="dl">?</span><span class="k">next</span><span class="dl">=</span>https<span class="pct">%3A%2F%2F</span>example-mail.com<span class="pct">%2F</span><span class="dl">&amp;</span><span class="k">q</span><span class="dl">=</span>hello<span class="pct">%20</span>world<span class="dl">#</span>step-2</span></code>
       <code class="rawline edited" id="edited-https"><span class="lbl">After your edits
         <button class="copybtn" data-copy="edited" data-card="https">Copy</button></span><span class="str"></span></code>
-      <a class="btn btn--go btn-block pv-btn btn-link pv-open" href="#" id="go-https">Continue to example.co.uk</a>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go pv-btn btn-link go" href="#" id="go-https" style="margin-top:0">Continue to example.co.uk</a>
+        <button class="btn splitcopy" data-card="https" aria-label="Copy the destination address">Copy</button>
+      </div>
       <p class="pv-meta">Expires in 6 days</p>
       <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
         else later. <strong>Always check the destination.</strong></span>
@@ -402,7 +422,10 @@
             <rect x="3.1" y="7.2" width="9.8" height="6.4" rx="1.8" stroke="currentColor" stroke-width="1.5"/></svg>
           Not Encrypted</span>
       </div>
-      <a class="btn btn--go btn-block pv-btn btn-link pv-open" href="#">Continue to example.com</a>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go pv-btn btn-link go" href="#" style="margin-top:0">Continue to example.com</a>
+        <button class="btn splitcopy" data-static="http://example.com/pay" aria-label="Copy the destination address">Copy</button>
+      </div>
       <p class="pv-meta">Expires in 6 days</p>
       <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
         else later. <strong>Always check the destination.</strong></span>
@@ -431,7 +454,7 @@
           <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
-      <span class="pv-blind">The destination is hidden until revealed.</span>
+      <span class="pv-blind">The destination is shown when revealed.</span>
       <button class="btn btn-block pv-btn pv-open">Reveal Destination</button>
       <div class="pv-badge-wrap"><span class="pv-badge once">Opens Once</span></div>
       <p class="pv-meta">Expires in 6 days</p>
@@ -441,7 +464,9 @@
     <p class="note"><b>Blue = you stay on YuioLink, and nothing shows before the use is
       spent</b> — you called the domain preview leakage, and it is: it let anyone holding
       the link learn where it points without burning the use, invisibly, when the burn is
-      the whole tamper-evidence of a one-timer. So the card is blind. Reveal is a POST — it
+      the whole tamper-evidence of a one-timer. So the card is blind, and the line says
+      what will happen, not that something is being withheld — the server genuinely has
+      not disclosed anything yet. Reveal is a POST — it
       spends the one use, mints the one-hop cookie, and the next page is the full preview
       (scheme tiers, chips, slices, everything above) with the amber Continue waiting; you
       spend the use to <em>look</em>, never to be thrown somewhere. "Opens Once" sits below
@@ -469,6 +494,10 @@
       <span class="pv-scheme">mailto<span class="colon">:</span></span>
       <span class="pv-value"><span class="lp">ella.storli</span><span class="dl">@</span><span class="reg">gmail.com</span></span>
       <div class="pv-slices" id="s-mailto1">
+        <div class="pv-slice" data-id="addr" data-addr="ella.storli@gmail.com">
+          <input type="checkbox" checked aria-label="Keep ella.storli@gmail.com">
+          <span class="txt"><span class="lp">ella.storli</span><span class="dl">@</span><span class="reg">gmail.com</span></span>
+        </div>
         <div class="pv-slice" data-id="subject">
           <input type="checkbox" checked aria-label="Keep subject">
           <span class="txt"><span class="dl">?</span><span class="k">subject</span><span class="dl">=</span>Order<span class="dsp"> </span>4192</span>
@@ -484,15 +513,20 @@
         <button class="copybtn" data-copy="stored" data-card="mailto1">Copy</button></span><span class="str"><span class="sch">mailto:</span>ella.storli<span class="dl">@</span><span class="reg">gmail.com</span><span class="dl">?</span><span class="k">subject</span><span class="dl">=</span>Order<span class="pct">%20</span>4192<span class="dl">&amp;</span><span class="k">body</span><span class="dl">=</span>call me</span></code>
       <code class="rawline edited" id="edited-mailto1"><span class="lbl">After your edits
         <button class="copybtn" data-copy="edited" data-card="mailto1">Copy</button></span><span class="str"></span></code>
-      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#" id="go-mailto1">
-        <span class="lead">Write to ella.storli@gmail.com</span>
-        <span class="what">An email address</span></a>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go btn-2 btn-link go" href="#" id="go-mailto1" style="margin-top:0">
+          <span class="lead">Write to ella.storli@gmail.com</span>
+          <span class="what">An email address</span></a>
+        <button class="btn splitcopy" data-card="mailto1" aria-label="Copy the address">Copy</button>
+      </div>
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
-    <p class="note"><b>One recipient, no recipient slice</b> — the address is the link's
-      identity, core like a host, so only <code>?subject</code> and <code>&amp;body</code>
-      are offered. The local part reads at full colour but regular weight — bold stays the
+    <p class="note"><b>Even the sole address is a slice now — the Draft rule, applied
+      consistently.</b> The old "core like a host" exception is gone: an address is
+      content, not routing, and RFC 6068 is happy without one. Untick it and the button
+      turns into "Draft a Message" over a legal <code>mailto:?subject=…</code>.
+      The local part reads at full colour but regular weight — bold stays the
       domain's mark (on freemail the local part <i>is</i>
       the identity); the wash stays on the domain. Two space stories on one card: the
       subject's dotted space was stored as <code>%20</code>; the body's bare space is a real
@@ -539,9 +573,12 @@
         <button class="copybtn" data-copy="stored" data-card="mailto">Copy</button></span><span class="str"><span class="sch">mailto:</span>sales<span class="dl">@</span><span class="reg">example.com</span><span class="dl">,</span>support<span class="dl">@</span><span class="reg">example.com</span><span class="dl">?</span><span class="k">cc</span><span class="dl">=</span>archive<span class="dl">@</span><span class="reg">records.example</span><span class="dl">&amp;</span><span class="k">subject</span><span class="dl">=</span>Order<span class="pct">%20</span>4192</span></code>
       <code class="rawline edited" id="edited-mailto"><span class="lbl">After your edits
         <button class="copybtn" data-copy="edited" data-card="mailto">Copy</button></span><span class="str"></span></code>
-      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#" id="go-mailto">
-        <span class="lead">Write to 3 addresses</span>
-        <span class="what">Email addresses</span></a>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go btn-2 btn-link go" href="#" id="go-mailto" style="margin-top:0">
+          <span class="lead">Write to 3 addresses</span>
+          <span class="what">Email addresses</span></a>
+        <button class="btn splitcopy" data-card="mailto" aria-label="Copy the addresses">Copy</button>
+      </div>
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
@@ -551,12 +588,12 @@
       slices). Untick <code>sales@</code> and three things follow: the button re-counts
       ("Write to 2 addresses"), "After your edits" opens with
       <code>mailto:support@example.com?…</code> — comma promoted away — and the strikethrough
-      lands on the slice, never the record. <b>The floor is one address, anywhere</b>: RFC
-      6068 allows a to-less mailto, and <code>mailto:?cc=…</code> opens fine, so you can
-      untick <em>both</em> recipients as long as <code>cc</code> holds — the rebuilt string
-      is legally to-less — and only the last address standing locks itself (checked and
-      disabled, the port/path voice), whichever field it lives in. The button always names
-      the survivor: "Write to archive@records.example".</p>
+      lands on the slice, never the record. <b>And no floor at all — your catch, twice
+      over</b>: RFC 6068 allows a to-less mailto (<code>mailto:?cc=…</code> opens fine)
+      and even an address-less one, so nothing ever locks. One address left, the button
+      names it ("Write to archive@records.example"); none left, it becomes
+      <b>"Draft a Message"</b> — the rebuilt <code>mailto:?subject=…</code> still opens a
+      compose, with the subject waiting and the To line yours to fill.</p>
   </div>
 </div>
 
@@ -575,7 +612,7 @@
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       <span class="pv-scheme">tel<span class="colon">:</span></span>
-      <span class="pv-value"><span class="grp">+47</span><span class="grp">820</span><span class="grp">12</span><span class="grp">345</span><span class="ext">ext. 4021</span></span>
+      <span class="pv-value">+47 820 12 345<span class="ext">ext. 4021</span></span>
       <div class="pv-facts">
         <span class="pv-fact"><span class="flag">🇳🇴</span> Norway</span>
         <span class="pv-fact warn">
@@ -588,8 +625,11 @@
       <span class="pv-note">The extension, 4021, is dialled after the call connects.</span>
       <code class="rawline"><span class="lbl">Exactly as stored
         <button class="copybtn" data-copy="stored" data-card="tel">Copy</button></span><span class="str" id="stored-tel-str"><span class="sch">tel:</span>+47-820-12-345<span class="dl">;</span><span class="k">ext</span><span class="dl">=</span>4021</span></code>
-      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
-        <span class="lead">Call +47 820 12 345</span><span class="what">A phone number</span></a>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go btn-2 btn-link go" href="#" style="margin-top:0">
+          <span class="lead">Call +47 820 12 345</span><span class="what">A phone number</span></a>
+        <button class="btn splitcopy" data-static="tel:+47-820-12-345;ext=4021" aria-label="Copy the number">Copy</button>
+      </div>
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
@@ -617,7 +657,7 @@
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       <span class="pv-scheme">sms<span class="colon">:</span></span>
-      <span class="pv-value"><span class="grp">+47</span><span class="grp">991</span><span class="grp">23</span><span class="grp">456</span></span>
+      <span class="pv-value">+47 991 23 456</span>
       <div class="pv-facts">
         <span class="pv-fact"><span class="flag">🇳🇴</span> Norway</span>
         <span class="pv-fact">Mobile</span>
@@ -634,9 +674,12 @@
         <button class="copybtn" data-copy="stored" data-card="sms">Copy</button></span><span class="str"><span class="sch">sms:</span>+4799123456<span class="dl">?</span><span class="k">body</span><span class="dl">=</span>JOIN<span class="pct">%20</span>LIST</span></code>
       <code class="rawline edited" id="edited-sms"><span class="lbl">After your edits
         <button class="copybtn" data-copy="edited" data-card="sms">Copy</button></span><span class="str"></span></code>
-      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#" id="go-sms">
-        <span class="lead">Message +47 991 23 456</span>
-        <span class="what">A phone number, for a message</span></a>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go btn-2 btn-link go" href="#" id="go-sms" style="margin-top:0">
+          <span class="lead">Message +47 991 23 456</span>
+          <span class="what">A phone number, for a message</span></a>
+        <button class="btn splitcopy" data-card="sms" aria-label="Copy the number">Copy</button>
+      </div>
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
@@ -690,9 +733,12 @@
         <button class="copybtn" data-copy="stored" data-card="magnet">Copy</button></span><span class="str"><span class="sch">magnet:</span><span class="dl">?</span><span class="k">xt</span><span class="dl">=</span>urn:btih:c12fe3a94b81d7e05f2c6a9048bb3e1d7f4a2c60<span class="dl">&amp;</span><span class="k">dn</span><span class="dl">=</span>ubuntu-24.04-desktop-amd64.iso<span class="dl">&amp;</span><span class="k">tr</span><span class="dl">=</span>udp<span class="pct">%3A%2F%2F</span>tracker.example.org<span class="pct">%3A</span>6969<span class="dl">&amp;</span><span class="k">tr</span><span class="dl">=</span>udp<span class="pct">%3A%2F%2F</span>tracker.example.net<span class="pct">%3A</span>1337</span></code>
       <code class="rawline edited" id="edited-magnet"><span class="lbl">After your edits
         <button class="copybtn" data-copy="edited" data-card="magnet">Copy</button></span><span class="str"></span></code>
-      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#" id="go-magnet">
-        <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">magnet:</span></span>
-        <span class="what">A file identified by its hash</span></a>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go btn-2 btn-link go" href="#" id="go-magnet" style="margin-top:0">
+          <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">magnet:</span></span>
+          <span class="what">A file identified by its hash</span></a>
+        <button class="btn splitcopy" data-card="magnet" aria-label="Copy the link">Copy</button>
+      </div>
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
@@ -718,9 +764,12 @@
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       <code class="pv-line"><span class="sch-big">spotify<span class="colon">:</span></span><wbr><span class="seg">track</span><span class="dl">:</span><wbr>6rqhFgbbKwnb9MLmUQDhG6</code>
-      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
-        <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">spotify:</span></span>
-        <span class="what">A track in Spotify's catalogue</span></a>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go btn-2 btn-link go" href="#" style="margin-top:0">
+          <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">spotify:</span></span>
+          <span class="what">A track in Spotify's catalogue</span></a>
+        <button class="btn splitcopy" data-static="spotify:track:6rqhFgbbKwnb9MLmUQDhG6" aria-label="Copy the link">Copy</button>
+      </div>
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
@@ -760,9 +809,12 @@
         <button class="copybtn" data-copy="stored" data-card="xmpp">Copy</button></span><span class="str"><span class="sch">xmpp:</span>lobby<span class="dl">@</span>rooms.<span class="reg">example.org</span><span class="dl">?</span><span class="k">join</span></span></code>
       <code class="rawline edited" id="edited-xmpp"><span class="lbl">After your edits
         <button class="copybtn" data-copy="edited" data-card="xmpp">Copy</button></span><span class="str"></span></code>
-      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#" id="go-xmpp">
-        <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">xmpp:</span></span>
-        <span class="what">A chat room on XMPP</span></a>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go btn-2 btn-link go" href="#" id="go-xmpp" style="margin-top:0">
+          <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">xmpp:</span></span>
+          <span class="what">A chat room on XMPP</span></a>
+        <button class="btn splitcopy" data-card="xmpp" aria-label="Copy the address">Copy</button>
+      </div>
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
@@ -788,9 +840,12 @@
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       <code class="pv-line"><span class="sch-big">matrix<span class="colon">:</span></span><wbr><span class="seg">r</span><span class="dl">/</span><wbr>keebs<span class="dl">:</span><span class="reg">example.org</span></code>
-      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
-        <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">matrix:</span></span>
-        <span class="what">A room on Matrix</span></a>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go btn-2 btn-link go" href="#" style="margin-top:0">
+          <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">matrix:</span></span>
+          <span class="what">A room on Matrix</span></a>
+        <button class="btn splitcopy" data-static="matrix:r/keebs:example.org" aria-label="Copy the link">Copy</button>
+      </div>
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
@@ -819,9 +874,12 @@
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       <code class="pv-line"><span class="sch-big">ircs<span class="colon">:</span></span><span class="dl">//</span><wbr><span class="reg">libera.chat</span><span class="dl">/</span><wbr><span class="seg">yuiolink</span></code>
-      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
-        <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">ircs:</span></span>
-        <span class="what">An IRC server or channel</span></a>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go btn-2 btn-link go" href="#" style="margin-top:0">
+          <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">ircs:</span></span>
+          <span class="what">An IRC server or channel</span></a>
+        <button class="btn splitcopy" data-static="ircs://libera.chat/yuiolink" aria-label="Copy the link">Copy</button>
+      </div>
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
@@ -847,9 +905,12 @@
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       <code class="pv-line"><span class="sch-big">ftp<span class="colon">:</span></span><span class="dl">//</span><wbr><span class="seg">files.</span><span class="reg">example.org</span><span class="dl">/</span><wbr><span class="seg">pub</span><span class="dl">/</span><span class="seg">notes.txt</span></code>
-      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
-        <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">ftp:</span></span>
-        <span class="what">An address on a file server</span></a>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go btn-2 btn-link go" href="#" style="margin-top:0">
+          <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">ftp:</span></span>
+          <span class="what">An address on a file server</span></a>
+        <button class="btn splitcopy" data-static="ftp://files.example.org/pub/notes.txt" aria-label="Copy the link">Copy</button>
+      </div>
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
@@ -937,11 +998,11 @@
       ]
     },
     mailto1: {
-      prefix: { raw: 'mailto:ella.storli@gmail.com',
-        html: '<span class="sch">mailto:</span>ella.storli<span class="dl">@</span>' +
-          '<span class="reg">gmail.com</span>' },
+      prefix: { raw: 'mailto:', html: '<span class="sch">mailto:</span>' },
       host: { raw: '', html: '' },
       parts: [
+        { id: 'addr', kind: 'to', raw: 'ella.storli@gmail.com',
+          html: 'ella.storli<span class="dl">@</span><span class="reg">gmail.com</span>' },
         { id: 'subject', kind: 'query', raw: 'subject=Order%204192',
           html: '<span class="k">subject</span><span class="dl">=</span>Order<span class="pct">%20</span>4192' },
         { id: 'body', kind: 'query', raw: 'body=call me',
@@ -1027,26 +1088,33 @@
   }
 
   /* per-card follow-the-edits behaviour beyond the raw line */
+  /* the Draft rule: no floor at all. RFC 6068 allows a to-less, cc-only,
+     even address-less mailto — a bare compose opens. So every address is
+     removable, and with none left the button offers a draft. */
+  function mailAddressLabel(keptRows, go) {
+    var lead = go.querySelector('.lead'), what = go.querySelector('.what');
+    if (keptRows.length === 0) {
+      lead.textContent = 'Draft a Message';
+      what.textContent = 'An email with no recipient';
+    } else if (keptRows.length === 1) {
+      lead.textContent = 'Write to ' + keptRows[0].row.getAttribute('data-addr');
+      what.textContent = 'An email address';
+    } else {
+      lead.textContent = 'Write to ' + keptRows.length + ' addresses';
+      what.textContent = 'Email addresses';
+    }
+  }
+
   var HOOKS = {
     mailto: function (isOn, go, boxes) {
-      /* the floor of one ADDRESS, anywhere: RFC 6068 allows a to-less
-         mailto (cc-only is legal and opens fine), so recipients and cc
-         share one floor — when a single address remains checked, its box
-         locks itself, whichever field it lives in. Re-tick another and
-         it unlocks. */
-      var addrs = ['to1', 'to2', 'cc'].map(function (k) { return boxes[k]; });
-      var kept = addrs.filter(function (b) { return b.cb.checked; });
-      addrs.forEach(function (b) { b.cb.disabled = false; });
-      if (kept.length === 1) kept[0].cb.disabled = true;
-      addrs.forEach(function (b) { b.row.classList.toggle('locked', b.cb.disabled); });
-      var lead = go.querySelector('.lead'), what = go.querySelector('.what');
-      if (kept.length === 1) {
-        lead.textContent = 'Write to ' + kept[0].row.getAttribute('data-addr');
-        what.textContent = 'An email address';
-      } else {
-        lead.textContent = 'Write to ' + kept.length + ' addresses';
-        what.textContent = 'Email addresses';
-      }
+      var kept = ['to1', 'to2', 'cc'].map(function (k) { return boxes[k]; })
+        .filter(function (b) { return b.cb.checked; });
+      mailAddressLabel(kept, go);
+    },
+    mailto1: function (isOn, go, boxes) {
+      var kept = ['addr'].map(function (k) { return boxes[k]; })
+        .filter(function (b) { return b.cb.checked; });
+      mailAddressLabel(kept, go);
     },
     xmpp: function (isOn, go) {
       go.querySelector('.what').textContent = isOn({ id: 'join' })
@@ -1119,6 +1187,13 @@
           copyText(text, btn);
         });
       });
+    /* the split's Copy segment: copies what the button would open */
+    document.querySelectorAll('.splitcopy[data-card="' + name + '"]')
+      .forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          copyText(refresh(), btn);
+        });
+      });
   }
 
   /* static cards with a Copy button but no slices */
@@ -1128,6 +1203,13 @@
       .forEach(function (btn) {
         btn.addEventListener('click', function () { copyText(STATIC[name], btn); });
       });
+  });
+
+  /* split Copy segments and pills with a fixed string */
+  document.querySelectorAll('[data-static]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      copyText(btn.getAttribute('data-static'), btn);
+    });
   });
 
   function copyText(text, btn) {
