@@ -1,0 +1,11 @@
+-- Rename `hits` to `uses`, the name that says what the column is for.
+--
+-- The column never counted views: the only thing that reads it is the live
+-- predicate `max_uses IS NULL OR uses < max_uses`, which gates a one-time link's
+-- single use. Calling it `hits` invited the reading that YuioLink tallies who
+-- opened what, which it does not -- the aggregate `stats` table (0005) is the
+-- whole of the counting, and it is day-granular and per-metric, never per link.
+--
+-- Pre-1.0, so this is a straight rename with no compatibility shim: the API
+-- field moves with it, and there is no stored client contract to keep.
+ALTER TABLE links RENAME COLUMN hits TO uses;

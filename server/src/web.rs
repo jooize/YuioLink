@@ -481,23 +481,25 @@ pub async fn resolve(
 
     match (d.kind.as_str(), d.max_uses.is_some()) {
         // Unlimited Text has no external destination to vet — open it straight
-        // away. This counts a hit (there is no use limit to gate).
+        // away. Nothing is spent: `uses` only gates a one-time link, and there
+        // is no per-link view counter to bump. The aggregate tally still records
+        // that a link resolved.
         ("text", false) => {
-            if let Err(e) = db::consume_link(&state.pool, &name).await {
-                return AppError::internal(e).into_response();
-            }
+            db::bump(&state.pool, db::Stat::Opened).await;
             let base_host = views::host_from_base(&state.base_url);
             Html(views::text_view_page(base_host, &d.name, &d.content).into_string())
                 .into_response()
         }
         // Redirects always preview; limited Text shows only that it exists.
-        ("redirect", _) | ("text", true) => interstitial_response(&state, &d),
+        ("redirect", _) | ("text", true) => interstitial_response(&state, &d).await,
         _ => AppError::NotFound.into_response(),
     }
 }
 
-/// Render the interstitial for a live link without consuming it.
-fn interstitial_response(state: &AppState, d: &LinkDetail) -> Response {
+/// Render the interstitial for a live link without consuming it. The render is
+/// tallied anonymously (`Stat::Previewed`) — day-granular and per-metric, which
+/// is where the retired per-link counter's job now lives.
+async fn interstitial_response(state: &AppState, d: &LinkDetail) -> Response {
     let base_host = views::host_from_base(&state.base_url);
     let short_url = format!("{}{}", state.base_url, d.name);
     let markup = if d.kind == "redirect" {
@@ -520,6 +522,7 @@ fn interstitial_response(state: &AppState, d: &LinkDetail) -> Response {
             target: Target::TextSnippet,
         })
     };
+    db::bump(&state.pool, db::Stat::Previewed).await;
     Html(markup.into_string()).into_response()
 }
 
@@ -577,6 +580,7 @@ pub async fn reveal(State(state): State<AppState>, Path(name): Path<String>) -> 
     }
     match db::consume_link(&state.pool, &name).await {
         Ok(Some(d)) => {
+            db::bump(&state.pool, db::Stat::Revealed).await;
             let t = token::mint(&state.secret, &d.name, now_unix() + token::TTL_SECS);
             // Carry the reveal capability in a short-lived, path-scoped cookie rather
             // than the URL, so the revealed page has a clean address and the token
@@ -981,7 +985,9 @@ pub struct ApiLink {
     /// `max_uses` — which is exactly why it is absent for limited links.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
-    pub hits: i64,
+    /// Uses spent. Only ever 0 or 1: it exists to gate a one-time link, not to
+    /// count views -- no per-link view counter exists anywhere in YuioLink.
+    pub uses: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_uses: Option<i64>,
     pub created_at: String,
@@ -1196,7 +1202,7 @@ pub async fn api_get_link(
         kind: d.kind,
         target,
         content,
-        hits: d.hits,
+        uses: d.uses,
         max_uses: d.max_uses,
         created_at: d.created_at,
         expires_at: d.expires_at,
@@ -1396,12 +1402,12 @@ mod tests {
             .unwrap()
     }
 
-    async fn hits(state: &AppState, name: &str) -> i64 {
+    async fn uses(state: &AppState, name: &str) -> i64 {
         db::get_link_any(&state.pool, name)
             .await
             .unwrap()
             .unwrap()
-            .hits
+            .uses
     }
 
     #[tokio::test]
@@ -1423,13 +1429,13 @@ mod tests {
             body.contains("Continue to example.com"),
             "interstitial body: {body}"
         );
-        assert_eq!(hits(&st, &l.name).await, 0);
+        assert_eq!(uses(&st, &l.name).await, 0);
 
         // POST /go consumes: 303 straight to the destination, hit counted.
         let (s, h, _) = send(&st, post(&format!("/{}/go", l.name))).await;
         assert_eq!(s, StatusCode::SEE_OTHER);
         assert_eq!(h.get("location").unwrap(), "https://example.com/x");
-        assert_eq!(hits(&st, &l.name).await, 1);
+        assert_eq!(uses(&st, &l.name).await, 1);
     }
 
     #[tokio::test]
@@ -1451,7 +1457,7 @@ mod tests {
             !body.contains("zzz-gated-path"),
             "path must be gated: {body}"
         );
-        assert_eq!(hits(&st, &l.name).await, 0);
+        assert_eq!(uses(&st, &l.name).await, 0);
 
         // POST /reveal consumes once and 303s to the clean /:name URL, with the
         // capability token in a Set-Cookie header (not the URL).
@@ -1462,7 +1468,7 @@ mod tests {
         let set_cookie = h.get("set-cookie").unwrap().to_str().unwrap();
         assert!(set_cookie.starts_with("yl_reveal="));
         let cookie = set_cookie.split(';').next().unwrap().to_string();
-        assert_eq!(hits(&st, &l.name).await, 1);
+        assert_eq!(uses(&st, &l.name).await, 1);
 
         // The revealed GET (carrying the cookie) shows the full URL and, in doing
         // so, deletes it from the server: it does NOT count a second hit, but a
@@ -1477,12 +1483,12 @@ mod tests {
         let (s, _, body) = send(&st, revealed_get(&cookie)).await;
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("zzz-gated-path"), "revealed body: {body}");
-        assert_eq!(hits(&st, &l.name).await, 1);
+        assert_eq!(uses(&st, &l.name).await, 1);
 
         let (s, _, body) = send(&st, revealed_get(&cookie)).await;
         assert_eq!(s, StatusCode::GONE, "second render with the same cookie");
         assert!(!body.contains("zzz-gated-path"));
-        assert_eq!(hits(&st, &l.name).await, 1);
+        assert_eq!(uses(&st, &l.name).await, 1);
 
         // Without the cookie the link is spent: 410 Gone, content not shown.
         let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
@@ -1514,11 +1520,11 @@ mod tests {
             !body.contains("zzz-gated"),
             "forged cookie must not reveal: {body}"
         );
-        assert_eq!(hits(&st, &l.name).await, 0);
+        assert_eq!(uses(&st, &l.name).await, 0);
     }
 
     #[tokio::test]
-    async fn unlimited_text_opens_immediately_and_counts_hit() {
+    async fn unlimited_text_opens_immediately_and_spends_nothing() {
         let st = test_state().await;
         let l = db::insert_link(
             &st.pool,
@@ -1538,7 +1544,11 @@ mod tests {
         let (s, _, body) = send(&st, get(&format!("/{}", l.name))).await;
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("hello plaintext"));
-        assert_eq!(hits(&st, &l.name).await, 1);
+        // `uses` gates a one-time link and nothing else, so rendering an
+        // unlimited Text link leaves it at zero however often it is read.
+        assert_eq!(uses(&st, &l.name).await, 0);
+        send(&st, get(&format!("/{}", l.name))).await;
+        assert_eq!(uses(&st, &l.name).await, 0);
     }
 
     #[tokio::test]
@@ -1556,7 +1566,7 @@ mod tests {
         let (s, _, body) = send(&st, get(&format!("/{}+", l.name))).await;
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("Continue to example.com"));
-        assert_eq!(hits(&st, &l.name).await, 0);
+        assert_eq!(uses(&st, &l.name).await, 0);
 
         // Typing a different case resolves (NOCASE) and the preview shows the
         // canonical stored name, not what was typed.
@@ -1757,6 +1767,10 @@ mod tests {
         assert_eq!(get_total("created_public"), 1);
         assert_eq!(get_total("created_redirect"), 1);
         assert_eq!(get_total("opened"), 1, "preview must not have counted");
+        // The preview render has its own metric — the only place a preview is
+        // ever counted, since no per-link counter exists.
+        assert_eq!(get_total("previewed"), 1);
+        assert_eq!(get_total("revealed"), 0, "nothing was revealed here");
 
         // The table holds counts and nothing else — no column could carry a name,
         // a destination, or a visitor.
@@ -1861,7 +1875,7 @@ mod tests {
             body.contains(r#""max_uses":1"#),
             "metadata still served: {body}"
         );
-        assert_eq!(hits(&st, &l.name).await, 0);
+        assert_eq!(uses(&st, &l.name).await, 0);
 
         // An unlimited link still returns its target (the REST "expand").
         let u = db::insert_link(
@@ -1993,7 +2007,7 @@ mod tests {
         .await
         .unwrap();
 
-        // A crawler hitting the interstitial and the card never bumps hits.
+        // A crawler hitting the interstitial and the card never spends a use.
         send(&st, get(&format!("/{}", l.name))).await;
         let resp = router(st.clone())
             .oneshot(get(&format!("/{}/card.png", l.name)))
@@ -2003,7 +2017,7 @@ mod tests {
         assert_eq!(resp.headers().get("content-type").unwrap(), "image/png");
         let png = resp.into_body().collect().await.unwrap().to_bytes();
         assert_eq!(&png[1..4], b"PNG");
-        assert_eq!(hits(&st, &l.name).await, 0);
+        assert_eq!(uses(&st, &l.name).await, 0);
 
         // Text links have no card.
         let t = db::insert_link(

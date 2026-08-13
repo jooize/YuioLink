@@ -7,7 +7,7 @@ info:
   # OpenAPI Specification version or the API implementation version)", so it is
   # not kept in lockstep with the crate version -- bump it when this file
   # changes, and leave it alone across releases that do not touch it.
-  version: "0.8.0"
+  version: "0.9.0"
   summary: Wieldy Ephemeral Links
   description: |
     Redirects and text snippets that always expire — never permanent.
@@ -304,7 +304,7 @@ components:
 
     Link:
       type: object
-      required: [name, kind, url, hits, created_at, expires_at]
+      required: [name, kind, url, uses, created_at, expires_at]
       properties:
         name:
           type: string
@@ -324,8 +324,11 @@ components:
         content:
           type: string
           description: The body, for unlimited Text links. Absent when limited.
-        hits:
+        uses:
           type: integer
+          description: >-
+            Uses spent -- only ever 0 or 1. It gates a one-time link and is not
+            a view counter; YuioLink keeps no per-link view count.
         max_uses:
           type: [integer, "null"]
         created_at:

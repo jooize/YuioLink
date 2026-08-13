@@ -1480,6 +1480,15 @@ pub fn stats_page(s: &StatsView) -> Markup {
             li { span { "Text" } span.stats-n { (total("created_text")) } }
         }
 
+        // The preview page's own tallies. They live here, and only here: the
+        // per-link counter that used to sit on the row is gone, so this is the
+        // whole of what is known about how often a preview is seen.
+        h3.stats-h { "Previews" }
+        ul.stats-list {
+            li { span { "Previews shown" } span.stats-n { (total("previewed")) } }
+            li { span { "Destinations revealed" } span.stats-n { (total("revealed")) } }
+        }
+
         h3.stats-h { "Last 7 days" }
         @if s.days.is_empty() {
             p { "Nothing counted yet." }

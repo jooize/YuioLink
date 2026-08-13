@@ -16,7 +16,7 @@ pub struct LinkDetail {
     // nothing reads this yet.
     #[allow(dead_code)]
     pub content_type: Option<String>,
-    pub hits: i64,
+    pub uses: i64,
     pub created_at: String,
     pub expires_at: String,
     pub max_uses: Option<i64>,
@@ -24,12 +24,12 @@ pub struct LinkDetail {
 
 /// Columns selected for a [`LinkDetail`], in struct order.
 const LINK_COLUMNS: &str =
-    "name, kind, content, content_type, hits, created_at, expires_at, max_uses";
+    "name, kind, content, content_type, uses, created_at, expires_at, max_uses";
 
 /// A link still resolvable: not past `expires_at`, not over `max_uses`, and not
 /// withdrawn by its creator.
 const LIVE_PREDICATE: &str =
-    "expires_at > datetime('now') AND (max_uses IS NULL OR hits < max_uses) AND withdrawn = 0";
+    "expires_at > datetime('now') AND (max_uses IS NULL OR uses < max_uses) AND withdrawn = 0";
 
 /// Fields needed to create a link; the name and `expires_at` are derived here.
 pub struct NewLink<'a> {
@@ -138,7 +138,7 @@ pub async fn reveal_and_redact(
     Ok(row)
 }
 
-/// Atomically count a hit and return the link, but only while it is still live.
+/// Atomically spend a use and return the link, but only while it is still live.
 /// One UPDATE … RETURNING does the not-expired / uses-left check and the
 /// increment together, so a burn-after-read link cannot be resolved twice even
 /// under concurrent requests. Returns `None` when expired or exhausted.
@@ -147,7 +147,7 @@ pub async fn consume_link(
     name: &str,
 ) -> Result<Option<LinkDetail>, sqlx::Error> {
     let sql = format!(
-        "UPDATE links SET hits = hits + 1 WHERE name = ? AND {LIVE_PREDICATE} RETURNING {LINK_COLUMNS}"
+        "UPDATE links SET uses = uses + 1 WHERE name = ? AND {LIVE_PREDICATE} RETURNING {LINK_COLUMNS}"
     );
     let row = sqlx::query_as::<_, LinkDetail>(&sql)
         .bind(name)
@@ -299,6 +299,15 @@ pub enum Stat {
     CreatedText,
     /// A link actually resolved (a use spent), not a preview or a card fetch.
     Opened,
+    /// An interstitial was rendered for a live link (`GET /:name`). This is
+    /// where the old per-link `hits` counting went: it answers "how much is the
+    /// preview page seen" without a per-link column, so there is no dedup
+    /// question to answer and nothing about one link to leak.
+    Previewed,
+    /// A one-time link's use was spent to look at it (`POST /:name/reveal`).
+    /// Counted next to `Previewed` so the pair reads as a funnel; `Opened`
+    /// still counts the same event as the use it spent.
+    Revealed,
     /// Reaped by the sweeper after its lifetime ran out.
     Expired,
 }
@@ -313,6 +322,8 @@ impl Stat {
             Stat::CreatedRedirect => "created_redirect",
             Stat::CreatedText => "created_text",
             Stat::Opened => "opened",
+            Stat::Previewed => "previewed",
+            Stat::Revealed => "revealed",
             Stat::Expired => "expired",
         }
     }
@@ -423,10 +434,10 @@ mod tests {
         )
         .await
         .unwrap();
-        // Reading twice must not move the hit counter.
+        // Reading twice must not move the use counter.
         assert!(get_link_live(&pool, &l.name).await.unwrap().is_some());
         let d = get_link_live(&pool, &l.name).await.unwrap().unwrap();
-        assert_eq!(d.hits, 0);
+        assert_eq!(d.uses, 0);
     }
 
     #[tokio::test]
@@ -440,9 +451,9 @@ mod tests {
         .await
         .unwrap();
 
-        // First consume succeeds and counts the hit.
+        // First consume succeeds and spends the use.
         let d = consume_link(&pool, &l.name).await.unwrap().unwrap();
-        assert_eq!(d.hits, 1);
+        assert_eq!(d.uses, 1);
 
         // Now exhausted: not live, but still a reserved tombstone (410, not 404).
         assert!(get_link_live(&pool, &l.name).await.unwrap().is_none());
