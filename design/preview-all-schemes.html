@@ -73,7 +73,9 @@
     .pv-value .reg { padding: 1px 5px; border-radius: 5px;
       background: color-mix(in srgb, var(--accent) 13%, transparent); }
     .pv-value .dl { color: var(--text-tertiary); font-weight: 400; }
-    .pv-value .lp { color: var(--text); font-weight: 700; }
+    /* round-20 shading, restored per round-25 review: local part regular
+       weight at full colour — bold stays the domain's mark */
+    .pv-value .lp { color: var(--text); font-weight: 400; }
     .pv-value .grp + .grp { margin-left: .4em; }
     .pv-value .ext { margin-left: .55em; font-size: .66em; font-weight: 500;
       color: var(--text-secondary); letter-spacing: 0; }
@@ -133,7 +135,7 @@
       font: 600 12px/1.4 var(--font); color: var(--text-secondary); padding: 6px; }
     .pv-parts-lid::-webkit-details-marker { display: none; }
     .pv-parts-lid::marker { content: ""; }
-    .pv-parts-lid .chev { color: var(--text-tertiary); margin-right: 4px; }
+    .pv-parts-lid .chev { color: var(--text-tertiary); margin-right: 7px; }
     .pv-parts .when-open { display: none; }
     .pv-parts[open] .when-open { display: inline; }
     .pv-parts[open] .when-closed { display: none; }
@@ -180,6 +182,11 @@
     .pv-url .sch.insecure { color: var(--danger); font-weight: 700; }
     .pv-url .usr { color: var(--danger); font-weight: 700; }
 
+    /* one-time: blind until revealed */
+    .pv-blind { display: block; margin-top: 10px; text-align: center;
+      font: 400 13px/1.5 var(--font); font-style: italic;
+      color: var(--text-secondary); }
+
     /* one-time badge, in the type's own colour */
     .pv-badge.once {
       color: var(--c-once);
@@ -220,10 +227,12 @@
       <code>,support@example.com</code> wearing its true comma — with the same grey native
       checkbox as every removable row. The old reason recipients could not be rows was the
       empty key column, and costume C abolished columns. Two special rules keep it honest:
-      <b>the floor of one</b> — when a single recipient remains checked, its box flips to
-      checked-and-disabled, the browser's own voice for "not yours to change", because a mail
-      link that writes to nobody is no longer a mail link (re-tick another and it unlocks);
-      and <b>a single-recipient mailto shows no recipient slice at all</b> — one address is
+      <b>the floor of one address, anywhere</b> — RFC 6068 allows a to-less mailto
+      (cc-only opens fine), so recipients and <code>cc</code> share one floor: when a single
+      address remains checked, whichever field it lives in, its box flips to
+      checked-and-disabled, the browser's own voice for "not yours to change" (re-tick
+      another and it unlocks);
+      and <b>a single-address mailto shows no recipient slice at all</b> — one address is
       the link's identity, core like the https host, not an option. The headline stays the
       untouched record; the strikethrough, the button count, and "After your edits" carry the
       editing. Try it live below.</li>
@@ -393,15 +402,6 @@
             <rect x="3.1" y="7.2" width="9.8" height="6.4" rx="1.8" stroke="currentColor" stroke-width="1.5"/></svg>
           Not Encrypted</span>
       </div>
-      <details class="pv-parts">
-        <summary class="pv-parts-lid"><span class="chev">▸</span><span class="when-closed">Show the parts</span><span class="when-open">Hide the parts</span></summary>
-        <div class="pv-slices">
-          <div class="pv-slice">
-            <input type="checkbox" checked disabled aria-label="Path, fixed">
-            <span class="txt"><span class="dl">/</span>pay</span>
-          </div>
-        </div>
-      </details>
       <a class="btn btn--go btn-block pv-btn btn-link pv-open" href="#">Continue to example.com</a>
       <p class="pv-meta">Expires in 6 days</p>
       <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
@@ -412,9 +412,10 @@
       the warning for colourblind readers and monochrome prints. This is the one red verdict
       the card can prove from the string alone — and why no green ever appears on
       <code>https</code>: encryption is the norm, its absence is the signal. The chip is a
-      warning, so it fires the open-padlock icon bare — but it does <em>not</em> unfold the
-      parts: it is about the transport, not the string, and the fold answers "what does this
-      URL carry".</p>
+      warning, so it fires the open-padlock icon bare. <b>No fold at all here</b> — a bare
+      path is already on the URL line, decoded and identical, so a fold would only restate
+      one row nobody can act on. The fold earns its line: it appears only when it has
+      something to add (a removable part, or a decoded difference).</p>
   </div>
 
   <div class="win">
@@ -430,19 +431,21 @@
           <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
-      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="seg">…</span></code>
+      <span class="pv-blind">The destination is hidden until revealed.</span>
       <button class="btn btn-block pv-btn pv-open">Reveal Destination</button>
       <div class="pv-badge-wrap"><span class="pv-badge once">Opens Once</span></div>
       <p class="pv-meta">Expires in 6 days</p>
       <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
         else later. <strong>Always check the destination.</strong></span>
     </div>
-    <p class="note"><b>Blue = you stay on YuioLink.</b> Reveal is a POST — it spends the one
-      use, mints the one-hop cookie, and shows the full address on the next page, where the
-      amber Continue anchor takes over. Domain first, dim ellipsis for the rest: enough to
-      decide whether to spend the use, nothing leaked before it is spent. "Opens Once" sits
-      below in the create picker's own purple — recognition, not an alarm — and there is no
-      cost subline on the button; the badge already says it.</p>
+    <p class="note"><b>Blue = you stay on YuioLink, and nothing shows before the use is
+      spent</b> — you called the domain preview leakage, and it is: it let anyone holding
+      the link learn where it points without burning the use, invisibly, when the burn is
+      the whole tamper-evidence of a one-timer. So the card is blind. Reveal is a POST — it
+      spends the one use, mints the one-hop cookie, and the next page is the full preview
+      (scheme tiers, chips, slices, everything above) with the amber Continue waiting; you
+      spend the use to <em>look</em>, never to be thrown somewhere. "Opens Once" sits below
+      in the create picker's own purple; no cost subline — the badge already says it.</p>
   </div>
 </div>
 
@@ -489,7 +492,8 @@
     </div>
     <p class="note"><b>One recipient, no recipient slice</b> — the address is the link's
       identity, core like a host, so only <code>?subject</code> and <code>&amp;body</code>
-      are offered. The local part carries full weight (on freemail the local part <i>is</i>
+      are offered. The local part reads at full colour but regular weight — bold stays the
+      domain's mark (on freemail the local part <i>is</i>
       the identity); the wash stays on the domain. Two space stories on one card: the
       subject's dotted space was stored as <code>%20</code>; the body's bare space is a real
       stored space — mail links are one of the few places that is legal — so no dots,
@@ -541,17 +545,18 @@
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
-    <p class="note"><b>The "to" checkboxes, live — proposal.</b> Each recipient is a verbatim
+    <p class="note"><b>The "to" checkboxes, live.</b> Each recipient is a verbatim
       slice, the second wearing its true comma, so the rows duplicate nothing they should
       not: the headline stays the untouched record (exactly like the https line above its
-      slices). Untick <code>sales@</code> and three things follow: <code>support@</code>
-      becomes the last recipient standing and its box <b>locks itself</b> — checked and
-      disabled, the same native voice as port and path — the button re-counts
-      ("Write to 2 addresses"), and "After your edits" opens with
-      <code>mailto:support@example.com?…</code>, comma promoted away. Drop <code>cc</code>
-      too and the button names the survivor: "Write to support@example.com". The floor is
-      one <em>recipient</em>, not one address: <code>cc</code> never locks, because a
-      message with no <code>to</code> is not a message.</p>
+      slices). Untick <code>sales@</code> and three things follow: the button re-counts
+      ("Write to 2 addresses"), "After your edits" opens with
+      <code>mailto:support@example.com?…</code> — comma promoted away — and the strikethrough
+      lands on the slice, never the record. <b>The floor is one address, anywhere</b>: RFC
+      6068 allows a to-less mailto, and <code>mailto:?cc=…</code> opens fine, so you can
+      untick <em>both</em> recipients as long as <code>cc</code> holds — the rebuilt string
+      is legally to-less — and only the last address standing locks itself (checked and
+      disabled, the port/path voice), whichever field it lives in. The button always names
+      the survivor: "Write to archive@records.example".</p>
   </div>
 </div>
 
@@ -1024,22 +1029,22 @@
   /* per-card follow-the-edits behaviour beyond the raw line */
   var HOOKS = {
     mailto: function (isOn, go, boxes) {
-      /* the floor of one: when a single recipient remains checked, its box
-         locks itself — checked and disabled, the browser's own "not yours
-         to change". Re-tick another recipient and it unlocks. */
-      var tos = ['to1', 'to2'].map(function (k) { return boxes[k]; });
-      var kept = tos.filter(function (b) { return b.cb.checked; });
-      tos.forEach(function (b) { b.cb.disabled = false; });
+      /* the floor of one ADDRESS, anywhere: RFC 6068 allows a to-less
+         mailto (cc-only is legal and opens fine), so recipients and cc
+         share one floor — when a single address remains checked, its box
+         locks itself, whichever field it lives in. Re-tick another and
+         it unlocks. */
+      var addrs = ['to1', 'to2', 'cc'].map(function (k) { return boxes[k]; });
+      var kept = addrs.filter(function (b) { return b.cb.checked; });
+      addrs.forEach(function (b) { b.cb.disabled = false; });
       if (kept.length === 1) kept[0].cb.disabled = true;
-      tos.forEach(function (b) { b.row.classList.toggle('locked', b.cb.disabled); });
-      var ccOn = isOn({ id: 'cc' });
-      var n = kept.length + (ccOn ? 1 : 0);
+      addrs.forEach(function (b) { b.row.classList.toggle('locked', b.cb.disabled); });
       var lead = go.querySelector('.lead'), what = go.querySelector('.what');
-      if (n === 1) {
+      if (kept.length === 1) {
         lead.textContent = 'Write to ' + kept[0].row.getAttribute('data-addr');
         what.textContent = 'An email address';
       } else {
-        lead.textContent = 'Write to ' + n + ' addresses';
+        lead.textContent = 'Write to ' + kept.length + ' addresses';
         what.textContent = 'Email addresses';
       }
     },

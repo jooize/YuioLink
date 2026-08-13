@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Splits and floors</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .cap { display: block; text-align: center; margin: 0 0 10px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .note { max-width: 420px; margin: 12px auto 0; font: 400 12.5px/1.55 var(--font);
+      color: var(--text-secondary); text-align: left; }
+    .note b { color: var(--text); font-weight: 600; }
+    .note code { font-family: var(--font-mono); font-size: .95em; }
+    .fixnote { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .fixnote ul { margin: 6px 0 0; padding-left: 20px; }
+    .fixnote li { margin: 3px 0; }
+    .win { width: min(100%, 420px); }
+    .app-window.win { margin: 0; padding: 30px 26px 26px; }
+    .card { width: min(100%, 400px); padding: 18px 18px 16px; border-radius: 16px;
+      background: var(--card-bg); border: .5px solid var(--card-border); }
+    .card h3 { margin: 0 0 2px; font: 600 15px/1.3 var(--font); color: var(--text); }
+    .card .sub { display: block; margin-bottom: 10px; font: 400 11.5px/1.4 var(--font);
+      color: var(--text-tertiary); }
+    .rank { display: inline-block; margin-bottom: 6px; padding: 1px 8px; border-radius: 999px;
+      font: 700 10px/1.6 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); border: 1px solid var(--card-border); }
+    .rank.pick { color: var(--switch-on);
+      border-color: color-mix(in srgb, var(--switch-on) 45%, transparent); }
+    .rank.nope { color: var(--danger);
+      border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    .btn-link { text-decoration: none; }
+    .btn--go.btn-link { color: #241a05; }
+
+    /* --- the split: act, or take it with you -----------------------------
+       Same construction as the create form's split (whose comment still
+       remembers: "Clear sits where Copy was"). Primary keeps its own colour
+       language — amber, you leave — and the Copy segment is blue, because
+       copying keeps you here. JS-injected like the checkboxes: without JS
+       the primary is full-width (the :has() rule already in app.css). */
+    .pv-split { display: flex; gap: 2px; margin-top: 22px; }
+    .pv-split .btn { margin-top: 0; }
+    .pv-split .go { flex: 1; border-radius: var(--radius-control) 0 0 var(--radius-control); }
+    .pv-split .splitcopy { flex: none; padding: 0 18px; font-size: 13px; font-weight: 600;
+      border-radius: 0 var(--radius-control) var(--radius-control) 0; }
+
+    .pv-scheme { display: block; text-align: center; margin-top: 4px;
+      font-family: var(--font-mono); font-weight: 700; letter-spacing: -.01em;
+      line-height: 1.35; font-size: clamp(19px, 5vw, 24px); color: var(--text); }
+    .pv-scheme .colon { opacity: .45; }
+    .pv-line { display: block; text-align: center; margin-top: 4px;
+      font-family: var(--font-mono); font-weight: 700; line-height: 1.4;
+      word-break: normal; overflow-wrap: break-word; color: var(--text);
+      font-size: clamp(17px, 4.6vw, 21px); }
+    .pv-line .sch-big { font-size: clamp(19px, 5vw, 24px); letter-spacing: -.01em; }
+    .pv-line .colon { opacity: .45; }
+    .pv-line .seg { color: var(--text-secondary); font-weight: 400; }
+    .pv-line .dl { color: var(--text-tertiary); font-weight: 400; }
+    .pv-line .usr { color: var(--danger); font-weight: 700; }
+    .pv-line .reg { padding: 1px 5px; border-radius: 5px;
+      background: color-mix(in srgb, var(--accent) 13%, transparent); }
+    .pv-value { display: block; margin-top: 9px; font-family: var(--font-mono);
+      font-size: clamp(17px, 4.6vw, 21px); font-weight: 700; line-height: 1.4;
+      word-break: normal; overflow-wrap: break-word; text-align: center;
+      color: var(--text); font-variant-numeric: tabular-nums; }
+    .pv-value .reg { padding: 1px 5px; border-radius: 5px;
+      background: color-mix(in srgb, var(--accent) 13%, transparent); }
+    .pv-value .dl { color: var(--text-tertiary); font-weight: 400; }
+    .pv-value .lp { color: var(--text); font-weight: 400; }
+    .pv-list { display: block; margin-top: 9px; font-family: var(--font-mono);
+      font-size: clamp(15px, 4vw, 18px); font-weight: 400; line-height: 1.55;
+      word-break: normal; overflow-wrap: break-word; text-align: center;
+      color: var(--text); }
+    .pv-list .dl { color: var(--text-tertiary); }
+    .pv-facts { display: flex; flex-wrap: wrap; gap: 7px 14px; justify-content: center;
+      margin-top: 10px; }
+    .pv-fact { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px;
+      border-radius: 999px; font: 600 11px/1.45 var(--font);
+      color: var(--text-secondary); background: var(--field-bg);
+      border: .5px solid var(--card-border); }
+    .pv-fact .flag { font-size: 13px; line-height: 1; }
+    .pv-fact.warn { background: transparent; border: none; padding: 3px 0;
+      color: var(--danger); }
+    .pv-fact svg { flex: none; color: var(--danger); }
+    .pv-slices { margin-top: 14px; font-family: var(--font-mono);
+      font-size: 12.5px; line-height: 1.5; }
+    .pv-slice { display: flex; align-items: baseline; gap: 9px;
+      padding: 7px 0; border-top: .5px solid var(--card-border);
+      text-align: left; }
+    .pv-slice:first-child { border-top: none; }
+    .pv-slice input { flex: none; align-self: center; margin: 0;
+      accent-color: var(--text-tertiary); }
+    .pv-slice.togglable { cursor: pointer; }
+    .pv-slice.togglable:hover { background: color-mix(in srgb, var(--text) 3%, transparent); }
+    .pv-slice.togglable .txt { cursor: text; }
+    .pv-slice .txt { color: var(--text); word-break: break-all; min-width: 0; }
+    .pv-slice .txt .dl { color: var(--accent); }
+    .pv-slice .txt .k { color: var(--text-secondary); font-weight: 700; }
+    .pv-slice .txt .reg { font-weight: 700; }
+    .pv-slice.usr .txt { color: var(--danger); font-weight: 700; }
+    .pv-slice.off .txt { opacity: .38; text-decoration: line-through;
+      text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent); }
+    .pv-slice.locked { cursor: default; }
+    .pv-slice.locked:hover { background: transparent; }
+    .dsp { border-bottom: 1px dotted var(--text-tertiary); }
+    .pv-parts { display: block; margin-top: 12px; }
+    .pv-parts-lid { list-style: none; cursor: pointer; text-align: center;
+      font: 600 12px/1.4 var(--font); color: var(--text-secondary); padding: 6px; }
+    .pv-parts-lid::-webkit-details-marker { display: none; }
+    .pv-parts-lid::marker { content: ""; }
+    .pv-parts-lid .chev { color: var(--text-tertiary); margin-right: 7px; }
+    .pv-parts .when-open { display: none; }
+    .pv-parts[open] .when-open { display: inline; }
+    .pv-parts[open] .when-closed { display: none; }
+    .rawline { display: block; margin-top: 14px; padding-top: 11px;
+      border-top: .5px solid var(--card-border); font-family: var(--font-mono);
+      font-size: 11.5px; line-height: 1.65; word-break: break-all; text-align: left;
+      color: var(--text); }
+    .rawline .lbl { display: flex; align-items: center; justify-content: space-between;
+      font-family: var(--font); font-size: 11px; font-weight: 500; font-style: italic;
+      color: var(--text-tertiary); margin-bottom: 3px; }
+    .rawline .sch { color: var(--text-tertiary); }
+    .rawline .dl { color: var(--accent); }
+    .rawline .k { color: var(--text-secondary); font-weight: 700; }
+    .rawline .reg { font-weight: 700; }
+    .rawline .pct { color: var(--text-tertiary); }
+    .rawline .usr { color: var(--danger); font-weight: 700; }
+    .rawline.edited { border-top-style: dashed; display: none; }
+    .rawline.edited .lbl { color: var(--accent); }
+    .rawline.edited.show { display: block; }
+    .copybtn { font: 600 10.5px/1.6 var(--font); font-style: normal;
+      padding: 1px 9px; border-radius: 999px; cursor: pointer;
+      color: var(--text-secondary); background: transparent;
+      border: .5px solid var(--card-border); }
+    .copybtn:hover { color: var(--text); }
+    .copybtn.done { color: var(--switch-on); border-color: transparent; }
+    .pv-note { display: block; max-width: 96%; margin: 12px auto 0; text-align: center;
+      font: 400 12px/1.55 var(--font); color: var(--text-secondary); }
+    .pv-note code { font-family: var(--font-mono); font-size: .95em; color: var(--text);
+      font-weight: 700; }
+    .btn.btn-2 { flex-direction: column; gap: 2px; padding-top: 9px; padding-bottom: 9px;
+      min-height: 54px; line-height: 1.25; }
+    .btn.btn-2 .lead { display: inline-flex; align-items: center; gap: 7px; }
+    .btn.btn-2 .what { font-size: 11.5px; font-weight: 500; opacity: .82; letter-spacing: 0; }
+    .btn .sch-tag { font-family: var(--font-mono); font-weight: 700; opacity: .72; }
+    .pv-open { margin-top: 22px; }
+    .pv-hedge { display: block; max-width: 92%; margin: 12px auto 0; text-align: center;
+      font: 400 11.5px/1.55 var(--font); color: var(--text-tertiary); }
+    .pv-blind { display: block; margin-top: 10px; text-align: center;
+      font: 400 13px/1.5 var(--font); font-style: italic;
+      color: var(--text-secondary); }
+    .pv-badge.once {
+      color: var(--c-once);
+      background: color-mix(in srgb, var(--c-once) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--c-once) 45%, transparent);
+    }
+    .pv-refuse-alert { display: grid; grid-template-columns: auto 1fr; gap: 11px;
+      margin: 14px auto 0; max-width: 94%; padding: 12px 14px; border-radius: 10px;
+      text-align: left; background: var(--field-bg); border: .5px solid var(--card-border); }
+    .pv-refuse-alert .sym { display: grid; place-items: center; height: 19px; width: 16px;
+      color: var(--danger); }
+    .pv-refuse-alert .msg { font-size: 11.5px; line-height: 1.55; color: var(--text-secondary);
+      margin: 0; }
+    .pv-refuse-alert .msg b { display: block; font-size: 12.5px; line-height: 19px;
+      font-weight: 700; color: var(--text); margin-bottom: 2px; }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 25 · interactive</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Splits and floors</h1>
+</div>
+
+<div class="fixnote">
+  <b>Your round-24 review, point by point.</b> Four corrections went straight into the
+  gallery (<code>preview-all-schemes</code>): local parts back to regular weight (that was
+  a regression against round 20's shading — good catch), a real gap after the <code>▸</code>,
+  no fold on the bare-path http card (a fold that can only restate one unactionable row
+  earns nothing — new rule: <b>the fold appears only when it has something to add</b>), and
+  the one-time card is now blind — you are right that the domain was leakage: it let anyone
+  holding the link learn where it points <em>without</em> burning the use, and the burn is
+  the whole tamper-evidence of a one-timer. Reveal now shows the full preview page — you
+  spend the use to look, never to be thrown somewhere.
+  <br><br>
+  <b>And you are right about mailto.</b> RFC 6068 allows a to-less mailto —
+  <code>mailto:?cc=archive@records.example</code> is legal and opens a compose like any
+  other — so the floor moves from "last recipient" to <b>"last address, anywhere"</b>:
+  recipients and <code>cc</code> share one floor, and only the final address standing
+  locks, whichever field it lives in. (Strictly, even <code>mailto:?subject=hi</code> is
+  legal — zero addresses, blank compose. Keeping one address is a product choice, not a
+  legal one: the button needs someone to name. Overrule it if you want the floor gone
+  entirely.) Live in the gallery's merryGECKO card: untick <em>both</em> recipients and
+  watch <code>cc</code> hold the floor.
+  <br><br>
+  The rest of your questions get their own sections below: the Copy split (1), Swedish
+  punctuation and what <code>tel:</code>/<code>sms:</code> can carry (2–3), whether ftp
+  and irc split (4–5), the refusal heading (6).
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">1 · The split: act, or take it with you</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">A · split button — recommended</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">calm</span><span class="nwg nw-1">FALCON</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">blog.</span><span class="reg">example.com</span><span class="pn">/</span><span class="seg">articles</span><span class="pn">/</span><span class="seg">2026</span><span class="pn">/</span><span class="seg">preview-design</span><span class="pn">?</span><span class="seg">ref</span><span class="pn">=</span><span class="qv">newsletter</span></code>
+      <details class="pv-parts">
+        <summary class="pv-parts-lid"><span class="chev">▸</span><span class="when-closed">Show the parts</span><span class="when-open">Hide the parts</span></summary>
+        <div class="pv-slices" id="s-blogx">
+          <div class="pv-slice" data-id="path">
+            <input type="checkbox" checked disabled aria-label="Path, fixed">
+            <span class="txt"><span class="dl">/</span>articles<span class="dl">/</span>2026<span class="dl">/</span>preview-design</span>
+          </div>
+          <div class="pv-slice" data-id="ref">
+            <input type="checkbox" checked aria-label="Keep ref">
+            <span class="txt"><span class="dl">?</span><span class="k">ref</span><span class="dl">=</span>newsletter</span>
+          </div>
+        </div>
+      </details>
+      <code class="rawline edited" id="edited-blogx"><span class="lbl">After your edits
+        <button class="copybtn" data-copy="edited" data-card="blogx">Copy</button></span><span class="str"></span></code>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go pv-btn btn-link go" href="#" id="go-blogx" style="margin-top:0">Continue to example.com</a>
+        <button class="btn splitcopy" data-card="blogx" aria-label="Copy the destination address">Copy</button>
+      </div>
+      <p class="pv-meta">Expires in 6 days</p>
+      <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
+        else later. <strong>Always check the destination.</strong></span>
+    </div>
+    <p class="note"><b>The create form's own pattern, whose CSS still remembers "Clear sits
+      where Copy was" — Copy comes home.</b> And the split carries the colour rule
+      naturally: amber segment = you leave, blue segment = you stay (copying keeps you
+      here). The segment copies <em>what the button would open</em> — untick
+      <code>?ref</code> above and Copy hands over the trimmed string, same as the rebuilt
+      <code>href</code>. The raw-line Copy buttons keep their precise jobs (stored vs
+      edited); this one is the everyday "take the address with me". A mis-tap is benign in
+      both directions: Copy keeps you here, Continue is the same amber press it always was.
+      JS-injected like the checkboxes — no JS, full-width Continue, and the
+      <code>:has()</code> rounding rule already in app.css handles that for free.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">B · pill under the line — the alternative</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">calm</span><span class="nwg nw-1">FALCON</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">blog.</span><span class="reg">example.com</span><span class="pn">/</span><span class="seg">articles</span><span class="pn">/</span><span class="seg">2026</span><span class="pn">/</span><span class="seg">preview-design</span><span class="pn">?</span><span class="seg">ref</span><span class="pn">=</span><span class="qv">newsletter</span></code>
+      <div style="text-align:center; margin-top:8px">
+        <button class="copybtn" data-static="https://blog.example.com/articles/2026/preview-design?ref=newsletter">Copy</button>
+      </div>
+      <a class="btn btn--go btn-block pv-btn btn-link pv-open" href="#">Continue to example.com</a>
+      <p class="pv-meta">Expires in 6 days</p>
+      <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
+        else later. <strong>Always check the destination.</strong></span>
+    </div>
+    <p class="note">The same pill the raw lines use, floating under the URL. It works, but
+      it is a third place for a copy control to live (raw lines right-aligned, this one
+      centred), it copies the <em>stored</em> string while the button may open an edited
+      one — a fork the split never has — and on the everyday page it adds a floating
+      control where A adds none (the split replaces, not appends). <b>A also closes a real
+      gap</b>: spotify, matrix, irc, and ftp have no exact line (their headline <em>is</em>
+      the stored string) and today no visible copy control at all — the split gives every
+      action button one, in one construction.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">A on tier 2 · the same split, the two-line button</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">plain</span><span class="nwg nw-1">MARTEN</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">mailto<span class="colon">:</span></span>
+      <span class="pv-value"><span class="lp">ella.storli</span><span class="dl">@</span><span class="reg">gmail.com</span></span>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go btn-2 btn-link go" href="#" style="margin-top:0">
+          <span class="lead">Write to ella.storli@gmail.com</span>
+          <span class="what">An email address</span></a>
+        <button class="btn splitcopy" data-static="mailto:ella.storli@gmail.com" aria-label="Copy the address">Copy</button>
+      </div>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note">The split generalises to every tier-2 button unchanged — the Copy
+      segment stretches with the two-line height for free (flex). Also note the local part:
+      regular weight now, full colour, bold back to being the domain's mark alone — the
+      round-20 shading, restored per your catch.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">2 · Phones: the punctuation belongs to the tables</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">tel · Sweden — the hyphen is libphonenumber's, not ours</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">polar</span><span class="nwg nw-1">ELAND</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">tel<span class="colon">:</span></span>
+      <span class="pv-value">+46 70-123 45 67</span>
+      <div class="pv-facts">
+        <span class="pv-fact"><span class="flag">🇸🇪</span> Sweden</span>
+        <span class="pv-fact">Mobile</span>
+      </div>
+      <code class="rawline"><span class="lbl">Exactly as stored
+        <button class="copybtn" data-static="tel:+46701234567">Copy</button></span><span class="str"><span class="sch">tel:</span>+46701234567</span></code>
+      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
+        <span class="lead">Call +46 70-123 45 67</span><span class="what">A phone number</span></a>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note"><b>Exactly your point, and the crate already carries it.</b> Each
+      country's punctuation lives in libphonenumber's own format strings — Sweden's
+      national rendering is <code>070-123 45 67</code>, hyphen included, from Google's
+      tables, not from us. We render the international format verbatim, whatever
+      characters the tables emit for that region. Real characters are fine in the
+      headline now: it is declared a <em>rendering</em>, the exact line and its Copy
+      button carry the stored truth, so nothing needs the round-13 margin trick anymore.
+      One more grammar fact while we are here: <b>a <code>tel:</code> URI is one number,
+      always</b> — RFC 3966 has no list form, so tel never grows the recipients
+      treatment.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">sms · a list is legal — RFC 5724 — so it gets the mailto treatment</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">eager</span><span class="nwg nw-1">TAPIR</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="pv-scheme">sms<span class="colon">:</span></span>
+      <code class="pv-list">+46 70-123 45 67<span class="dl">,</span><wbr>+47 991 23 456</code>
+      <div class="pv-facts">
+        <span class="pv-fact"><span class="flag">🇸🇪</span> Sweden</span>
+        <span class="pv-fact"><span class="flag">🇳🇴</span> Norway</span>
+        <span class="pv-fact">Mobile</span>
+      </div>
+      <div class="pv-slices" id="s-sms2">
+        <div class="pv-slice" data-id="n1" data-addr="+46 70-123 45 67">
+          <input type="checkbox" checked aria-label="Keep +46 70-123 45 67">
+          <span class="txt">+46701234567</span>
+        </div>
+        <div class="pv-slice" data-id="n2" data-addr="+47 991 23 456">
+          <input type="checkbox" checked aria-label="Keep +47 991 23 456">
+          <span class="txt"><span class="dl">,</span>+4799123456</span>
+        </div>
+        <div class="pv-slice" data-id="body">
+          <input type="checkbox" checked aria-label="Keep body">
+          <span class="txt"><span class="dl">?</span><span class="k">body</span><span class="dl">=</span>JOIN<span class="dsp"> </span>LIST</span>
+        </div>
+      </div>
+      <span class="pv-note">One message goes to every number listed — anything sent goes out
+        from your number.</span>
+      <code class="rawline" id="stored-sms2"><span class="lbl">Exactly as stored
+        <button class="copybtn" data-copy="stored" data-card="sms2">Copy</button></span><span class="str"><span class="sch">sms:</span>+46701234567<span class="dl">,</span>+4799123456<span class="dl">?</span><span class="k">body</span><span class="dl">=</span>JOIN<span class="pct">%20</span>LIST</span></code>
+      <code class="rawline edited" id="edited-sms2"><span class="lbl">After your edits
+        <button class="copybtn" data-copy="edited" data-card="sms2">Copy</button></span><span class="str"></span></code>
+      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#" id="go-sms2">
+        <span class="lead">Message 2 numbers</span>
+        <span class="what">Phone numbers, for one message</span></a>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note"><b>Yes — sms can carry several numbers</b> (RFC 5724 comma-joins
+      recipients exactly like mailto), so the whole recipients apparatus transfers:
+      formatted list headline, verbatim digit slices with the comma on the second, the
+      floor of one, the counting button that names the survivor. The chips list every
+      region on the card — two countries on one link is itself worth a glance. The slices
+      show the stored digits; the headline and button show the tables' rendering.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">3 · ftp and irc: the machinery arrives only when the parts do</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">ftp · with something to say — same rule as https</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">salty</span><span class="nwg nw-1">PIKE</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <code class="pv-line"><span class="sch-big">ftp<span class="colon">:</span></span><span class="dl">//</span><span class="usr">alice@</span><wbr><span class="seg">files.</span><span class="reg">example.org</span><span class="dl">:</span><span class="seg">2121</span><span class="dl">/</span><wbr><span class="seg">pub</span><span class="dl">/</span><span class="seg">notes.txt</span><span class="dl">;</span><span class="seg">type=i</span></code>
+      <div class="pv-facts">
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Username in the Address</span>
+      </div>
+      <div class="pv-slices" id="s-ftpg">
+        <div class="pv-slice usr" data-id="user">
+          <input type="checkbox" checked aria-label="Keep alice@">
+          <span class="txt">alice@</span>
+        </div>
+        <div class="pv-slice" data-id="port">
+          <input type="checkbox" checked disabled aria-label="Port, fixed">
+          <span class="txt"><span class="dl">:</span>2121</span>
+        </div>
+        <div class="pv-slice" data-id="path">
+          <input type="checkbox" checked disabled aria-label="Path, fixed">
+          <span class="txt"><span class="dl">/</span>pub<span class="dl">/</span>notes.txt</span>
+        </div>
+        <div class="pv-slice" data-id="type">
+          <input type="checkbox" checked aria-label="Keep type">
+          <span class="txt"><span class="dl">;</span><span class="k">type</span><span class="dl">=</span>i</span>
+        </div>
+      </div>
+      <code class="rawline edited" id="edited-ftpg"><span class="lbl">After your edits
+        <button class="copybtn" data-copy="edited" data-card="ftpg">Copy</button></span><span class="str"></span></code>
+      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#" id="go-ftpg">
+        <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">ftp:</span></span>
+        <span class="what">An address on a file server</span></a>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note"><b>Yes, ftp splits — by the same rule as https, so usually not.</b> The
+      plain <code>ftp://files.example.org/pub/notes.txt</code> in the gallery stays a clean
+      one-run card: nothing removable, nothing to add, no machinery. This one earns it:
+      userinfo (same red, same chip as the web tier), a non-standard port (fixed — which
+      server answers is not yours to change), and RFC 1738's <code>;type=</code> transfer
+      mode, a removable keyed tail. One rule everywhere: the machinery follows the parts,
+      never the scheme.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">irc · the formats, and when it splits</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">witty</span><span class="nwg nw-1">STOAT</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <code class="pv-line"><span class="sch-big">ircs<span class="colon">:</span></span><span class="dl">//</span><wbr><span class="reg">libera.chat</span><span class="dl">:</span><span class="seg">6697</span><span class="dl">/</span><wbr><span class="seg">yuiolink</span><span class="dl">?</span><span class="seg">key=hunter2</span></code>
+      <div class="pv-slices" id="s-irc">
+        <div class="pv-slice" data-id="port">
+          <input type="checkbox" checked disabled aria-label="Port, fixed">
+          <span class="txt"><span class="dl">:</span>6697</span>
+        </div>
+        <div class="pv-slice" data-id="chan">
+          <input type="checkbox" checked disabled aria-label="Channel, fixed">
+          <span class="txt"><span class="dl">/</span>yuiolink</span>
+        </div>
+        <div class="pv-slice" data-id="key">
+          <input type="checkbox" checked aria-label="Keep key">
+          <span class="txt"><span class="dl">?</span><span class="k">key</span><span class="dl">=</span>hunter2</span>
+        </div>
+      </div>
+      <code class="rawline edited" id="edited-irc"><span class="lbl">After your edits
+        <button class="copybtn" data-copy="edited" data-card="irc">Copy</button></span><span class="str"></span></code>
+      <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#" id="go-irc">
+        <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">ircs:</span></span>
+        <span class="what">An IRC channel</span></a>
+      <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
+      <p class="pv-meta">Expires in 6 days</p>
+    </div>
+    <p class="note"><b>The formats, honestly: irc URLs were never standardised</b> — the
+      grammar is a de-facto draft (draft-butcher-irc-url) that clients follow loosely:
+      <code>irc[s]://host[:port]/[target][,flags][?key]</code>. The target is a channel
+      (the <code>#</code> is usually implied; when written it often arrives encoded as
+      <code>%23</code>); <code>,isnick</code> flags the target as a person, which would
+      swap the subtitle to "A person on IRC"; <code>?key</code> is a channel key.
+      Classification accepts all of it, generates none of it. Splitting follows the parts
+      rule: the plain card in the gallery has none and stays whole; this one has a fixed
+      port, a fixed channel (the thing itself), and a removable <code>?key</code> —
+      dropping it still names the channel, your client just asks for the key instead of
+      knowing it.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">4 · The refusal heading — three candidates</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank pick">Keep</span>
+    <h3>No Button for This One</h3>
+    <span class="sub">Names what the visitor notices</span>
+    <div class="pv-refuse-alert" style="margin-top:0">
+      <svg class="sym" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+      <p class="msg"><b>No Button for This One</b>The address stored here would tell your
+        browser to do something rather than go somewhere, so YuioLink shows it and stops
+        there.</p>
+    </div>
+    <p class="note">A fact about the page, verifiable by looking at it, and it answers the
+      visitor's actual first question ("where's the button?"). The body then carries the
+      why. Every heading on the site states; none of them judge — this one stays in
+      character.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank">Alt</span>
+    <h3>An Instruction, Not an Address</h3>
+    <span class="sub">Names the reason instead</span>
+    <div class="pv-refuse-alert" style="margin-top:0">
+      <svg class="sym" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+      <p class="msg"><b>An Instruction, Not an Address</b>What is stored here would tell your
+        browser to do something rather than go somewhere, so YuioLink shows it and stops
+        there.</p>
+    </div>
+    <p class="note">Also a pure fact — it fronts the diagnosis instead of the consequence.
+      Slightly more to parse before the reader knows what it means for <em>them</em>; the
+      body then half-repeats it. Viable, if you prefer the reason up top.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank nope">Against</span>
+    <h3>Potentially Risky Instruction</h3>
+    <span class="sub">A judgement, and a hedged one</span>
+    <div class="pv-refuse-alert" style="margin-top:0">
+      <svg class="sym" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+      <p class="msg"><b>Potentially Risky Instruction</b>The address stored here would tell
+        your browser to do something rather than go somewhere, so YuioLink shows it and
+        stops there.</p>
+    </div>
+    <p class="note">This is the pattern the design has turned away three times: "Special"
+      (a judgement without content), red buttons (asserting malice we can't know), green
+      https (safety we can't promise). "Potentially" hedges and "Risky" judges — and a
+      <code>javascript:</code> bookmarklet a friend shared is refused all the same, not
+      because it is risky but because it is not an address. The refusal is structural;
+      the heading should be too.</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<p class="mock-h">5 · One-time: what the visitor sees before spending</p>
+
+<div class="mock-row">
+  <div class="card">
+    <span class="rank nope">Was</span>
+    <h3>Domain preview</h3>
+    <span class="sub">Round 24 — leaks without burning</span>
+    <code class="pv-url" style="display:block;text-align:center"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="seg">…</span></code>
+    <button class="btn btn-block" style="margin-top:16px">Reveal Destination</button>
+    <div class="pv-badge-wrap"><span class="pv-badge once">Opens Once</span></div>
+    <p class="note">Anyone holding the link learns the domain, silently, without spending
+      the use — and "the use was spent" is the only tamper-evidence a one-timer has. Your
+      call, and you are right: this is leakage.</p>
+  </div>
+
+  <div class="card">
+    <span class="rank pick">Now</span>
+    <h3>Blind until revealed</h3>
+    <span class="sub">Applied in the gallery</span>
+    <span class="pv-blind">The destination is hidden until revealed.</span>
+    <button class="btn btn-block" style="margin-top:16px">Reveal Destination</button>
+    <div class="pv-badge-wrap"><span class="pv-badge once">Opens Once</span></div>
+    <p class="note">Nothing discloses before the spend — not the domain, not the scheme.
+      The trade is honest because of what Reveal leads to: the <em>full preview page</em>
+      (tiers, chips, slices, Continue), not the destination itself. You spend the use to
+      look; nothing ever auto-opens. Symmetry bonus: a one-time Redirect now behaves
+      exactly like a one-time Text — opaque until revealed, judged after.</p>
+  </div>
+</div>
+
+<script>
+/* MOCKUP-ONLY. Real build: preview.js (progressive enhancement; without JS
+   the checkboxes and the Copy split are not rendered at all). */
+(function () {
+  var CARDS = {
+    blogx: {
+      prefix: { raw: 'https://', html: '<span class="sch">https://</span>' },
+      host: { raw: 'blog.example.com',
+              html: 'blog.<span class="reg">example.com</span>' },
+      parts: [
+        { id: 'path', kind: 'fixed', raw: '/articles/2026/preview-design',
+          html: '<span class="dl">/</span>articles<span class="dl">/</span>2026<span class="dl">/</span>preview-design' },
+        { id: 'ref', kind: 'query', raw: 'ref=newsletter',
+          html: '<span class="k">ref</span><span class="dl">=</span>newsletter' }
+      ]
+    },
+    sms2: {
+      prefix: { raw: 'sms:', html: '<span class="sch">sms:</span>' },
+      host: { raw: '', html: '' },
+      parts: [
+        { id: 'n1', kind: 'to', raw: '+46701234567', html: '+46701234567' },
+        { id: 'n2', kind: 'to', raw: '+4799123456', html: '+4799123456' },
+        { id: 'body', kind: 'query', raw: 'body=JOIN%20LIST',
+          html: '<span class="k">body</span><span class="dl">=</span>JOIN<span class="pct">%20</span>LIST' }
+      ]
+    },
+    ftpg: {
+      prefix: { raw: 'ftp://', html: '<span class="sch">ftp://</span>' },
+      host: { raw: 'files.example.org',
+              html: 'files.<span class="reg">example.org</span>' },
+      parts: [
+        { id: 'user', kind: 'user', raw: 'alice@',
+          html: '<span class="usr">alice@</span>' },
+        { id: 'port', kind: 'fixed', raw: ':2121',
+          html: '<span class="dl">:</span>2121' },
+        { id: 'path', kind: 'fixed', raw: '/pub/notes.txt',
+          html: '<span class="dl">/</span>pub<span class="dl">/</span>notes.txt' },
+        { id: 'type', kind: 'tail', raw: ';type=i',
+          html: '<span class="dl">;</span><span class="k">type</span><span class="dl">=</span>i' }
+      ]
+    },
+    irc: {
+      prefix: { raw: 'ircs://', html: '<span class="sch">ircs://</span>' },
+      host: { raw: 'irc.libera.chat',
+              html: 'irc.<span class="reg">libera.chat</span>' },
+      parts: [
+        { id: 'port', kind: 'fixed', raw: ':6697',
+          html: '<span class="dl">:</span>6697' },
+        { id: 'chan', kind: 'fixed', raw: '/yuiolink',
+          html: '<span class="dl">/</span>yuiolink' },
+        { id: 'key', kind: 'query', raw: 'key=hunter2',
+          html: '<span class="k">key</span><span class="dl">=</span>hunter2' }
+      ]
+    }
+  };
+
+  function build(card, on) {
+    var raw = card.prefix.raw, html = card.prefix.html;
+    var user = null, tail = { raw: '', html: '' };
+    var tos = [], queries = [], frag = null;
+    card.parts.forEach(function (p) {
+      if (!on(p)) return;
+      if (p.kind === 'user') user = p;
+      else if (p.kind === 'to') tos.push(p);
+      else if (p.kind === 'query') queries.push(p);
+      else if (p.kind === 'fragment') frag = p;
+      else { tail.raw += p.raw; tail.html += p.html; }
+    });
+    if (user) { raw += user.raw; html += user.html; }
+    tos.forEach(function (p, i) {
+      var d = i === 0 ? '' : ',';
+      raw += d + p.raw;
+      html += (d ? '<span class="dl">,</span>' : '') + p.html;
+    });
+    raw += card.host.raw + tail.raw; html += card.host.html + tail.html;
+    queries.forEach(function (p, i) {
+      var d = i === 0 ? '?' : '&';
+      raw += d + p.raw;
+      html += '<span class="dl">' + (d === '&' ? '&amp;' : d) + '</span>' + p.html;
+    });
+    if (frag) { raw += '#' + frag.raw; html += '<span class="dl">#</span>' + frag.html; }
+    return { raw: raw, html: html };
+  }
+
+  function floorLock(ids, boxes) {
+    var rows = ids.map(function (k) { return boxes[k]; }).filter(Boolean);
+    var kept = rows.filter(function (b) { return b.cb.checked; });
+    rows.forEach(function (b) { b.cb.disabled = false; });
+    if (kept.length === 1) kept[0].cb.disabled = true;
+    rows.forEach(function (b) { b.row.classList.toggle('locked', b.cb.disabled); });
+    return kept;
+  }
+
+  var HOOKS = {
+    sms2: function (isOn, go, boxes) {
+      var kept = floorLock(['n1', 'n2'], boxes);
+      var lead = go.querySelector('.lead'), what = go.querySelector('.what');
+      if (kept.length === 1) {
+        lead.textContent = 'Message ' + kept[0].row.getAttribute('data-addr');
+        what.textContent = 'A phone number, for a message';
+      } else {
+        lead.textContent = 'Message ' + kept.length + ' numbers';
+        what.textContent = 'Phone numbers, for one message';
+      }
+    }
+  };
+
+  function setup(name) {
+    var card = CARDS[name];
+    var rows = document.querySelectorAll('#s-' + name + ' .pv-slice');
+    var boxes = {};
+    rows.forEach(function (r) {
+      var cb = r.querySelector('input');
+      boxes[r.getAttribute('data-id')] = { row: r, cb: cb };
+    });
+    function isOn(p) {
+      var b = boxes[p.id];
+      return !b || !b.cb || b.cb.disabled || b.cb.checked;
+    }
+    var stored = build(card, function () { return true; }).raw;
+    var editedEl = document.getElementById('edited-' + name);
+    var go = document.getElementById('go-' + name);
+    function refresh() {
+      rows.forEach(function (r) {
+        var cb = r.querySelector('input');
+        r.classList.toggle('off', !!cb && !cb.checked);
+      });
+      var now = build(card, isOn);
+      if (editedEl) {
+        editedEl.classList.toggle('show', now.raw !== stored);
+        editedEl.querySelector('.str').innerHTML = now.html;
+      }
+      if (go) go.setAttribute('data-href', now.raw); /* real build: href = now.raw */
+      if (HOOKS[name]) HOOKS[name](isOn, go, boxes);
+      return now.raw;
+    }
+    Object.keys(boxes).forEach(function (k) {
+      var cb = boxes[k].cb;
+      if (cb) cb.addEventListener('change', refresh);
+    });
+    rows.forEach(function (r) {
+      var cb = r.querySelector('input');
+      if (!cb || cb.disabled) return;
+      r.classList.add('togglable');
+      var pending = null;
+      r.addEventListener('click', function (e) {
+        if (e.target === cb) return;
+        if (cb.disabled) return;
+        if (e.detail > 1) return;
+        clearTimeout(pending);
+        pending = setTimeout(function () {
+          var sel = window.getSelection();
+          if (sel && !sel.isCollapsed) return;
+          if (cb.disabled) return;
+          cb.checked = !cb.checked;
+          refresh();
+        }, 180);
+      });
+      r.addEventListener('dblclick', function () { clearTimeout(pending); });
+    });
+    refresh();
+    document.querySelectorAll('.copybtn[data-card="' + name + '"]')
+      .forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var text = btn.getAttribute('data-copy') === 'stored'
+            ? stored : refresh();
+          copyText(text, btn, 'Copy');
+        });
+      });
+    /* the split's Copy segment: copies what the button would open */
+    document.querySelectorAll('.splitcopy[data-card="' + name + '"]')
+      .forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          copyText(refresh(), btn, 'Copy');
+        });
+      });
+  }
+
+  /* static Copy controls (pill mock, tier-2 split mock, exact lines) */
+  document.querySelectorAll('[data-static]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      copyText(btn.getAttribute('data-static'), btn, 'Copy');
+    });
+  });
+
+  function copyText(text, btn, label) {
+    var ok = function () {
+      btn.classList.add('done'); btn.textContent = 'Copied ✓';
+      setTimeout(function () {
+        btn.classList.remove('done'); btn.textContent = label;
+      }, 1300);
+    };
+    function fallback(t) {   /* file:// mock safety net only */
+      var ta = document.createElement('textarea');
+      ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(ok, function () { fallback(text); ok(); });
+    } else { fallback(text); ok(); }
+  }
+
+  ['blogx', 'sms2', 'ftpg', 'irc'].forEach(setup);
+})();
+</script>
+
+</body>
+</html>
