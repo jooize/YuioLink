@@ -220,12 +220,12 @@
     // deadline (never early; last partial second reads "1 second"). "soon" (≤5 min) then "now".
     const formatCountdown = (expiresIso, createdMs) => {
         const d = parseUtc(expiresIso);
-        if (!d || Number.isNaN(d.getTime())) return { text: "", compact: "", level: "" };
+        if (!d || Number.isNaN(d.getTime())) return { text: "", compact: "", level: "", unit: "" };
         const ms = d.getTime() - Date.now();
         // "expired" keys off the real deadline (not the floored seconds) so the label never
         // flips before the link is actually gone — the last partial second still reads
         // "1 second", matching the greying/Delete-disable which also use the true deadline.
-        if (ms <= 0) return { text: "expired", compact: "expired", level: "now" };
+        if (ms <= 0) return { text: "expired", compact: "expired", level: "now", unit: "" };
         const s = Math.floor(ms / 1000);
         const created = Number(createdMs);
         const fresh = created && Date.now() - created < SET_GRACE_MS && ms >= 120000;
@@ -244,7 +244,9 @@
         else if (ms < 86400000) { const h = Math.floor(ms / 3600000); unit = plural(h, "hour"); short = `${h}h`; }
         else { const days = Math.ceil(ms / 86400000); unit = plural(days, "day"); short = `${days}d`; } // days round up & hold (stay same until the day turns)
         const level = s < 60 ? "now" : s <= 300 ? "soon" : "";
-        return { text: `${unit} left`, compact: short, level };
+        // `unit` is the bare span ("6 days"). Prose that is not a countdown borrows it
+        // rather than stripping the " left" back off `text`.
+        return { text: `${unit} left`, compact: short, level, unit };
     };
     // Result spans show the full phrase; history spans set data-compact for "1h"/"4m".
     const updateCountdown = (span) => {
@@ -409,7 +411,17 @@
                 if (await serverDelete(entry.name, entry.token)) {
                     // serverDelete has already struck the hero through
                     // markPanelWithdrawn — it is the same link.
-                    label.textContent = "Deleted. The name stays reserved until it would have expired.";
+                    //
+                    // Name the time left, the way the 410 page does, since the expiry is
+                    // right here. Deliberately the app.js countdown and not the server's
+                    // humanizer: the two renderers exist separately by design and round
+                    // differently (this one rounds days up and holds, the server rounds
+                    // to the nearest), so the figure can differ by a day near a boundary.
+                    // That is the accepted cost of not fusing them.
+                    const left = formatCountdown(entry.expires, entry.created).unit;
+                    label.textContent = left
+                        ? `Deleted. The name stays reserved for ${left}.`
+                        : "Deleted. The name stays reserved until it would have expired.";
                     del.hidden = true;
                     tombstone(entry, "deleted");
                 } else {
