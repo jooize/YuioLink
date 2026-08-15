@@ -381,9 +381,13 @@
         }
         const del = document.getElementById("delete-result");
         const box = document.getElementById("result-confirm");
-        // Which link the hero is showing, for markPanelWithdrawn.
+        // Which link the hero is showing: the name for markPanelWithdrawn, the history
+        // entry's id for clearResultFor (a tombstone keeps only the id).
         const heroPanel = document.getElementById("link-panel");
-        if (heroPanel) heroPanel.dataset.name = entry.name ?? "";
+        if (heroPanel) {
+            heroPanel.dataset.name = entry.name ?? "";
+            heroPanel.dataset.entry = entry.id ?? "";
+        }
         if (!del || !box) return;
         box.hidden = true;
         box.replaceChildren();
@@ -828,7 +832,12 @@
     // may be a stale reference from a previous render). Returns the index, or -1.
     const findEntry = (it) => {
         if (persistEnabled) memHistory = mergeHistories(memHistory, readStored());
-        return memHistory.findIndex((e) => e.id === it.id);
+        const i = memHistory.findIndex((e) => e.id === it.id);
+        // A cleared entry is gone: what is left under its id is only the death-certificate
+        // other tabs still have to adopt. Writing over it would put the row back on screen
+        // — which is exactly what a stale result panel's Delete used to do, so the row could
+        // be cleared, resurrected, cleared again, forever.
+        return i !== -1 && memHistory[i].tombstone === "cleared" ? -1 : i;
     };
     // Replace the entry in place with a tombstone, purging its url / name / token but keeping
     // the id (so the removal merges across tabs) and created (for ordering).
@@ -846,6 +855,7 @@
         // across tabs instead of being resurrected by another tab's stale copy.
         memHistory[i] = clearedMarker(memHistory[i]);
         persistNow();
+        clearResultFor([memHistory[i].id]);
         renderHistory();
     };
     // Forgetting removes the entry from this device at once. If the link is still live we
@@ -916,6 +926,21 @@
         actions.append(retry);
         overlay.replaceChildren(label, actions);
     };
+    // Take the hero's Delete away and shut its prompt. Called once a link is withdrawn:
+    // the only thing left for that button to do is ask the server to delete a link that
+    // is already gone.
+    const dropPanelDelete = () => {
+        const del = document.getElementById("delete-result");
+        if (del) { del.hidden = true; del.onclick = null; }
+        // Close an unanswered prompt (its Cancel is still there) — it now asks about a
+        // link that is already gone. A prompt already answered is left alone: the hero's
+        // own Delete writes its outcome into this same box just after this runs.
+        const box = document.getElementById("result-confirm");
+        if (box && (!box.firstChild || box.querySelector(".cancel"))) {
+            box.hidden = true;
+            box.replaceChildren();
+        }
+    };
     // The hero shows exactly one link. When that link is withdrawn — from its own
     // Delete, from a history row, or from a forget-grace window — the hero has to say
     // so, and keep saying so. `withdrawn` is the sticky record of that: set once here,
@@ -929,6 +954,26 @@
         const copyBtn = panel.querySelector(".result-copy");
         copyBtn?.classList.add("disabled");
         copyBtn?.removeAttribute("href");
+        dropPanelDelete();
+    };
+    // Clearing a history row also clears the hero, when the hero is showing that same
+    // link: the row was the last record of it, and a hero left standing over a record
+    // that no longer exists is a dead end — it kept offering Delete, and taking it wrote
+    // the row back into the list. Matched by the entry id stamped when the result was
+    // rendered, since a tombstone has already given up its name and url. The panel goes
+    // back to its pre-create state, so the next link fills a clean one.
+    const clearResultFor = (ids) => {
+        const panel = document.getElementById("link-panel");
+        const id = panel?.dataset.entry;
+        if (!panel || !id || !ids.includes(id)) return;
+        panel.hidden = true;
+        panel.classList.remove("withdrawn", "expired", "stale");
+        delete panel.dataset.entry;
+        delete panel.dataset.name;
+        currentResultUrl = null;
+        dropPanelDelete();
+        const box = document.getElementById("result-confirm");
+        if (box) { box.hidden = true; box.replaceChildren(); }
     };
     // Best-effort DELETE on the server; true if the link is gone (204) or already gone
     // (404, expired/reaped). Shared by the confirm-menu Delete and the tombstone out.
@@ -1274,6 +1319,10 @@
         const showReady = (url, kind, expiresIso, uses) => {
             if (linkWordEl) linkWordEl.replaceChildren(nameHalves(url.split("#")[0].split("/").pop()));
             renderUrlInto(linkEl, url);
+            // `withdrawn` is sticky by design (see markPanelWithdrawn) and this is a
+            // different link, so the hero starts alive again — otherwise the link just
+            // created inherited the strike-through of the one deleted before it.
+            panel.classList.remove("withdrawn", "expired");
             const copyBtn = document.getElementById("copy-result");
             if (copyBtn) { copyBtn.href = url; copyBtn.classList.remove("disabled"); }
             buildMeta(metaEl, kind, expiresIso, uses);
@@ -1408,6 +1457,7 @@
             // other tabs instead of being undone by their in-memory copies.
             memHistory = memHistory.map(clearedMarker);
             persistNow();
+            clearResultFor(memHistory.map((it) => it.id));
             setClearMenu(false);
             renderHistory();
         });
@@ -1415,8 +1465,14 @@
             setHistoryOpen(!historyOpen);
         });
         document.getElementById("history-clear-expired")?.addEventListener("click", () => {
-            memHistory = memHistory.map((it) => (isExpired(it) ? clearedMarker(it) : it));
+            const cleared = [];
+            memHistory = memHistory.map((it) => {
+                if (!isExpired(it)) return it;
+                cleared.push(it.id);
+                return clearedMarker(it);
+            });
             persistNow();
+            clearResultFor(cleared);
             setClearMenu(false);
             renderHistory();
         });
