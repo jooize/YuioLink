@@ -30,6 +30,12 @@
     --c-public: #c11574;
     --c-secret: #1a8f3c;
     --c-once: #8b2fc9;
+    /* An explicit port, which decides which server actually answers. Amber, at
+       the same hue (36) as the "you leave" buttons, so it reads as attention
+       rather than alarm: red was ruled out, and yellow cannot clear AA on a
+       light background. 5.40:1 on pure white and 4.96:1 on the glass -- --warn's
+       own #c77a00 would have been 3.10:1, a new contrast failure. */
+    --c-port: #995c00;
 
     --bg-1: #e7e8ec;
     --bg-2: #f6f7f9;
@@ -75,6 +81,9 @@
         --c-public: #ff6fb5;
         --c-secret: #30d158;
         --c-once: #bf5af2;
+        /* The same hue at the weight dark needs, and the exact amber .btn--go
+           already ends its gradient on. 6.94:1 on the lightest glass. */
+        --c-port: #ff9f0a;
 
         --bg-1: #121214;
         --bg-2: #202024;
@@ -1447,10 +1456,21 @@ html.js .custom-field:not(.open) {
     color: var(--text);
 }
 
-/* The port, a keyless fragment, a refused scheme's printed body: content, so
-   they read at full strength like every other value. */
+/* A keyless fragment and a refused scheme's printed body: content, so they read
+   at full strength like every other value. (The port used to be here too; it
+   has its own colour now.) */
 .pv-url .seg {
     color: var(--text);
+}
+
+/* The port, in its own amber, wherever it appears. Regular weight: it is
+   neither a key nor a domain, so it earns no bold and the colour is the whole
+   of its distinction. */
+.pv-url .port,
+.pv-line .port,
+.pv-slice .txt .port,
+.rawline .port {
+    color: var(--c-port);
 }
 
 /* A tail's key — `?xmt`, `&slof`, `;sid`, and an unrolled fragment's keys — is a

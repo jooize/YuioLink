@@ -1136,7 +1136,7 @@ fn one_run_body(uri: &UriView) -> Markup {
                     span.dl { "//" } wbr;
                     (pieces(&slice.display, PieceStyle::Headline))
                 }
-                Role::Port => { span.dl { ":" } span.seg { (slice.value) } }
+                Role::Port => { span.dl { ":" } span.port { (slice.value) } }
                 Role::Path => (path_run(&slice.value)),
                 _ => {
                     @if !slice.delim.is_empty() { span.dl { (slice.delim) } wbr; }
@@ -1283,7 +1283,7 @@ fn slice_rows(uri: &UriView, rows: &[&urlview::Slice]) -> Markup {
                         // magnet hash) drops to its own line whole instead of
                         // orphaning its last three characters, and only breaks
                         // inside itself when a line genuinely cannot hold it.
-                        span.val {
+                        span class=(value_class(slice)) {
                             @if slice.role == Role::Path { (path_slices_markup(&slice.display)) }
                             @else { (pieces(&slice.display, PieceStyle::Slice)) }
                         }
@@ -1291,6 +1291,19 @@ fn slice_rows(uri: &UriView, rows: &[&urlview::Slice]) -> Markup {
                 }
             }
         }
+    }
+}
+
+/// The extra class a slice's value carries, if any.
+///
+/// Only the port has one. An explicit port is unusual, and it decides which
+/// server actually answers, so it gets a colour of its own rather than another
+/// shade of the same grey — see `--c-port` in app.css.
+fn value_class(slice: &urlview::Slice) -> &'static str {
+    if slice.role == Role::Port {
+        "val port"
+    } else {
+        "val"
     }
 }
 
@@ -1359,6 +1372,7 @@ fn stored_value(value: &str, role: Role) -> Markup {
         @for (text, is_escape) in escapes {
             @if is_escape { span.pct { (text) } }
             @else if role == Role::Userinfo { span.usr { (text) } }
+            @else if role == Role::Port { span.port { (text) } }
             @else { (text) }
         }
     }
@@ -1747,7 +1761,7 @@ fn url_line_parts(uri: &UriView) -> Markup {
                 // "you leave", and this is not that.
                 Role::Userinfo => span.usr { (slice.value) },
                 Role::Host => (host_markup(uri)),
-                Role::Port => { span.pn { ":" } span.seg { (slice.value) } },
+                Role::Port => { span.pn { ":" } span.port { (slice.value) } },
                 // The path reads at full strength: it is the part of the line
                 // that says what opens.
                 Role::Path => (path_markup(&slice.display)),
@@ -1919,10 +1933,10 @@ fn stored_runs(slice: &urlview::Slice) -> Vec<(&'static str, String)> {
     if slice.equals {
         out.push(("dl", "=".to_string()));
     }
-    let plain = if slice.role == Role::Userinfo {
-        "usr"
-    } else {
-        ""
+    let plain = match slice.role {
+        Role::Userinfo => "usr",
+        Role::Port => "port",
+        _ => "",
     };
     for (text, is_escape) in escape_runs(&slice.value) {
         out.push((if is_escape { "pct" } else { plain }, text));
@@ -2531,7 +2545,7 @@ mod tests {
         // Userinfo and port are back on the line -- the old renderer had no
         // branch for either and dropped both.
         assert!(c.contains(r#"<span class="usr">alice@</span>"#));
-        assert!(c.contains(r#"<span class="seg">8443</span>"#));
+        assert!(c.contains(r#"<span class="port">8443</span>"#));
         // Decoding changed the `next` value, so the record gets said out loud.
         assert!(c.contains("Exactly as stored"), "{c}");
     }
@@ -2879,9 +2893,42 @@ mod tests {
             ),
             "keys are the signposts: secondary, bold"
         );
+        // The port's own colour, defined once per theme.
+        assert_eq!(
+            APP_CSS.matches("--c-port:").count(),
+            2,
+            "--c-port needs a value in each theme"
+        );
+        assert!(APP_CSS.contains("color: var(--c-port);"));
         // Still dim: the two things that really are inert.
         assert!(APP_CSS.contains(".pv-url .sch {\n    color: var(--text-tertiary);\n}"));
         assert!(APP_CSS.contains(".pv-url .pe {\n    color: var(--text-tertiary);\n}"));
+    }
+
+    /// An explicit port is unusual and it decides which server actually answers,
+    /// so it is the one token that gets a colour of its own rather than another
+    /// shade of grey. It must reach every surface, and it must not drag along
+    /// the keyless fragment it used to share `.seg` with.
+    #[test]
+    fn the_port_is_marked_on_every_surface() {
+        let c = card("https://alice@example.com:8443/reset?next=x");
+        assert!(c.contains(r#"<span class="port">8443</span>"#), "{c}");
+        assert!(
+            c.contains(r#"<span class="val port">"#),
+            "the slice row: {c}"
+        );
+        // The runs preview.js rebuilds the edited line from carry it too.
+        let model = card_model(&urlview::parse_uri("https://example.com:8443/x"));
+        assert!(model.contains(r#"["port","8443"]"#), "{model}");
+        // A one-run headline gets it as well.
+        assert!(
+            card("ftp://files.example.org:2121/pub").contains(r#"<span class="port">2121</span>"#)
+        );
+        // The fragment did not come along for the ride.
+        assert!(
+            card("https://example.com:8443/x#step-2")
+                .contains(r#"<span class="seg">step-2</span>"#)
+        );
     }
 
     /// The shared classes must not drag a cannot-be-a-base scheme anywhere. A
@@ -2897,6 +2944,7 @@ mod tests {
         );
         assert!(c.contains(r#"<span class="k">xt</span>"#), "{c}");
         assert!(!c.contains(r#"class="ps""#), "{c}");
+        assert!(!c.contains(r#"class="port""#), "{c}");
         assert!(card("mailto:a@b.example?subject=Hi").contains(r#"<span class="val">Hi</span>"#));
     }
 

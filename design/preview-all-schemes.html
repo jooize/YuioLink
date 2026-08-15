@@ -217,6 +217,11 @@
        bold keys do that job without draining the line. */
     .pv-url .ps { color: var(--text); }
     .pv-url .qv { color: var(--text); }
+    /* An explicit port decides which server actually answers, so it is the one
+       token with a colour of its own: amber at the "you leave" buttons' hue --
+       attention, not alarm -- contrast-checked in both themes. */
+    .pv-url .port, .pv-line .port,
+    .pv-slice .txt .port, .rawline .port { color: var(--c-port); }
     /* A tail's key is a signpost: bold at the secondary colour, the way the
        slices and both raw lines have always drawn it. Not a new rule -- the URL
        line was the one surface that had never applied it. */
@@ -364,7 +369,7 @@
           <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
-      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="usr">alice@</span><span class="sub">login.</span><span class="reg">example.co.uk</span><span class="pn">:</span><span class="seg">8443</span><span class="pn">/</span><span class="ps">reset</span><span class="pn">?</span><span class="qk">next</span><span class="pn">=</span><span class="qv">https://example-mail.com/</span><span class="pn">&amp;</span><span class="qk">q</span><span class="pn">=</span><span class="qv">hello world</span><span class="pn">#</span><span class="seg">step-2</span></code>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="usr">alice@</span><span class="sub">login.</span><span class="reg">example.co.uk</span><span class="pn">:</span><span class="port">8443</span><span class="pn">/</span><span class="ps">reset</span><span class="pn">?</span><span class="qk">next</span><span class="pn">=</span><span class="qv">https://example-mail.com/</span><span class="pn">&amp;</span><span class="qk">q</span><span class="pn">=</span><span class="qv">hello world</span><span class="pn">#</span><span class="seg">step-2</span></code>
       <div class="pv-facts">
         <span class="pv-fact warn">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -386,7 +391,7 @@
         </div>
         <div class="pv-slice" data-id="port">
           <input type="checkbox" checked disabled aria-label="Port, fixed">
-          <span class="txt"><span class="dl">:</span>8443</span>
+          <span class="txt"><span class="dl">:</span><span class="port">8443</span></span>
         </div>
         <div class="pv-slice" data-id="path">
           <input type="checkbox" checked disabled aria-label="Path, fixed">
@@ -413,7 +418,7 @@
         address — this page is on <code>example.co.uk</code>. And <code>next</code> is
         itself a complete web address, on a different domain.</span>
       <code class="rawline" id="stored-https"><span class="lbl">Exactly as stored
-        <button class="copybtn" data-copy="stored" data-card="https">Copy</button></span><span class="str"><span class="sch">https://</span><span class="usr">alice@</span>login.<span class="reg">example.co.uk</span><span class="dl">:</span>8443<span class="dl">/</span>reset<span class="dl">;</span><span class="k">sid</span><span class="dl">=</span>9f2c<span class="dl">?</span><span class="k">next</span><span class="dl">=</span>https<span class="pct">%3A%2F%2F</span>example-mail.com<span class="pct">%2F</span><span class="dl">&amp;</span><span class="k">q</span><span class="dl">=</span>hello<span class="pct">%20</span>world<span class="dl">#</span>step-2</span></code>
+        <button class="copybtn" data-copy="stored" data-card="https">Copy</button></span><span class="str"><span class="sch">https://</span><span class="usr">alice@</span>login.<span class="reg">example.co.uk</span><span class="dl">:</span><span class="port">8443</span><span class="dl">/</span>reset<span class="dl">;</span><span class="k">sid</span><span class="dl">=</span>9f2c<span class="dl">?</span><span class="k">next</span><span class="dl">=</span>https<span class="pct">%3A%2F%2F</span>example-mail.com<span class="pct">%2F</span><span class="dl">&amp;</span><span class="k">q</span><span class="dl">=</span>hello<span class="pct">%20</span>world<span class="dl">#</span>step-2</span></code>
       <code class="rawline edited" id="edited-https"><span class="lbl">After your edits
         <button class="copybtn" data-copy="edited" data-card="https">Copy</button></span><span class="str"></span></code>
       <div class="pv-split pv-open">
