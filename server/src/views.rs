@@ -1283,7 +1283,7 @@ fn slice_rows(uri: &UriView, rows: &[&urlview::Slice]) -> Markup {
                         // magnet hash) drops to its own line whole instead of
                         // orphaning its last three characters, and only breaks
                         // inside itself when a line genuinely cannot hold it.
-                        span class=(if demoted_value(uri, slice) { "val qv" } else { "val" }) {
+                        span.val {
                             @if slice.role == Role::Path { (path_slices_markup(&slice.display)) }
                             @else { (pieces(&slice.display, PieceStyle::Slice)) }
                         }
@@ -1292,26 +1292,6 @@ fn slice_rows(uri: &UriView, rows: &[&urlview::Slice]) -> Markup {
             }
         }
     }
-}
-
-/// Whether this slice's value is one of the tails that now reads one step back
-/// from the path.
-///
-/// The ladder under the domain was re-ranked on 2026-08-15 at the user's call,
-/// overriding round 4's value emphasis: on a real URL the path says what you are
-/// about to open and the query is usually tracking noise, so full-strength query
-/// VALUES outranking secondary path SEGMENTS read backwards. Path segments now
-/// take full colour (still regular weight -- bold remains the registrable
-/// domain's, site-wide) and query keys, query values, path parameters, and the
-/// fragment all sit at secondary.
-///
-/// Gated on there being an authority at all, which is the same thing as there
-/// being a path to rank against: `magnet:`, `mailto:`, and the other
-/// cannot-be-a-base schemes keep the dress they already had, because a magnet's
-/// parameters are not noise riding along beside a destination -- they ARE the
-/// destination.
-fn demoted_value(uri: &UriView, slice: &urlview::Slice) -> bool {
-    uri.host.is_some() && matches!(slice.role, Role::Query | Role::PathParam | Role::Fragment)
 }
 
 fn slice_class(slice: &urlview::Slice) -> String {
@@ -1368,11 +1348,7 @@ fn stored_markup(uri: &UriView) -> Markup {
             @if !slice.delim.is_empty() { span.dl { (slice.delim) } }
             @if let Some(k) = &slice.key { span.k { (k) } }
             @if slice.equals { span.dl { "=" } }
-            @if demoted_value(uri, slice) {
-                span.qv { (stored_value(&slice.value, slice.role)) }
-            } @else {
-                (stored_value(&slice.value, slice.role))
-            }
+            (stored_value(&slice.value, slice.role))
         }
     }
 }
@@ -1887,7 +1863,7 @@ fn card_model(uri: &UriView) -> String {
                 "fixed": !s.removable,
                 "row": s.is_row(),
                 "label": recipient_label(uri, s),
-                "p": stored_runs(s, demoted_value(uri, s)),
+                "p": stored_runs(s),
             })
         })
         .collect();
@@ -1935,7 +1911,7 @@ fn recipient_label(uri: &UriView, slice: &urlview::Slice) -> Option<String> {
 /// One slice in the exact line's dress, as `(class, text)` runs: a bold key, an
 /// accent `=`, then the value with its percent escapes dimmed to the encoding
 /// noise they are. An empty class means a bare text node.
-fn stored_runs(slice: &urlview::Slice, demoted: bool) -> Vec<(&'static str, String)> {
+fn stored_runs(slice: &urlview::Slice) -> Vec<(&'static str, String)> {
     let mut out: Vec<(&'static str, String)> = Vec::new();
     if let Some(k) = &slice.key {
         out.push(("k", k.clone()));
@@ -1945,8 +1921,6 @@ fn stored_runs(slice: &urlview::Slice, demoted: bool) -> Vec<(&'static str, Stri
     }
     let plain = if slice.role == Role::Userinfo {
         "usr"
-    } else if demoted {
-        "qv"
     } else {
         ""
     };
@@ -2839,68 +2813,91 @@ mod tests {
         );
     }
 
-    /// The ladder under the domain, re-ranked 2026-08-15 at the user's call.
-    /// The inversion it fixes: a long real URL where the path says what you are
-    /// opening and the query is tracking noise used to draw the query VALUES at
-    /// full strength and the path SEGMENTS one step back.
+    /// The register the URL wears, settled 2026-08-15 after the user saw two
+    /// candidates side by side.
+    ///
+    /// It is the raw line's look, applied everywhere: flat full-colour text in
+    /// which the BOLD KEYS carry the structure, with dimming spent only on
+    /// characters that are genuinely inert. A brief experiment demoted the
+    /// tails' VALUES to secondary to lift the path above them; that is reverted,
+    /// because bold keys do the same job without draining the line.
+    ///
+    /// Colour lives in app.css; what this pins is that each token gets the class
+    /// that carries it, and that the classes stay separable.
     #[test]
-    fn the_path_outranks_the_tails_that_ride_beside_it() {
+    fn every_token_on_the_url_line_gets_its_own_class() {
         let c = card("https://www.threads.com/@milestogo13/post/Db3LGarHIem?xmt=AQG0&slof=1");
-        // The domain keeps everything it had.
+        // The domain keeps bold AND full colour AND the wash AND the size -- the
+        // only token wearing all four, which is what keeps its rank unambiguous.
         assert!(c.contains(r#"<span class="reg">threads.com</span>"#), "{c}");
-        // Path segments read at full colour, in their own class.
         for segment in ["@milestogo13", "post", "Db3LGarHIem"] {
             assert!(
                 c.contains(&format!(r#"<span class="ps">{segment}</span>"#)),
                 "{segment} should be a path segment: {c}"
             );
         }
-        // Keys and values of the tails are both one step back in colour, and
-        // the key takes bold on top of that -- a signpost, not a rank above the
-        // domain, which keeps bold AND full colour AND the wash to itself.
+        // Keys are the signposts; values sit beside them at full strength.
         assert!(c.contains(r#"<span class="qk">xmt</span>"#), "{c}");
         assert!(c.contains(r#"<span class="qk">slof</span>"#), "{c}");
         assert!(c.contains(r#"<span class="qv">AQG0</span>"#), "{c}");
 
-        // Path parameters and the fragment demote with the query.
         let mixed = card("https://example.com/a;sid=1/b?q=x#f");
         assert!(mixed.contains(r#"<span class="ps">a</span>"#), "{mixed}");
-        assert!(mixed.contains(r#"<span class="ps">b</span>"#), "{mixed}");
         assert!(mixed.contains(r#"<span class="qk">sid</span>"#), "{mixed}");
         assert!(mixed.contains(r#"<span class="qv">1</span>"#), "{mixed}");
-        // A keyless fragment is not a key and must not read as one; nor is the
-        // port. Both keep `.seg`.
+        // A keyless fragment is a value, not a key, and keeps `.seg`.
         assert!(mixed.contains(r#"<span class="seg">f</span>"#), "{mixed}");
-        assert!(card("https://example.com:8443/x").contains(r#"<span class="seg">8443</span>"#));
-        // An `=`-shaped fragment unrolls, and then its keys ARE keys.
+        // An `=`-shaped fragment unrolls first, so the OAuth case's keys ARE keys.
         let oauth = card("https://example.com/cb#access_token=abc&expires_in=3600");
         assert!(
             oauth.contains(r#"<span class="qk">access_token</span>"#),
             "{oauth}"
         );
-        // The rows and the record wear the same re-rank -- one palette, not a
-        // fork per surface.
-        assert!(mixed.contains(r#"<span class="val qv">"#), "{mixed}");
-
-        // A one-run headline gets it too.
         assert!(
             card("ftp://files.example.org/pub/notes.txt")
                 .contains(r#"<span class="ps">pub</span>"#)
         );
     }
 
+    /// The register itself, which lives in the stylesheet. Pinned because "less
+    /// dimming, not more" is a decision a later tidy-up could quietly undo one
+    /// declaration at a time.
+    #[test]
+    fn the_url_register_keeps_its_colours() {
+        const APP_CSS: &str = include_str!("../static/app.css");
+        assert!(
+            APP_CSS.contains(".pv-url .qv {\n    color: var(--text);\n}"),
+            "query values must read at full strength"
+        );
+        assert!(
+            APP_CSS.contains(".pv-url .seg {\n    color: var(--text);\n}"),
+            "a keyless fragment is a value too"
+        );
+        assert!(
+            APP_CSS.contains(
+                ".pv-url .qk {\n    color: var(--text-secondary);\n    font-weight: 700;\n}"
+            ),
+            "keys are the signposts: secondary, bold"
+        );
+        // Still dim: the two things that really are inert.
+        assert!(APP_CSS.contains(".pv-url .sch {\n    color: var(--text-tertiary);\n}"));
+        assert!(APP_CSS.contains(".pv-url .pe {\n    color: var(--text-tertiary);\n}"));
+    }
+
+    /// The shared classes must not drag a cannot-be-a-base scheme anywhere. A
+    /// magnet has no authority, so nothing to rank a path against; its
+    /// parameters are the destination, not noise beside one, and they read at
+    /// full strength with their keys bold like everything else.
     #[test]
     fn a_cannot_be_a_base_scheme_keeps_the_dress_it_had() {
-        // A magnet's parameters are not noise riding beside a destination --
-        // they ARE the destination, so there is nothing for them to rank under
-        // and the re-rank does not reach them.
         let c = card("magnet:?xt=urn:btih:abc&dn=x.iso");
         assert!(
             c.contains(r#"<span class="val">urn:btih:abc</span>"#),
             "{c}"
         );
-        assert!(!c.contains("val qv"), "{c}");
-        assert!(!card("mailto:a@b.example?subject=Hi").contains("val qv"));
+        assert!(c.contains(r#"<span class="k">xt</span>"#), "{c}");
+        assert!(!c.contains(r#"class="ps""#), "{c}");
+        assert!(card("mailto:a@b.example?subject=Hi").contains(r#"<span class="val">Hi</span>"#));
     }
 
     #[test]

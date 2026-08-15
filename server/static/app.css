@@ -1447,9 +1447,10 @@ html.js .custom-field:not(.open) {
     color: var(--text);
 }
 
-/* The port and a keyless fragment: named parts that are not keys. */
+/* The port, a keyless fragment, a refused scheme's printed body: content, so
+   they read at full strength like every other value. */
 .pv-url .seg {
-    color: var(--text-secondary);
+    color: var(--text);
 }
 
 /* A tail's key — `?xmt`, `&slof`, `;sid`, and an unrolled fragment's keys — is a
@@ -1464,10 +1465,16 @@ html.js .custom-field:not(.open) {
     font-weight: 700;
 }
 
-/* Query values, path parameters, fragment values -- demoted from full colour by
-   the same re-rank. */
+/* Values read at full strength.
+
+   They were briefly demoted to secondary to lift the path above them. The user
+   has now seen both and prefers the register the raw line already had: flat
+   full-colour text in which the bold KEYS carry the structure, with dimming
+   spent only on characters that are genuinely inert -- the scheme and the
+   percent-escapes. Bold keys turn out to do the ranking job without draining
+   the line, so the direction here is LESS dimming, not more. */
 .pv-url .qv {
-    color: var(--text-secondary);
+    color: var(--text);
 }
 
 /* Lookalike / IDN warning: red (danger), plain language, left-aligned table. */
@@ -1998,13 +2005,6 @@ html.js .custom-field:not(.open) {
     color: var(--text-tertiary);
 }
 
-/* One palette everywhere (rounds 18/20), so the re-rank reaches the rows too: a
-   keyed tail's value sits one step back, a path row stays at full colour. Only
-   on the hierarchical schemes -- a magnet's parameters are not noise beside a
-   destination, they are the destination. */
-.pv-slice .txt .qv {
-    color: var(--text-secondary);
-}
 
 .pv-slice .txt .bad {
     color: var(--danger);
@@ -2144,11 +2144,6 @@ html.js .custom-field:not(.open) {
     color: var(--text-tertiary);
 }
 
-/* And on the record, for the same reason. The path is the bare text here, at
-   the line's own full colour. */
-.rawline .qv {
-    color: var(--text-secondary);
-}
 
 .rawline .usr {
     color: var(--danger);

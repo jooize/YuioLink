@@ -210,16 +210,19 @@
        never weight -- bold still means the registrable domain, site-wide.
        Cannot-be-a-base schemes (magnet, mailto, ...) keep their old dress:
        their parameters are not noise beside a destination, they are it. */
+    /* The raw line's register, applied everywhere (settled 2026-08-15): flat
+       full-colour text in which the bold KEYS carry the structure, with dimming
+       spent only on the scheme and the percent-escapes. A brief experiment
+       demoted the tails' values to lift the path above them; reverted, because
+       bold keys do that job without draining the line. */
     .pv-url .ps { color: var(--text); }
-    .pv-url .qv { color: var(--text-secondary); }
+    .pv-url .qv { color: var(--text); }
     /* A tail's key is a signpost: bold at the secondary colour, the way the
        slices and both raw lines have always drawn it. Not a new rule -- the URL
        line was the one surface that had never applied it. */
     .pv-url .qk { color: var(--text-secondary); font-weight: 700; }
     .pv-line .k { color: var(--text-secondary); font-weight: 700; }
     .pv-line .ps { color: var(--text); font-weight: 400; }
-    .pv-slice .txt .qv { color: var(--text-secondary); }
-    .rawline .qv { color: var(--text-secondary); }
 
     /* insecure http: red on the scheme characters; the chip says it in words */
     .pv-url .sch.insecure { color: var(--danger); font-weight: 700; }
