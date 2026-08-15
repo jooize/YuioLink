@@ -2678,13 +2678,15 @@ html.history-collapsed .history-body {
     flex: none;
     display: flex;
     align-items: center;
-    /* Two knobs, deliberately adjacent so either can be tuned or zeroed after a
-       look at the real thing. The first spaces the icons from one another; the
-       second is the extra breathing room before the destructive one, set to
-       double the first so the trash reads as separated from the pair rather
-       than as the third of three. */
-    --row-icon-gap: 6px;
-    --row-trash-gap: 6px;
+    /* Two knobs, deliberately adjacent so either can be tuned or zeroed on its
+       own. The first spaces the icons from one another; the second is extra
+       separation before the destructive one. That second one is 0 by the user's
+       call after seeing it on a real row: the destructive-isolation experiment
+       was tried and rejected. The knob stays, wired and documented at zero,
+       rather than the rule being deleted and the idea having to be
+       rediscovered next time someone wonders. */
+    --row-icon-gap: 5px;
+    --row-trash-gap: 0;
     gap: var(--row-icon-gap);
 }
 
