@@ -203,6 +203,19 @@
     .pv-hedge { display: block; max-width: 92%; margin: 12px auto 0; text-align: center;
       font: 400 11.5px/1.55 var(--font); color: var(--text-tertiary); }
 
+    /* The ladder under the domain, re-ranked 2026-08-15 at the user's call,
+       overriding round 4's value emphasis: on a real URL the path says what
+       opens and the query is usually tracking noise, so full-strength query
+       VALUES over secondary path SEGMENTS read backwards. Path takes colour,
+       never weight -- bold still means the registrable domain, site-wide.
+       Cannot-be-a-base schemes (magnet, mailto, ...) keep their old dress:
+       their parameters are not noise beside a destination, they are it. */
+    .pv-url .ps { color: var(--text); }
+    .pv-url .qv { color: var(--text-secondary); }
+    .pv-line .ps { color: var(--text); font-weight: 400; }
+    .pv-slice .txt .qv { color: var(--text-secondary); }
+    .rawline .qv { color: var(--text-secondary); }
+
     /* insecure http: red on the scheme characters; the chip says it in words */
     .pv-url .sch.insecure { color: var(--danger); font-weight: 700; }
     .pv-url .usr { color: var(--danger); font-weight: 700; }
@@ -298,7 +311,7 @@
           <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
-      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">blog.</span><span class="reg">example.com</span><span class="pn">/</span><span class="seg">articles</span><span class="pn">/</span><span class="seg">2026</span><span class="pn">/</span><span class="seg">preview-design</span><span class="pn">?</span><span class="seg">ref</span><span class="pn">=</span><span class="qv">newsletter</span></code>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">blog.</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">articles</span><span class="pn">/</span><span class="ps">2026</span><span class="pn">/</span><span class="ps">preview-design</span><span class="pn">?</span><span class="seg">ref</span><span class="pn">=</span><span class="qv">newsletter</span></code>
       <details class="pv-parts">
         <summary class="pv-parts-lid"><span class="when-closed">Show the parts</span><span class="when-open">Hide the parts</span></summary>
         <div class="pv-slices" id="s-blog">
@@ -343,7 +356,7 @@
           <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
-      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="usr">alice@</span><span class="sub">login.</span><span class="reg">example.co.uk</span><span class="pn">:</span><span class="seg">8443</span><span class="pn">/</span><span class="seg">reset</span><span class="pn">?</span><span class="seg">next</span><span class="pn">=</span><span class="qv">https://example-mail.com/</span><span class="pn">&amp;</span><span class="seg">q</span><span class="pn">=</span><span class="qv">hello world</span><span class="pn">#</span><span class="seg">step-2</span></code>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="usr">alice@</span><span class="sub">login.</span><span class="reg">example.co.uk</span><span class="pn">:</span><span class="seg">8443</span><span class="pn">/</span><span class="ps">reset</span><span class="pn">?</span><span class="seg">next</span><span class="pn">=</span><span class="qv">https://example-mail.com/</span><span class="pn">&amp;</span><span class="seg">q</span><span class="pn">=</span><span class="qv">hello world</span><span class="pn">#</span><span class="seg">step-2</span></code>
       <div class="pv-facts">
         <span class="pv-fact warn">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -426,7 +439,7 @@
           <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
-      <code class="pv-url"><span class="sch insecure">http</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="seg">pay</span></code>
+      <code class="pv-url"><span class="sch insecure">http</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">pay</span></code>
       <div class="pv-facts">
         <span class="pv-fact warn">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -885,7 +898,7 @@
           <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
-      <code class="pv-line"><span class="sch-big">ircs<span class="colon">:</span></span><span class="dl">//</span><wbr><span class="reg">libera.chat</span><span class="dl">/</span><wbr><span class="seg">yuiolink</span></code>
+      <code class="pv-line"><span class="sch-big">ircs<span class="colon">:</span></span><span class="dl">//</span><wbr><span class="reg">libera.chat</span><span class="dl">/</span><wbr><span class="ps">yuiolink</span></code>
       <div class="pv-split pv-open">
         <a class="btn btn--go btn-2 btn-link go" href="#" style="margin-top:0">
           <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">ircs:</span></span>
@@ -916,7 +929,7 @@
           <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
-      <code class="pv-line"><span class="sch-big">ftp<span class="colon">:</span></span><span class="dl">//</span><wbr><span class="seg">files.</span><span class="reg">example.org</span><span class="dl">/</span><wbr><span class="seg">pub</span><span class="dl">/</span><span class="seg">notes.txt</span></code>
+      <code class="pv-line"><span class="sch-big">ftp<span class="colon">:</span></span><span class="dl">//</span><wbr><span class="seg">files.</span><span class="reg">example.org</span><span class="dl">/</span><wbr><span class="ps">pub</span><span class="dl">/</span><span class="ps">notes.txt</span></code>
       <div class="pv-split pv-open">
         <a class="btn btn--go btn-2 btn-link go" href="#" style="margin-top:0">
           <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">ftp:</span></span>

@@ -1433,12 +1433,29 @@ html.js .custom-field:not(.open) {
     background: color-mix(in srgb, var(--accent) 13%, transparent);
 }
 
+/* The ladder under the domain, re-ranked 2026-08-15 at the user's call, which
+   overrides round 4's value emphasis. On a real URL the path is what says what
+   you are about to open and the query is usually tracking noise, so the old
+   order -- full-strength query VALUES over secondary path SEGMENTS -- read
+   backwards on exactly the long links where it mattered.
+
+   Reading down: the registrable domain (bold + wash + 1.06em, untouched), then
+   the path at full colour, then every tail at secondary, then the punctuation
+   and escapes. The path takes colour but NOT weight: bold still means one thing
+   site-wide, and that thing is the registrable domain. */
+.pv-url .ps {
+    color: var(--text);
+}
+
+/* Query keys, the port, and a keyless fragment. */
 .pv-url .seg {
     color: var(--text-secondary);
 }
 
+/* Query values, path parameters, fragment values -- demoted from full colour by
+   the same re-rank. */
 .pv-url .qv {
-    color: var(--text);
+    color: var(--text-secondary);
 }
 
 /* Lookalike / IDN warning: red (danger), plain language, left-aligned table. */
@@ -1638,6 +1655,13 @@ html.js .custom-field:not(.open) {
 
 .pv-line .seg {
     color: var(--text-secondary);
+    font-weight: 400;
+}
+
+/* Same re-rank on a one-run headline (ftp, irc): the path reads at full colour,
+   regular weight. */
+.pv-line .ps {
+    color: var(--text);
     font-weight: 400;
 }
 
@@ -1955,6 +1979,14 @@ html.js .custom-field:not(.open) {
     color: var(--text-tertiary);
 }
 
+/* One palette everywhere (rounds 18/20), so the re-rank reaches the rows too: a
+   keyed tail's value sits one step back, a path row stays at full colour. Only
+   on the hierarchical schemes -- a magnet's parameters are not noise beside a
+   destination, they are the destination. */
+.pv-slice .txt .qv {
+    color: var(--text-secondary);
+}
+
 .pv-slice .txt .bad {
     color: var(--danger);
     font-weight: 700;
@@ -2091,6 +2123,12 @@ html.js .custom-field:not(.open) {
 
 .rawline .pct {
     color: var(--text-tertiary);
+}
+
+/* And on the record, for the same reason. The path is the bare text here, at
+   the line's own full colour. */
+.rawline .qv {
+    color: var(--text-secondary);
 }
 
 .rawline .usr {

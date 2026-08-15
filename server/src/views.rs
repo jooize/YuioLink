@@ -1283,7 +1283,7 @@ fn slice_rows(uri: &UriView, rows: &[&urlview::Slice]) -> Markup {
                         // magnet hash) drops to its own line whole instead of
                         // orphaning its last three characters, and only breaks
                         // inside itself when a line genuinely cannot hold it.
-                        span.val {
+                        span class=(if demoted_value(uri, slice) { "val qv" } else { "val" }) {
                             @if slice.role == Role::Path { (path_slices_markup(&slice.display)) }
                             @else { (pieces(&slice.display, PieceStyle::Slice)) }
                         }
@@ -1292,6 +1292,26 @@ fn slice_rows(uri: &UriView, rows: &[&urlview::Slice]) -> Markup {
             }
         }
     }
+}
+
+/// Whether this slice's value is one of the tails that now reads one step back
+/// from the path.
+///
+/// The ladder under the domain was re-ranked on 2026-08-15 at the user's call,
+/// overriding round 4's value emphasis: on a real URL the path says what you are
+/// about to open and the query is usually tracking noise, so full-strength query
+/// VALUES outranking secondary path SEGMENTS read backwards. Path segments now
+/// take full colour (still regular weight -- bold remains the registrable
+/// domain's, site-wide) and query keys, query values, path parameters, and the
+/// fragment all sit at secondary.
+///
+/// Gated on there being an authority at all, which is the same thing as there
+/// being a path to rank against: `magnet:`, `mailto:`, and the other
+/// cannot-be-a-base schemes keep the dress they already had, because a magnet's
+/// parameters are not noise riding along beside a destination -- they ARE the
+/// destination.
+fn demoted_value(uri: &UriView, slice: &urlview::Slice) -> bool {
+    uri.host.is_some() && matches!(slice.role, Role::Query | Role::PathParam | Role::Fragment)
 }
 
 fn slice_class(slice: &urlview::Slice) -> String {
@@ -1348,7 +1368,11 @@ fn stored_markup(uri: &UriView) -> Markup {
             @if !slice.delim.is_empty() { span.dl { (slice.delim) } }
             @if let Some(k) = &slice.key { span.k { (k) } }
             @if slice.equals { span.dl { "=" } }
-            (stored_value(&slice.value, slice.role))
+            @if demoted_value(uri, slice) {
+                span.qv { (stored_value(&slice.value, slice.role)) }
+            } @else {
+                (stored_value(&slice.value, slice.role))
+            }
         }
     }
 }
@@ -1748,6 +1772,8 @@ fn url_line_parts(uri: &UriView) -> Markup {
                 Role::Userinfo => span.usr { (slice.value) },
                 Role::Host => (host_markup(uri)),
                 Role::Port => { span.pn { ":" } span.seg { (slice.value) } },
+                // The path reads at full strength: it is the part of the line
+                // that says what opens.
                 Role::Path => (path_markup(&slice.display)),
                 Role::Opaque => span.seg { (pieces(&slice.display, PieceStyle::Url)) },
                 // A keyless fragment is one literal segment; a keyed part is a
@@ -1784,7 +1810,7 @@ fn path_run(path: &str) -> Markup {
     html! {
         @for (n, part) in path.split('/').enumerate() {
             @if n > 0 { span.dl { "/" } wbr; }
-            @if !part.is_empty() { span.seg { (part) } }
+            @if !part.is_empty() { span.ps { (part) } }
         }
     }
 }
@@ -1805,7 +1831,7 @@ fn path_markup(display: &[Piece]) -> Markup {
     html! {
         @for (n, part) in text.split('/').enumerate() {
             @if n > 0 { span.pn { "/" } }
-            @if !part.is_empty() { span.seg { (part) } }
+            @if !part.is_empty() { span.ps { (part) } }
         }
     }
 }
@@ -1857,7 +1883,7 @@ fn card_model(uri: &UriView) -> String {
                 "fixed": !s.removable,
                 "row": s.is_row(),
                 "label": recipient_label(uri, s),
-                "p": stored_runs(s),
+                "p": stored_runs(s, demoted_value(uri, s)),
             })
         })
         .collect();
@@ -1905,7 +1931,7 @@ fn recipient_label(uri: &UriView, slice: &urlview::Slice) -> Option<String> {
 /// One slice in the exact line's dress, as `(class, text)` runs: a bold key, an
 /// accent `=`, then the value with its percent escapes dimmed to the encoding
 /// noise they are. An empty class means a bare text node.
-fn stored_runs(slice: &urlview::Slice) -> Vec<(&'static str, String)> {
+fn stored_runs(slice: &urlview::Slice, demoted: bool) -> Vec<(&'static str, String)> {
     let mut out: Vec<(&'static str, String)> = Vec::new();
     if let Some(k) = &slice.key {
         out.push(("k", k.clone()));
@@ -1915,6 +1941,8 @@ fn stored_runs(slice: &urlview::Slice) -> Vec<(&'static str, String)> {
     }
     let plain = if slice.role == Role::Userinfo {
         "usr"
+    } else if demoted {
+        "qv"
     } else {
         ""
     };
@@ -2805,6 +2833,56 @@ mod tests {
             mail.contains(r#"<span class="lp">archive</span><span class="dl">@</span><span class="reg">records.example</span>"#),
             "{mail}"
         );
+    }
+
+    /// The ladder under the domain, re-ranked 2026-08-15 at the user's call.
+    /// The inversion it fixes: a long real URL where the path says what you are
+    /// opening and the query is tracking noise used to draw the query VALUES at
+    /// full strength and the path SEGMENTS one step back.
+    #[test]
+    fn the_path_outranks_the_tails_that_ride_beside_it() {
+        let c = card("https://www.threads.com/@milestogo13/post/Db3LGarHIem?xmt=AQG0&slof=1");
+        // The domain keeps everything it had.
+        assert!(c.contains(r#"<span class="reg">threads.com</span>"#), "{c}");
+        // Path segments read at full colour, in their own class.
+        for segment in ["@milestogo13", "post", "Db3LGarHIem"] {
+            assert!(
+                c.contains(&format!(r#"<span class="ps">{segment}</span>"#)),
+                "{segment} should be a path segment: {c}"
+            );
+        }
+        // Keys and values of the tails are both one step back.
+        assert!(c.contains(r#"<span class="seg">xmt</span>"#), "{c}");
+        assert!(c.contains(r#"<span class="qv">AQG0</span>"#), "{c}");
+
+        // Path parameters and the fragment demote with the query.
+        let mixed = card("https://example.com/a;sid=1/b?q=x#f");
+        assert!(mixed.contains(r#"<span class="ps">a</span>"#), "{mixed}");
+        assert!(mixed.contains(r#"<span class="ps">b</span>"#), "{mixed}");
+        assert!(mixed.contains(r#"<span class="qv">1</span>"#), "{mixed}");
+        // The rows and the record wear the same re-rank -- one palette, not a
+        // fork per surface.
+        assert!(mixed.contains(r#"<span class="val qv">"#), "{mixed}");
+
+        // A one-run headline gets it too.
+        assert!(
+            card("ftp://files.example.org/pub/notes.txt")
+                .contains(r#"<span class="ps">pub</span>"#)
+        );
+    }
+
+    #[test]
+    fn a_cannot_be_a_base_scheme_keeps_the_dress_it_had() {
+        // A magnet's parameters are not noise riding beside a destination --
+        // they ARE the destination, so there is nothing for them to rank under
+        // and the re-rank does not reach them.
+        let c = card("magnet:?xt=urn:btih:abc&dn=x.iso");
+        assert!(
+            c.contains(r#"<span class="val">urn:btih:abc</span>"#),
+            "{c}"
+        );
+        assert!(!c.contains("val qv"), "{c}");
+        assert!(!card("mailto:a@b.example?subject=Hi").contains("val qv"));
     }
 
     #[test]
