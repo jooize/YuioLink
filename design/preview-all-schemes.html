@@ -212,6 +212,11 @@
        their parameters are not noise beside a destination, they are it. */
     .pv-url .ps { color: var(--text); }
     .pv-url .qv { color: var(--text-secondary); }
+    /* A tail's key is a signpost: bold at the secondary colour, the way the
+       slices and both raw lines have always drawn it. Not a new rule -- the URL
+       line was the one surface that had never applied it. */
+    .pv-url .qk { color: var(--text-secondary); font-weight: 700; }
+    .pv-line .k { color: var(--text-secondary); font-weight: 700; }
     .pv-line .ps { color: var(--text); font-weight: 400; }
     .pv-slice .txt .qv { color: var(--text-secondary); }
     .rawline .qv { color: var(--text-secondary); }
@@ -311,7 +316,7 @@
           <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
-      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">blog.</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">articles</span><span class="pn">/</span><span class="ps">2026</span><span class="pn">/</span><span class="ps">preview-design</span><span class="pn">?</span><span class="seg">ref</span><span class="pn">=</span><span class="qv">newsletter</span></code>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">blog.</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">articles</span><span class="pn">/</span><span class="ps">2026</span><span class="pn">/</span><span class="ps">preview-design</span><span class="pn">?</span><span class="qk">ref</span><span class="pn">=</span><span class="qv">newsletter</span></code>
       <details class="pv-parts">
         <summary class="pv-parts-lid"><span class="when-closed">Show the parts</span><span class="when-open">Hide the parts</span></summary>
         <div class="pv-slices" id="s-blog">
@@ -356,7 +361,7 @@
           <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
                 stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
-      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="usr">alice@</span><span class="sub">login.</span><span class="reg">example.co.uk</span><span class="pn">:</span><span class="seg">8443</span><span class="pn">/</span><span class="ps">reset</span><span class="pn">?</span><span class="seg">next</span><span class="pn">=</span><span class="qv">https://example-mail.com/</span><span class="pn">&amp;</span><span class="seg">q</span><span class="pn">=</span><span class="qv">hello world</span><span class="pn">#</span><span class="seg">step-2</span></code>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="usr">alice@</span><span class="sub">login.</span><span class="reg">example.co.uk</span><span class="pn">:</span><span class="seg">8443</span><span class="pn">/</span><span class="ps">reset</span><span class="pn">?</span><span class="qk">next</span><span class="pn">=</span><span class="qv">https://example-mail.com/</span><span class="pn">&amp;</span><span class="qk">q</span><span class="pn">=</span><span class="qv">hello world</span><span class="pn">#</span><span class="seg">step-2</span></code>
       <div class="pv-facts">
         <span class="pv-fact warn">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">

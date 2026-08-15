@@ -1784,7 +1784,11 @@ fn url_line_parts(uri: &UriView) -> Markup {
                 }
                 _ => {
                     span.pn { (slice.delim) }
-                    @if let Some(k) = &slice.key { span.seg { (k) } }
+                    // A tail's key is a signpost, so it takes the bold the
+                    // slices and the exact line have always given it. `.seg` is
+                    // left to the port and a keyless fragment, which are not
+                    // keys and must not read as ones.
+                    @if let Some(k) = &slice.key { span.qk { (k) } }
                     @if slice.equals { span.pn { "=" } }
                     span.qv { (pieces(&slice.display, PieceStyle::Url)) }
                 }
@@ -2851,15 +2855,29 @@ mod tests {
                 "{segment} should be a path segment: {c}"
             );
         }
-        // Keys and values of the tails are both one step back.
-        assert!(c.contains(r#"<span class="seg">xmt</span>"#), "{c}");
+        // Keys and values of the tails are both one step back in colour, and
+        // the key takes bold on top of that -- a signpost, not a rank above the
+        // domain, which keeps bold AND full colour AND the wash to itself.
+        assert!(c.contains(r#"<span class="qk">xmt</span>"#), "{c}");
+        assert!(c.contains(r#"<span class="qk">slof</span>"#), "{c}");
         assert!(c.contains(r#"<span class="qv">AQG0</span>"#), "{c}");
 
         // Path parameters and the fragment demote with the query.
         let mixed = card("https://example.com/a;sid=1/b?q=x#f");
         assert!(mixed.contains(r#"<span class="ps">a</span>"#), "{mixed}");
         assert!(mixed.contains(r#"<span class="ps">b</span>"#), "{mixed}");
+        assert!(mixed.contains(r#"<span class="qk">sid</span>"#), "{mixed}");
         assert!(mixed.contains(r#"<span class="qv">1</span>"#), "{mixed}");
+        // A keyless fragment is not a key and must not read as one; nor is the
+        // port. Both keep `.seg`.
+        assert!(mixed.contains(r#"<span class="seg">f</span>"#), "{mixed}");
+        assert!(card("https://example.com:8443/x").contains(r#"<span class="seg">8443</span>"#));
+        // An `=`-shaped fragment unrolls, and then its keys ARE keys.
+        let oauth = card("https://example.com/cb#access_token=abc&expires_in=3600");
+        assert!(
+            oauth.contains(r#"<span class="qk">access_token</span>"#),
+            "{oauth}"
+        );
         // The rows and the record wear the same re-rank -- one palette, not a
         // fork per surface.
         assert!(mixed.contains(r#"<span class="val qv">"#), "{mixed}");

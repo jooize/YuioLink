@@ -1447,9 +1447,21 @@ html.js .custom-field:not(.open) {
     color: var(--text);
 }
 
-/* Query keys, the port, and a keyless fragment. */
+/* The port and a keyless fragment: named parts that are not keys. */
 .pv-url .seg {
     color: var(--text-secondary);
+}
+
+/* A tail's key — `?xmt`, `&slof`, `;sid`, and an unrolled fragment's keys — is a
+   signpost, so it takes bold at the secondary colour. This is not a new rule but
+   the one surface that had never applied it: "bold means a registrable domain;
+   parameter keys are also bold, as navigation signposts" is settled design, and
+   the slice rows and both raw lines have drawn keys this way all along. Dim bold
+   keeps the ranking unambiguous — the registrable domain is still the only thing
+   wearing bold AND full colour AND the wash. */
+.pv-url .qk {
+    color: var(--text-secondary);
+    font-weight: 700;
 }
 
 /* Query values, path parameters, fragment values -- demoted from full colour by
@@ -1663,6 +1675,13 @@ html.js .custom-field:not(.open) {
 .pv-line .ps {
     color: var(--text);
     font-weight: 400;
+}
+
+/* And a key there is a key too (an irc channel key, say). Without this it would
+   inherit the headline's own 700 at full colour and outrank the domain. */
+.pv-line .k {
+    color: var(--text-secondary);
+    font-weight: 700;
 }
 
 .pv-line .dl {
