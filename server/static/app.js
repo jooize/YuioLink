@@ -256,9 +256,17 @@
         // its rows instead) and disables Copy — the link no longer resolves. History
         // countdowns sit outside .result, so this no-ops for them. Live, since this runs
         // every tick via tickCountdowns().
+        //
+        // A link dies two ways and only one of them is on the clock: it runs out, or
+        // its creator withdraws it. This function owns the first and must not overwrite
+        // the second, so a withdrawal is remembered on the panel and read back here.
+        // Without that, the tick after a delete quietly un-struck a link the server had
+        // already stopped serving — and since ticks land on display boundaries (or the
+        // moment the tab is shown again), it looked intermittent and looked like the
+        // fault of whatever the user happened to click next.
         const panel = span.closest(".result");
         if (panel) {
-            const dead = text === "expired";
+            const dead = text === "expired" || panel.classList.contains("withdrawn");
             panel.classList.toggle("expired", dead);
             const copyBtn = panel.querySelector(".result-copy");
             if (copyBtn) {
@@ -371,6 +379,9 @@
         }
         const del = document.getElementById("delete-result");
         const box = document.getElementById("result-confirm");
+        // Which link the hero is showing, for markPanelWithdrawn.
+        const heroPanel = document.getElementById("link-panel");
+        if (heroPanel) heroPanel.dataset.name = entry.name ?? "";
         if (!del || !box) return;
         box.hidden = true;
         box.replaceChildren();
@@ -396,11 +407,10 @@
                 cancel.remove();
                 go.remove();
                 if (await serverDelete(entry.name, entry.token)) {
+                    // serverDelete has already struck the hero through
+                    // markPanelWithdrawn — it is the same link.
                     label.textContent = "Deleted. The name stays reserved until it would have expired.";
                     del.hidden = true;
-                    const panel = document.getElementById("link-panel");
-                    panel?.classList.add("expired");
-                    document.getElementById("copy-result")?.classList.add("disabled");
                     tombstone(entry, "deleted");
                 } else {
                     label.textContent = "Could not delete the link.";
@@ -894,6 +904,20 @@
         actions.append(retry);
         overlay.replaceChildren(label, actions);
     };
+    // The hero shows exactly one link. When that link is withdrawn — from its own
+    // Delete, from a history row, or from a forget-grace window — the hero has to say
+    // so, and keep saying so. `withdrawn` is the sticky record of that: set once here,
+    // never cleared, and read by updateCountdown, which owns `.expired` on the clock.
+    // Matched by name off a dataset stamped when the result was rendered, rather than
+    // by reading the displayed text, so it does not depend on how the URL is drawn.
+    const markPanelWithdrawn = (name) => {
+        const panel = document.getElementById("link-panel");
+        if (!panel || !name || panel.dataset.name !== name) return;
+        panel.classList.add("withdrawn", "expired");
+        const copyBtn = panel.querySelector(".result-copy");
+        copyBtn?.classList.add("disabled");
+        copyBtn?.removeAttribute("href");
+    };
     // Best-effort DELETE on the server; true if the link is gone (204) or already gone
     // (404, expired/reaped). Shared by the confirm-menu Delete and the tombstone out.
     const serverDelete = async (name, token) => {
@@ -902,7 +926,11 @@
                 method: "DELETE",
                 headers: { Authorization: `Bearer ${token}` },
             });
-            return resp.ok || resp.status === 404;
+            const gone = resp.ok || resp.status === 404;
+            // Marked here rather than at each call site, so no delete path added later
+            // can forget to: every one of them comes through this function.
+            if (gone) markPanelWithdrawn(name);
+            return gone;
         } catch {
             return false;
         }

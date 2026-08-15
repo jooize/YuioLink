@@ -2739,6 +2739,30 @@ mod tests {
         }
     }
 
+    /// `withdrawn` is a three-file agreement — app.js sets it, app.js reads it
+    /// back, and app.css draws it — which is the shape of mistake that already
+    /// cost this project once (see the parts-model tests above). A rename in one
+    /// file silently un-strikes a dead link, which is the one thing the class
+    /// exists to prevent.
+    #[test]
+    fn the_withdrawn_marker_is_set_read_and_drawn() {
+        const APP_JS: &str = include_str!("../static/app.js");
+        const APP_CSS: &str = include_str!("../static/app.css");
+        assert!(
+            APP_JS.contains(r#"classList.add("withdrawn", "expired")"#),
+            "app.js no longer marks a withdrawn link"
+        );
+        assert!(
+            APP_JS.contains(r#"panel.classList.contains("withdrawn")"#),
+            "the countdown no longer reads the marker, so the next tick will \
+             un-strike a link the server has stopped serving"
+        );
+        assert!(
+            APP_CSS.contains(".result.withdrawn .result-word"),
+            "app.css no longer strikes a withdrawn link"
+        );
+    }
+
     #[test]
     fn no_markup_crosses_into_the_parts_model() {
         // The site's CSP carries `require-trusted-types-for 'script'` with no

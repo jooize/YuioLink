@@ -939,9 +939,13 @@ html.js .custom-field:not(.open) {
 }
 
 /* A dead result strikes through both the hero name word and the URL — the link no
-   longer resolves, so its whole identity reads as crossed out. */
+   longer resolves, so its whole identity reads as crossed out.
+   `.withdrawn` is listed as well as `.expired`: a withdrawn link is dead whatever
+   its clock says, and the strike must not wait for, or depend on, a countdown tick. */
 .result.expired .result-word,
-.result.expired .result-url {
+.result.expired .result-url,
+.result.withdrawn .result-word,
+.result.withdrawn .result-url {
     text-decoration: line-through;
 }
 
