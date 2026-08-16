@@ -2071,13 +2071,25 @@ html.js .custom-field:not(.open) {
 .pv-parts-lid {
     list-style: none;
     cursor: pointer;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
     text-align: center;
     font-family: var(--font);
     font-size: 12px;
     font-weight: 600;
     line-height: 1.4;
     color: var(--text-secondary);
-    padding: 6px;
+    padding: 9px 12px;
+    /* A quiet full-width bar, dressed like a field so it reads as a control
+       rather than a stray caption line. */
+    background: var(--field-bg);
+    border: 0.5px solid var(--field-border);
+    border-radius: 10px;
+}
+
+.pv-parts-lid:hover {
+    color: var(--text);
 }
 
 .pv-parts-lid::-webkit-details-marker {
@@ -2703,7 +2715,7 @@ html.history-collapsed .history-body {
        was tried and rejected. The knob stays, wired and documented at zero,
        rather than the rule being deleted and the idea having to be
        rediscovered next time someone wonders. */
-    --row-icon-gap: 5px;
+    --row-icon-gap: 0;
     --row-trash-gap: 0;
     gap: var(--row-icon-gap);
 }
@@ -2897,7 +2909,8 @@ html.history-collapsed .history-body {
     flex: 1;
     min-width: 0;
     font-size: 12px;
-    color: var(--text-secondary);
+    /* Full-strength text: this is the question being asked, not a caption. */
+    color: var(--text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
