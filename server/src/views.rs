@@ -1344,7 +1344,7 @@ fn exact_line(uri: &UriView) -> Markup {
     }
     html! {
         code.rawline {
-            span.lbl { "Exactly as stored" }
+            span.lbl { "Exactly as Stored" }
             span.str { (stored_markup(uri)) }
         }
     }
@@ -2524,7 +2524,7 @@ mod tests {
         assert!(c.contains("Show URL Details"));
         assert!(c.contains("Continue to example.com"));
         // The URL line already is the stored string, so nothing is restated.
-        assert!(!c.contains("Exactly as stored"), "{c}");
+        assert!(!c.contains("Exactly as Stored"), "{c}");
     }
 
     #[test]
@@ -2547,7 +2547,7 @@ mod tests {
         assert!(c.contains(r#"<span class="usr">alice@</span>"#));
         assert!(c.contains(r#"<span class="port">8443</span>"#));
         // Decoding changed the `next` value, so the record gets said out loud.
-        assert!(c.contains("Exactly as stored"), "{c}");
+        assert!(c.contains("Exactly as Stored"), "{c}");
     }
 
     #[test]
@@ -2560,7 +2560,7 @@ mod tests {
         ] {
             let c = card(stored);
             assert!(c.contains(r#"<code class="pv-line""#), "{stored}: {c}");
-            assert!(!c.contains("Exactly as stored"), "{stored}: {c}");
+            assert!(!c.contains("Exactly as Stored"), "{stored}: {c}");
             assert!(c.contains("What opens it, if anything"), "{stored}");
         }
     }
@@ -2574,7 +2574,7 @@ mod tests {
             "magnet:?xt=urn:btih:abc&dn=x.iso",
             "xmpp:lobby@rooms.example.org?join",
         ] {
-            assert!(card(stored).contains("Exactly as stored"), "{stored}");
+            assert!(card(stored).contains("Exactly as Stored"), "{stored}");
         }
     }
 
@@ -2633,7 +2633,7 @@ mod tests {
             assert!(!c.contains("<input"), "{stored}: {c}");
             assert!(!c.contains("copybtn"), "{stored}: {c}");
             assert!(!c.contains("pv-split"), "{stored}: {c}");
-            assert!(!c.contains("After your edits"), "{stored}: {c}");
+            assert!(!c.contains("After Your Edits"), "{stored}: {c}");
             // The action is a full-width link either way.
             assert!(c.contains("btn-block"), "{stored}: {c}");
         }

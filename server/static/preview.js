@@ -242,7 +242,7 @@
             line.className = "rawline edited";
             const label = document.createElement("span");
             label.className = "lbl";
-            label.textContent = "After your edits";
+            label.textContent = "After Your Edits";
             const copy = document.createElement("button");
             copy.type = "button";
             copy.className = "copybtn";
