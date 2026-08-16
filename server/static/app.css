@@ -19,9 +19,6 @@
     /* The name in the footer credit: the site's purple, darkened until 12.5px
        text clears 4.5:1 on the glass. */
     --credit-jooize: #8b2fc9;
-    /* The alternate name-word colour, paired with the accent: a deep navy so a
-       multi-word name reads as blue/navy/blue/navy — two blues, no purple. */
-    --word-alt: #003e8f;
 
     /* Per-type colour key for the link-type picker: Public rose (open), Secret
        green (secure), One-Time purple (single-use). Public deliberately sits
@@ -77,7 +74,6 @@
            deepens. */
         --credit-jooize: #c77dff;
         /* Dark inverts the pairing: the alt word goes pale, the accent stays mid. */
-        --word-alt: #99c5ff;
         --c-public: #ff6fb5;
         --c-secret: #30d158;
         --c-once: #bf5af2;
@@ -979,11 +975,17 @@ html.js .custom-field:not(.open) {
 .result-url .nw-0,
 .result-url .nw-1 { color: inherit; }
 
-/* Shoutkey name words, alternating colour so a multi-word name reads as separate
-   words (the result hero, the URL name, history rows, and the interstitial). The
-   explicit per-word colour overrides whatever the surrounding context paints. */
-.nw-0 { color: var(--accent); }
-.nw-1 { color: var(--word-alt); }
+/* Shoutkey name words (the result hero, the URL name, history rows, and the
+   interstitial). One colour per context with a hairline of air at each case
+   boundary, so a multi-word name reads the way a compound word does. The
+   two-colour alternation (accent/navy here, text/grey in the lists) was tried
+   and retired: the case already marks the boundary, and the second colour
+   asked to be decoded as meaning. */
+.nw-0,
+.nw-1 { color: var(--accent); }
+
+.nw + .nw,
+.nwg + .nwg { margin-left: 0.09em; }
 
 /* The preview page uses a plainer inline code (no box). Must exclude the result
    hero word — this selector (0,2,1) otherwise outweighs `.result-word` (0,1,0) and
@@ -1341,13 +1343,11 @@ html.js .custom-field:not(.open) {
     white-space: nowrap;
 }
 
-/* Beats the global .nw-0/.nw-1 accent pairing (0,2,0 over 0,1,0). */
-.pv-name .nw-0 {
-    color: var(--text);
-}
-
+/* Beats the global .nw-0/.nw-1 accent (0,2,0 over 0,1,0): the interstitial
+   hero stays greyscale. */
+.pv-name .nw-0,
 .pv-name .nw-1 {
-    color: var(--text-secondary);
+    color: var(--text);
 }
 
 .pv-hostline {
@@ -2776,13 +2776,11 @@ html.history-collapsed .history-body {
 }
 
 /* The name is the point of the row, so it runs bold at full strength to outshine the
-   host. It stays greyscale (never accent/purple — that's the result hero's job); the
-   alternating case alone separates the words — uniform weight reads cleaner than a
-   mixed-weight split. */
+   host. It stays greyscale (never accent/purple — that's the result hero's job), in
+   one colour: the alternating case plus the global hairline gap separate the words. */
 .history-url .u-name { color: var(--text); font-weight: 600; }
-.history-url .nw-0 { color: var(--text); }
-/* In the dense list the alternation stays monochrome: text/grey/text/grey. */
-.history-url .nw-1 { color: var(--text-secondary); }
+.history-url .nw-0,
+.history-url .nw-1 { color: var(--text); }
 
 /* Line 2: kind pill + expiry, in the UI font (mockup A). */
 .history-meta {
