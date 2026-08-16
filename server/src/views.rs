@@ -1259,8 +1259,8 @@ fn slice_section(uri: &UriView) -> Markup {
         @if folds {
             details.pv-parts open[uri.warns_about_the_string()] {
                 summary.pv-parts-lid {
-                    span.when-closed { "Show what's inside" }
-                    span.when-open { "Hide what's inside" }
+                    span.when-closed { "Show URL Details" }
+                    span.when-open { "Hide URL Details" }
                 }
                 (slice_rows(uri, &rows))
             }
@@ -2521,7 +2521,7 @@ mod tests {
         // One removable part, so the fold has something to add -- and it is
         // closed, because nothing warned.
         assert!(c.contains(r#"<details class="pv-parts">"#), "{c}");
-        assert!(c.contains("Show what's inside"));
+        assert!(c.contains("Show URL Details"));
         assert!(c.contains("Continue to example.com"));
         // The URL line already is the stored string, so nothing is restated.
         assert!(!c.contains("Exactly as stored"), "{c}");
