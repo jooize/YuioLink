@@ -2627,10 +2627,13 @@ html.history-collapsed .history-body {
     border-bottom: 0;
 }
 
-/* While a row's remove menu is open it is a panel, not a list row: the separator
-   underneath would draw a line across the bottom of the prompt. Only this row's
-   line goes — the rest of the list keeps its rhythm. */
-.history-item.confirming {
+/* While a row's remove menu is open it is a panel, not a list row: the separators
+   above and below would draw lines across the prompt. The line above belongs to the
+   previous row, so that row lets go of it too; the first row has no line above (the
+   list's outer border is not a separator). Only this prompt's lines go — the rest
+   of the list keeps its rhythm. */
+.history-item.confirming,
+.history-item:has(+ .history-item.confirming) {
     border-bottom-color: transparent;
 }
 
