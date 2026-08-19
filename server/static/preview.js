@@ -404,7 +404,10 @@
         const pill =
             document.querySelector(".rawline.edited.show .copybtn") ||
             document.querySelector(".rawline:not(.edited) .copybtn");
-        if (pill) {
+        // The stored line can sit inside a closed fold now; a confirmation on
+        // a pill nobody can see is no confirmation, so fall through to the
+        // headline instead of flashing into the void.
+        if (pill && pill.offsetParent !== null) {
             confirmOn(pill);
             return;
         }

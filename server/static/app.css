@@ -2126,10 +2126,17 @@ html.js .custom-field:not(.open) {
     display: none;
 }
 
-/* The two raw lines share one dress. "Exactly as stored" is the record and
-   never collapses; "After your edits" is the tool and appears only when the
-   rebuilt string differs. Both are copied by explicit buttons — there are no
-   selection tricks anywhere on this page. */
+/* The record inside the fold sits under the last slice row, keeping its own
+   top rule so it still reads as a register change. */
+.pv-parts .rawline {
+    margin-top: 10px;
+}
+
+/* The two raw lines share one dress. "Exactly as stored" is the record — on
+   http(s) it lives inside the fold, which any warning about the string forces
+   open; everywhere else it never collapses. "After your edits" is the tool
+   and appears only when the rebuilt string differs. Both are copied by
+   explicit buttons — there are no selection tricks anywhere on this page. */
 .rawline {
     display: block;
     margin-top: 14px;
@@ -2382,6 +2389,21 @@ html.js .custom-field:not(.open) {
 .pv-url .bad {
     color: var(--danger);
     font-weight: 700;
+}
+
+/* An address carried inside a value: its own punctuation recedes to the
+   encoding-noise grey rather than reading as the URL's structure, and its
+   domain keeps bold but NOT the wash or the size bump — the wash is spent
+   once per page, on the headline's host. */
+.pv-url .dl {
+    color: var(--text-tertiary);
+}
+
+.pv-url .qv .reg,
+.pv-url .seg .reg {
+    font-size: 1em;
+    padding: 0;
+    background: none;
 }
 
 /* Tier 3: printed, never linked, and given no control at all — not a disabled

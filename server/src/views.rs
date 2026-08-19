@@ -1013,7 +1013,9 @@ fn redirect_card(i: &Interstitial, uri: &UriView, href: &str) -> Markup {
         (card_body(uri, href))
         p.pv-meta { "Expires in " (humanize_expires_in(i.expires_at)) }
         span.pv-caution {
-            "YuioLinks expire and are reused, so a link can point somewhere else later. "
+            // "Will", not "may": reuse is the design, not an accident, and the
+            // caution's job is to make the reader believe it.
+            "YuioLinks expire and are reused, so will point elsewhere later. "
             strong { "Always check the destination." }
         }
     }
@@ -1134,7 +1136,10 @@ fn one_run_body(uri: &UriView) -> Markup {
             @match slice.role {
                 Role::Host => {
                     span.dl { "//" } wbr;
-                    (pieces(&slice.display, PieceStyle::Headline))
+                    // The one-run promise is character-identity with storage,
+                    // so the host renders from the stored characters — never
+                    // from the decoded reading the http(s) hero uses.
+                    (pieces(&urlview::host_pieces(&slice.value), PieceStyle::Headline))
                 }
                 Role::Port => { span.dl { ":" } span.port { (slice.value) } }
                 Role::Path => (path_run(&slice.value)),
@@ -1263,6 +1268,12 @@ fn slice_section(uri: &UriView) -> Markup {
                     span.when-open { "Hide URL Details" }
                 }
                 (slice_rows(uri, &rows))
+                // The record's home on http(s). Same gate as the fold itself
+                // (`fold_is_worth_it` includes it), and any warning about the
+                // string has already forced the fold open — so the everyday
+                // %20 link folds its record away while every warned card
+                // shows it exactly as before.
+                @if uri.decoding_changed_anything() { (raw_record(uri)) }
             }
         } @else {
             (slice_rows(uri, &rows))
@@ -1326,22 +1337,35 @@ fn index_of(uri: &UriView, slice: &urlview::Slice) -> usize {
 // Register 3: the exact line
 // --------------------------------------------------------------------------
 
-/// "Exactly as stored" — the record, and never collapsed.
+/// "Exactly as stored" — the record, wherever the headline is a *rendering*:
+/// a formatted number, a comma-joined address list, a decoded value.
 ///
-/// It appears wherever the headline is a *rendering*: a formatted number, a
-/// comma-joined address list, a decoded value. On an http(s) card the URL line
-/// already is the stored string, so the exact line appears only when reading
-/// changed something; on a one-run card the headline is the stored string
-/// outright, so it never appears at all.
+/// On an http(s) card the record lives inside the fold (see `slice_section`),
+/// which exists whenever decoding changed anything and arrives open whenever a
+/// warning fired; this call is only the fallback for the rare http(s) card
+/// with no rows at all — a bare host whose reading differs from storage. On a
+/// one-run card the headline is the stored string outright, so the record
+/// never appears. Everywhere else it is unconditional and never collapsed.
 fn exact_line(uri: &UriView) -> Markup {
     let needed = match uri.scheme.as_str() {
-        "http" | "https" => uri.decoding_changed_anything(),
+        "http" | "https" => uri.decoding_changed_anything() && !web_fold_renders(uri),
         s if is_one_run(s) => false,
         _ => true,
     };
     if !needed {
         return html! {};
     }
+    raw_record(uri)
+}
+
+/// True when the http(s) card renders its details fold — the record's home.
+/// Mirrors the early returns in `slice_section`, which is what actually draws
+/// it; the two must agree or the record goes missing.
+fn web_fold_renders(uri: &UriView) -> bool {
+    uri.tier == Tier::Web && uri.rows().next().is_some() && uri.fold_is_worth_it()
+}
+
+fn raw_record(uri: &UriView) -> Markup {
     html! {
         code.rawline {
             span.lbl { "Exactly as Stored" }
@@ -1809,23 +1833,52 @@ fn path_run(path: &str) -> Markup {
     }
 }
 
+/// A path's display pieces, split at its `/` separators with every piece's
+/// dress intact — flattening to text here used to strip a dotted space or a
+/// red escape in the path of its marking (and its colour in the hero).
+fn split_path_segments(display: &[Piece]) -> Vec<Vec<Piece>> {
+    let mut segments: Vec<Vec<Piece>> = vec![Vec::new()];
+    for piece in display {
+        match piece {
+            Piece::Text(s) if s.contains('/') => {
+                for (n, part) in s.split('/').enumerate() {
+                    if n > 0 {
+                        segments.push(Vec::new());
+                    }
+                    if !part.is_empty() {
+                        segments
+                            .last_mut()
+                            .expect("segments starts non-empty")
+                            .push(Piece::Text(part.to_string()));
+                    }
+                }
+            }
+            p => segments
+                .last_mut()
+                .expect("segments starts non-empty")
+                .push(p.clone()),
+        }
+    }
+    segments
+}
+
 /// A path inside a slice row: same idea, the row's own delimiter colour.
 fn path_slices_markup(display: &[Piece]) -> Markup {
-    let text: String = display.iter().map(Piece::text).collect();
+    let segments = split_path_segments(display);
     html! {
-        @for (n, part) in text.split('/').enumerate() {
+        @for (n, seg) in segments.iter().enumerate() {
             @if n > 0 { span.dl { "/" } }
-            (part)
+            (pieces(seg, PieceStyle::Slice))
         }
     }
 }
 
 fn path_markup(display: &[Piece]) -> Markup {
-    let text: String = display.iter().map(Piece::text).collect();
+    let segments = split_path_segments(display);
     html! {
-        @for (n, part) in text.split('/').enumerate() {
+        @for (n, seg) in segments.iter().enumerate() {
             @if n > 0 { span.pn { "/" } }
-            @if !part.is_empty() { span.ps { (part) } }
+            @if !seg.is_empty() { span.ps { (pieces(seg, PieceStyle::Url)) } }
         }
     }
 }
@@ -2546,8 +2599,62 @@ mod tests {
         // branch for either and dropped both.
         assert!(c.contains(r#"<span class="usr">alice@</span>"#));
         assert!(c.contains(r#"<span class="port">8443</span>"#));
-        // Decoding changed the `next` value, so the record gets said out loud.
+        // Decoding changed the `next` value, so the record gets said out loud —
+        // inside the fold, which the warning has already forced open.
+        let record = c.find("Exactly as Stored").expect("record missing");
+        assert!(record > c.find("<details").unwrap(), "{c}");
+        assert!(record < c.find("</details>").unwrap(), "{c}");
+    }
+
+    #[test]
+    fn the_record_folds_away_on_a_quiet_card() {
+        let c = card("https://example.com/files/r%C3%A9sum%C3%A9.pdf?q=hello%20world");
+        // Harmless decodes: the fold stays closed, and the record lives inside
+        // it rather than doubling the page for every %20.
+        assert!(c.contains(r#"<details class="pv-parts">"#), "{c}");
+        let record = c.find("Exactly as Stored").expect("record missing");
+        assert!(record > c.find("<details").unwrap(), "{c}");
+        assert!(record < c.find("</details>").unwrap(), "{c}");
+    }
+
+    #[test]
+    fn a_decoded_host_grows_the_record_and_a_bare_one_still_gets_it() {
+        // The hero reads the stored punycode as Unicode, so the record appears.
+        let c = card("https://xn--mnchen-3ya.de/kontakt");
+        assert!(c.contains("münchen.de"), "{c}");
         assert!(c.contains("Exactly as Stored"), "{c}");
+        // No rows at all means no fold to live in: the record falls back to
+        // the open card rather than going missing.
+        let bare = card("https://EXAMPLE.com");
+        assert!(!bare.contains("pv-parts"), "{bare}");
+        assert!(bare.contains("Exactly as Stored"), "{bare}");
+    }
+
+    #[test]
+    fn a_marked_character_in_the_path_keeps_its_dress() {
+        // A %20 in the path used to be flattened to a bare space in the hero
+        // and the slice row; the dotted receipt must survive the `/` split.
+        let c = card("https://example.com/my%20file/x");
+        assert!(c.contains(r#"<span class="dsp">"#), "{c}");
+    }
+
+    #[test]
+    fn an_undecodable_escape_stays_on_screen_as_stored() {
+        let c = card("https://example.com/x?q=a%FFb");
+        // Not valid UTF-8: no replacement mark, the escape itself stays.
+        assert!(!c.contains('\u{fffd}'), "{c}");
+        assert!(c.contains("%FF"), "{c}");
+        // And since nothing was decoded, there is nothing to prove.
+        assert!(!c.contains("Exactly as Stored"), "{c}");
+    }
+
+    #[test]
+    fn a_one_run_host_shows_its_stored_characters() {
+        // The one-run promise is character-identity with storage, so the host
+        // never takes the decoded reading (no lowercasing, no punycode).
+        let c = card("ftp://EXAMPLE.org/pub");
+        assert!(c.contains(r#"<span class="reg">EXAMPLE.org</span>"#), "{c}");
+        assert!(!c.contains("Exactly as Stored"), "{c}");
     }
 
     #[test]
@@ -2903,6 +3010,13 @@ mod tests {
         // Still dim: the two things that really are inert.
         assert!(APP_CSS.contains(".pv-url .sch {\n    color: var(--text-tertiary);\n}"));
         assert!(APP_CSS.contains(".pv-url .pe {\n    color: var(--text-tertiary);\n}"));
+        // A carried address inside a value: its punctuation recedes, and its
+        // domain keeps bold but never the wash -- that is spent once per page,
+        // on the headline's host.
+        assert!(APP_CSS.contains(".pv-url .dl {\n    color: var(--text-tertiary);\n}"));
+        assert!(APP_CSS.contains(
+            ".pv-url .qv .reg,\n.pv-url .seg .reg {\n    font-size: 1em;\n    padding: 0;\n    background: none;\n}"
+        ));
     }
 
     /// An explicit port is unusual and it decides which server actually answers,

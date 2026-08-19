@@ -9,7 +9,8 @@
 //! **The invariant.** Concatenating [`UriView::prefix`] with every slice's
 //! [`Slice::raw`] in order reproduces the stored string, character for
 //! character. Everything the card shows is either one of those characters or a
-//! rendering the card openly labels as one ("Exactly as stored" sits underneath
+//! rendering the card openly labels as one ("Exactly as stored" carries the
+//! record — inside the http(s) fold, underneath every other rendered headline —
 //! precisely so the headline may be formatted for reading). See
 //! `slices_reassemble_the_stored_string` in the tests.
 //!
@@ -240,8 +241,8 @@ impl Slice {
     /// True when reading this value put different characters on screen from the
     /// ones in storage. Colour is not a difference — a bold domain and a dim
     /// delimiter still spell the stored string — so this is a plain comparison
-    /// of what is shown against what is kept. It is what gates the exact line
-    /// on an http(s) card: everyday links stay one quiet line.
+    /// of what is shown against what is kept. It is what gates the record on
+    /// an http(s) card: everyday links stay one quiet line.
     pub fn decoded_differs(&self) -> bool {
         self.display.iter().map(Piece::text).collect::<String>() != self.value
     }
@@ -326,7 +327,7 @@ impl UriView {
     }
 
     /// True when reading changed any value, which is the only thing that makes
-    /// an http(s) card grow an "Exactly as stored" line.
+    /// an http(s) card grow its "Exactly as stored" record (inside the fold).
     pub fn decoding_changed_anything(&self) -> bool {
         self.slices.iter().any(Slice::decoded_differs)
     }
@@ -437,7 +438,7 @@ fn hierarchical(stored: &str, scheme: &str) -> UriView {
         key: None,
         equals: false,
         value: host_str.to_string(),
-        display: host_pieces(host_str),
+        display: host_display(host.as_ref(), host_str),
         removable: false,
     });
     if let Some(p) = port {
@@ -813,7 +814,7 @@ fn split_pair(pair: &str) -> (&str, bool, &str) {
 }
 
 /// A host, split so the registrable domain can carry the weight.
-fn host_pieces(host: &str) -> Vec<Piece> {
+pub(crate) fn host_pieces(host: &str) -> Vec<Piece> {
     if host.is_empty() {
         return Vec::new();
     }
@@ -825,6 +826,26 @@ fn host_pieces(host: &str) -> Vec<Piece> {
     }
     out.push(Piece::Domain(registrable.to_string()));
     out
+}
+
+/// The characters the http(s) headline actually shows for the host.
+/// [`build_host`] decides between the decoded Unicode and the raw punycode;
+/// mirroring its choice here keeps [`Slice::decoded_differs`] honest about the
+/// one part of the card that is decoded somewhere other than
+/// [`decode_for_reading`] — a stored `xn--…` host that reads as Unicode grows
+/// the record like any other rendering.
+fn host_display(host: Option<&HostView>, stored: &str) -> Vec<Piece> {
+    match host {
+        Some(h) => {
+            let mut out = Vec::new();
+            if !h.subdomain.is_empty() {
+                out.push(Piece::Text(format!("{}.", h.subdomain)));
+            }
+            out.push(Piece::Domain(h.registrable.clone()));
+            out
+        }
+        None => host_pieces(stored),
+    }
 }
 
 /// An address or a bare number, read for what it is. On freemail the local part
@@ -1013,6 +1034,10 @@ pub fn decode_for_reading(value: &str) -> Vec<Piece> {
     for (idx, (c, escape)) in chars.iter().enumerate() {
         let piece = match escape {
             Some(raw) if STRUCTURE.contains(c) => Piece::Escape(raw.clone()),
+            // The replacement character stands for bytes that were not valid
+            // UTF-8 (or really was U+FFFD in storage — same dress either way):
+            // nothing honest to show decoded, so the escape stays on screen.
+            Some(raw) if *c == char::REPLACEMENT_CHARACTER => Piece::Escape(raw.clone()),
             Some(raw) if is_invisible(*c) => Piece::BadEscape(raw.clone()),
             _ if is_invisible(*c) && *c != ' ' => Piece::BadEscape(escaped(*c)),
             _ if padded[idx] => Piece::Padding(c.to_string()),
