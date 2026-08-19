@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Shown and stored</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding (never goes into app.css)
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .cap { display: block; text-align: center; margin: 0 0 10px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .note { max-width: 420px; margin: 12px auto 0; font: 400 12.5px/1.55 var(--font);
+      color: var(--text-secondary); text-align: left; }
+    .note b { color: var(--text); font-weight: 600; }
+    .note code { font-family: var(--font-mono); font-size: .95em; }
+    .fixnote { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .fixnote ul { margin: 6px 0 0; padding-left: 20px; }
+    .fixnote li { margin: 3px 0; }
+    .fixnote table { border-collapse: collapse; margin: 8px 0 2px; }
+    .fixnote th, .fixnote td { text-align: left; padding: 3px 18px 3px 0;
+      border-bottom: .5px solid var(--card-border); font-size: 12.5px; vertical-align: top; }
+    .fixnote th { font-weight: 600; color: var(--text); }
+    .win { width: min(100%, 420px); }
+    .app-window.win { margin: 0; padding: 30px 26px 26px; }
+    /* a hero-only strip: options B and C change nothing but the URL line,
+       so they are judged as lines, not as whole pages */
+    .app-window.win.strip { padding: 18px 20px 16px; }
+    .strip .pv-url { margin-top: 0; }
+    .strip .rawline { margin-top: 12px; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    /* Option C — the receipt, generalised. `.dsp` already means "this space
+       was an escape in the stored link"; `.dec` says the same of any decoded
+       run. One dress, one meaning: dotted = it was an escape, dim %NN = it
+       still is one, bare = it really is that character. */
+    .dec { border-bottom: 1px dotted var(--text-tertiary); }
+    /* Option D — the record inside the fold sits below the last slice row,
+       keeping its own top rule so it still reads as a register change. */
+    .pv-parts .rawline { margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<div class="wrap" style="padding-top:26px">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 25 · fold sections are real — click them</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Shown and stored — the hero, the escapes, and where the record lives</h1>
+</div>
+
+<div class="fixnote">
+  <b>The three questions this note answers.</b> Should the hero write out the %-escapes?
+  Is there a way to remove "Exactly as Stored"? Or should it collapse by default unless it
+  earns its line? Reading the code first turned up something that reframes all three:
+  <b>the hero already writes out every escape that matters.</b> The decode policy in
+  <code>urlview::decode_for_reading</code> is per character:
+  <table>
+    <tr><th>Stored</th><th>The hero shows</th><th>Dress</th></tr>
+    <tr><td><code>%20</code></td><td>a space</td><td>dotted underline (<code>.dsp</code>) — the receipt</td></tr>
+    <tr><td><code>%26 %3D %23 %25</code> (<code>&amp; = # %</code>)</td><td>the escape, raw</td><td>dim — decoding would redraw the URL's own structure</td></tr>
+    <tr><td>escape of an invisible / direction-changing character</td><td>the escape, raw</td><td>red, with the Hidden Characters chip</td></tr>
+    <tr><td>a <em>literal</em> invisible character</td><td>an escape we invent</td><td>red, with the chip — the hero out-honests the stored string</td></tr>
+    <tr><td>padding spaces</td><td>the spaces</td><td>tinted, with the Padded With Spaces chip</td></tr>
+    <tr><td>everything else (<code>%C3%A9</code>→é, <code>%3A%2F%2F</code>→<code>://</code>)</td><td>the decoded character</td><td>plain — <b>the only silent decode, and the only job the exact line still has</b></td></tr>
+  </table>
+  So the real question is narrow: what should carry the provenance of that last row —
+  a duplicate line (today), raw escapes in the hero (B), a receipt in the hero (C),
+  or the fold (D)? Sections 1–5 show each on the same three links.
+</div>
+
+<div class="fixnote">
+  <b>Found while reading, worth fixing regardless of the verdict:</b>
+  <ul>
+    <li><b>The hero's path drops its dress.</b> <code>path_markup</code> and
+      <code>path_slices_markup</code> flatten pieces to text before splitting on
+      <code>/</code> — a dotted space, a red escape, or padding <em>in the path</em>
+      loses its colour in the hero and in the slice rows. The characters survive;
+      the marking does not.</li>
+    <li><b>The embedded domain is washed twice.</b> <code>uri_value_pieces</code> promises
+      "no accent wash — spent once per page", but <code>.pv-url .reg</code> matches the
+      <code>Piece::Domain</code> inside a query value too, so a carried address's domain
+      gets the wash and the 1.06em bump in the hero. Section 1, middle card, shows it live.</li>
+    <li><b><code>.pv-url .dl</code> is unstyled.</b> A carried address's <code>://</code>
+      renders at full value-strength in the hero instead of receding; the same piece is
+      dim in the slices and the raw line.</li>
+    <li><b>An invalid-UTF-8 escape leaks a replacement mark.</b> The comment in
+      <code>decode_for_reading</code> says it "stays escaped", but the piece match falls
+      through to <code>Piece::Text("�")</code> — the raw escape is lost from display and
+      <code>decoded_differs</code> fires on a substitution the reader cannot see.</li>
+  </ul>
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">1 · Today — what the hero and the exact line each carry (option A, the baseline)</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">everyday decodes — é and a %20 space</span>
+    <div class="app-window win strip">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">files</span><span class="pn">/</span><span class="ps">résumé.pdf</span><span class="pn">?</span><span class="qk">q</span><span class="pn">=</span><span class="qv">hello<span class="dsp"> </span>world</span></code>
+      <code class="rawline"><span class="lbl">Exactly as Stored<button class="copybtn" type="button">Copy</button></span><span class="str"><span class="sch">https://</span><span class="reg">example.com</span><span class="dl">/</span>files<span class="dl">/</span>r<span class="pct">%C3%A9</span>sum<span class="pct">%C3%A9</span>.pdf<span class="dl">?</span><span class="k">q</span><span class="dl">=</span>hello<span class="pct">%20</span>world</span></code>
+    </div>
+    <p class="note"><b>The annoying case.</b> A perfectly harmless link, and because two
+      escapes decoded, the whole URL prints twice. The space keeps its dotted receipt but
+      the é decodes with no mark at all (the path flattening above), so the only thing
+      saying "the stored string spells this differently" is the duplicate line.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">a carried address — %3A%2F%2F decodes silently</span>
+    <div class="app-window win strip">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">login.</span><span class="reg">example.co.uk</span><span class="pn">/</span><span class="ps">reset</span><span class="pn">?</span><span class="qk">next</span><span class="pn">=</span><span class="qv">https<span class="dl">://</span><span class="reg">example-mail.com</span><span class="dl">/</span></span></code>
+      <code class="rawline"><span class="lbl">Exactly as Stored<button class="copybtn" type="button">Copy</button></span><span class="str"><span class="sch">https://</span>login.<span class="reg">example.co.uk</span><span class="dl">/</span>reset<span class="dl">?</span><span class="k">next</span><span class="dl">=</span>https<span class="pct">%3A%2F%2F</span>example-mail.com<span class="pct">%2F</span></span></code>
+    </div>
+    <p class="note"><b>The load-bearing case.</b> The hero silently decodes exactly the
+      attack-shaped characters: <code>%3A%2F%2F</code> becomes a readable <code>://</code>
+      with no receipt. Only the exact line shows the address was smuggled in encoded —
+      which is what makes it a parameter value and not a second destination. (Also visible:
+      the double wash on <code>example-mail.com</code> and the full-strength <code>://</code>
+      from the findings list.)</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">a hidden character — already written out, in red</span>
+    <div class="app-window win strip">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">pay</span><span class="pn">?</span><span class="qk">user</span><span class="pn">=</span><span class="qv">admin<span class="bad">%E2%80%8B</span></span></code>
+      <code class="rawline"><span class="lbl">Exactly as Stored<button class="copybtn" type="button">Copy</button></span><span class="str"><span class="sch">https://</span><span class="reg">example.com</span><span class="dl">/</span>pay<span class="dl">?</span><span class="k">user</span><span class="dl">=</span>admin<span class="pct">%E2%80%8B</span></span></code>
+    </div>
+    <p class="note"><b>Already solved without the exact line.</b> The zero-width space is
+      never decoded: the hero shows the raw escape in red with its chip. Note the inversion:
+      here the <em>record</em> is the weaker teller — it dims <code>%E2%80%8B</code> to
+      encoding noise like any other escape.</p>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">2 · Option B — write every escape out in the hero, retire the exact line</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">everyday decodes — the price</span>
+    <div class="app-window win strip">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">files</span><span class="pn">/</span><span class="ps">r<span class="pe">%C3%A9</span>sum<span class="pe">%C3%A9</span>.pdf</span><span class="pn">?</span><span class="qk">q</span><span class="pn">=</span><span class="qv">hello<span class="pe">%20</span>world</span></code>
+    </div>
+    <p class="note"><b>The hero becomes the record — and stops being readable.</b>
+      <code>résumé.pdf</code> is now a puzzle. Every non-ASCII letter, every space, in
+      every everyday link, forever. The one virtue: nothing left to prove, so the exact
+      line really can go.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">a carried address — the price, where it hurts</span>
+    <div class="app-window win strip">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">login.</span><span class="reg">example.co.uk</span><span class="pn">/</span><span class="ps">reset</span><span class="pn">?</span><span class="qk">next</span><span class="pn">=</span><span class="qv">https<span class="pe">%3A%2F%2F</span>example-mail.com<span class="pe">%2F</span></span></code>
+    </div>
+    <p class="note"><b>The warning loses its evidence.</b> "Carries Another Address" would
+      chip a value the eye can no longer parse as an address — no <code>://</code>, no bold
+      domain. The card would be asserting something it just stopped showing. And on the
+      hidden-character card B changes nothing at all: the dangerous escapes are already
+      written out today. <b>B pays its whole price on the harmless links and buys nothing
+      on the dangerous ones. Rejected.</b></p>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">3 · Option C — decode for reading, but every decoded run wears the receipt</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">everyday decodes — self-declaring</span>
+    <div class="app-window win strip">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">files</span><span class="pn">/</span><span class="ps">r<span class="dec">é</span>sum<span class="dec">é</span>.pdf</span><span class="pn">?</span><span class="qk">q</span><span class="pn">=</span><span class="qv">hello<span class="dsp"> </span>world</span></code>
+    </div>
+    <p class="note"><b>The dotted underline already means this.</b> <code>.dsp</code> is
+      documented as "dotted = it was an escape, dim %NN = it still is one, bare = it really
+      is that character" — spaces are just the only run that got the dress. Generalising it
+      (<code>.dec</code>, same one-line style) makes the hero say <em>that</em> something
+      was encoded without saying the bytes. Readable and honest.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">a carried address — the disguise is outlined</span>
+    <div class="app-window win strip">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">login.</span><span class="reg">example.co.uk</span><span class="pn">/</span><span class="ps">reset</span><span class="pn">?</span><span class="qk">next</span><span class="pn">=</span><span class="qv">https<span class="dl"><span class="dec">://</span></span><span class="reg">example-mail.com</span><span class="dl"><span class="dec">/</span></span></span></code>
+    </div>
+    <p class="note"><b>The receipt lands exactly on the disguised characters.</b> The
+      <code>://</code> and trailing <code>/</code> were stored as escapes; the domain was
+      stored in the clear. The dotting shows precisely which characters were dressed up —
+      the shape of the trick, in the hero itself. <b>Cost:</b> piece provenance must survive
+      merging and <code>structure_value</code>'s re-parse, and the path-flattening fix
+      becomes a prerequisite. Worth it, but it is a follow-up, not the fix.</p>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">4 · Option D — the record moves into the fold it already shares a gate with</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">everyday decodes — the quiet page, recovered</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">calm</span><span class="nwg nw-1">FALCON</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">files</span><span class="pn">/</span><span class="ps">résumé.pdf</span><span class="pn">?</span><span class="qk">q</span><span class="pn">=</span><span class="qv">hello<span class="dsp"> </span>world</span></code>
+      <details class="pv-parts">
+        <summary class="pv-parts-lid"><span class="when-closed">Show URL Details</span><span class="when-open">Hide URL Details</span></summary>
+        <div class="pv-slices">
+          <div class="pv-slice">
+            <input type="checkbox" checked disabled aria-label="Path, fixed">
+            <span class="txt"><span class="dl">/</span>files<span class="dl">/</span>résumé.pdf</span>
+          </div>
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep q">
+            <span class="txt"><span class="dl">?</span><span class="k">q</span><span class="dl">=</span>hello<span class="dsp"> </span>world</span>
+          </div>
+        </div>
+        <code class="rawline"><span class="lbl">Exactly as Stored<button class="copybtn" type="button">Copy</button></span><span class="str"><span class="sch">https://</span><span class="reg">example.com</span><span class="dl">/</span>files<span class="dl">/</span>r<span class="pct">%C3%A9</span>sum<span class="pct">%C3%A9</span>.pdf<span class="dl">?</span><span class="k">q</span><span class="dl">=</span>hello<span class="pct">%20</span>world</span></code>
+      </details>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go pv-btn btn-link go" href="#" style="margin-top:0">Continue to example.com</a>
+        <button class="btn splitcopy" aria-label="Copy the destination address">Copy</button>
+      </div>
+      <p class="pv-meta">Expires in 6 days</p>
+      <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
+        else later. <strong>Always check the destination.</strong></span>
+    </div>
+    <p class="note"><b>Two wrapped mono lines returned to every harmless link.</b> No new
+      mechanics: <code>fold_is_worth_it()</code> already guarantees the fold exists whenever
+      the exact line fires, so the record always has this home. Open the fold (it works) —
+      the record sits under the rows, Copy pill and all. ⌘C still copies the destination
+      from the hero, unchanged.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">a carried address — the warning forces the fold open</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">dewy</span><span class="nwg nw-1">OTTER</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">login.</span><span class="reg">example.co.uk</span><span class="pn">/</span><span class="ps">reset</span><span class="pn">?</span><span class="qk">next</span><span class="pn">=</span><span class="qv">https<span class="dl">://</span><span class="reg">example-mail.com</span><span class="dl">/</span></span></code>
+      <div class="pv-facts">
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Carries Another Address</span>
+      </div>
+      <details class="pv-parts" open>
+        <summary class="pv-parts-lid"><span class="when-closed">Show URL Details</span><span class="when-open">Hide URL Details</span></summary>
+        <div class="pv-slices">
+          <div class="pv-slice">
+            <input type="checkbox" checked disabled aria-label="Path, fixed">
+            <span class="txt"><span class="dl">/</span>reset</span>
+          </div>
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep next">
+            <span class="txt"><span class="dl">?</span><span class="k">next</span><span class="dl">=</span>https<span class="dl">://</span><span class="reg">example-mail.com</span><span class="dl">/</span></span>
+          </div>
+        </div>
+        <code class="rawline"><span class="lbl">Exactly as Stored<button class="copybtn" type="button">Copy</button></span><span class="str"><span class="sch">https://</span>login.<span class="reg">example.co.uk</span><span class="dl">/</span>reset<span class="dl">?</span><span class="k">next</span><span class="dl">=</span>https<span class="pct">%3A%2F%2F</span>example-mail.com<span class="pct">%2F</span></span></code>
+      </details>
+      <span class="pv-note">One of the parameters is itself a complete web address, on a
+        different domain.</span>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go pv-btn btn-link go" href="#" style="margin-top:0">Continue to example.co.uk</a>
+        <button class="btn splitcopy" aria-label="Copy the destination address">Copy</button>
+      </div>
+      <p class="pv-meta">Expires in 2 days</p>
+      <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
+        else later. <strong>Always check the destination.</strong></span>
+    </div>
+    <p class="note"><b>Nothing hides when it matters.</b> Any warning about the string
+      already opens the fold server-side (<code>open[uri.warns_about_the_string()]</code>),
+      so on every warned card the record is exactly as visible as it is today — it just
+      sits inside the section instead of after the notes. The reader who was told "carries
+      another address" sees the encoded smuggle right there. And unticking
+      <code>next</code> — the remedy — lives in the same box as the evidence.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">a hidden character — same rule, no special case</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">slim</span><span class="nwg nw-1">ROBIN</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">pay</span><span class="pn">?</span><span class="qk">user</span><span class="pn">=</span><span class="qv">admin<span class="bad">%E2%80%8B</span></span></code>
+      <div class="pv-facts">
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Hidden Characters</span>
+      </div>
+      <details class="pv-parts" open>
+        <summary class="pv-parts-lid"><span class="when-closed">Show URL Details</span><span class="when-open">Hide URL Details</span></summary>
+        <div class="pv-slices">
+          <div class="pv-slice">
+            <input type="checkbox" checked disabled aria-label="Path, fixed">
+            <span class="txt"><span class="dl">/</span>pay</span>
+          </div>
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep user">
+            <span class="txt"><span class="dl">?</span><span class="k">user</span><span class="dl">=</span>admin<span class="bad">%E2%80%8B</span></span>
+          </div>
+        </div>
+        <code class="rawline"><span class="lbl">Exactly as Stored<button class="copybtn" type="button">Copy</button></span><span class="str"><span class="sch">https://</span><span class="reg">example.com</span><span class="dl">/</span>pay<span class="dl">?</span><span class="k">user</span><span class="dl">=</span>admin<span class="pct">%E2%80%8B</span></span></code>
+      </details>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go pv-btn btn-link go" href="#" style="margin-top:0">Continue to example.com</a>
+        <button class="btn splitcopy" aria-label="Copy the destination address">Copy</button>
+      </div>
+      <p class="pv-meta">Expires in 4 days</p>
+      <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
+        else later. <strong>Always check the destination.</strong></span>
+    </div>
+    <p class="note"><b>The chip's evidence never needed the exact line.</b> The red escape
+      is in the hero, in the slice row, and in the record — all three registers, fold open
+      because the warning fired. Nothing about D weakens this card.</p>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">5 · Option E = C + D — the honest hero over the folded record</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">the carried address, wearing both</span>
+    <div class="app-window win">
+      <div class="pv-head">
+        <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
+        <span class="pv-name"><span class="nwg nw-0">warm</span><span class="nwg nw-1">GECKO</span></span>
+        <span class="pv-hostline">yuio.link</span>
+      </div>
+      <span class="pv-arrow">
+        <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
+          <path d="M9 2v15M3.5 12 9 17.5 14.5 12" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">login.</span><span class="reg">example.co.uk</span><span class="pn">/</span><span class="ps">reset</span><span class="pn">?</span><span class="qk">next</span><span class="pn">=</span><span class="qv">https<span class="dl"><span class="dec">://</span></span><span class="reg">example-mail.com</span><span class="dl"><span class="dec">/</span></span></span></code>
+      <div class="pv-facts">
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Carries Another Address</span>
+      </div>
+      <details class="pv-parts" open>
+        <summary class="pv-parts-lid"><span class="when-closed">Show URL Details</span><span class="when-open">Hide URL Details</span></summary>
+        <div class="pv-slices">
+          <div class="pv-slice">
+            <input type="checkbox" checked disabled aria-label="Path, fixed">
+            <span class="txt"><span class="dl">/</span>reset</span>
+          </div>
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep next">
+            <span class="txt"><span class="dl">?</span><span class="k">next</span><span class="dl">=</span>https<span class="dl"><span class="dec">://</span></span><span class="reg">example-mail.com</span><span class="dl"><span class="dec">/</span></span></span>
+          </div>
+        </div>
+        <code class="rawline"><span class="lbl">Exactly as Stored<button class="copybtn" type="button">Copy</button></span><span class="str"><span class="sch">https://</span>login.<span class="reg">example.co.uk</span><span class="dl">/</span>reset<span class="dl">?</span><span class="k">next</span><span class="dl">=</span>https<span class="pct">%3A%2F%2F</span>example-mail.com<span class="pct">%2F</span></span></code>
+      </details>
+      <span class="pv-note">One of the parameters is itself a complete web address, on a
+        different domain.</span>
+      <div class="pv-split pv-open">
+        <a class="btn btn--go pv-btn btn-link go" href="#" style="margin-top:0">Continue to example.co.uk</a>
+        <button class="btn splitcopy" aria-label="Copy the destination address">Copy</button>
+      </div>
+      <p class="pv-meta">Expires in 2 days</p>
+      <span class="pv-caution">YuioLinks expire and are reused, so a link can point somewhere
+        else later. <strong>Always check the destination.</strong></span>
+    </div>
+    <p class="note"><b>The full stack.</b> Hero: readable, with the disguised characters
+      dotted. Chip: the claim. Fold (forced open): the removable part and the record proving
+      the claim. Nothing is said twice at the same register, and nothing true is more than
+      one glance away.</p>
+  </div>
+
+  <div class="win" style="align-self:center">
+    <div class="fixnote" style="max-width:420px">
+      <b>Verdict.</b>
+      <ul>
+        <li><b>Do D now.</b> Move <code>exact_line</code> inside the fold in
+          <code>slice_section</code> (http/https only; mailto, tel, sms keep their always-on
+          record — their heroes are true renderings). The gates already exist and already
+          agree: the fold exists whenever the record does, and warnings force it open. The
+          everyday <code>%20</code> link gets its quiet page back; no warned card loses
+          anything.</li>
+        <li><b>B is rejected</b> — it pays on the harmless cards and buys nothing on the
+          dangerous ones, which already write their escapes out.</li>
+        <li><b>C is the follow-up</b>, not the fix: generalise the <code>.dsp</code> receipt
+          to all decoded runs (<code>.dec</code>). It needs piece provenance to survive
+          merging and <code>structure_value</code>, and the path-flattening fix first. With
+          C in place the hero really does show everything the reader <em>needs</em>; the
+          record keeps only two jobs — the bytes, and the Copy pill.</li>
+        <li><b>Fix the four findings</b> (path dress flattening, double wash, unstyled
+          <code>.pv-url .dl</code>, the invalid-UTF-8 leak) regardless.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
