@@ -3021,6 +3021,15 @@ mod tests {
         assert!(APP_CSS.contains(
             ".pv-url .qv .reg,\n.pv-url .seg .reg {\n    font-size: 1em;\n    padding: 0;\n    background: none;\n}"
         ));
+        // The receipt rides the glyphs' own baseline as decoration, not a
+        // border: line-height cannot push it away, and Safari draws it on a
+        // lone space (verified on-device 2026-08-20, design note 28).
+        assert!(
+            APP_CSS.contains(
+                ".dsp {\n    text-decoration: underline dotted var(--text-tertiary) 1px;\n    text-underline-offset: 2px;\n}"
+            ),
+            "the dotted receipt must be text-decoration, not border-bottom"
+        );
     }
 
     /// An explicit port is unusual and it decides which server actually answers,

@@ -2055,9 +2055,13 @@ html.js .custom-field:not(.open) {
 
 /* A space that was stored as %20. Three appearances, three meanings, no
    overlap: dotted = it was an escape, dim %NN = it still is one, bare space =
-   it really is a space. */
+   it really is a space. Decoration, not border-bottom: the dots follow the
+   glyphs' own baseline, so line-height can never push them away from the
+   text. Safari draws decoration on a lone space (verified on-device against
+   design note 28, 2026-08-20). */
 .dsp {
-    border-bottom: 1px dotted var(--text-tertiary);
+    text-decoration: underline dotted var(--text-tertiary) 1px;
+    text-underline-offset: 2px;
 }
 
 /* The fold, for http(s) only: the everyday page stays one quiet line and the

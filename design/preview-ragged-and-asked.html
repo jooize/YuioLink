@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Ragged &amp; asked</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .cap { display: block; text-align: center; margin: 0 0 10px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .note { max-width: 420px; margin: 12px auto 0; font: 400 12.5px/1.55 var(--font);
+      color: var(--text-secondary); text-align: left; }
+    .note b { color: var(--text); font-weight: 600; }
+    .note code { font-family: var(--font-mono); font-size: .95em; }
+    .fixnote { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .fixnote ul { margin: 6px 0 0; padding-left: 20px; }
+    .fixnote li { margin: 3px 0; }
+    .win { width: min(100%, 420px); }
+    .app-window.win { margin: 0; padding: 26px 22px 22px; overflow: visible; }
+    .app-window.win.strip { padding: 18px 20px 16px; }
+    .strip .pv-url { margin-top: 0; }
+    .win + .app-window.win { margin-top: 12px; }
+
+    /* ===================================================================
+       CANDIDATES for app.css -- section 1, alignment
+       =================================================================== */
+    /* A: centre if it fits, left when it wraps. fit-content shrinks the
+       block to the text when one line is enough and the auto margins centre
+       it; longer text takes the full width and left-aligns. No JS, no length
+       threshold, no wrap detection -- the layout engine itself decides. */
+    .pv-url.v-fit { width: fit-content; max-width: 100%; box-sizing: border-box;
+      margin-inline: auto; text-align: left; }
+    /* B, on top of A: hanging indent. Continuation lines tuck in 1.5ch, the
+       editor-world signal for "same token continues, nothing was here". */
+    .pv-url.v-hang { padding-left: 1.5ch; text-indent: -1.5ch; }
+    /* C, on top of A/B: prefer breaking at the structure. <wbr> after each
+       delimiter; "anywhere" stays as overflow insurance for one segment
+       longer than the whole line. */
+    .pv-url.v-struct { word-break: normal; overflow-wrap: anywhere; }
+
+    /* ===================================================================
+       Section 2 scaffolding -- SIMULATED wrap marker (hand-broken lines)
+       =================================================================== */
+    .simwrap { text-align: left; }
+    .simwrap .sim { display: block; white-space: nowrap; }
+    .simwrap .sim + .sim { padding-left: 1.5ch; position: relative; }
+    .simwrap .sim + .sim::before { content: "\21AA"; position: absolute;
+      left: 0; top: .2em; font-size: .72em; font-family: var(--font);
+      color: var(--text-tertiary); }
+
+    /* ===================================================================
+       CANDIDATES for app.css -- section 3, ask a character
+       =================================================================== */
+    /* Cast-entry dress carried over from note 28 (variant 1, bare tiles). */
+    .pv-cast { text-align: left; }
+    .pv-cast .entry { display: flex; align-items: center; gap: 10px;
+      padding: 7px 0; }
+    .pv-cast .tiles { display: inline-flex; gap: 5px; flex: none; }
+    .pv-cast .tile { display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; box-sizing: border-box;
+      font-family: var(--font-mono); font-size: 15px; font-weight: 600;
+      color: var(--text); border-radius: 7px; }
+    .pv-cast .tile.sym { border: 1.5px dotted var(--text-tertiary);
+      font-size: 8.5px; font-weight: 700; letter-spacing: .04em; }
+    .pv-cast .tile.raw, .pv-cast .tile.lit { background: var(--field-bg);
+      border: .5px solid var(--field-border); }
+    .pv-cast .entry.warn .tile.sym { border-color: var(--danger); color: var(--danger); }
+    .pv-cast .what { font: 400 12px/1.5 var(--font); color: var(--text-secondary);
+      min-width: 0; font-weight: 400; }
+    .pv-cast .what b { color: var(--text); font-weight: 600; }
+    .pv-cast .what .cp { font-family: var(--font-mono); color: var(--text-tertiary); }
+    .pv-cast .what code { font-family: var(--font-mono); font-size: .95em;
+      color: var(--text); }
+    .pv-cast .entry.warn .what b, .pv-cast .entry.warn .what code { color: var(--danger); }
+
+    /* A marked character that will answer when asked. Padding grows the hit
+       area (a lone space is half a character wide); cursor + hover say
+       "this one talks" without adding any ink. */
+    .ask { position: relative; cursor: help; padding: 3px 1px; margin: -3px -1px; }
+    .ask:hover { filter: brightness(1.18); }
+
+    /* Variant A: the answer floats at the character. */
+    .pv-pop { display: none; position: absolute; z-index: 40;
+      top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+      width: max-content; max-width: 300px; padding: 8px 12px;
+      border-radius: 10px; background: var(--card-bg);
+      border: .5px solid var(--card-border);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .16);
+      font-family: var(--font); font-weight: 400; letter-spacing: normal;
+      text-indent: 0; text-align: left; word-break: normal; white-space: normal;
+      color: var(--text-secondary); }
+    .pv-pop::before { content: ""; position: absolute; top: -4.5px;
+      left: calc(50% - 4.5px); width: 9px; height: 9px; transform: rotate(45deg);
+      background: var(--card-bg); border-left: .5px solid var(--card-border);
+      border-top: .5px solid var(--card-border); }
+    .ask.open .pv-pop { display: block; }
+    .pv-pop .entry { padding: 0; }
+
+    /* Variant B: the answer is one line inside the fold, and it pulses. */
+    .pv-castline { margin: 10px 2px 2px; }
+    .pv-castline .entry { display: none; padding: 7px 6px; border-radius: 8px; }
+    .pv-castline .entry.shown { display: flex; animation: tellpulse 1.4s ease-out; }
+    @keyframes tellpulse {
+      0% { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+      100% { background: transparent; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrap" style="padding-top:26px">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 29 · the dotted receipt on this page is LIVE production css now</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">The ragged edge, and a cast that answers when asked</h1>
+</div>
+
+<div class="fixnote">
+  <b>Where this picks up.</b> Safari showed both dotted underlines in note 28, so the
+  receipt is <b>shipped</b>: <code>.dsp</code> now uses <code>text-decoration: underline
+  dotted</code> and every receipt on this page is drawn by production CSS. The always-visible
+  cast list from note 28 is retired per your call — explanations appear <b>only when a
+  marked character is clicked individually</b> (section 3). New question first, though:
+  what a long URL should do when it wraps (sections 1 and 2).
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">1 · Where the long URL falls — alignment when it wraps</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">today — centred, breaks anywhere</span>
+    <div class="app-window win strip">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">example-shop.co.uk</span><span class="pn">/</span><span class="ps">products</span><span class="pn">/</span><span class="ps">kitchen</span><span class="pn">/</span><span class="ps">espresso-machines</span><span class="pn">/</span><span class="ps">lever-operated</span><span class="pn">?</span><span class="qk">colour</span><span class="pn">=</span><span class="qv">stainless<span class="dsp"> </span>steel</span><span class="pn">&amp;</span><span class="qk">campaign</span><span class="pn">=</span><span class="qv">spring_newsletter_2026</span><span class="pn">&amp;</span><span class="qk">utm_source</span><span class="pn">=</span><span class="qv">weekly<span class="dsp"> </span>digest</span><span class="pn">&amp;</span><span class="qk">ref</span><span class="pn">=</span><span class="qv">a<span class="pe">%26</span>b</span></code>
+    </div>
+    <p class="note"><b>The problem.</b> Four ragged edges. Every line starts somewhere
+      new, so the eye re-finds its place four times, and a break in the middle of
+      <code>kitchen</code> looks the same as a break at <code>&amp;</code>.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">A — left when it wraps, centred when it fits</span>
+    <div class="app-window win strip">
+      <code class="pv-url v-fit"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">example-shop.co.uk</span><span class="pn">/</span><span class="ps">products</span><span class="pn">/</span><span class="ps">kitchen</span><span class="pn">/</span><span class="ps">espresso-machines</span><span class="pn">/</span><span class="ps">lever-operated</span><span class="pn">?</span><span class="qk">colour</span><span class="pn">=</span><span class="qv">stainless<span class="dsp"> </span>steel</span><span class="pn">&amp;</span><span class="qk">campaign</span><span class="pn">=</span><span class="qv">spring_newsletter_2026</span><span class="pn">&amp;</span><span class="qk">utm_source</span><span class="pn">=</span><span class="qv">weekly<span class="dsp"> </span>digest</span><span class="pn">&amp;</span><span class="qk">ref</span><span class="pn">=</span><span class="qv">a<span class="pe">%26</span>b</span></code>
+    </div>
+    <div class="app-window win strip">
+      <code class="pv-url v-fit"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">docs</span></code>
+    </div>
+    <p class="note"><b>One CSS rule, no JS, no threshold.</b> <code>width: fit-content</code>
+      + auto margins: text that fits one line shrinks the box to itself and the box is
+      centred — the short URL below is under the <em>same</em> rule and hasn't moved.
+      Text that wraps takes the full width and left-aligns. The layout engine is the
+      wrap detector.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">B — A + hanging indent on continuation lines</span>
+    <div class="app-window win strip">
+      <code class="pv-url v-fit v-hang"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">example-shop.co.uk</span><span class="pn">/</span><span class="ps">products</span><span class="pn">/</span><span class="ps">kitchen</span><span class="pn">/</span><span class="ps">espresso-machines</span><span class="pn">/</span><span class="ps">lever-operated</span><span class="pn">?</span><span class="qk">colour</span><span class="pn">=</span><span class="qv">stainless<span class="dsp"> </span>steel</span><span class="pn">&amp;</span><span class="qk">campaign</span><span class="pn">=</span><span class="qv">spring_newsletter_2026</span><span class="pn">&amp;</span><span class="qk">utm_source</span><span class="pn">=</span><span class="qv">weekly<span class="dsp"> </span>digest</span><span class="pn">&amp;</span><span class="qk">ref</span><span class="pn">=</span><span class="qv">a<span class="pe">%26</span>b</span></code>
+    </div>
+    <p class="note"><b>The indent is the "no space here" signal.</b> A tucked-in line is
+      how every code editor says "this is still the previous line" — a continuation, not
+      a new item. First line flush, the rest 1.5ch in. (Cost: on a one-liner the box
+      carries the unused 1.5ch, so centring shifts about half a character. Invisible in
+      practice; if it ever bothers, A alone still stands.)</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">C — A + B + breaks prefer the structure</span>
+    <div class="app-window win strip">
+      <code class="pv-url v-fit v-hang v-struct"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">example-shop.co.uk</span><span class="pn">/</span><wbr><span class="ps">products</span><span class="pn">/</span><wbr><span class="ps">kitchen</span><span class="pn">/</span><wbr><span class="ps">espresso-machines</span><span class="pn">/</span><wbr><span class="ps">lever-operated</span><span class="pn">?</span><wbr><span class="qk">colour</span><span class="pn">=</span><wbr><span class="qv">stainless<span class="dsp"> </span>steel</span><span class="pn">&amp;</span><wbr><span class="qk">campaign</span><span class="pn">=</span><wbr><span class="qv">spring_newsletter_2026</span><span class="pn">&amp;</span><wbr><span class="qk">utm_source</span><span class="pn">=</span><wbr><span class="qv">weekly<span class="dsp"> </span>digest</span><span class="pn">&amp;</span><wbr><span class="qk">ref</span><span class="pn">=</span><wbr><span class="qv">a<span class="pe">%26</span>b</span></code>
+    </div>
+    <p class="note"><b>Lines end where the URL has joints.</b> A <code>&lt;wbr&gt;</code>
+      after each delimiter lets lines end on <code>/</code> <code>?</code> <code>&amp;</code>
+      <code>=</code> — characters that visibly cannot end a URL, so the break explains
+      itself. <code>overflow-wrap: anywhere</code> stays underneath as insurance: one
+      segment longer than the whole line still breaks mid-word rather than overflowing.
+      Server-side, <code>url_line_parts</code> emits the <code>&lt;wbr&gt;</code>s;
+      they are unselectable and never reach the clipboard.</p>
+  </div>
+
+  <div class="win" style="align-self:center">
+    <div class="fixnote" style="max-width:420px">
+      <b>Recommendation: C</b> (which contains A and B). All three are pure CSS plus
+      invisible <code>&lt;wbr&gt;</code> tags — no JS, so the no-JS page gets the same
+      layout. Resize this window and the breaks re-place themselves; the short URL
+      never leaves centre.
+    </div>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">2 · Saying "no space here" at the break, explicitly</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">simulated — gutter arrow on continuation lines</span>
+    <div class="app-window win strip">
+      <code class="pv-url simwrap"><span class="sim"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">example-shop.co.uk</span><span class="pn">/</span><span class="ps">products</span><span class="pn">/</span><span class="ps">kit</span></span><span class="sim"><span class="ps">chen</span><span class="pn">/</span><span class="ps">espresso-machines</span><span class="pn">/</span><span class="ps">lever-operated</span><span class="pn">?</span><span class="qk">colo</span></span><span class="sim"><span class="qk">ur</span><span class="pn">=</span><span class="qv">stainless<span class="dsp"> </span>steel</span><span class="pn">&amp;</span><span class="qk">campaign</span><span class="pn">=</span><span class="qv">spring_newslet</span></span><span class="sim"><span class="qv">ter_2026</span><span class="pn">&amp;</span><span class="qk">utm_source</span><span class="pn">=</span><span class="qv">weekly<span class="dsp"> </span>digest</span><span class="pn">&amp;</span><span class="qk">ref</span><span class="pn">=</span><span class="qv">a<span class="pe">%26</span>b</span></span></code>
+    </div>
+    <p class="note"><b>Simulated</b> — these line breaks are hand-placed so you can judge
+      the look; the browser did not choose them. A real version needs JS measuring line
+      boxes and re-running on every resize.</p>
+  </div>
+
+  <div class="win" style="align-self:center">
+    <div class="fixnote" style="max-width:420px">
+      <b>Recommendation: don't.</b> Three reasons to leave the explicit marker unmade:
+      <ul>
+        <li>The hero's whole promise is that what you see is what the URL contains. The
+          arrow is a character the URL does <em>not</em> contain, added to the one line
+          whose job is to add nothing. (Same reason CSS <code>hyphens</code> is out —
+          a hyphen at the break reads as part of the address.)</li>
+        <li>It needs JS, so the no-JS page loses the signal — while B and C above give
+          it for free, to everyone.</li>
+        <li>The receipt already guarantees the other half: a <em>real</em> space always
+          wears the dotted underline, so a bare, unmarked break can never be hiding a
+          space. Indent + delimiter-breaks say "continues"; the receipt says "and a
+          space would have been visible".</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">3 · The cast answers only when asked — click a marked character</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">variant A — the answer floats at the character</span>
+    <div class="app-window win">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">my<span class="ask"><span class="dsp"> </span><span class="pv-pop pv-cast"><span class="entry"><span class="tiles"><span class="tile sym">SP</span><span class="tile raw">&#32;</span></span><span class="what"><b>space</b> <span class="cp">U+0020</span> — stored as <code>%20</code></span></span></span></span>file</span><span class="pn">?</span><span class="qk">user</span><span class="pn">=</span><span class="qv">admin<span class="ask open"><span class="bad">%E2%80%8B</span><span class="pv-pop pv-cast"><span class="entry warn"><span class="tiles"><span class="tile sym">ZWSP</span><span class="tile raw">&#8203;</span></span><span class="what"><b>zero-width space</b> <span class="cp">U+200B</span> — stored as <code>%E2%80%8B</code>. The empty box is the character.</span></span></span></span></span><span class="pn">&amp;</span><span class="qk">q</span><span class="pn">=</span><span class="qv">a<span class="ask"><span class="pe">%26</span><span class="pv-pop pv-cast"><span class="entry"><span class="tiles"><span class="tile lit">&amp;</span></span><span class="what"><b>ampersand</b> <span class="cp">U+0026</span> — kept escaped as <code>%26</code> so it cannot read as a new parameter</span></span></span></span>b</span></code>
+      <div class="pv-facts">
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Hidden Characters</span>
+      </div>
+    </div>
+    <p class="note"><b>Live — click the dotted space, the red escape, or the grey
+      <code>%26</code>.</b> The explanation is one cast entry from note 28, floated at
+      the finger; nothing exists until asked, and Esc or a click elsewhere dismisses it.
+      The invisible characters are thin targets, so the clickable area is padded a few
+      px beyond the mark. Concerns: it floats over the card (edge collisions need care
+      on phones), and it needs JS — no-JS gets a <code>title</code> tooltip as the
+      crumb, plus the record in the fold as always.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">variant B — the answer is one line in the fold</span>
+    <div class="app-window win">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">my<span class="ask ask2" data-tell="sp"><span class="dsp"> </span></span>file</span><span class="pn">?</span><span class="qk">user</span><span class="pn">=</span><span class="qv">admin<span class="ask ask2" data-tell="zwsp"><span class="bad">%E2%80%8B</span></span></span><span class="pn">&amp;</span><span class="qk">q</span><span class="pn">=</span><span class="qv">a<span class="ask ask2" data-tell="amp"><span class="pe">%26</span></span>b</span></code>
+      <div class="pv-facts">
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Hidden Characters</span>
+      </div>
+      <details class="pv-parts" open>
+        <summary class="pv-parts-lid"><span class="when-closed">Show URL Details</span><span class="when-open">Hide URL Details</span><svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <div class="pv-slices">
+          <div class="pv-slice">
+            <input type="checkbox" checked disabled aria-label="Path, fixed">
+            <span class="txt"><span class="dl">/</span>my<span class="ask ask2" data-tell="sp"><span class="dsp"> </span></span>file</span>
+          </div>
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep user">
+            <span class="txt"><span class="dl">?</span><span class="k">user</span><span class="dl">=</span>admin<span class="ask ask2" data-tell="zwsp"><span class="bad">%E2%80%8B</span></span></span>
+          </div>
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep q">
+            <span class="txt"><span class="dl">&amp;</span><span class="k">q</span><span class="dl">=</span>a<span class="ask ask2" data-tell="amp"><span class="pct">%26</span></span>b</span>
+          </div>
+        </div>
+        <div class="pv-cast pv-castline">
+          <div class="entry shown" data-name="sp">
+            <span class="tiles"><span class="tile sym">SP</span><span class="tile raw">&#32;</span></span>
+            <span class="what"><b>space</b> <span class="cp">U+0020</span> — stored as
+              <code>%20</code>, in the path</span>
+          </div>
+          <div class="entry warn" data-name="zwsp">
+            <span class="tiles"><span class="tile sym">ZWSP</span><span class="tile raw">&#8203;</span></span>
+            <span class="what"><b>zero-width space</b> <span class="cp">U+200B</span> —
+              stored as <code>%E2%80%8B</code>, in <code>user</code>. The empty box is
+              the character.</span>
+          </div>
+          <div class="entry" data-name="amp">
+            <span class="tiles"><span class="tile lit">&amp;</span></span>
+            <span class="what"><b>ampersand</b> <span class="cp">U+0026</span> — kept
+              escaped as <code>%26</code> so it cannot read as a new parameter, in
+              <code>q</code></span>
+          </div>
+        </div>
+        <code class="rawline"><span class="lbl">Exactly as Stored</span><span class="str"><span class="sch">https://</span><span class="reg">example.com</span><span class="dl">/</span>my<span class="pct">%20</span>file<span class="dl">?</span><span class="k">user</span><span class="dl">=</span>admin<span class="pct">%E2%80%8B</span><span class="dl">&amp;</span><span class="k">q</span><span class="dl">=</span>a<span class="pct">%26</span>b</span></code>
+      </details>
+    </div>
+    <p class="note"><b>Live — same clicks, calmer answer.</b> Clicking a marked character
+      (hero or slice row) opens the fold if it's closed and one cast line appears above
+      the record, pulsing once. Nothing floats, nothing can collide with an edge, and
+      the entry sits next to the record it explains. Cost: the eye travels from the
+      clicked character down to the fold — the answer is not at the finger.</p>
+  </div>
+
+  <div class="win" style="align-self:center">
+    <div class="fixnote" style="max-width:420px">
+      <b>Mild recommendation: A</b> — it is the literal shape of "explain this one when I
+      click it", and the tie between character and explanation is strongest at zero
+      distance. B is the safe fallback if A feels floaty on the phone. Shared either way:
+      <ul>
+        <li>Only marked characters answer (receipt spaces, red hidden characters, kept
+          escapes) — plain text stays inert.</li>
+        <li>One answer at a time; asking another swaps it.</li>
+        <li>Production: the server wraps each marked run in a real
+          <code>&lt;button&gt;</code> (focusable, <code>aria-expanded</code>) with a
+          <code>title</code> as the no-JS crumb; the behaviour lives in preview.js keyed
+          on <code>html.js</code>.</li>
+        <li>The always-visible cast list is dead; note 28's entry dress survives as the
+          answer's body.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Mockup-only wiring; production would live in preview.js behind html.js.
+  function closeAll() {
+    document.querySelectorAll('.ask.open').forEach(function (o) { o.classList.remove('open'); });
+  }
+  document.querySelectorAll('.ask').forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (a.classList.contains('ask2')) {
+        var win = a.closest('.app-window');
+        var d = win.querySelector('details'); if (d) d.open = true;
+        win.querySelectorAll('.pv-castline .entry').forEach(function (en) { en.classList.remove('shown'); });
+        var t = win.querySelector('.pv-castline .entry[data-name="' + a.dataset.tell + '"]');
+        if (t) {
+          t.classList.add('shown');
+          t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
+        }
+        return;
+      }
+      var was = a.classList.contains('open');
+      closeAll();
+      if (!was) a.classList.add('open');
+    });
+  });
+  document.addEventListener('click', closeAll);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+</script>
+
+</body>
+</html>
