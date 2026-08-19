@@ -2061,13 +2061,18 @@ html.js .custom-field:not(.open) {
 }
 
 /* The fold, for http(s) only: the everyday page stays one quiet line and the
-   parts are an offer. The chevron is generated content, so a selection or a
-   copy never picks it up — it used to arrive in the clipboard as "Show". */
+   parts are an offer. The chevron is an inline SVG (no text content), so a
+   selection or a copy never picks it up — it used to arrive in the clipboard
+   as "Show" back when it was a text glyph. */
 .pv-parts {
     display: block;
     margin-top: 12px;
 }
 
+/* The lid wears the site's own "there is more" register — the main page's
+   "Security ⌄": accent 600 with a turning chevron, no bar. The old field-
+   dressed bar was the heaviest element on a quiet card, dressed stronger
+   than the URL it served (retired 2026-08-19 at the user's call). */
 .pv-parts-lid {
     list-style: none;
     cursor: pointer;
@@ -2076,20 +2081,15 @@ html.js .custom-field:not(.open) {
     width: 100%;
     text-align: center;
     font-family: var(--font);
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 600;
     line-height: 1.4;
-    color: var(--text-secondary);
-    padding: 9px 12px;
-    /* A quiet full-width bar, dressed like a field so it reads as a control
-       rather than a stray caption line. */
-    background: var(--field-bg);
-    border: 0.5px solid var(--field-border);
-    border-radius: 10px;
+    color: var(--accent);
+    padding: 7px 6px;
 }
 
 .pv-parts-lid:hover {
-    color: var(--text);
+    filter: brightness(1.12);
 }
 
 .pv-parts-lid::-webkit-details-marker {
@@ -2100,18 +2100,13 @@ html.js .custom-field:not(.open) {
     content: "";
 }
 
-.pv-parts-lid::before {
-    content: "\25b8";
-    display: inline-block;
-    margin-right: 8px;
-    font-size: 14px;
-    line-height: 1;
-    color: var(--text-tertiary);
-    transition: transform 0.18s ease;
+.pv-parts-lid .chev {
+    margin-left: 5px;
+    vertical-align: 1px;
 }
 
-.pv-parts[open] .pv-parts-lid::before {
-    transform: rotate(90deg);
+.pv-parts[open] .pv-parts-lid .chev {
+    transform: rotate(180deg);
 }
 
 .pv-parts .when-open {

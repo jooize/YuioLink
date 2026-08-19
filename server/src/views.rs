@@ -1266,6 +1266,10 @@ fn slice_section(uri: &UriView) -> Markup {
                 summary.pv-parts-lid {
                     span.when-closed { "Show URL Details" }
                     span.when-open { "Hide URL Details" }
+                    svg.chev width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" {
+                        path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor"
+                            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" {}
+                    }
                 }
                 (slice_rows(uri, &rows))
                 // The record's home on http(s). Same gate as the fold itself

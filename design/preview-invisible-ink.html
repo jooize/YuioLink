@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Invisible ink</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .cap { display: block; text-align: center; margin: 0 0 10px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .note { max-width: 420px; margin: 12px auto 0; font: 400 12.5px/1.55 var(--font);
+      color: var(--text-secondary); text-align: left; }
+    .note b { color: var(--text); font-weight: 600; }
+    .note code { font-family: var(--font-mono); font-size: .95em; }
+    .fixnote { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .fixnote ul { margin: 6px 0 0; padding-left: 20px; }
+    .fixnote li { margin: 3px 0; }
+    .win { width: min(100%, 420px); }
+    .app-window.win { margin: 0; padding: 26px 22px 22px; }
+    .app-window.win.strip { padding: 18px 20px 16px; }
+    .strip .pv-url { margin-top: 0; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    /* The receipt, on the text line (note 27, "maybe that"): decoration
+       follows the glyphs, so nothing can push it down. */
+    .dsp2 { text-decoration: underline dotted var(--text-tertiary) 1px;
+      text-underline-offset: 2px; }
+
+    /* The cast list, take 2 — just the character, per the user:
+       - the SYMBOL tile wears the Unicode-chart dress for things you cannot
+         see: the abbreviation in a DOTTED square;
+       - beside it, one tile holds the ACTUAL character, which appears empty
+         on purpose — the emptiness is the demonstration;
+       - a printable escape (&) is its own proof: one plain tile, no pair.
+       Then: name, U+ codepoint, the stored escape, and a clause of prose. */
+    .pv-cast { margin: 12px 2px 2px; text-align: left; }
+    .pv-cast .entry { display: flex; align-items: center; gap: 10px;
+      padding: 7px 0; }
+    .pv-cast .entry + .entry { border-top: .5px solid var(--card-border); }
+    .pv-cast .tiles { display: inline-flex; gap: 5px; flex: none; align-items: flex-start; }
+    .pv-cast .tilebox { display: inline-flex; flex-direction: column;
+      align-items: center; gap: 3px; }
+    .pv-cast .tile { display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; box-sizing: border-box;
+      font-family: var(--font-mono); font-size: 15px; font-weight: 600;
+      color: var(--text); border-radius: 7px; }
+    .pv-cast .tile.sym { border: 1.5px dotted var(--text-tertiary);
+      font-size: 8.5px; font-weight: 700; letter-spacing: .04em; }
+    .pv-cast .tile.raw { background: var(--field-bg);
+      border: .5px solid var(--field-border); }
+    .pv-cast .tile.lit { background: var(--field-bg);
+      border: .5px solid var(--field-border); }
+    .pv-cast .entry.warn .tile.sym { border-color: var(--danger); color: var(--danger); }
+    .pv-cast .tiny { font: 600 8px/1 var(--font); letter-spacing: .05em;
+      text-transform: uppercase; color: var(--text-tertiary); }
+    .pv-cast .what { font: 400 12px/1.5 var(--font); color: var(--text-secondary);
+      min-width: 0; }
+    .pv-cast .what b { color: var(--text); font-weight: 600; }
+    .pv-cast .what .cp { font-family: var(--font-mono); color: var(--text-tertiary); }
+    .pv-cast .what code { font-family: var(--font-mono); font-size: .95em;
+      color: var(--text); }
+    .pv-cast .entry.warn .what b, .pv-cast .entry.warn .what code { color: var(--danger); }
+  </style>
+</head>
+<body>
+
+<div class="wrap" style="padding-top:26px">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 28 · the blue lid below is LIVE production css now</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Invisible ink — the cast list, character only</h1>
+</div>
+
+<div class="fixnote">
+  <b>Changes from note 27, per your feedback.</b> The neighbour-context tiles are gone —
+  just the character. Each entry is now: <b>symbol · name · U+ · stored form · prose</b>.
+  The symbol wears the dotted square (the Unicode-chart dress for characters you cannot
+  see), and beside it sits one plain field holding the <em>actual</em> character — which
+  appears empty, on purpose: the emptiness is the demonstration. A printable escape like
+  <code>&amp;</code> is its own proof, so it gets one plain tile and no pair. Also on
+  this page: the blue lid you picked is implemented (the fold below uses production CSS),
+  and section 2 is the on-device check for the "maybe" receipt.
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">1 · The cast list, two dresses on the same three characters</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">variant 1 — bare tiles, the prose carries the labels</span>
+    <div class="app-window win">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">my<span class="dsp2"> </span>file</span><span class="pn">?</span><span class="qk">user</span><span class="pn">=</span><span class="qv">admin<span class="bad">%E2%80%8B</span></span><span class="pn">&amp;</span><span class="qk">q</span><span class="pn">=</span><span class="qv">a<span class="pe">%26</span>b</span></code>
+      <div class="pv-facts">
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Hidden Characters</span>
+      </div>
+      <details class="pv-parts" open>
+        <summary class="pv-parts-lid"><span class="when-closed">Show URL Details</span><span class="when-open">Hide URL Details</span><svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <div class="pv-slices">
+          <div class="pv-slice">
+            <input type="checkbox" checked disabled aria-label="Path, fixed">
+            <span class="txt"><span class="dl">/</span>my<span class="dsp2"> </span>file</span>
+          </div>
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep user">
+            <span class="txt"><span class="dl">?</span><span class="k">user</span><span class="dl">=</span>admin<span class="bad">%E2%80%8B</span></span>
+          </div>
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep q">
+            <span class="txt"><span class="dl">&amp;</span><span class="k">q</span><span class="dl">=</span>a<span class="pct">%26</span>b</span>
+          </div>
+        </div>
+        <div class="pv-cast">
+          <div class="entry">
+            <span class="tiles"><span class="tile sym">SP</span><span class="tile raw">&#32;</span></span>
+            <span class="what"><b>space</b> <span class="cp">U+0020</span> — stored as
+              <code>%20</code>, in the path</span>
+          </div>
+          <div class="entry warn">
+            <span class="tiles"><span class="tile sym">ZWSP</span><span class="tile raw">&#8203;</span></span>
+            <span class="what"><b>zero-width space</b> <span class="cp">U+200B</span> —
+              stored as <code>%E2%80%8B</code>, in <code>user</code>. The empty box is
+              the character.</span>
+          </div>
+          <div class="entry">
+            <span class="tiles"><span class="tile lit">&amp;</span></span>
+            <span class="what"><b>ampersand</b> <span class="cp">U+0026</span> — kept
+              escaped as <code>%26</code> so it cannot read as a new parameter, in
+              <code>q</code></span>
+          </div>
+        </div>
+        <code class="rawline"><span class="lbl">Exactly as Stored</span><span class="str"><span class="sch">https://</span><span class="reg">example.com</span><span class="dl">/</span>my<span class="pct">%20</span>file<span class="dl">?</span><span class="k">user</span><span class="dl">=</span>admin<span class="pct">%E2%80%8B</span><span class="dl">&amp;</span><span class="k">q</span><span class="dl">=</span>a<span class="pct">%26</span>b</span></code>
+      </details>
+    </div>
+    <p class="note"><b>Quietest version.</b> The dotted square says "this one you cannot
+      see", the plain field beside it proves it, and the ZWSP entry says so outright
+      ("the empty box is the character") so the blank never reads as a rendering bug.
+      The ampersand needs no pair — the glyph is its own proof.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">variant 2 — tiny captions name the two tiles</span>
+    <div class="app-window win">
+      <details class="pv-parts" open>
+        <summary class="pv-parts-lid"><span class="when-closed">Show URL Details</span><span class="when-open">Hide URL Details</span><svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <div class="pv-cast">
+          <div class="entry">
+            <span class="tiles">
+              <span class="tilebox"><span class="tile sym">SP</span><span class="tiny">symbol</span></span>
+              <span class="tilebox"><span class="tile raw">&#32;</span><span class="tiny">shown</span></span>
+            </span>
+            <span class="what"><b>space</b> <span class="cp">U+0020</span> — stored as
+              <code>%20</code>, in the path</span>
+          </div>
+          <div class="entry warn">
+            <span class="tiles">
+              <span class="tilebox"><span class="tile sym">ZWSP</span><span class="tiny">symbol</span></span>
+              <span class="tilebox"><span class="tile raw">&#8203;</span><span class="tiny">shown</span></span>
+            </span>
+            <span class="what"><b>zero-width space</b> <span class="cp">U+200B</span> —
+              stored as <code>%E2%80%8B</code>, in <code>user</code></span>
+          </div>
+          <div class="entry">
+            <span class="tiles">
+              <span class="tilebox"><span class="tile lit">&amp;</span><span class="tiny">char</span></span>
+            </span>
+            <span class="what"><b>ampersand</b> <span class="cp">U+0026</span> — kept
+              escaped as <code>%26</code>, in <code>q</code></span>
+          </div>
+        </div>
+      </details>
+    </div>
+    <p class="note"><b>Self-labelling, at a cost.</b> The captions make the pair
+      impossible to misread on first contact, but they add a second line of type to
+      every entry and the words repeat down the column. If the prose sentence in
+      variant 1 ("The empty box is the character") does the job, the captions are
+      ballast.</p>
+  </div>
+
+  <div class="win" style="align-self:center">
+    <div class="fixnote" style="max-width:420px">
+      <b>Recommendation.</b> Variant 1. The dotted square is doing the explaining —
+      it is the same dress every character-picker and Unicode chart uses for
+      invisibles — and one plain sentence covers the one entry where the blank could
+      puzzle. Rules it encodes:
+      <ul>
+        <li>Invisible character → dotted-square symbol + plain field with the real
+          character (empty on purpose).</li>
+        <li>Printable-but-escaped character → one plain tile with the glyph.</li>
+        <li>Every entry: name, <code>U+XXXX</code>, the stored escape, where it sits.
+          Repeats collapse to one entry with a count.</li>
+        <li>Red only where the chip is red (the hidden character); housekeeping
+          escapes stay in the grey register.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">2 · The receipt check — read this line in Safari</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">text-decoration receipt on a lone space</span>
+    <div class="app-window win strip">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">my<span class="dsp2"> </span>file</span><span class="pn">?</span><span class="qk">q</span><span class="pn">=</span><span class="qv">hello<span class="dsp2"> </span>world</span></code>
+    </div>
+    <p class="note"><b>If you can see two dotted underlines hugging the text</b> (one in
+      the path, one in the query) in this very page in Safari, the "maybe" is a yes:
+      <code>.dsp</code> switches from border-bottom to
+      <code>text-decoration: underline dotted</code> + 2px offset and the receipt sits
+      on the line everywhere. If either is missing, Safari refuses decoration on a lone
+      space and border-bottom stays.</p>
+  </div>
+</div>
+
+</body>
+</html>
