@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Touch the receipt</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .cap { display: block; text-align: center; margin: 0 0 10px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .note { max-width: 420px; margin: 12px auto 0; font: 400 12.5px/1.55 var(--font);
+      color: var(--text-secondary); text-align: left; }
+    .note b { color: var(--text); font-weight: 600; }
+    .note code { font-family: var(--font-mono); font-size: .95em; }
+    .fixnote { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .fixnote ul { margin: 6px 0 0; padding-left: 20px; }
+    .fixnote li { margin: 3px 0; }
+    .win { width: min(100%, 420px); }
+    .app-window.win { margin: 0; padding: 26px 22px 22px; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    /* A marked run becomes a tap target. The glyph itself can be 4px wide
+       (a space), so the hit area is grown with padding and pulled back with
+       negative margin -- the line's geometry never moves. */
+    .mark-tap { padding: 8px 5px; margin: -8px -5px; border-radius: 5px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .mark-tap:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+    .mark-tap:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+    /* Variant B: one shared caption line under the hero. aria-live, filled
+       with textContent only (the CSP requires trusted types anyway). */
+    .pv-whatis { display: none; margin: 9px auto 0; max-width: 94%;
+      font: 400 12px/1.5 var(--font); color: var(--text-secondary);
+      text-align: center; }
+    .pv-whatis.show { display: block; }
+    .pv-whatis code { font-family: var(--font-mono); font-size: .95em;
+      color: var(--text); }
+    .pv-whatis.warn { color: var(--danger); }
+    .pv-whatis.warn code { color: var(--danger); }
+
+    /* Variant A: the pulse on the row / record bytes the tap aimed at. */
+    .flash { animation: receipt-flash 1.3s ease; }
+    @keyframes receipt-flash {
+      0%   { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+      100% { background: transparent; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrap" style="padding-top:26px">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 26 · interactive — tap the dotted space, the red escape, the dim escape</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Touch the receipt — what a marked character says when asked</h1>
+</div>
+
+<div class="fixnote">
+  <b>The idea (user's, 2026-08-19).</b> The hero marks three kinds of character —
+  dotted space (was an escape), dim <code>%NN</code> (still is one), red <code>%NN</code>
+  (hides something) — and the marks say <em>that</em> without saying <em>what</em>.
+  Tap one and it should explain itself. Ground rules that shaped both variants:
+  <ul>
+    <li><b>No tooltips.</b> Touch has no hover and screen readers lose floating text —
+      the codebase already refuses tooltips for exactly this (see <code>flashSource</code>).</li>
+    <li><b>Mobile first.</b> A space glyph is a ~4px target; the hit area grows via
+      padding pulled back with negative margin (<code>.mark-tap</code>), keeping ~40px
+      touch height without moving the line.</li>
+    <li><b>No JS, no loss.</b> The marks stay what they are today — receipts — and the
+      fold still tells everything. The tap is purely additive.</li>
+    <li><b>Trusted types.</b> Captions are set with <code>textContent</code>; no markup
+      is assembled (the contract-lint tests already pin this for preview.js).</li>
+  </ul>
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">1 · Variant A — the tap aims at the fold</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">tap a mark → fold opens, its row and its bytes pulse</span>
+    <div class="app-window win">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">my<span class="dsp mark-tap" role="button" tabindex="0" data-var="a" data-row="a-row-path" data-bytes="a-esc-20"> </span>file</span><span class="pn">?</span><span class="qk">user</span><span class="pn">=</span><span class="qv">admin<span class="bad mark-tap" role="button" tabindex="0" data-var="a" data-row="a-row-user" data-bytes="a-esc-zwsp">%E2%80%8B</span></span></code>
+      <div class="pv-facts">
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Hidden Characters</span>
+      </div>
+      <details class="pv-parts" id="a-fold" open>
+        <summary class="pv-parts-lid"><span class="when-closed">Show URL Details</span><span class="when-open">Hide URL Details</span></summary>
+        <div class="pv-slices">
+          <div class="pv-slice" id="a-row-path">
+            <input type="checkbox" checked disabled aria-label="Path, fixed">
+            <span class="txt"><span class="dl">/</span>my<span class="dsp"> </span>file</span>
+          </div>
+          <div class="pv-slice togglable" id="a-row-user">
+            <input type="checkbox" checked aria-label="Keep user">
+            <span class="txt"><span class="dl">?</span><span class="k">user</span><span class="dl">=</span>admin<span class="bad">%E2%80%8B</span></span>
+          </div>
+        </div>
+        <code class="rawline"><span class="lbl">Exactly as Stored</span><span class="str"><span class="sch">https://</span><span class="reg">example.com</span><span class="dl">/</span>my<span class="pct" id="a-esc-20">%20</span>file<span class="dl">?</span><span class="k">user</span><span class="dl">=</span>admin<span class="pct" id="a-esc-zwsp">%E2%80%8B</span></span></code>
+      </details>
+    </div>
+    <p class="note"><b>The explanation surface already exists</b> — the tap just aims the
+      reader at it: the fold opens if closed, and the mark's own slice row and its bytes
+      in the record pulse once. Strength: everything shown is in context, nothing new to
+      dismiss. Weakness: on a phone the fold opening <em>moves the page</em> under the
+      finger, and the pulse answers "where" better than it answers "what" — the reader
+      still has to infer that <code>%E2%80%8B</code> means an invisible character.</p>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">2 · Variant B — the mark answers in one line, right there</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">tap a mark → one shared caption under the hero says what it is</span>
+    <div class="app-window win">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">my<span class="dsp mark-tap" role="button" tabindex="0" data-var="b" data-warn="0" data-what="␣ a space — stored as %20 in the link" aria-label="A space, stored as the escape %20"> </span>file</span><span class="pn">?</span><span class="qk">user</span><span class="pn">=</span><span class="qv">admin<span class="bad mark-tap" role="button" tabindex="0" data-var="b" data-warn="1" data-what="%E2%80%8B — an invisible character (zero-width space). It changes the value without changing what you see." aria-label="An invisible character, zero-width space, kept escaped">%E2%80%8B</span></span><span class="pn">&amp;</span><span class="qk">q</span><span class="pn">=</span><span class="qv">a<span class="pe mark-tap" role="button" tabindex="0" data-var="b" data-warn="0" data-what="%26 — an ampersand, kept escaped: decoded it would read as a new parameter starting" aria-label="An ampersand, kept escaped">%26</span>b</span></code>
+      <p class="pv-whatis" id="b-whatis" aria-live="polite"></p>
+      <div class="pv-facts">
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Hidden Characters</span>
+      </div>
+      <details class="pv-parts" open>
+        <summary class="pv-parts-lid"><span class="when-closed">Show URL Details</span><span class="when-open">Hide URL Details</span></summary>
+        <div class="pv-slices">
+          <div class="pv-slice">
+            <input type="checkbox" checked disabled aria-label="Path, fixed">
+            <span class="txt"><span class="dl">/</span>my<span class="dsp"> </span>file</span>
+          </div>
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep user">
+            <span class="txt"><span class="dl">?</span><span class="k">user</span><span class="dl">=</span>admin<span class="bad">%E2%80%8B</span></span>
+          </div>
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep q">
+            <span class="txt"><span class="dl">&amp;</span><span class="k">q</span><span class="dl">=</span>a<span class="pct">%26</span>b</span>
+          </div>
+        </div>
+        <code class="rawline"><span class="lbl">Exactly as Stored</span><span class="str"><span class="sch">https://</span><span class="reg">example.com</span><span class="dl">/</span>my<span class="pct">%20</span>file<span class="dl">?</span><span class="k">user</span><span class="dl">=</span>admin<span class="pct">%E2%80%8B</span><span class="dl">&amp;</span><span class="k">q</span><span class="dl">=</span>a<span class="pct">%26</span>b</span></code>
+      </details>
+    </div>
+    <p class="note"><b>One stable line, no occlusion, reader stays put.</b> The caption
+      appears in a reserved spot under the hero, so nothing floats over the URL and
+      nothing reflows mid-read on a phone. It answers "what" in words the chip never has
+      room for; a red mark keeps its red in the caption. Tapping the same mark again —
+      or another mark — replaces or clears the line; <code>aria-live="polite"</code>
+      reads it out. The dim structural escapes (<code>%26</code>) join in for free,
+      which quietly teaches what the three dresses mean.</p>
+  </div>
+
+  <div class="win" style="align-self:center">
+    <div class="fixnote" style="max-width:420px">
+      <b>Verdict (proposed).</b>
+      <ul>
+        <li><b>B is the feature:</b> it answers the actual question ("what does this
+          represent?") at the place the eye already is, works one-handed on a phone,
+          and degrades to nothing — no JS, no captions, no loss.</li>
+        <li><b>A is not worth its jump.</b> The fold is already one tap away and opens
+          itself whenever a warning fires; auto-opening it from a character tap moves
+          the page under the reader's finger for little gain. Drop it.</li>
+        <li>Every marked run (<code>.dsp</code>, <code>.bad</code>, <code>.pe</code>/<code>.pct</code>)
+          gets the same treatment, in the hero and in the slice rows — one rule, no
+          special cases.</li>
+        <li>Real implementation: the spans become focusable (<code>tabindex</code>,
+          <code>role="button"</code>, per-mark <code>aria-label</code>), captions are
+          server-written into a <code>data-what</code> attribute so preview.js only
+          moves text it never composes.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Mock behaviour only; the real thing lives in preview.js and reads
+  // server-written data-what attributes.
+  (function () {
+    "use strict";
+    var openMark = null;
+
+    function flash(el) {
+      if (!el) return;
+      el.classList.remove("flash");
+      void el.offsetWidth;
+      el.classList.add("flash");
+    }
+
+    function activate(mark) {
+      if (mark.getAttribute("data-var") === "a") {
+        var fold = document.getElementById("a-fold");
+        if (fold) fold.open = true;
+        flash(document.getElementById(mark.getAttribute("data-row")));
+        flash(document.getElementById(mark.getAttribute("data-bytes")));
+        return;
+      }
+      var line = document.getElementById("b-whatis");
+      if (!line) return;
+      if (openMark === mark) {
+        line.classList.remove("show");
+        openMark = null;
+        return;
+      }
+      openMark = mark;
+      line.textContent = mark.getAttribute("data-what");
+      line.classList.toggle("warn", mark.getAttribute("data-warn") === "1");
+      line.classList.add("show");
+    }
+
+    document.querySelectorAll(".mark-tap").forEach(function (mark) {
+      mark.addEventListener("click", function () { activate(mark); });
+      mark.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        activate(mark);
+      });
+    });
+  })();
+</script>
+
+</body>
+</html>
