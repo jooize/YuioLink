@@ -16,7 +16,10 @@
 // one it creates itself; it never un-hides something the server left in the
 // page. That is what keeps the first paint the final paint (the site has a
 // layout-shift history), and it is why the no-JS page has no empty checkboxes,
-// no dead Copy buttons, and no collapsed rows waiting for a script.
+// no dead Copy buttons, and no collapsed rows waiting for a script. The one
+// reveal here happens on a *click*, never on load: a cast entry naming a
+// marked character. The stylesheet hides the cast only when this script is
+// present (html.js); the no-JS page shows the list in full.
 //
 // There is also no selection or clipboard interception, deliberately. Copying
 // is what the Copy buttons do; selecting text does exactly what it looks like.
@@ -55,12 +58,65 @@
         wire() {
             copyShortcut();
             if (this.model) this.buildRows();
+            this.buildCast();
             this.buildSplit();
             this.buildRawCopyButtons();
             if (this.model) {
                 this.buildEditedLine();
                 this.refresh();
             }
+        }
+
+        // ------------------------------------------------------------------
+        // The cast
+        // ------------------------------------------------------------------
+
+        /**
+         * The cast answers when asked. Every marked character the server
+         * tagged with `data-tell` becomes a control: clicking it opens the
+         * fold if it was closed and shows the one cast entry that names the
+         * character, pulsing once. One answer at a time; asking again puts it
+         * away. Without this script the stylesheet shows the whole cast
+         * instead, so nothing here is the only way to the information.
+         */
+        buildCast() {
+            const cast = document.querySelector(".pv-cast");
+            if (!cast) return;
+            const wired = [];
+            document.querySelectorAll("[data-tell]").forEach((mark) => {
+                const name = mark.getAttribute("data-tell");
+                const entry = cast.querySelector('.entry[data-name="' + name + '"]');
+                if (!entry) return;
+                wired.push(mark);
+                mark.classList.add("ask");
+                mark.setAttribute("role", "button");
+                mark.setAttribute("tabindex", "0");
+                mark.setAttribute("aria-expanded", "false");
+                const tell = (event) => {
+                    // A mark can sit inside a togglable row; naming a
+                    // character must not also untick the part it lives in.
+                    event.stopPropagation();
+                    const selection = window.getSelection();
+                    if (selection && !selection.isCollapsed) return;
+                    const asking = mark.getAttribute("aria-expanded") !== "true";
+                    cast.querySelectorAll(".entry.shown").forEach((shown) =>
+                        shown.classList.remove("shown"),
+                    );
+                    wired.forEach((m) => m.setAttribute("aria-expanded", "false"));
+                    if (!asking) return;
+                    const fold = cast.closest("details");
+                    if (fold) fold.open = true;
+                    void entry.offsetWidth; // restart the pulse
+                    entry.classList.add("shown");
+                    mark.setAttribute("aria-expanded", "true");
+                };
+                mark.addEventListener("click", tell);
+                mark.addEventListener("keydown", (event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    tell(event);
+                });
+            });
         }
 
         // ------------------------------------------------------------------

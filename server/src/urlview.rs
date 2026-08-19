@@ -1096,10 +1096,45 @@ fn escaped(c: char) -> String {
         .collect()
 }
 
+/// Re-derive `(character, stored form)` pairs from a run of `%XX` escapes,
+/// reading it exactly the way [`decode_for_reading`] did — one pair per
+/// decoded character, or a single replacement-character pair when the bytes
+/// are not valid UTF-8. The cast list uses this to name what a kept escape
+/// stands for.
+pub(crate) fn escape_run_pairs(run: &str) -> Vec<(char, String)> {
+    let bytes = run.as_bytes();
+    let mut buf: Vec<u8> = Vec::new();
+    let mut i = 0;
+    while bytes.get(i) == Some(&b'%') {
+        match (hex(bytes.get(i + 1)), hex(bytes.get(i + 2))) {
+            (Some(h), Some(l)) => {
+                buf.push(h * 16 + l);
+                i += 3;
+            }
+            _ => break,
+        }
+    }
+    match std::str::from_utf8(&buf) {
+        Ok(decoded) => {
+            let mut consumed = 0;
+            decoded
+                .chars()
+                .map(|c| {
+                    let n = c.len_utf8() * 3;
+                    let raw = run[consumed..consumed + n].to_string();
+                    consumed += n;
+                    (c, raw)
+                })
+                .collect()
+        }
+        Err(_) => vec![(char::REPLACEMENT_CHARACTER, run.to_string())],
+    }
+}
+
 /// Invisible, zero-width, or direction-changing. These are the characters that
 /// let a stored string read as one thing and act as another, so they are never
 /// decoded for display — the reader sees the escape and the chip.
-fn is_invisible(c: char) -> bool {
+pub(crate) fn is_invisible(c: char) -> bool {
     matches!(c,
         '\u{0000}'..='\u{001f}'
             | '\u{007f}'..='\u{009f}'

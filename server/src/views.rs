@@ -1272,6 +1272,7 @@ fn slice_section(uri: &UriView) -> Markup {
                     }
                 }
                 (slice_rows(uri, &rows))
+                (cast_list(uri))
                 // The record's home on http(s). Same gate as the fold itself
                 // (`fold_is_worth_it` includes it), and any warning about the
                 // string has already forced the fold open — so the everyday
@@ -1281,6 +1282,7 @@ fn slice_section(uri: &UriView) -> Markup {
             }
         } @else {
             (slice_rows(uri, &rows))
+            (cast_list(uri))
         }
     }
 }
@@ -1429,6 +1431,312 @@ fn escape_runs(value: &str) -> Vec<(String, bool)> {
         i += take;
     }
     out
+}
+
+// --------------------------------------------------------------------------
+// The cast: naming the marked characters
+// --------------------------------------------------------------------------
+
+/// Why a marked character is in the cast at all — the story its entry tells.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CastKind {
+    /// A space stored as `%20` (the dotted receipt).
+    Space,
+    /// Literal spaces used as padding (the red run).
+    Padding,
+    /// An escape decoding to something invisible or direction-changing.
+    Hidden,
+    /// A structure character kept escaped so it cannot redraw the URI.
+    Kept,
+    /// An escape whose bytes are not valid text — nothing honest to name.
+    Undecodable,
+}
+
+/// Where an entry's character sits, for the "in the path" clause.
+#[derive(Clone, PartialEq, Eq)]
+enum CastPlace {
+    Path,
+    Username,
+    Fragment,
+    Query,
+    Address,
+    Key(String),
+}
+
+/// One uncommon character the card marked, named. Identical characters
+/// collapse to one entry with a count; every mark that drew the character
+/// points here through its `data-tell`.
+struct CastEntry {
+    id: String,
+    ch: char,
+    stored: String,
+    kind: CastKind,
+    count: usize,
+    places: Vec<CastPlace>,
+}
+
+/// The Unicode-chart dress for a character you cannot see: the short symbol
+/// worn by the dotted tile, and a lowercase name for the prose. Characters
+/// outside the table keep their hex digits as the symbol.
+fn char_dress(c: char) -> (String, String) {
+    let (sym, name) = match c {
+        ' ' => ("SP", "space"),
+        '\t' => ("TAB", "tab"),
+        '\n' => ("LF", "line feed"),
+        '\r' => ("CR", "carriage return"),
+        '\u{001b}' => ("ESC", "escape character"),
+        '\u{007f}' => ("DEL", "delete"),
+        '\u{00a0}' => ("NBSP", "no-break space"),
+        '\u{00ad}' => ("SHY", "soft hyphen"),
+        '\u{034f}' => ("CGJ", "combining grapheme joiner"),
+        '\u{061c}' => ("ALM", "Arabic letter mark"),
+        '\u{180e}' => ("MVS", "Mongolian vowel separator"),
+        '\u{2000}' => ("NQSP", "en quad"),
+        '\u{2001}' => ("MQSP", "em quad"),
+        '\u{2002}' => ("ENSP", "en space"),
+        '\u{2003}' => ("EMSP", "em space"),
+        '\u{2004}' => ("3/MSP", "three-per-em space"),
+        '\u{2005}' => ("4/MSP", "four-per-em space"),
+        '\u{2006}' => ("6/MSP", "six-per-em space"),
+        '\u{2007}' => ("FSP", "figure space"),
+        '\u{2008}' => ("PSP", "punctuation space"),
+        '\u{2009}' => ("THSP", "thin space"),
+        '\u{200a}' => ("HSP", "hair space"),
+        '\u{200b}' => ("ZWSP", "zero-width space"),
+        '\u{200c}' => ("ZWNJ", "zero-width non-joiner"),
+        '\u{200d}' => ("ZWJ", "zero-width joiner"),
+        '\u{200e}' => ("LRM", "left-to-right mark"),
+        '\u{200f}' => ("RLM", "right-to-left mark"),
+        '\u{2028}' => ("LS", "line separator"),
+        '\u{2029}' => ("PS", "paragraph separator"),
+        '\u{202a}' => ("LRE", "left-to-right embedding"),
+        '\u{202b}' => ("RLE", "right-to-left embedding"),
+        '\u{202c}' => ("PDF", "pop directional formatting"),
+        '\u{202d}' => ("LRO", "left-to-right override"),
+        '\u{202e}' => ("RLO", "right-to-left override"),
+        '\u{202f}' => ("NNBSP", "narrow no-break space"),
+        '\u{205f}' => ("MMSP", "medium mathematical space"),
+        '\u{2060}' => ("WJ", "word joiner"),
+        '\u{2066}' => ("LRI", "left-to-right isolate"),
+        '\u{2067}' => ("RLI", "right-to-left isolate"),
+        '\u{2068}' => ("FSI", "first strong isolate"),
+        '\u{2069}' => ("PDI", "pop directional isolate"),
+        '\u{3000}' => ("IDSP", "ideographic space"),
+        '\u{3164}' => ("HF", "hangul filler"),
+        '\u{feff}' => ("BOM", "byte order mark"),
+        '&' => ("&", "ampersand"),
+        '=' => ("=", "equals sign"),
+        '#' => ("#", "number sign"),
+        '%' => ("%", "percent sign"),
+        _ => return (format!("{:04X}", c as u32), "hidden character".to_string()),
+    };
+    (sym.to_string(), name.to_string())
+}
+
+/// The `data-tell` id and hover title for a marked escape run. The run's
+/// first character names it, so every mark drawing the same character points
+/// at the same cast entry.
+fn mark_meta(run: &str) -> (String, String) {
+    match urlview::escape_run_pairs(run).first() {
+        Some((c, _)) if *c == char::REPLACEMENT_CHARACTER => {
+            ("ufffd".to_string(), "undecodable bytes".to_string())
+        }
+        Some((c, _)) => {
+            let (_, name) = char_dress(*c);
+            (
+                format!("u{:04x}", *c as u32),
+                format!("{name} U+{:04X}", *c as u32),
+            )
+        }
+        None => (String::new(), String::new()),
+    }
+}
+
+fn place_of(slice: &urlview::Slice) -> CastPlace {
+    if let Some(k) = &slice.key {
+        return CastPlace::Key(k.clone());
+    }
+    match slice.role {
+        Role::Path => CastPlace::Path,
+        Role::Userinfo => CastPlace::Username,
+        Role::Fragment => CastPlace::Fragment,
+        Role::Query => CastPlace::Query,
+        _ => CastPlace::Address,
+    }
+}
+
+/// Walk the same display pieces the card draws and collect one entry per
+/// distinct marked character. Hosts and ports never render marks (the host
+/// has the IDN machinery instead), so they contribute nothing.
+fn cast_entries(uri: &UriView) -> Vec<CastEntry> {
+    let mut out: Vec<CastEntry> = Vec::new();
+    let mut note = |ch: char, stored: String, kind: CastKind, place: CastPlace, n: usize| {
+        let id = if kind == CastKind::Padding {
+            "pad".to_string()
+        } else {
+            format!("u{:04x}", ch as u32)
+        };
+        match out.iter_mut().find(|e| e.id == id) {
+            Some(e) => {
+                e.count += n;
+                if !e.places.contains(&place) {
+                    e.places.push(place);
+                }
+            }
+            None => out.push(CastEntry {
+                id,
+                ch,
+                stored,
+                kind,
+                count: n,
+                places: vec![place],
+            }),
+        }
+    };
+    for slice in &uri.slices {
+        if matches!(slice.role, Role::Host | Role::Port) {
+            continue;
+        }
+        let place = place_of(slice);
+        for piece in &slice.display {
+            match piece {
+                Piece::DecodedSpace => {
+                    note(' ', "%20".to_string(), CastKind::Space, place.clone(), 1);
+                }
+                Piece::Padding(s) => {
+                    note(
+                        ' ',
+                        s.clone(),
+                        CastKind::Padding,
+                        place.clone(),
+                        s.chars().count(),
+                    );
+                }
+                Piece::Escape(s) => {
+                    for (c, raw) in urlview::escape_run_pairs(s) {
+                        let kind = if c == char::REPLACEMENT_CHARACTER {
+                            CastKind::Undecodable
+                        } else {
+                            CastKind::Kept
+                        };
+                        note(c, raw, kind, place.clone(), 1);
+                    }
+                }
+                Piece::BadEscape(s) => {
+                    for (c, raw) in urlview::escape_run_pairs(s) {
+                        note(c, raw, CastKind::Hidden, place.clone(), 1);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    out
+}
+
+/// The cast, in note 28's dress: for an invisible character, the dotted-square
+/// symbol tile every Unicode chart uses beside one plain field holding the
+/// actual character — which appears empty, on purpose. A printable kept escape
+/// is its own proof and gets one plain tile. With the script running, entries
+/// stay hidden until their character is clicked (design note 29, the user's
+/// pick); the no-JS page shows the list in full instead — that split lives in
+/// the stylesheet, keyed on `html.js`.
+fn cast_list(uri: &UriView) -> Markup {
+    let entries = cast_entries(uri);
+    html! {
+        @if !entries.is_empty() {
+            div.pv-cast {
+                @for e in &entries { (cast_entry(e)) }
+            }
+        }
+    }
+}
+
+fn cast_entry(e: &CastEntry) -> Markup {
+    let warn = matches!(e.kind, CastKind::Hidden | CastKind::Padding);
+    let (sym, name) = char_dress(e.ch);
+    let name = if e.kind == CastKind::Undecodable {
+        "undecodable bytes".to_string()
+    } else {
+        name
+    };
+    html! {
+        div class=(if warn { "entry warn" } else { "entry" }) data-name=(e.id) {
+            span.tiles {
+                @if e.kind == CastKind::Kept {
+                    span.tile.lit { (e.ch) }
+                } @else if e.kind == CastKind::Undecodable {
+                    // No character exists to put in a box — a replacement
+                    // mark here would claim one does. The dotted square asks
+                    // the question instead.
+                    span.tile.sym { "?" }
+                } @else {
+                    span.tile.sym { (sym) }
+                    span.tile.raw { (e.ch) }
+                }
+            }
+            span.what {
+                b { (name) } " "
+                @if e.kind != CastKind::Undecodable {
+                    span.cp { "U+" (format!("{:04X}", e.ch as u32)) } " "
+                }
+                "— " (cast_prose(e)) (cast_tail(e))
+                @if e.kind == CastKind::Hidden { ". The empty box is the character." }
+            }
+        }
+    }
+}
+
+fn cast_prose(e: &CastEntry) -> Markup {
+    html! {
+        @match e.kind {
+            CastKind::Space => { "stored as " code { "%20" } }
+            CastKind::Padding => { "literal, used as padding" }
+            CastKind::Hidden => { "stored as " code { (e.stored) } }
+            CastKind::Kept => {
+                "kept escaped as " code { (e.stored) }
+                " so it cannot read as " (structure_reason(e.ch))
+            }
+            CastKind::Undecodable => {
+                "kept escaped as " code { (e.stored) }
+                " — the bytes are not valid text"
+            }
+        }
+    }
+}
+
+/// The count and place clauses: "…, twice, in the path".
+fn cast_tail(e: &CastEntry) -> Markup {
+    html! {
+        @if e.count == 2 { ", twice" }
+        @else if e.count > 2 { ", " (e.count) " times" }
+        @if e.places.len() == 1 { ", in " (place_markup(&e.places[0])) }
+        @else { ", in " (e.places.len()) " places" }
+    }
+}
+
+fn place_markup(p: &CastPlace) -> Markup {
+    html! {
+        @match p {
+            CastPlace::Path => { "the path" }
+            CastPlace::Username => { "the username" }
+            CastPlace::Fragment => { "the fragment" }
+            CastPlace::Query => { "the query" }
+            CastPlace::Address => { "the address" }
+            CastPlace::Key(k) => { code { (k) } }
+        }
+    }
+}
+
+/// What decoding this structure character would have redrawn.
+fn structure_reason(c: char) -> &'static str {
+    match c {
+        '&' => "a new parameter",
+        '=' => "a key taking a value",
+        '#' => "a fragment starting",
+        '%' => "another escape starting",
+        _ => "the URL's own structure",
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -1758,12 +2066,21 @@ fn pieces(parts: &[Piece], style: PieceStyle) -> Markup {
                 Piece::Text(s) => { (s) }
                 // A space that was stored as %20 wears a dotted underline: a
                 // receipt saying "this space is an escape in the link".
-                Piece::DecodedSpace => { span.dsp { " " } }
-                Piece::Padding(s) => { span.bad { (s) } }
+                //
+                // Every mark also names itself: `data-tell` points at the cast
+                // entry for its character (preview.js wires the click) and the
+                // title is the hover crumb the no-JS page keeps.
+                Piece::DecodedSpace => { span.dsp data-tell="u0020" title="space U+0020" { " " } }
+                Piece::Padding(s) => { span.bad data-tell="pad" title="space U+0020, padding" { (s) } }
                 Piece::Escape(s) => {
-                    @if style == PieceStyle::Url { span.pe { (s) } } @else { span.pct { (s) } }
+                    @let (tell, title) = mark_meta(s);
+                    @if style == PieceStyle::Url { span.pe data-tell=(tell) title=(title) { (s) } }
+                    @else { span.pct data-tell=(tell) title=(title) { (s) } }
                 }
-                Piece::BadEscape(s) => { span.bad { (s) } }
+                Piece::BadEscape(s) => {
+                    @let (tell, title) = mark_meta(s);
+                    span.bad data-tell=(tell) title=(title) { (s) }
+                }
                 Piece::Delim(s) => { span.dl { (s) } }
                 Piece::Local(s) => {
                     @if style == PieceStyle::Url { (s) } @else { span.lp { (s) } }
@@ -1796,18 +2113,22 @@ fn url_line_parts(uri: &UriView) -> Markup {
                 Role::Opaque => span.seg { (pieces(&slice.display, PieceStyle::Url)) },
                 // A keyless fragment is one literal segment; a keyed part is a
                 // key, an `=`, and a value.
+                // A `<wbr>` after each delimiter: when the line wraps, it
+                // prefers to break where the URL has a joint, so a line ends
+                // on a character that visibly cannot end a URL (design note
+                // 29). No text, so a selection or a copy never picks it up.
                 _ if slice.key.is_none() => {
-                    span.pn { (slice.delim) }
+                    span.pn { (slice.delim) } wbr;
                     span.seg { (pieces(&slice.display, PieceStyle::Url)) }
                 }
                 _ => {
-                    span.pn { (slice.delim) }
+                    span.pn { (slice.delim) } wbr;
                     // A tail's key is a signpost, so it takes the bold the
                     // slices and the exact line have always given it. `.seg` is
                     // left to the port and a keyless fragment, which are not
                     // keys and must not read as ones.
                     @if let Some(k) = &slice.key { span.qk { (k) } }
-                    @if slice.equals { span.pn { "=" } }
+                    @if slice.equals { span.pn { "=" } wbr; }
                     span.qv { (pieces(&slice.display, PieceStyle::Url)) }
                 }
             }
@@ -1881,7 +2202,7 @@ fn path_markup(display: &[Piece]) -> Markup {
     let segments = split_path_segments(display);
     html! {
         @for (n, seg) in segments.iter().enumerate() {
-            @if n > 0 { span.pn { "/" } }
+            @if n > 0 { span.pn { "/" } wbr; }
             @if !seg.is_empty() { span.ps { (pieces(seg, PieceStyle::Url)) } }
         }
     }
@@ -2639,7 +2960,77 @@ mod tests {
         // A %20 in the path used to be flattened to a bare space in the hero
         // and the slice row; the dotted receipt must survive the `/` split.
         let c = card("https://example.com/my%20file/x");
-        assert!(c.contains(r#"<span class="dsp">"#), "{c}");
+        assert!(c.contains(r#"<span class="dsp" data-tell="u0020""#), "{c}");
+    }
+
+    /// The cast (design note 29): every marked character gets one entry in the
+    /// fold. The markup is one page for everyone — the stylesheet keyed on
+    /// `html.js` hides the entries behind a click when the script is present
+    /// and shows the full list when it is not.
+    #[test]
+    fn the_cast_names_every_marked_character() {
+        let c = card("https://example.com/my%20file?user=admin%E2%80%8B&q=a%26b");
+        assert!(c.contains(r#"<div class="pv-cast">"#), "{c}");
+        // The hidden character's entry warns; housekeeping stays grey.
+        assert!(
+            c.contains(r#"<div class="entry warn" data-name="u200b""#),
+            "{c}"
+        );
+        assert!(c.contains(r#"<div class="entry" data-name="u0026""#), "{c}");
+        // The raw tile holds the ACTUAL character — empty on purpose — and
+        // the prose says so, so the blank never reads as a rendering bug.
+        assert!(
+            c.contains("<span class=\"tile raw\">\u{200b}</span>"),
+            "{c}"
+        );
+        assert!(c.contains("The empty box is the character."), "{c}");
+        // A printable kept escape is its own proof: one plain tile, no pair.
+        assert!(c.contains(r#"<span class="tile lit">&amp;</span>"#), "{c}");
+        // Names, codepoints, provenance, place.
+        assert!(c.contains("stored as <code>%20</code>, in the path"), "{c}");
+        assert!(c.contains("zero-width space"), "{c}");
+        assert!(c.contains("U+200B"), "{c}");
+        // Every mark points at its entry.
+        assert!(c.contains(r#"data-tell="u200b""#), "{c}");
+        assert!(c.contains(r#"data-tell="u0026""#), "{c}");
+        // And the stylesheet carries both halves of the reveal.
+        const APP_CSS: &str = include_str!("../static/app.css");
+        assert!(APP_CSS.contains("html.js .pv-cast .entry {\n    display: none;\n}"));
+        assert!(APP_CSS.contains("html:not(.js) .pv-cast .entry + .entry {"));
+    }
+
+    #[test]
+    fn the_cast_collapses_repeats_to_one_entry_with_a_count() {
+        let c = card("https://example.com/a%20b%20c%20d");
+        assert_eq!(c.matches(r#"data-name="u0020""#).count(), 1, "{c}");
+        assert!(c.contains("3 times, in the path"), "{c}");
+    }
+
+    #[test]
+    fn a_card_with_no_marked_characters_has_no_cast() {
+        let c = card("https://example.com/plain?q=1");
+        assert!(!c.contains("pv-cast"), "{c}");
+    }
+
+    /// Design note 29's other half: the hero prefers to break at the URL's
+    /// joints, so a wrapped line ends on a character that visibly cannot end
+    /// a URL — and the stylesheet centres a one-line URL while left-aligning
+    /// a wrapped one, with the layout engine as the wrap detector.
+    #[test]
+    fn the_hero_wraps_at_the_structure_and_falls_ragged_left() {
+        let c = card("https://example.com/a/b?x=1&y=2");
+        assert!(c.contains(r#"<span class="pn">/</span><wbr>"#), "{c}");
+        assert!(c.contains(r#"<span class="pn">?</span><wbr>"#), "{c}");
+        assert!(c.contains(r#"<span class="pn">&amp;</span><wbr>"#), "{c}");
+        assert!(c.contains(r#"<span class="pn">=</span><wbr>"#), "{c}");
+        const APP_CSS: &str = include_str!("../static/app.css");
+        for rule in [
+            "width: fit-content",
+            "overflow-wrap: anywhere",
+            "text-indent: -1.5ch",
+        ] {
+            assert!(APP_CSS.contains(rule), "app.css lost `{rule}`");
+        }
     }
 
     #[test]

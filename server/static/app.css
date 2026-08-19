@@ -1393,16 +1393,31 @@ html.js .custom-field:not(.open) {
     font-family: var(--font);
 }
 
-/* Full destination URL, coloured by part (registrable domain highlighted). */
+/* Full destination URL, coloured by part (registrable domain highlighted).
+
+   Centred while it fits, ragged-right when it wraps (design note 29): with
+   fit-content and auto margins the layout engine itself is the wrap detector,
+   so a one-line URL keeps the centred composition and a long one left-aligns
+   without JS or a length threshold. Continuation lines hang 1.5ch in -- the
+   editor-world signal for "same token continues, nothing was here" -- and
+   breaks prefer the <wbr> joints the server puts after each delimiter, so a
+   line ends on a character that visibly cannot end a URL. overflow-wrap
+   stays underneath as insurance for one segment longer than the whole line. */
 .pv-url {
     display: block;
-    text-align: center;
-    margin-top: 4px;
+    width: fit-content;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin: 4px auto 0;
+    padding-left: 1.5ch;
+    text-indent: -1.5ch;
+    text-align: left;
     font-family: var(--font-mono);
     font-size: 13.5px;
     line-height: 1.9;
     letter-spacing: 0.03em;
-    word-break: break-all;
+    word-break: normal;
+    overflow-wrap: anywhere;
 }
 
 /* ⌘C on a preview page copies the destination (preview.js); a green check trails
@@ -2064,6 +2079,128 @@ html.js .custom-field:not(.open) {
     text-underline-offset: 2px;
 }
 
+/* A marked character preview.js has wired to answer (`.ask` is added by the
+   script, never by the server): clicking it shows the cast entry naming the
+   character. The affordance is spent on the cursor and a hover wash -- no
+   extra ink on the line itself. */
+.ask {
+    cursor: help;
+    border-radius: 4px;
+}
+
+.ask:hover {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* The cast: one entry per uncommon character the card marked. An invisible
+   character wears the dotted-square symbol tile every Unicode chart uses,
+   beside one plain field holding the actual character -- which appears
+   empty, on purpose: the emptiness is the demonstration. A printable kept
+   escape (&) is its own proof and gets one plain tile. With the script the
+   entries stay hidden until their character is clicked (design note 29, the
+   user's pick); without it the full list simply shows -- the no-JS page
+   keeps every fact. */
+.pv-cast {
+    margin: 10px 2px 2px;
+    text-align: left;
+}
+
+.pv-cast .entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 6px;
+    border-radius: 8px;
+}
+
+html.js .pv-cast .entry {
+    display: none;
+}
+
+html.js .pv-cast .entry.shown {
+    display: flex;
+    animation: cast-pulse 1.4s ease-out;
+}
+
+html:not(.js) .pv-cast .entry + .entry {
+    border-top: 0.5px solid var(--card-border);
+}
+
+@keyframes cast-pulse {
+    from {
+        background: color-mix(in srgb, var(--accent) 15%, transparent);
+    }
+
+    to {
+        background: transparent;
+    }
+}
+
+.pv-cast .tiles {
+    display: inline-flex;
+    gap: 5px;
+    flex: none;
+}
+
+.pv-cast .tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    box-sizing: border-box;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    border-radius: 7px;
+}
+
+.pv-cast .tile.sym {
+    border: 1.5px dotted var(--text-tertiary);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.pv-cast .tile.raw,
+.pv-cast .tile.lit {
+    background: var(--field-bg);
+    border: 0.5px solid var(--field-border);
+}
+
+.pv-cast .entry.warn .tile.sym {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.pv-cast .what {
+    font: 400 12px/1.5 var(--font);
+    color: var(--text-secondary);
+    min-width: 0;
+}
+
+.pv-cast .what b {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.pv-cast .what .cp {
+    font-family: var(--font-mono);
+    color: var(--text-tertiary);
+}
+
+.pv-cast .what code {
+    font-family: var(--font-mono);
+    font-size: 0.95em;
+    color: var(--text);
+}
+
+.pv-cast .entry.warn .what b,
+.pv-cast .entry.warn .what code {
+    color: var(--danger);
+}
+
 /* The fold, for http(s) only: the everyday page stays one quiet line and the
    parts are an offer. The chevron is an inline SVG (no text content), so a
    selection or a copy never picks it up — it used to arrive in the clipboard
@@ -2411,7 +2548,6 @@ html.js .custom-field:not(.open) {
    page. */
 .pv-url.inert {
     opacity: 0.7;
-    text-align: center;
 }
 
 .pv-refuse-alert {
