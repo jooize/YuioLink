@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Cast of characters</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .cap { display: block; text-align: center; margin: 0 0 10px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .note { max-width: 420px; margin: 12px auto 0; font: 400 12.5px/1.55 var(--font);
+      color: var(--text-secondary); text-align: left; }
+    .note b { color: var(--text); font-weight: 600; }
+    .note code { font-family: var(--font-mono); font-size: .95em; }
+    .fixnote { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .fixnote ul { margin: 6px 0 0; padding-left: 20px; }
+    .fixnote li { margin: 3px 0; }
+    .win { width: min(100%, 420px); }
+    .app-window.win { margin: 0; padding: 26px 22px 22px; }
+    .app-window.win.strip { padding: 18px 20px 16px; }
+    .strip .pv-url { margin-top: 0; }
+
+    /* ===================================================================
+       CANDIDATES for app.css
+       =================================================================== */
+    /* 1 — the fold lid as the site's blue heading. Same affordance the main
+       page already uses for "Security ⌄": accent 600 with a turning chevron,
+       no bar. The bar dress is removed, not restyled. */
+    .pv-parts-lid.heading { background: none; border: none;
+      color: var(--accent); font-size: 12.5px; padding: 7px 6px; }
+    .pv-parts-lid.heading::before { content: none; }
+    .pv-parts-lid.heading:hover { color: var(--accent); filter: brightness(1.12); }
+    .pv-parts-lid.heading .chev { display: inline-block; margin-left: 5px;
+      transition: transform .18s ease; vertical-align: 1px; }
+    .pv-parts[open] .pv-parts-lid.heading .chev { transform: rotate(180deg); }
+
+    /* 2 — the receipt hugs the text: decoration follows the glyphs, not the
+       box, so no padding can push it away. (Verify on-device that Safari
+       draws a dotted underline under a LONE space; border-bottom is the
+       fallback if not.) */
+    .dsp2 { text-decoration: underline dotted var(--text-tertiary) 1px;
+      text-underline-offset: 2px; }
+    /* Hit-slop for a future tap: an ::after overlay grows the target without
+       moving one pixel of layout — the note-26 padding trick is retired. */
+    .mark-tap2 { position: relative; cursor: pointer; }
+    .mark-tap2::after { content: ""; position: absolute; inset: -10px -4px; }
+
+    /* 3 — the cast list: every uncommon character at once, left-aligned,
+       each shown big in a tile with two neighbours for context (the 1Password
+       Large Type register: checkered mono cells). */
+    .pv-cast { margin: 12px 2px 2px; text-align: left; }
+    .pv-cast .entry { display: flex; align-items: center; gap: 11px;
+      padding: 6px 0; }
+    .pv-cast .tiles { display: inline-flex; flex: none; }
+    .pv-cast .tile { display: inline-flex; align-items: center; justify-content: center;
+      min-width: 26px; height: 30px; padding: 0 3px;
+      font-family: var(--font-mono); font-size: 15px; font-weight: 600;
+      color: var(--text); background: var(--field-bg);
+      border: .5px solid var(--card-border); }
+    .pv-cast .tile:nth-child(even) { background: var(--card-bg); }
+    .pv-cast .tile + .tile { margin-left: -0.5px; }
+    .pv-cast .tile:first-child { border-radius: 6px 0 0 6px; }
+    .pv-cast .tile:last-child { border-radius: 0 6px 6px 0; }
+    .pv-cast .tile.it {
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 38%, transparent); }
+    .pv-cast .tile.it.warn {
+      background: color-mix(in srgb, var(--danger) 12%, transparent);
+      border-color: color-mix(in srgb, var(--danger) 42%, transparent);
+      color: var(--danger); }
+    .pv-cast .tile .tiny { font-size: 8px; font-weight: 700; letter-spacing: .04em; }
+    .pv-cast .what { font: 400 12px/1.45 var(--font); color: var(--text-secondary);
+      min-width: 0; }
+    .pv-cast .what code { font-family: var(--font-mono); font-size: .95em;
+      color: var(--text); }
+    .pv-cast .entry.warn .what, .pv-cast .entry.warn .what code { color: var(--danger); }
+  </style>
+</head>
+<body>
+
+<div class="wrap" style="padding-top:26px">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 27 · fold sections are real — click them</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Cast of characters — the blue lid, the tight receipt, and Large Type for escapes</h1>
+</div>
+
+<div class="fixnote">
+  <b>Three answers before the pictures.</b>
+  <ul>
+    <li><b>Why the dotted line sat so low:</b> note 26 grew the tap target with
+      <code>padding</code>, and <code>.dsp</code>'s border-bottom rides the padding box —
+      8px of padding is 8px of gap. Production has no padding, so the live pages are
+      tighter, but the fix is structural: draw the receipt with
+      <code>text-decoration: underline dotted</code> + <code>text-underline-offset: 2px</code>
+      (decoration follows glyphs, immune to any box), and grow tap targets with an
+      absolutely-positioned <code>::after</code> overlay that moves no layout at all.
+      One thing to verify on a real device: Safari drawing a dotted underline under a
+      <em>lone space</em> — if it refuses, border-bottom stays as the fallback.</li>
+    <li><b>Do adjacent click zones overlap?</b> The slops can touch, but a contested
+      sliver just goes to the later mark in the string (paint order) — zones partition,
+      they don't dead-zone. The real rule is to keep horizontal slop at or under half a
+      character: the hero's mono advance is ~8px, so ±4px of slop guarantees every mark
+      keeps its own glyph plus its share of the gap. Vertical slop can stay generous
+      (±10px) because marks never stack vertically. And if the cast list below lands,
+      mis-taps stop mattering: nothing is <em>only</em> reachable by tapping.</li>
+    <li><b>The cast list makes note 26's tap-captions mostly obsolete</b> — that was
+      your instinct ("less messy than clicking every one"), and it holds: showing every
+      uncommon character at once, with context, beats an interrogation one tap at a
+      time. Tapping a mark can stay as a bonus that pulses its cast entry.</li>
+  </ul>
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">1 · The fold lid — today's bar against the main page's blue heading</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">today — the field-dressed bar</span>
+    <div class="app-window win strip">
+      <details class="pv-parts">
+        <summary class="pv-parts-lid"><span class="when-closed">Show URL Details</span><span class="when-open">Hide URL Details</span></summary>
+        <div class="pv-slices">
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep ref">
+            <span class="txt"><span class="dl">?</span><span class="k">ref</span><span class="dl">=</span>newsletter</span>
+          </div>
+        </div>
+      </details>
+    </div>
+    <p class="note">The bar reads as a control, but it is the <b>heaviest element on a
+      quiet card</b> — a bordered field wrapping nine words of affordance, dressed more
+      strongly than the URL above it.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">proposed — the "Security ⌄" register</span>
+    <div class="app-window win strip">
+      <details class="pv-parts">
+        <summary class="pv-parts-lid heading"><span class="when-closed">Show URL Details</span><span class="when-open">Hide URL Details</span><svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <div class="pv-slices">
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep ref">
+            <span class="txt"><span class="dl">?</span><span class="k">ref</span><span class="dl">=</span>newsletter</span>
+          </div>
+        </div>
+      </details>
+    </div>
+    <p class="note"><b>The site already has this word for "there is more":</b> the main
+      page's "Security ⌄" — accent 600, turning chevron, no box. Reusing it here means
+      the preview teaches nothing new, and the quiet card gets quieter: the lid weighs
+      less than the URL, as it should. (The leading ▸ goes; the trailing chevron is the
+      Security toggle's own grammar.)</p>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">2 · The receipt, back on the text line</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">note 26 (the complaint) — border + padding</span>
+    <div class="app-window win strip">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">my<span class="dsp" style="padding: 8px 5px; margin: -8px -5px;"> </span>file</span></code>
+    </div>
+    <p class="note">The padding that grew the tap target dragged the border down with
+      the padding box. This is what the screenshot showed.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">production today — bare border-bottom</span>
+    <div class="app-window win strip">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">my<span class="dsp"> </span>file</span></code>
+    </div>
+    <p class="note">No padding, so the border sits at the glyph box — but still at the
+      descender line, a couple of pixels lower than an underline wants to be.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">proposed — text-decoration + ::after hit-slop</span>
+    <div class="app-window win strip">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">my<span class="dsp2 mark-tap2"> </span>file</span></code>
+    </div>
+    <p class="note"><b>The decoration follows the text</b> (2px under the baseline,
+      tunable), and the invisible <code>::after</code> overlay carries the whole tap
+      area — grow it to ±10px vertically and it cannot move the line, ever.</p>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<p class="mock-h">3 · The cast list — every uncommon character at once, Large Type style</p>
+
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">all specials, with context, no clicking</span>
+    <div class="app-window win">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">my<span class="dsp2"> </span>file</span><span class="pn">?</span><span class="qk">user</span><span class="pn">=</span><span class="qv">admin<span class="bad">%E2%80%8B</span></span><span class="pn">&amp;</span><span class="qk">q</span><span class="pn">=</span><span class="qv">a<span class="pe">%26</span>b</span></code>
+      <div class="pv-facts">
+        <span class="pv-fact warn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
+          Hidden Characters</span>
+      </div>
+      <details class="pv-parts" open>
+        <summary class="pv-parts-lid heading"><span class="when-closed">Show URL Details</span><span class="when-open">Hide URL Details</span><svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <div class="pv-slices">
+          <div class="pv-slice">
+            <input type="checkbox" checked disabled aria-label="Path, fixed">
+            <span class="txt"><span class="dl">/</span>my<span class="dsp2"> </span>file</span>
+          </div>
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep user">
+            <span class="txt"><span class="dl">?</span><span class="k">user</span><span class="dl">=</span>admin<span class="bad">%E2%80%8B</span></span>
+          </div>
+          <div class="pv-slice togglable">
+            <input type="checkbox" checked aria-label="Keep q">
+            <span class="txt"><span class="dl">&amp;</span><span class="k">q</span><span class="dl">=</span>a<span class="pct">%26</span>b</span>
+          </div>
+        </div>
+        <div class="pv-cast">
+          <div class="entry">
+            <span class="tiles"><span class="tile">y</span><span class="tile it"><span class="tiny">SP</span></span><span class="tile">f</span></span>
+            <span class="what">a space — stored as <code>%20</code>, in the path</span>
+          </div>
+          <div class="entry warn">
+            <span class="tiles"><span class="tile">i</span><span class="tile">n</span><span class="tile it warn"><span class="tiny">ZWSP</span></span></span>
+            <span class="what">a zero-width space — <code>%E2%80%8B</code>, invisible when decoded, in <code>user</code></span>
+          </div>
+          <div class="entry">
+            <span class="tiles"><span class="tile">a</span><span class="tile it"><span class="tiny">%26</span></span><span class="tile">b</span></span>
+            <span class="what">an ampersand — kept escaped so it cannot read as a new parameter, in <code>q</code></span>
+          </div>
+        </div>
+        <code class="rawline"><span class="lbl">Exactly as Stored</span><span class="str"><span class="sch">https://</span><span class="reg">example.com</span><span class="dl">/</span>my<span class="pct">%20</span>file<span class="dl">?</span><span class="k">user</span><span class="dl">=</span>admin<span class="pct">%E2%80%8B</span><span class="dl">&amp;</span><span class="k">q</span><span class="dl">=</span>a<span class="pct">%26</span>b</span></code>
+      </details>
+    </div>
+    <p class="note"><b>The 1Password Large Type register, pointed at the escapes:</b>
+      checkered mono tiles, the special one tinted (accent = housekeeping, red = the
+      warning's colour), flanked by its real neighbours so "which space?" answers
+      itself. Left-aligned like the rows, every entry visible at once — nothing is
+      only reachable by tapping. Identical repeats would collapse to one entry with
+      a count ("×3").</p>
+  </div>
+
+  <div class="win" style="align-self:center">
+    <div class="fixnote" style="max-width:420px">
+      <b>Placement, and a verdict to argue with.</b>
+      <ul>
+        <li><b>The cast list lives in the fold, above the record.</b> Your sketch had
+          it under the hero; the fold placement gets the same effect exactly when it
+          matters, because every string warning already forces the fold open — a
+          hidden character's cast entry is on screen with zero taps. What it avoids:
+          the everyday <code>%20</code> café-menu link growing a tile block on the
+          closed, quiet card.</li>
+        <li><b>It replaces note 26's caption line</b> (variant B retires). Tapping a
+          hero mark stays as a bonus: open the fold if closed and pulse the matching
+          cast entry — a pointer, not the payload, so a mis-tap costs nothing.</li>
+        <li><b>Lid:</b> go blue-heading (section 1) — same words, same fold, the main
+          page's own "there is more" grammar.</li>
+        <li><b>Receipt:</b> switch <code>.dsp</code> to text-decoration + offset once
+          the lone-space underline is verified in Safari on device; hit-slop via
+          <code>::after</code> whenever tapping ships.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
