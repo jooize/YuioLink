@@ -18,7 +18,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// rather than a build timestamp on purpose: builds stay reproducible, and a
 /// visitor wants to know when the site last changed, not when this binary was
 /// compiled. Bump it alongside the workspace version.
-const RELEASE_DATE: &str = "2026-08-16";
+const RELEASE_DATE: &str = "2026-08-20";
 
 /// A static asset's URL, stamped with the release it belongs to.
 ///
