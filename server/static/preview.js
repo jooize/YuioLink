@@ -72,10 +72,11 @@
         // ------------------------------------------------------------------
 
         /**
-         * The cast answers when asked. Every marked character the server
-         * tagged with `data-tell` becomes a control: clicking it opens the
-         * fold if it was closed and shows the one cast entry that names the
-         * character, pulsing once. One answer at a time; asking another
+         * The cast answers when asked. Every element the server tagged with
+         * `data-tell` becomes a control — the marked characters in the values
+         * and the symbol tiles of the cast's index alike: clicking one opens
+         * the fold if it was closed and shows the one cast entry that names
+         * the character, pulsing once. One answer at a time; asking another
          * swaps it. A click only ever opens — asking the same character
          * again re-pulses its entry rather than blanking it, and putting the
          * answers away is what closing the fold does (the user's call:

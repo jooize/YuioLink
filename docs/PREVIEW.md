@@ -129,9 +129,13 @@ http(s) keeps its quiet single-line page and offers the parts behind
   when it has something to add**: a part that can be unticked, or a value that
   reads differently from the way it is stored. A bare path never folds; a plain
   `ftp://` card and a `tel:` card show no rows at all.
-- It arrives **open** when a warning about the *string* fired. "Not Encrypted"
-  does not open it: that one is about the transport and says nothing about the
-  parts.
+- It always arrives **closed**. The warn chips outside it say everything a
+  warning must say; opening is the reader's move, and clicking a marked
+  character still opens it to the cast entry naming that character.
+- Inside, the cast leads. With the script, a sole marked character shows its
+  naming entry outright; several collapse to a compact row of clickable
+  symbol tiles, each opening its entry. Without the script the full cast
+  simply shows and the tile row is dropped.
 - Warn chips always sit **outside** the fold. A warning that needs a click is a
   warning that was not made.
 - The chevron is `::before` generated content, so a copy of the label never

@@ -1246,7 +1246,10 @@ fn phone_numbers(uri: &UriView) -> Vec<phone::Number> {
 /// the parts are most of what there is to read. The fold earns its line: it
 /// appears only when it has something to add — a part that can be unticked, or
 /// a value that reads differently from the way it is stored — so a bare path
-/// never folds. And it arrives open when a warning about the string fired.
+/// never folds. It always arrives closed (the user's call, 2026-08-20): the
+/// chips outside it say everything a warning must say, and opening is the
+/// reader's move — a click on a marked character still opens it to the entry
+/// that names the character.
 fn slice_section(uri: &UriView) -> Markup {
     let rows: Vec<&urlview::Slice> = uri.rows().collect();
     if rows.is_empty() {
@@ -1262,7 +1265,7 @@ fn slice_section(uri: &UriView) -> Markup {
     let folds = uri.tier == Tier::Web;
     html! {
         @if folds {
-            details.pv-parts open[uri.warns_about_the_string()] {
+            details.pv-parts {
                 summary.pv-parts-lid {
                     span.when-closed { "Show URL Details" }
                     span.when-open { "Hide URL Details" }
@@ -1276,11 +1279,10 @@ fn slice_section(uri: &UriView) -> Markup {
                 // parts, then the record.
                 (cast_list(uri))
                 (slice_rows(uri, &rows))
-                // The record's home on http(s). Any warning about the string
-                // has already forced the fold open — and a card whose only
-                // decoding is receipted %20 spaces skips the record: the
-                // receipt and its cast entry already name the stored form,
-                // so the record would restate the hero.
+                // The record's home on http(s). A card whose only decoding
+                // is receipted %20 spaces skips the record: the receipt and
+                // its cast entry already name the stored form, so the record
+                // would restate the hero.
                 @if uri.decoding_changed_more_than_spaces() { (raw_record(uri)) }
             }
         } @else {
@@ -1350,9 +1352,9 @@ fn index_of(uri: &UriView, slice: &urlview::Slice) -> usize {
 /// a formatted number, a comma-joined address list, a decoded value.
 ///
 /// On an http(s) card the record lives inside the fold (see `slice_section`),
-/// which exists whenever decoding changed anything and arrives open whenever a
-/// warning fired; this call is only the fallback for the rare http(s) card
-/// with no rows at all — a bare host whose reading differs from storage. On a
+/// which exists whenever decoding changed anything; this call is only the
+/// fallback for the rare http(s) card with no rows at all — a bare host whose
+/// reading differs from storage. On a
 /// one-run card the headline is the stored string outright, so the record
 /// never appears. Everywhere else it is unconditional and never collapsed.
 fn exact_line(uri: &UriView) -> Markup {
@@ -1640,22 +1642,57 @@ fn cast_entries(uri: &UriView) -> Vec<CastEntry> {
 /// The cast, in note 28's dress: for an invisible character, the dotted-square
 /// symbol tile every Unicode chart uses beside one plain field holding the
 /// actual character — which appears empty, on purpose. A printable kept escape
-/// is its own proof and gets one plain tile. With the script running, entries
-/// stay hidden until their character is clicked (design note 29, the user's
-/// pick); the no-JS page shows the list in full instead — that split lives in
-/// the stylesheet, keyed on `html.js`.
+/// is its own proof and gets one plain tile.
+///
+/// With the script running (the user's call, 2026-08-20): a sole entry shows
+/// outright — one character to explain needs no ceremony — while several
+/// collapse to a compact index of clickable symbol tiles, each opening the
+/// entry that names it, the same wiring the marks in the values use. The
+/// no-JS page shows the list in full and drops the index instead — that split
+/// lives in the stylesheet, keyed on `html.js`.
 fn cast_list(uri: &UriView) -> Markup {
     let entries = cast_entries(uri);
+    let solo = entries.len() == 1;
     html! {
         @if !entries.is_empty() {
             div.pv-cast {
-                @for e in &entries { (cast_entry(e)) }
+                @if !solo { (cast_index(&entries)) }
+                @for e in &entries { (cast_entry(e, solo)) }
             }
         }
     }
 }
 
-fn cast_entry(e: &CastEntry) -> Markup {
+/// The index a many-character cast opens with: every entry's symbol tile in
+/// one row, each carrying the `data-tell` that preview.js already wires — so
+/// clicking a tile answers exactly the way clicking the character in the
+/// value does.
+fn cast_index(entries: &[CastEntry]) -> Markup {
+    html! {
+        div.pv-index {
+            @for e in entries {
+                @let (sym, name) = char_dress(e.ch);
+                @let title = match e.kind {
+                    CastKind::Undecodable => "undecodable bytes".to_string(),
+                    CastKind::Padding => format!("{name} U+{:04X}, padding", e.ch as u32),
+                    _ => format!("{name} U+{:04X}", e.ch as u32),
+                };
+                @let warn = matches!(e.kind, CastKind::Hidden | CastKind::Padding);
+                @if e.kind == CastKind::Kept {
+                    span.tile.lit data-tell=(e.id) title=(title) { (e.ch) }
+                } @else if e.kind == CastKind::Undecodable {
+                    span.tile.sym data-tell=(e.id) title=(title) { "?" }
+                } @else if warn {
+                    span.tile.sym.warn data-tell=(e.id) title=(title) { (sym) }
+                } @else {
+                    span.tile.sym data-tell=(e.id) title=(title) { (sym) }
+                }
+            }
+        }
+    }
+}
+
+fn cast_entry(e: &CastEntry, solo: bool) -> Markup {
     let warn = matches!(e.kind, CastKind::Hidden | CastKind::Padding);
     let (sym, name) = char_dress(e.ch);
     let name = if e.kind == CastKind::Undecodable {
@@ -1663,8 +1700,15 @@ fn cast_entry(e: &CastEntry) -> Markup {
     } else {
         name
     };
+    let mut class = String::from("entry");
+    if warn {
+        class.push_str(" warn");
+    }
+    if solo {
+        class.push_str(" solo");
+    }
     html! {
-        div class=(if warn { "entry warn" } else { "entry" }) data-name=(e.id) {
+        div class=(class) data-name=(e.id) {
             span.tiles {
                 @if e.kind == CastKind::Kept {
                     span.tile.lit { (e.ch) }
@@ -1835,7 +1879,7 @@ fn notes(uri: &UriView) -> Markup {
     }
     if uri.has(Hazard::CarriesAnotherAddress) {
         out.push(html! {
-            "One of the parameters is itself a complete web address, on a different domain."
+            "One parameter is itself a complete web address on a different domain."
         });
     }
     match uri.scheme.as_str() {
@@ -2918,17 +2962,19 @@ mod tests {
     }
 
     #[test]
-    fn a_warning_about_the_string_lays_the_parts_flat() {
+    fn a_warning_about_the_string_keeps_the_chips_out_but_the_fold_closed() {
         let c = card("https://alice@example.com:8443/reset?next=https%3A%2F%2Fother.example%2F");
         assert!(c.contains("Username in the Address"));
         assert!(c.contains("Carries Another Address"));
-        assert!(c.contains(r#"<details class="pv-parts" open>"#), "{c}");
+        // The chips say everything a warning must say; the fold stays closed
+        // and opening is the reader's move (the user's call, 2026-08-20).
+        assert!(c.contains(r#"<details class="pv-parts">"#), "{c}");
         // Userinfo and port are back on the line -- the old renderer had no
         // branch for either and dropped both.
         assert!(c.contains(r#"<span class="usr">alice@</span>"#));
         assert!(c.contains(r#"<span class="port">8443</span>"#));
-        // Decoding changed the `next` value, so the record gets said out loud —
-        // inside the fold, which the warning has already forced open.
+        // Decoding changed the `next` value, so the record gets said out loud,
+        // inside the fold.
         let record = c.find("Exactly as Stored").expect("record missing");
         assert!(record > c.find("<details").unwrap(), "{c}");
         assert!(record < c.find("</details>").unwrap(), "{c}");
@@ -2996,10 +3042,39 @@ mod tests {
         // Every mark points at its entry.
         assert!(c.contains(r#"data-tell="u200b""#), "{c}");
         assert!(c.contains(r#"data-tell="u0026""#), "{c}");
-        // And the stylesheet carries both halves of the reveal.
+        // Several characters to explain: none shows outright, and the cast
+        // opens with the index — one clickable symbol tile per entry.
+        assert!(!c.contains(r#"class="entry solo"#), "{c}");
+        assert!(c.contains(r#"<div class="pv-index">"#), "{c}");
+        assert!(
+            c.contains(r#"<span class="tile sym warn" data-tell="u200b""#),
+            "{c}"
+        );
+        assert!(
+            c.contains(r#"<span class="tile lit" data-tell="u0026""#),
+            "{c}"
+        );
+        // And the stylesheet carries both halves of the reveal, plus the
+        // index's own: the no-JS page shows the full list instead.
         const APP_CSS: &str = include_str!("../static/app.css");
         assert!(APP_CSS.contains("html.js .pv-cast .entry {\n    display: none;\n}"));
         assert!(APP_CSS.contains("html:not(.js) .pv-cast .entry + .entry {"));
+        assert!(APP_CSS.contains("html:not(.js) .pv-index {\n    display: none;\n}"));
+    }
+
+    /// One character to explain needs no ceremony: its entry shows from the
+    /// start (`.solo`, displayed by the stylesheet even under `html.js`) and
+    /// no index is offered.
+    #[test]
+    fn a_sole_cast_entry_shows_outright_with_no_index() {
+        let c = card("https://example.com/my%20file?q=1");
+        assert!(
+            c.contains(r#"<div class="entry solo" data-name="u0020""#),
+            "{c}"
+        );
+        assert!(!c.contains("pv-index"), "{c}");
+        const APP_CSS: &str = include_str!("../static/app.css");
+        assert!(APP_CSS.contains("html.js .pv-cast .entry.solo {\n    display: flex;\n}"));
     }
 
     #[test]

@@ -1969,6 +1969,7 @@ html.js .custom-field:not(.open) {
 }
 
 .pv-slice {
+    position: relative;
     display: flex;
     align-items: baseline;
     gap: 9px;
@@ -1995,8 +1996,16 @@ html.js .custom-field:not(.open) {
     cursor: pointer;
 }
 
-.pv-slice.togglable:hover {
-    background: color-mix(in srgb, var(--text) 3%, transparent);
+/* The hover wash is a rounded pill painted behind the row (z-index -1 tucks
+   it under the text and the hairlines), reaching a little past the checkbox
+   and the row's right edge rather than stopping square at the content. */
+.pv-slice.togglable:hover::before {
+    content: "";
+    position: absolute;
+    inset: 1.5px -9px;
+    z-index: -1;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--text) 3.5%, transparent);
 }
 
 .pv-slice.togglable .txt {
@@ -2059,13 +2068,22 @@ html.js .custom-field:not(.open) {
     text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent);
 }
 
+/* The whole unticked part is what goes, value included. The value is an
+   inline-block (so long ones wrap whole), and a text-decoration never
+   propagates into an inline-block -- restate it or the strike stops at the
+   key. */
+.pv-slice.off .txt .val {
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
 /* The last sms recipient locks: RFC 5724's grammar needs at least one. */
 .pv-slice.locked {
     cursor: default;
 }
 
-.pv-slice.locked:hover {
-    background: transparent;
+.pv-slice.locked:hover::before {
+    content: none;
 }
 
 /* A space that was stored as %20. Three appearances, three meanings, no
@@ -2096,10 +2114,11 @@ html.js .custom-field:not(.open) {
    character wears the dotted-square symbol tile every Unicode chart uses,
    beside one plain field holding the actual character -- which appears
    empty, on purpose: the emptiness is the demonstration. A printable kept
-   escape (&) is its own proof and gets one plain tile. With the script the
-   entries stay hidden until their character is clicked (design note 29, the
-   user's pick); without it the full list simply shows -- the no-JS page
-   keeps every fact. */
+   escape (&) is its own proof and gets one plain tile. With the script a
+   sole entry shows outright and several collapse to the .pv-index tile row,
+   each entry staying hidden until its character is clicked (the user's call,
+   2026-08-20); without the script the full list simply shows and the index
+   is dropped -- the no-JS page keeps every fact. */
 .pv-cast {
     margin: 10px 2px 2px;
     text-align: left;
@@ -2120,6 +2139,12 @@ html.js .pv-cast .entry {
 html.js .pv-cast .entry.shown {
     display: flex;
     animation: cast-pulse 1.4s ease-out;
+}
+
+/* A sole entry needs no asking: it shows from the start -- and without the
+   pulse, which is the mark of an answer just given. */
+html.js .pv-cast .entry.solo {
+    display: flex;
 }
 
 html:not(.js) .pv-cast .entry + .entry {
@@ -2167,11 +2192,43 @@ html:not(.js) .pv-cast .entry + .entry {
 .pv-cast .tile.lit {
     background: var(--field-bg);
     border: 0.5px solid var(--field-border);
+    /* A flex container drops a whitespace-only text node outright, so a tile
+       holding a real space would hold nothing -- pre keeps the character in
+       the box, where it can be selected and copied. */
+    white-space: pre;
 }
 
-.pv-cast .entry.warn .tile.sym {
+.pv-cast .entry.warn .tile.sym,
+.pv-cast .tile.sym.warn {
     border-color: var(--danger);
     color: var(--danger);
+}
+
+/* The index a many-character cast opens with: every symbol tile in one
+   compact row, each a click away from the entry naming it (preview.js wires
+   the data-tell). The no-JS page shows the full list instead, so the index
+   would only repeat it. */
+.pv-index {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 2px 6px 8px;
+}
+
+html:not(.js) .pv-index {
+    display: none;
+}
+
+.pv-cast .pv-index .tile {
+    width: auto;
+    min-width: 26px;
+    height: 26px;
+    padding: 0 6px;
+    cursor: pointer;
+}
+
+.pv-cast .pv-index .tile:hover {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .pv-cast .what {
@@ -2269,9 +2326,9 @@ html:not(.js) .pv-cast .entry + .entry {
 }
 
 /* The two raw lines share one dress. "Exactly as stored" is the record — on
-   http(s) it lives inside the fold, which any warning about the string forces
-   open; everywhere else it never collapses. "After your edits" is the tool
-   and appears only when the rebuilt string differs. Both are copied by
+   http(s) it lives inside the fold, which arrives closed and opens at the
+   reader's call; everywhere else it never collapses. "After your edits" is
+   the tool and appears only when the rebuilt string differs. Both are copied by
    explicit buttons — there are no selection tricks anywhere on this page. */
 .rawline {
     display: block;
@@ -2376,6 +2433,8 @@ html:not(.js) .pv-cast .entry + .entry {
     font-weight: 400;
     line-height: 1.55;
     color: var(--text-secondary);
+    /* A centred sentence must not strand its last word alone on a line. */
+    text-wrap: pretty;
 }
 
 .pv-note code {

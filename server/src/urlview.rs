@@ -336,13 +336,6 @@ impl UriView {
         self.slices.iter().find(|s| s.role == role)
     }
 
-    /// True when any warning fired that is about the *string* rather than the
-    /// transport. This is what opens the fold: a warning should never need a
-    /// click to understand, but "Not Encrypted" says nothing about the parts.
-    pub fn warns_about_the_string(&self) -> bool {
-        self.hazards.iter().any(|h| *h != Hazard::NotEncrypted)
-    }
-
     /// True when reading changed any value. This is half of what makes the
     /// fold worth a line.
     pub fn decoding_changed_anything(&self) -> bool {
@@ -1722,13 +1715,9 @@ mod tests {
     }
 
     #[test]
-    fn the_string_hazards_open_the_fold_but_the_transport_one_does_not() {
+    fn a_bare_http_path_stays_quiet_and_the_busy_specimen_earns_its_fold() {
         let plain_http = parse_uri("http://example.com/pay");
         assert!(plain_http.has(Hazard::NotEncrypted));
-        assert!(
-            !plain_http.warns_about_the_string(),
-            "http is about the transport, not the parts"
-        );
         assert!(
             !plain_http.fold_is_worth_it(),
             "a bare path has nothing to add"
@@ -1737,7 +1726,6 @@ mod tests {
         let busy = parse_uri(SPECIMENS[1]);
         assert!(busy.has(Hazard::UsernameInTheAddress));
         assert!(busy.has(Hazard::CarriesAnotherAddress));
-        assert!(busy.warns_about_the_string());
         assert!(busy.fold_is_worth_it());
     }
 
