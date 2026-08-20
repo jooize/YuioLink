@@ -2130,6 +2130,10 @@ html.js .custom-field:not(.open) {
     gap: 10px;
     padding: 7px 6px;
     border-radius: 8px;
+    /* Two lines of .what (12px * 1.5), even when the prose takes one: a
+       one-line answer keeps the height of a two-line one, so swapping the
+       shown entry never shifts the card under the pointer. */
+    min-height: 36px;
 }
 
 html.js .pv-cast .entry {
@@ -2165,6 +2169,12 @@ html:not(.js) .pv-cast .entry + .entry {
     display: inline-flex;
     gap: 5px;
     flex: none;
+    /* Two columns, always: the dotted symbol on the left, the character on
+       the right. An entry with one box leaves the left column empty, so
+       every character box -- and every name after it -- starts at the same
+       x whether the dotted label is there or not. */
+    width: 65px;
+    justify-content: flex-end;
 }
 
 .pv-cast .tile {
@@ -2192,9 +2202,15 @@ html:not(.js) .pv-cast .entry + .entry {
 .pv-cast .tile.lit {
     background: var(--field-bg);
     border: 0.5px solid var(--field-border);
-    /* A flex container drops a whitespace-only text node outright, so a tile
-       holding a real space would hold nothing -- pre keeps the character in
-       the box, where it can be selected and copied. */
+    /* The character box centres with line-height, not flex: a flex container
+       drops a whitespace-only text node outright, and even kept (pre) it
+       becomes an anonymous flex item Safari will not let a drag select. As
+       plain inline text the space stays in the box and selects like text --
+       double-click lands on it. pre both preserves it and stops it
+       collapsing at the box's edge. */
+    display: inline-block;
+    line-height: 29px;
+    text-align: center;
     white-space: pre;
 }
 
@@ -2224,6 +2240,8 @@ html:not(.js) .pv-index {
     min-width: 26px;
     height: 26px;
     padding: 0 6px;
+    /* Only the .lit tiles centre with line-height; the flex ones ignore it. */
+    line-height: 25px;
     cursor: pointer;
 }
 
