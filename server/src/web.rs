@@ -1553,7 +1553,12 @@ mod tests {
             body.contains(r#"href="https://example.com/x""#),
             "Continue must be an <a href>: {body}"
         );
-        assert!(!body.contains("/go"), "the consume POST is gone: {body}");
+        // The name is a random word, so match the whole route: a bare "/go"
+        // would also fire on a link named "gong".
+        assert!(
+            !body.contains(&format!("/{}/go", l.name)),
+            "the consume POST is gone: {body}"
+        );
         assert_eq!(uses(&st, &l.name).await, 0);
 
         // And the route it used to post to no longer exists.

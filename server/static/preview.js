@@ -75,9 +75,13 @@
          * The cast answers when asked. Every marked character the server
          * tagged with `data-tell` becomes a control: clicking it opens the
          * fold if it was closed and shows the one cast entry that names the
-         * character, pulsing once. One answer at a time; asking again puts it
-         * away. Without this script the stylesheet shows the whole cast
-         * instead, so nothing here is the only way to the information.
+         * character, pulsing once. One answer at a time; asking another
+         * swaps it. A click only ever opens — asking the same character
+         * again re-pulses its entry rather than blanking it, and putting the
+         * answers away is what closing the fold does (the user's call:
+         * toggling read as confusion). Without this script the stylesheet
+         * shows the whole cast instead, so nothing here is the only way to
+         * the information.
          */
         buildCast() {
             const cast = document.querySelector(".pv-cast");
@@ -98,12 +102,10 @@
                     event.stopPropagation();
                     const selection = window.getSelection();
                     if (selection && !selection.isCollapsed) return;
-                    const asking = mark.getAttribute("aria-expanded") !== "true";
                     cast.querySelectorAll(".entry.shown").forEach((shown) =>
                         shown.classList.remove("shown"),
                     );
                     wired.forEach((m) => m.setAttribute("aria-expanded", "false"));
-                    if (!asking) return;
                     const fold = cast.closest("details");
                     if (fold) fold.open = true;
                     void entry.offsetWidth; // restart the pulse

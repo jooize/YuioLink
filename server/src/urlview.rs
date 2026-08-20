@@ -246,6 +246,23 @@ impl Slice {
     pub fn decoded_differs(&self) -> bool {
         self.display.iter().map(Piece::text).collect::<String>() != self.value
     }
+
+    /// Like [`Slice::decoded_differs`], but blind to the one decoding the
+    /// hero already receipts in place: a space shown for a stored `%20`
+    /// wears the dotted underline, and its cast entry names the stored form
+    /// outright. True only when something *else* reads differently from
+    /// storage.
+    pub fn decoded_differs_beyond_spaces(&self) -> bool {
+        let respaced: String = self
+            .display
+            .iter()
+            .map(|p| match p {
+                Piece::DecodedSpace => "%20",
+                p => p.text(),
+            })
+            .collect();
+        respaced != self.value
+    }
 }
 
 /// Something true about the stored string that the reader would want said out
@@ -326,10 +343,19 @@ impl UriView {
         self.hazards.iter().any(|h| *h != Hazard::NotEncrypted)
     }
 
-    /// True when reading changed any value, which is the only thing that makes
-    /// an http(s) card grow its "Exactly as stored" record (inside the fold).
+    /// True when reading changed any value. This is half of what makes the
+    /// fold worth a line.
     pub fn decoding_changed_anything(&self) -> bool {
         self.slices.iter().any(Slice::decoded_differs)
+    }
+
+    /// True when reading changed something the receipt does not already name
+    /// in place — any decoding beyond a `%20` shown as its dotted space.
+    /// This is what makes an http(s) card grow its "Exactly as stored"
+    /// record: a card whose only decoding is receipted spaces would merely
+    /// restate the hero (the user's call, 2026-08-20).
+    pub fn decoding_changed_more_than_spaces(&self) -> bool {
+        self.slices.iter().any(Slice::decoded_differs_beyond_spaces)
     }
 
     pub fn rows(&self) -> impl Iterator<Item = &Slice> {

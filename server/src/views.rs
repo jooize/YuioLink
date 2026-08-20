@@ -1271,18 +1271,21 @@ fn slice_section(uri: &UriView) -> Markup {
                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" {}
                     }
                 }
-                (slice_rows(uri, &rows))
+                // The cast leads (the user's call, 2026-08-20): the fold
+                // opens to the names of the marked characters, then the
+                // parts, then the record.
                 (cast_list(uri))
-                // The record's home on http(s). Same gate as the fold itself
-                // (`fold_is_worth_it` includes it), and any warning about the
-                // string has already forced the fold open — so the everyday
-                // %20 link folds its record away while every warned card
-                // shows it exactly as before.
-                @if uri.decoding_changed_anything() { (raw_record(uri)) }
+                (slice_rows(uri, &rows))
+                // The record's home on http(s). Any warning about the string
+                // has already forced the fold open — and a card whose only
+                // decoding is receipted %20 spaces skips the record: the
+                // receipt and its cast entry already name the stored form,
+                // so the record would restate the hero.
+                @if uri.decoding_changed_more_than_spaces() { (raw_record(uri)) }
             }
         } @else {
-            (slice_rows(uri, &rows))
             (cast_list(uri))
+            (slice_rows(uri, &rows))
         }
     }
 }
@@ -1354,7 +1357,7 @@ fn index_of(uri: &UriView, slice: &urlview::Slice) -> usize {
 /// never appears. Everywhere else it is unconditional and never collapsed.
 fn exact_line(uri: &UriView) -> Markup {
     let needed = match uri.scheme.as_str() {
-        "http" | "https" => uri.decoding_changed_anything() && !web_fold_renders(uri),
+        "http" | "https" => uri.decoding_changed_more_than_spaces() && !web_fold_renders(uri),
         s if is_one_run(s) => false,
         _ => true,
     };
@@ -3010,6 +3013,29 @@ mod tests {
     fn a_card_with_no_marked_characters_has_no_cast() {
         let c = card("https://example.com/plain?q=1");
         assert!(!c.contains("pv-cast"), "{c}");
+    }
+
+    /// The cast leads the fold: names first, then the parts, then the record
+    /// (the user's call, 2026-08-20).
+    #[test]
+    fn the_cast_opens_the_fold() {
+        let c = card("https://example.com/my%20file?q=1");
+        let cast = c.find(r#"<div class="pv-cast">"#).expect("a cast");
+        let slices = c.find(r#"<div class="pv-slices""#).expect("slices");
+        assert!(cast < slices, "{c}");
+    }
+
+    /// A card whose only decoding is receipted %20 spaces skips the record:
+    /// the dotted receipt and its cast entry already name the stored form,
+    /// so "Exactly as Stored" would restate the hero (the user's call,
+    /// 2026-08-20). Anything decoded beyond that still earns it.
+    #[test]
+    fn a_spaces_only_card_keeps_the_receipt_and_skips_the_record() {
+        let c = card("https://example.com/my%20file");
+        assert!(c.contains("pv-cast"), "{c}");
+        assert!(!c.contains("Exactly as Stored"), "{c}");
+        let decoded = card("https://example.com/caf%C3%A9%20menu");
+        assert!(decoded.contains("Exactly as Stored"), "{decoded}");
     }
 
     /// Design note 29's other half: the hero prefers to break at the URL's
