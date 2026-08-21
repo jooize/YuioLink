@@ -2130,25 +2130,40 @@ html.js .custom-field:not(.open) {
     gap: 10px;
     padding: 7px 6px;
     border-radius: 8px;
-    /* Two lines of .what (12px * 1.5), even when the prose takes one: a
-       one-line answer keeps the height of a two-line one, so swapping the
-       shown entry never shifts the card under the pointer. */
-    min-height: 36px;
+}
+
+/* With the script the cast is a deck: the index takes the first grid row
+   and every entry is stacked in the one cell under it, hidden by
+   visibility rather than display so it keeps its layout. The cast then
+   always stands as tall as its tallest answer, and swapping the shown
+   entry never shifts the card under the pointer -- a min-height cannot do
+   this, because prose wraps to a different line count per entry and per
+   viewport. */
+html.js .pv-cast {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+html.js .pv-cast .pv-index {
+    grid-row: 1;
+    grid-column: 1;
 }
 
 html.js .pv-cast .entry {
-    display: none;
-}
-
-html.js .pv-cast .entry.shown {
-    display: flex;
-    animation: cast-pulse 1.4s ease-out;
+    grid-row: 2;
+    grid-column: 1;
+    visibility: hidden;
 }
 
 /* A sole entry needs no asking: it shows from the start -- and without the
    pulse, which is the mark of an answer just given. */
+html.js .pv-cast .entry.shown,
 html.js .pv-cast .entry.solo {
-    display: flex;
+    visibility: visible;
+}
+
+html.js .pv-cast .entry.shown {
+    animation: cast-pulse 1.4s ease-out;
 }
 
 html:not(.js) .pv-cast .entry + .entry {

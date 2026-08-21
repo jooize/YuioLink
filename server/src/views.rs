@@ -3055,9 +3055,12 @@ mod tests {
             "{c}"
         );
         // And the stylesheet carries both halves of the reveal, plus the
-        // index's own: the no-JS page shows the full list instead.
+        // index's own: the no-JS page shows the full list instead. Entries
+        // hide by visibility in one stacked grid cell, so the cast stands as
+        // tall as its tallest answer and swapping never shifts the card.
         const APP_CSS: &str = include_str!("../static/app.css");
-        assert!(APP_CSS.contains("html.js .pv-cast .entry {\n    display: none;\n}"));
+        assert!(APP_CSS
+            .contains("html.js .pv-cast .entry {\n    grid-row: 2;\n    grid-column: 1;\n    visibility: hidden;\n}"));
         assert!(APP_CSS.contains("html:not(.js) .pv-cast .entry + .entry {"));
         assert!(APP_CSS.contains("html:not(.js) .pv-index {\n    display: none;\n}"));
     }
@@ -3074,7 +3077,8 @@ mod tests {
         );
         assert!(!c.contains("pv-index"), "{c}");
         const APP_CSS: &str = include_str!("../static/app.css");
-        assert!(APP_CSS.contains("html.js .pv-cast .entry.solo {\n    display: flex;\n}"));
+        assert!(APP_CSS
+            .contains("html.js .pv-cast .entry.shown,\nhtml.js .pv-cast .entry.solo {\n    visibility: visible;\n}"));
     }
 
     #[test]
