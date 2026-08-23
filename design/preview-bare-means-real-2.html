@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Bare means real, round 2</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .cap { display: block; text-align: center; margin: 0 0 10px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .note { max-width: 460px; margin: 12px auto 0; font: 400 12.5px/1.55 var(--font);
+      color: var(--text-secondary); text-align: left; }
+    .note b { color: var(--text); font-weight: 600; }
+    .note code { font-family: var(--font-mono); font-size: .95em; }
+    .fixnote { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); box-sizing: border-box; }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .fixnote ul { margin: 6px 0 0; padding-left: 20px; }
+    .fixnote li { margin: 3px 0; }
+    .win { width: min(100%, 460px); }
+    .win.wide { width: min(100%, 620px); }
+    .app-window.win { margin: 0; padding: 22px 20px 18px; overflow: visible; }
+    .win + .app-window.win { margin-top: 12px; }
+    .pv-url { margin-top: 0; }
+    .voice { display: block; margin: 14px 0 3px; font: 600 10px/1.4 var(--font);
+      letter-spacing: .06em; text-transform: uppercase; color: var(--text-tertiary); }
+
+    /* The capsule (2A, the pick) — as in note 30. */
+    .cv { background: color-mix(in srgb, var(--text) 6%, transparent);
+      border-radius: 6px; padding: 1px 4px; margin: 0 1px;
+      -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+    .cv .idl { color: var(--text-tertiary); }
+    .cv .ireg { font-weight: 700; }
+
+    /* ===================================================================
+       Section 2 — colors for ALL the things (as asked: show it)
+       =================================================================== */
+    /* C1: a hue per role, as text color. */
+    .c1 .sch2  { color: var(--text-tertiary); }
+    .c1 .host2 { color: var(--accent); font-weight: 700; }
+    .c1 .path2 { color: #2f9e63; }
+    .c1 .key2  { color: #8e6fd8; font-weight: 700; }
+    .c1 .val2  { color: var(--text); }
+    .c1 .frag2 { color: #0e8f8f; }
+    .c1 .dl2   { color: var(--text-tertiary); }
+    @media (prefers-color-scheme: dark) {
+      .c1 .path2 { color: #4fbf85; }
+      .c1 .key2  { color: #b39ae8; }
+      .c1 .frag2 { color: #3fb8b8; }
+    }
+    /* C2: a tint band per role. */
+    .c2 .band { padding: 1px 3px; border-radius: 5px;
+      -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+    .c2 .b-host { background: color-mix(in srgb, var(--accent) 13%, transparent); }
+    .c2 .b-path { background: color-mix(in srgb, #2f9e63 13%, transparent); }
+    .c2 .b-pair { background: color-mix(in srgb, #8e6fd8 12%, transparent); }
+    .c2 .b-frag { background: color-mix(in srgb, #0e8f8f 13%, transparent); }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;
+      margin-top: 10px; font: 500 11px/1.4 var(--font); color: var(--text-secondary); }
+    .legend .sw { display: inline-block; width: 10px; height: 10px;
+      border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  </style>
+</head>
+<body>
+
+<div class="wrap" style="padding-top:26px">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 30, round 2 · nothing on this page is live</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Bare means real, round 2</h1>
+</div>
+
+<div class="fixnote">
+  <b>Verdicts carried in from round 1.</b> 2A (the plain capsule) is the anchor. 2B dies —
+  the ↪ was a symbol that is not a character, and every symbol on the line must be real.
+  4D's role-group labels die — too much page. 5's earned capsule (<code>a&amp;b</code>)
+  stays. Below: your <code>%</code> refinement, the full-colour version you asked to see,
+  the copy question laid out straight, nesting, and the whole card assembled.
+</div>
+
+<p class="mock-h">1 · the percent, refined — your RFC 3986 point</p>
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">pct-encoded = "%" HEXDIG HEXDIG — so % opens when it cannot match</span>
+    <div class="app-window win">
+      <span class="voice">?discount=100%25 — nothing hex follows: bare</span>
+      <code class="pv-url" style="font-size:14px"><span class="pn">?</span><span class="qk">discount</span><span class="pn">=</span><span class="qv">100%</span></code>
+      <span class="voice">?text=50%25off — "of" is not HEXDIG HEXDIG: bare</span>
+      <code class="pv-url" style="font-size:14px"><span class="pn">?</span><span class="qk">text</span><span class="pn">=</span><span class="qv">50%off</span></code>
+      <span class="voice">…/a%2520b.jpg — "20" IS hex: stays closed</span>
+      <code class="pv-url" style="font-size:14px"><span class="qv cv">https<span class="idl">://</span><span class="ireg">img.example</span><span class="idl">/</span>a<span class="pe">%25</span>20b.jpg</span></code>
+    </div>
+    <p class="note"><b>The rule, one sentence.</b> A stored <code>%25</code> opens to a
+      bare <code>%</code> whenever the next two characters <em>of the reading</em> are
+      not both hex digits — because then, by the grammar you quoted, it cannot be
+      mistaken for an encoding. When they are hex, it stays dim <code>%25</code>: a
+      bare <code>%</code> there would spell a fake escape and poison "bare means real"
+      for everything after it. No colour or highlight can rescue that case — a
+      differently-tinted bare <code>%20</code> still <em>reads</em> as an escape at a
+      glance, and glance-speed is the speed attacks happen at. The check runs on the
+      reading, not the storage, so <code>%25%32%30</code> (which decodes to
+      <code>%</code>, <code>2</code>, <code>0</code>) is caught too. Everyday win:
+      <code>100%</code> and <code>50%off</code> — the common real-world percents —
+      now read like what they are.</p>
+  </div>
+</div>
+
+<p class="mock-h">2 · colours for all the things — shown, as asked</p>
+<div class="mock-row">
+  <div class="win wide">
+    <span class="cap">C1 — a hue per role, in the ink</span>
+    <div class="app-window win c1">
+      <code class="pv-url"><span class="sch2">https</span><span class="dl2">://</span><span class="host2">www.reddit.com</span><span class="dl2">/</span><span class="path2">media</span><span class="dl2">?</span><span class="key2">url</span><span class="dl2">=</span><span class="val2 cv">https<span class="idl">://</span>preview.<span class="ireg">redd.it</span><span class="idl">/</span>new-pc-upgrade-3x-55-lg-g5-oled-tvs-v0-qz9y97z5vhch1.jpg<span class="idl">?</span>width<span class="idl">=</span>1080<span class="idl">&amp;</span>crop<span class="idl">=</span>smart<span class="idl">&amp;</span>auto<span class="idl">=</span>webp<span class="idl">&amp;</span>s<span class="idl">=</span>f768b6aff493732ba8a8b81ff7a1075bca1242cd</span><span class="dl2">#</span><span class="frag2">comments</span></code>
+      <div class="legend">
+        <span style="color:var(--accent);font-weight:700">host</span>
+        <span style="color:#2f9e63">path</span>
+        <span style="color:#8e6fd8;font-weight:700">key</span>
+        <span>value</span>
+        <span style="color:#0e8f8f">fragment</span>
+      </div>
+    </div>
+    <div class="app-window win c1">
+      <div class="pv-slices" style="margin-top:0">
+        <div class="pv-slice"><span class="txt"><span class="val"><span class="dl2">/</span><span class="path2">media</span></span></span></div>
+        <div class="pv-slice"><span class="txt"><span class="dl2">?</span><span class="key2">url</span><span class="dl2">=</span><span class="val cv">https<span class="idl">://</span>preview.<span class="ireg">redd.it</span><span class="idl">/</span>new-pc-…jpg<span class="idl">?</span>width<span class="idl">=</span>1080<span class="idl">&amp;</span>crop<span class="idl">=</span>smart…</span></span></div>
+        <div class="pv-slice"><span class="txt"><span class="dl2">#</span><span class="val frag2">comments</span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="win wide">
+    <span class="cap">C2 — a tint band per role</span>
+    <div class="app-window win c2">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="band b-host"><span class="sub">www.</span><span class="reg">reddit.com</span></span><span class="pn">/</span><span class="band b-path"><span class="ps">media</span></span><span class="pn">?</span><span class="band b-pair"><span class="qk">url</span><span class="pn">=</span><span class="qv">https<span class="idl">://</span>preview.<span class="ireg">redd.it</span><span class="idl">/</span>new-pc-upgrade-3x-55-lg-g5-oled-tvs-v0-qz9y97z5vhch1.jpg<span class="idl">?</span>width<span class="idl">=</span>1080<span class="idl">&amp;</span>crop<span class="idl">=</span>smart<span class="idl">&amp;</span>auto<span class="idl">=</span>webp<span class="idl">&amp;</span>s<span class="idl">=</span>f768b6aff493732ba8a8b81ff7a1075bca1242cd</span></span><span class="pn">#</span><span class="band b-frag">comments</span></code>
+      <div class="legend">
+        <span><span class="sw" style="background: color-mix(in srgb, var(--accent) 32%, transparent)"></span>host</span>
+        <span><span class="sw" style="background: color-mix(in srgb, #2f9e63 32%, transparent)"></span>path</span>
+        <span><span class="sw" style="background: color-mix(in srgb, #8e6fd8 30%, transparent)"></span>key=value</span>
+        <span><span class="sw" style="background: color-mix(in srgb, #0e8f8f 32%, transparent)"></span>fragment</span>
+      </div>
+    </div>
+    <p class="note"><b>Look at what happened to the capsule.</b> In C2 it drowned: the
+      one background that used to mean "one bounded value" is now just another band
+      among four, and the reader must consult a legend to know which. In C1 the ink
+      survives better — but count what the page now asks a first-time visitor to learn:
+      five hues, two weights, plus red, plus the wash. Today's card teaches four things
+      (bold = domain, wash = THE domain, accent = structure, red = danger) and every one
+      pays rent. My read stands: colour-for-anatomy spends the loudness budget on
+      labels, and the labels were never the threat. But C1 is the version I would pick
+      if you overrule me.</p>
+  </div>
+</div>
+
+<p class="mock-h">3 · the copy question, laid out straight</p>
+<div class="mock-row">
+  <div class="win wide">
+    <span class="cap">What a selection actually yields</span>
+    <div class="app-window win">
+      <span class="voice">On screen (the reading)</span>
+      <code class="pv-url" style="font-size:13px"><span class="pn">?</span><span class="qk">url</span><span class="pn">=</span><span class="qv cv">https<span class="idl">://</span>preview.<span class="ireg">redd.it</span><span class="idl">/</span>…jpg<span class="idl">?</span>width<span class="idl">=</span>1080<span class="idl">&amp;</span>crop<span class="idl">=</span>smart</span></code>
+      <span class="voice">What ⌘C over it puts on the clipboard</span>
+      <code class="pv-url" style="font-size:13px; color: var(--text-secondary)">?url=https://preview.redd.it/…jpg?width=1080&amp;crop=smart</code>
+      <span class="voice">What storage says</span>
+      <code class="pv-url" style="font-size:13px; color: var(--text-secondary)">?url=https<span class="pct">%3A%2F%2F</span>preview.redd.it<span class="pct">%2F</span>…jpg<span class="pct">%3F</span>width<span class="pct">%3D</span>1080<span class="pct">%26</span>crop<span class="pct">%3D</span>smart</span></code>
+    </div>
+    <p class="note"><b>Yes — that is exactly what I meant, and yes, that is why the
+      record exists.</b> Paste the middle line into a browser and reddit.com receives
+      <code>crop</code> as its own top-level parameter, not as part of <code>url</code>:
+      a <em>different link</em>. The options, all of them:
+      <br><br>
+      <b>i. Intercept copy and fix it up.</b> Dead on arrival — the page's oldest rule
+      is no selection or clipboard tricks, ever. The clipboard lying about what you saw
+      is worse than the screen lying about what you copy.
+      <br>
+      <b>ii. Render the stored text and fake the reading with CSS.</b> Copies honestly,
+      but breaks find-in-page, screen readers, and — your rule — every visible symbol
+      being real.
+      <br>
+      <b>iii. Keep one record on the card wherever a capsule is.</b> What round 1
+      proposed. Honest, but it is the fourth voice you are trying to kill.
+      <br>
+      <b>iv. Accept the drift, name it once.</b> The thing people re-share <em>is the
+      YuioLink</em> — that is the product. The Continue button follows storage exactly.
+      Selection-copy of the hero is for reading, quoting, searching — and for those,
+      the reading is the better text. One quiet line in the fold ("Selecting copies
+      the readable form; Copy copies the link exactly") says it once, to the person
+      who opened the fold to care.
+      <br><br>
+      <b>iv is my recommendation</b> — see section 5 for where the exactness then
+      lives.</p>
+  </div>
+</div>
+
+<p class="mock-h">4 · nesting — one boundary is the whole design</p>
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">An address inside the address inside the address</span>
+    <div class="app-window win">
+      <span class="voice">stored</span>
+      <code class="pv-url" style="font-size:12.5px; color:var(--text-secondary)">?next=https<span class="pct">%3A%2F%2F</span>a.example<span class="pct">%2F</span>redir<span class="pct">%3F</span>to<span class="pct">%3D</span>https<span class="pct">%253A%252F%252F</span>deep.example</code>
+      <span class="voice">the capsule reads (one decode, one boundary)</span>
+      <code class="pv-url" style="font-size:12.5px"><span class="pn">?</span><span class="qk">next</span><span class="pn">=</span><span class="qv cv">https<span class="idl">://</span><span class="ireg">a.example</span><span class="idl">/</span>redir<span class="idl">?</span>to<span class="idl">=</span>https<span class="pe">%3A%2F%2F</span>deep.example</span></code>
+    </div>
+    <p class="note"><b>Exactly as you said: what is the URL, and what is encoded inside
+      it.</b> The capsule opens the outer URL's one layer of encoding — that is the
+      layer <em>this</em> link owns. Whatever is still encoded after that
+      (<code>%3A%2F%2F</code> here) belongs to the next hop: it stays dim, closed, and
+      inside the pill, and "% begins an encoding" explains it on sight. No capsule ever
+      nests in a capsule; depth shows up as dim percent-runs, which is the honest shape
+      of "this link carries a letter it has not opened."</p>
+  </div>
+</div>
+
+<p class="mock-h">5 · the card, assembled — and where "Exactly as Stored" goes</p>
+<div class="mock-row">
+  <div class="win wide">
+    <span class="cap">The proposal, whole: hero · chips · fold (flat table, one quiet line)</span>
+    <div class="app-window win">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">reddit.com</span><span class="pn">/</span><span class="ps">media</span><span class="pn">?</span><span class="qk">url</span><span class="pn">=</span><span class="qv cv">https<span class="idl">://</span>preview.<span class="ireg">redd.it</span><span class="idl">/</span>new-pc-upgrade-3x-55-lg-g5-oled-tvs-v0-qz9y97z5vhch1.jpg<span class="idl">?</span>width<span class="idl">=</span>1080<span class="idl">&amp;</span>crop<span class="idl">=</span>smart<span class="idl">&amp;</span>auto<span class="idl">=</span>webp<span class="idl">&amp;</span>s<span class="idl">=</span>f768b6aff493732ba8a8b81ff7a1075bca1242cd</span></code>
+      <div class="pv-facts" style="margin-top:12px"><span class="pv-fact warn"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"></circle><path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path><circle cx="8" cy="11.2" r=".95" fill="currentColor"></circle></svg>Carries Another Address</span></div>
+      <div style="text-align:center; margin-top:10px; font: 600 12.5px/1.4 var(--font); color: var(--accent)">Hide URL Details</div>
+      <div class="pv-slices" style="margin-top:8px">
+        <div class="pv-slice"><span class="txt"><span class="val"><span class="dl">/</span>media</span></span></div>
+        <div class="pv-slice"><span class="txt"><span class="dl">?</span><span class="k">url</span><span class="dl">=</span><span class="val cv">https<span class="idl">://</span>preview.<span class="ireg">redd.it</span><span class="idl">/</span>new-pc-upgrade-3x-55-lg-g5-oled-tvs-v0-qz9y97z5vhch1.jpg<span class="idl">?</span>width<span class="idl">=</span>1080<span class="idl">&amp;</span>crop<span class="idl">=</span>smart<span class="idl">&amp;</span>auto<span class="idl">=</span>webp<span class="idl">&amp;</span>s<span class="idl">=</span>f768b6aff493732ba8a8b81ff7a1075bca1242cd</span></span></div>
+      </div>
+      <code class="rawline"><span class="lbl"><span>Exactly as Stored</span><span class="copybtn">Copy</span></span><span class="str" style="color:var(--text-tertiary); font-size:10.5px">https://www.reddit.com/media?url=https%3A%2F%2Fpreview.redd.it%2Fnew-pc-upgrade-3x-55-lg-g5-oled-tvs-v0-qz9y97z5vhch1.jpg%3Fwidth%3D1080%26crop%3Dsmart%26auto%3Dwebp%26s%3Df768b6aff493732ba8a8b81ff7a1075bca1242cd</span></code>
+    </div>
+    <p class="note"><b>Two voices. The reading (hero and table, same register, capsule
+      and all) and the record — demoted, not dropped.</b> I tried to give you the drop
+      you are hoping for and I cannot do it honestly: once the screen is a rendering,
+      <em>something</em> on the page must be the bytes, or verification rests entirely
+      on trusting our styling — and this page's whole job is to be checkable. But
+      demoted means: it lives only inside the fold, dead last, smaller and tertiary
+      (mocked above), with the Copy button that answers section 3. The closed card —
+      which is the card almost everyone sees — is hero, chip, button. One voice.
+      Compare that to today's /helper: this kills the "Reads as" line, the row's
+      half-encoded repeat, and the record's presence anywhere outside the fold.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">The everyday card, for contrast — unchanged</span>
+    <div class="app-window win">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">blog</span><span class="pn">/</span><span class="ps">2026</span><span class="pn">/</span><span class="ps">the-post</span><span class="pn">?</span><span class="qk">ref</span><span class="pn">=</span><span class="qv">share</span></code>
+    </div>
+    <p class="note"><b>The rule costs ordinary links nothing.</b> No capsule (nothing to
+      bound), no record (nothing decoded), no fold beyond what exists today. Every
+      escalation on the reddit card was earned by the reddit string.</p>
+  </div>
+</div>
+
+<div class="fixnote" style="margin-top:44px">
+  <b>Decisions this round asks of you.</b>
+  <ul>
+    <li>The refined percent rule (opens unless HEXDIG HEXDIG follows in the reading) — in?</li>
+    <li>Colour: stay frugal, or C1? (C2 I would argue hard against — it eats the capsule.)</li>
+    <li>Copy drift: accept option iv (one quiet line in the fold), or keep the record
+      out on the card whenever a capsule is present (option iii)?</li>
+    <li>The record demoted to fold-only as mocked — close enough to "dropped", or do
+      you want to keep pushing on removing it entirely?</li>
+  </ul>
+</div>
+
+</body>
+</html>
