@@ -1028,9 +1028,12 @@ fn card_body(uri: &UriView, href: &str) -> Markup {
     html! {
         (headline(uri, &numbers))
         @if let Some(w) = uri.idn_warning() { (idn_panel(w)) }
-        // Warn chips live OUTSIDE the fold, always: a warning that needs a
-        // click is a warning that was not made.
         (chip_row(uri, &numbers))
+        // On http(s) the cast answers directly under the hero: click a
+        // marked character and its entry appears here (the fold that used
+        // to house it is gone — design note 30, round 3). The no-JS page
+        // shows the list in full.
+        @if uri.tier == Tier::Web { (cast_list(uri, true)) }
         (slice_section(uri))
         (notes(uri))
         (exact_line(uri))
@@ -1091,7 +1094,12 @@ fn is_one_run(scheme: &str) -> bool {
 
 fn headline(uri: &UriView, numbers: &[phone::Number]) -> Markup {
     match uri.scheme.as_str() {
-        "http" | "https" => html! { code.pv-url #destination { (url_line_parts(uri)) } },
+        // The hero carries the parts model when anything is removable: it is
+        // the editor now (design note 30, round 3) — preview.js wires each
+        // `data-slice` wrapper to strike on click and rebuild the button.
+        "http" | "https" => html! {
+            code.pv-url #destination data-card=[web_model(uri)] { (url_line_parts(uri)) }
+        },
         _ if is_one_run(&uri.scheme) => html! {
             code.pv-line #destination {
                 span.sch-big { (uri.scheme) span.colon { ":" } }
@@ -1239,56 +1247,27 @@ fn phone_numbers(uri: &UriView) -> Vec<phone::Number> {
 // Register 2: the slices
 // --------------------------------------------------------------------------
 
-/// The rows, folded or bare.
-///
-/// http(s) keeps its quiet single-line page and offers the parts behind a
-/// disclosure; every other scheme lists them outright, because on those cards
-/// the parts are most of what there is to read. The fold earns its line: it
-/// appears only when it has something to add — a part that can be unticked, or
-/// a value that reads differently from the way it is stored — so a bare path
-/// never folds. It always arrives closed (the user's call, 2026-08-20): the
-/// chips outside it say everything a warning must say, and opening is the
-/// reader's move — a click on a marked character still opens it to the entry
-/// that names the character.
+/// The rows — non-web schemes only, listed outright, because on those cards
+/// the parts are most of what there is to read. http(s) has no section at all
+/// any more: the hero is the reading and the editor (design note 30, round 3),
+/// and the fold that used to live here is gone.
 fn slice_section(uri: &UriView) -> Markup {
+    if uri.tier == Tier::Web {
+        return html! {};
+    }
     let rows: Vec<&urlview::Slice> = uri.rows().collect();
     if rows.is_empty() {
         return html! {};
     }
     // The rule follows the parts, never the scheme: a section that could only
     // restate a row nobody can act on has not earned its line. That is what
-    // leaves the bare-path http card, the plain ftp card, and the tel card with
-    // no rows at all.
+    // leaves the plain ftp card and the tel card with no rows at all.
     if !uri.fold_is_worth_it() {
         return html! {};
     }
-    let folds = uri.tier == Tier::Web;
     html! {
-        @if folds {
-            details.pv-parts {
-                summary.pv-parts-lid {
-                    span.when-closed { "Show URL Details" }
-                    span.when-open { "Hide URL Details" }
-                    svg.chev width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" {
-                        path d="M2 3.5 L5 6.5 L8 3.5" fill="none" stroke="currentColor"
-                            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" {}
-                    }
-                }
-                // The cast leads (the user's call, 2026-08-20): the fold
-                // opens to the names of the marked characters, then the
-                // parts, then the record.
-                (cast_list(uri))
-                (slice_rows(uri, &rows))
-                // The record's home on http(s). A card whose only decoding
-                // is receipted %20 spaces skips the record: the receipt and
-                // its cast entry already name the stored form, so the record
-                // would restate the hero.
-                @if uri.decoding_changed_more_than_spaces() { (raw_record(uri)) }
-            }
-        } @else {
-            (cast_list(uri))
-            (slice_rows(uri, &rows))
-        }
+        (cast_list(uri, false))
+        (slice_rows(uri, &rows))
     }
 }
 
@@ -1309,32 +1288,11 @@ fn slice_rows(uri: &UriView, rows: &[&urlview::Slice]) -> Markup {
                             @if slice.role == Role::Path { (path_slices_markup(&slice.display)) }
                             @else { (pieces(&slice.display, PieceStyle::Slice)) }
                         }
-                        // A value that is itself a web address, shown with
-                        // escapes kept closed, earns a second line reading
-                        // it opened (the user's ask, 2026-08-21).
-                        @if carried_line_worth_it(slice) {
-                            span.carried {
-                                span.clbl { "Reads as" }
-                                (pieces(&urlview::carried_reading(&slice.value), PieceStyle::Slice))
-                            }
-                        }
                     }
                 }
             }
         }
     }
-}
-
-/// True when this query value is a complete web address whose reading kept
-/// escapes closed — the one case where an opened second line adds something.
-/// A nested address with nothing closed already reads in full on its row.
-fn carried_line_worth_it(slice: &urlview::Slice) -> bool {
-    slice.role == Role::Query
-        && slice
-            .display
-            .iter()
-            .any(|p| matches!(p, Piece::Escape(_)))
-        && urlview::carries_an_address(&slice.display)
 }
 
 /// The extra class a slice's value carries, if any.
@@ -1372,29 +1330,40 @@ fn index_of(uri: &UriView, slice: &urlview::Slice) -> usize {
 /// "Exactly as stored" — the record, wherever the headline is a *rendering*:
 /// a formatted number, a comma-joined address list, a decoded value.
 ///
-/// On an http(s) card the record lives inside the fold (see `slice_section`),
-/// which exists whenever decoding changed anything; this call is only the
-/// fallback for the rare http(s) card with no rows at all — a bare host whose
-/// reading differs from storage. On a
-/// one-run card the headline is the stored string outright, so the record
-/// never appears. Everywhere else it is unconditional and never collapsed.
+/// On an http(s) card the record lives behind the small "Stored Form"
+/// disclosure (design note 30, round 3). On a one-run card the headline is
+/// the stored string outright, so the record never appears. Everywhere else
+/// it is unconditional and never collapsed.
 fn exact_line(uri: &UriView) -> Markup {
-    let needed = match uri.scheme.as_str() {
-        "http" | "https" => uri.decoding_changed_more_than_spaces() && !web_fold_renders(uri),
-        s if is_one_run(s) => false,
-        _ => true,
-    };
-    if !needed {
-        return html! {};
+    match uri.scheme.as_str() {
+        "http" | "https" => stored_details(uri),
+        s if is_one_run(s) => html! {},
+        _ => raw_record(uri),
     }
-    raw_record(uri)
 }
 
-/// True when the http(s) card renders its details fold — the record's home.
-/// Mirrors the early returns in `slice_section`, which is what actually draws
-/// it; the two must agree or the record goes missing.
-fn web_fold_renders(uri: &UriView) -> bool {
-    uri.tier == Tier::Web && uri.rows().next().is_some() && uri.fold_is_worth_it()
+/// The record behind a small native disclosure, with the drift line beside it
+/// (round 3 picks: record = link, driftnote = line). `<details>`, so the
+/// no-JS page keeps its path to the bytes. It appears only when the reading
+/// differs from storage beyond receipted `%20` spaces — an undecoded card
+/// would only restate the hero, and a spaces-only card's receipt and cast
+/// entry already name the stored form (the user's call, 2026-08-20).
+fn stored_details(uri: &UriView) -> Markup {
+    if !uri.decoding_changed_more_than_spaces() {
+        return html! {};
+    }
+    html! {
+        details.pv-stored {
+            summary.pv-stored-lid { "Stored Form" }
+            (raw_record(uri))
+            // The drift, named once, where the bytes live: the hero is a
+            // reading, so a selection copies the readable characters.
+            span.pv-drift {
+                "Selecting text copies the readable form; the Copy button "
+                "copies the link exactly as stored."
+            }
+        }
+    }
 }
 
 fn raw_record(uri: &UriView) -> Markup {
@@ -1671,13 +1640,18 @@ fn cast_entries(uri: &UriView) -> Vec<CastEntry> {
 /// entry that names it, the same wiring the marks in the values use. The
 /// no-JS page shows the list in full and drops the index instead — that split
 /// lives in the stylesheet, keyed on `html.js`.
-fn cast_list(uri: &UriView) -> Markup {
+///
+/// `bare` is the http(s) dress (design note 30, round 3): the cast sits on
+/// the open card under the hero, so it stays entirely quiet until a marked
+/// character is clicked — no index row, no solo pre-show — and the marks in
+/// the hero are the whole affordance.
+fn cast_list(uri: &UriView, bare: bool) -> Markup {
     let entries = cast_entries(uri);
-    let solo = entries.len() == 1;
+    let solo = !bare && entries.len() == 1;
     html! {
         @if !entries.is_empty() {
             div.pv-cast {
-                @if !solo { (cast_index(&entries)) }
+                @if !bare && entries.len() > 1 { (cast_index(&entries)) }
                 @for e in &entries { (cast_entry(e, solo)) }
             }
         }
@@ -2160,19 +2134,19 @@ fn pieces(parts: &[Piece], style: PieceStyle) -> Markup {
 }
 
 /// The full destination URL, coloured by part. Built from the same slices the
-/// fold lists, so userinfo and an explicit port can no longer go missing — the
+/// model lists, so userinfo and an explicit port can no longer go missing — the
 /// old renderer had no branch for either, which quietly dropped `alice@` and
 /// `:8443` from the line and from its copy.
 fn url_line_parts(uri: &UriView) -> Markup {
     html! {
         span class=(if uri.scheme == "http" { "sch insecure" } else { "sch" }) { (uri.scheme) }
         span.pn { (uri.prefix.trim_start_matches(&uri.scheme)) }
-        @for slice in &uri.slices {
+        @for (n, slice) in uri.slices.iter().enumerate() {
             @match slice.role {
-                // The username goes danger red here and in its slice, co-firing
-                // with its chip. Not amber: amber is the button language for
-                // "you leave", and this is not that.
-                Role::Userinfo => span.usr { (slice.value) },
+                // The username goes danger red, co-firing with its chip. Not
+                // amber: amber is the button language for "you leave", and
+                // this is not that.
+                Role::Userinfo => (hero_part(n, slice, html! { span.usr { (slice.value) } })),
                 Role::Host => (host_markup(uri)),
                 Role::Port => { span.pn { ":" } span.port { (slice.value) } },
                 // The path reads at full strength: it is the part of the line
@@ -2185,23 +2159,60 @@ fn url_line_parts(uri: &UriView) -> Markup {
                 // prefers to break where the URL has a joint, so a line ends
                 // on a character that visibly cannot end a URL (design note
                 // 29). No text, so a selection or a copy never picks it up.
-                _ if slice.key.is_none() => {
+                _ if slice.key.is_none() => (hero_part(n, slice, html! {
                     span.pn { (slice.delim) } wbr;
-                    span.seg { (pieces(&slice.display, PieceStyle::Url)) }
-                }
-                _ => {
+                    span class=(hero_value_class(slice, "seg fg")) {
+                        (pieces(&slice.display, PieceStyle::Url))
+                    }
+                })),
+                _ => (hero_part(n, slice, html! {
                     span.pn { (slice.delim) } wbr;
                     // A tail's key is a signpost, so it takes the bold the
-                    // slices and the exact line have always given it. `.seg` is
-                    // left to the port and a keyless fragment, which are not
-                    // keys and must not read as ones.
+                    // raw lines have always given it. `.seg` is left to the
+                    // port, which is not a key and must not read as one.
                     @if let Some(k) = &slice.key { span.qk { (k) } }
                     @if slice.equals { span.pn { "=" } wbr; }
-                    span.qv { (pieces(&slice.display, PieceStyle::Url)) }
-                }
+                    span class=(hero_value_class(slice, "qv")) {
+                        (pieces(&slice.display, PieceStyle::Url))
+                    }
+                })),
             }
         }
     }
+}
+
+/// A removable part of the hero, wrapped so preview.js can make it a control:
+/// click to strike, click again to restore (design note 30 round 3 — editing
+/// lives in the hero, the checkbox table is the other schemes' dress). Fixed
+/// parts render unwrapped; without the script the wrapper is inert text.
+fn hero_part(n: usize, slice: &urlview::Slice, inner: Markup) -> Markup {
+    html! {
+        @if slice.removable {
+            span.hp data-slice=(n) { (inner) }
+        } @else {
+            (inner)
+        }
+    }
+}
+
+/// The value's classes: `base`, plus the capsule when the reading earned one —
+/// the visible boundary that lets a value's inner `&`, `=`, `?`, `#`, or a
+/// whole carried address read as the value's own rather than the URL's.
+fn hero_value_class(slice: &urlview::Slice, base: &str) -> String {
+    if urlview::needs_capsule(&slice.display) {
+        format!("{base} cv")
+    } else {
+        base.to_string()
+    }
+}
+
+/// The parts model rides the hero only when something is removable — a bare
+/// path has nothing to edit and gets no attribute at all.
+fn web_model(uri: &UriView) -> Option<String> {
+    uri.slices
+        .iter()
+        .any(|s| s.removable)
+        .then(|| card_model(uri))
 }
 
 /// The host, with the accent wash on the registrable domain — the once-per-page
@@ -2960,17 +2971,24 @@ mod tests {
     }
 
     #[test]
-    fn the_web_tier_keeps_its_quiet_line_and_offers_the_parts() {
+    fn the_web_tier_is_one_voice_with_the_hero_as_editor() {
         let c = card("https://blog.example.com/articles/2026/post?ref=newsletter");
-        assert!(c.contains(r#"<code class="pv-url" id="destination">"#));
+        // The hero carries the parts model (design note 30, round 3): it is
+        // the editor now, and the removable part is wrapped for the script.
+        assert!(
+            c.contains(r#"<code class="pv-url" id="destination" data-card=""#),
+            "{c}"
+        );
         assert!(c.contains(r#"<span class="reg">example.com</span>"#));
-        // One removable part, so the fold has something to add -- and it is
-        // closed, because nothing warned.
-        assert!(c.contains(r#"<details class="pv-parts">"#), "{c}");
-        assert!(c.contains("Show URL Details"));
+        assert!(c.contains(r#"<span class="hp" data-slice=""#), "{c}");
+        // The fold is gone entirely.
+        assert!(!c.contains("pv-parts"), "{c}");
+        assert!(!c.contains("Show URL Details"), "{c}");
         assert!(c.contains("Continue to example.com"));
-        // The URL line already is the stored string, so nothing is restated.
+        // The URL line already is the stored string, so nothing is restated
+        // and no Stored Form is offered.
         assert!(!c.contains("Exactly as Stored"), "{c}");
+        assert!(!c.contains("pv-stored"), "{c}");
     }
 
     #[test]
@@ -2983,30 +3001,36 @@ mod tests {
     }
 
     #[test]
-    fn a_warning_about_the_string_keeps_the_chips_out_but_the_fold_closed() {
+    fn a_warning_about_the_string_keeps_the_chips_and_the_stored_form() {
         let c = card("https://alice@example.com:8443/reset?next=https%3A%2F%2Fother.example%2F");
         assert!(c.contains("Username in the Address"));
         assert!(c.contains("Carries Another Address"));
-        // The chips say everything a warning must say; the fold stays closed
-        // and opening is the reader's move (the user's call, 2026-08-20).
-        assert!(c.contains(r#"<details class="pv-parts">"#), "{c}");
-        // Userinfo and port are back on the line -- the old renderer had no
-        // branch for either and dropped both.
+        // Userinfo and port are on the line -- an old renderer had no branch
+        // for either and dropped both.
         assert!(c.contains(r#"<span class="usr">alice@</span>"#));
         assert!(c.contains(r#"<span class="port">8443</span>"#));
-        // Decoding changed the `next` value, so the record gets said out loud,
-        // inside the fold.
+        // Bare means real: the carried address reads decoded inside its
+        // capsule, domain bold, its own delimiters dim.
+        assert!(c.contains(r#"<span class="qv cv">"#), "{c}");
+        assert!(
+            c.contains(r#"<span class="dl">://</span><span class="reg">other.example</span>"#),
+            "{c}"
+        );
+        // Decoding changed the value, so the record waits behind the Stored
+        // Form disclosure, with the drift line beside it.
         let record = c.find("Exactly as Stored").expect("record missing");
-        assert!(record > c.find("<details").unwrap(), "{c}");
+        assert!(record > c.find(r#"<details class="pv-stored">"#).unwrap(), "{c}");
         assert!(record < c.find("</details>").unwrap(), "{c}");
+        assert!(c.contains("Selecting text copies the readable form"), "{c}");
     }
 
     #[test]
-    fn the_record_folds_away_on_a_quiet_card() {
+    fn the_record_waits_behind_the_stored_form_disclosure() {
         let c = card("https://example.com/files/r%C3%A9sum%C3%A9.pdf?q=hello%20world");
-        // Harmless decodes: the fold stays closed, and the record lives inside
-        // it rather than doubling the page for every %20.
-        assert!(c.contains(r#"<details class="pv-parts">"#), "{c}");
+        // Harmless decodes: the record lives behind the small Stored Form
+        // link rather than doubling the page.
+        assert!(c.contains(r#"<details class="pv-stored">"#), "{c}");
+        assert!(c.contains(r#"<summary class="pv-stored-lid">Stored Form</summary>"#), "{c}");
         let record = c.find("Exactly as Stored").expect("record missing");
         assert!(record > c.find("<details").unwrap(), "{c}");
         assert!(record < c.find("</details>").unwrap(), "{c}");
@@ -3041,12 +3065,15 @@ mod tests {
     fn the_cast_names_every_marked_character() {
         let c = card("https://example.com/my%20file?user=admin%E2%80%8B&q=a%26b");
         assert!(c.contains(r#"<div class="pv-cast">"#), "{c}");
-        // The hidden character's entry warns; housekeeping stays grey.
+        // The hidden character's entry warns.
         assert!(
             c.contains(r#"<div class="entry warn" data-name="u200b""#),
             "{c}"
         );
-        assert!(c.contains(r#"<div class="entry" data-name="u0026""#), "{c}");
+        // Bare means real: the & simply decodes inside its capsule, so it
+        // needs no entry at all any more — only what stayed closed is cast.
+        assert!(!c.contains(r#"data-name="u0026""#), "{c}");
+        assert!(c.contains(r#"<span class="qv cv">a<span class="dl">&amp;</span>b</span>"#), "{c}");
         // The raw tile holds the ACTUAL character — empty on purpose — and
         // the prose says so, so the blank never reads as a rendering bug.
         assert!(
@@ -3054,31 +3081,16 @@ mod tests {
             "{c}"
         );
         assert!(c.contains("The empty box is the character."), "{c}");
-        // A printable kept escape is its own proof: one plain tile, no pair.
-        assert!(c.contains(r#"<span class="tile lit">&amp;</span>"#), "{c}");
         // Names, codepoints, provenance, place.
         assert!(c.contains("stored as <code>%20</code>, in the path"), "{c}");
         assert!(c.contains("zero-width space"), "{c}");
         assert!(c.contains("U+200B"), "{c}");
         // Every mark points at its entry.
         assert!(c.contains(r#"data-tell="u200b""#), "{c}");
-        assert!(c.contains(r#"data-tell="u0026""#), "{c}");
-        // Several characters to explain: none shows outright, and the cast
-        // opens with the index — one clickable symbol tile per entry.
-        assert!(!c.contains(r#"class="entry solo"#), "{c}");
-        assert!(c.contains(r#"<div class="pv-index">"#), "{c}");
-        assert!(
-            c.contains(r#"<span class="tile sym warn" data-tell="u200b""#),
-            "{c}"
-        );
-        assert!(
-            c.contains(r#"<span class="tile lit" data-tell="u0026""#),
-            "{c}"
-        );
-        // And the stylesheet carries both halves of the reveal, plus the
-        // index's own: the no-JS page shows the full list instead. Entries
-        // hide by visibility in one stacked grid cell, so the cast stands as
-        // tall as its tallest answer and swapping never shifts the card.
+        // And the stylesheet carries both halves of the reveal: the no-JS
+        // page shows the full list instead. Entries hide by visibility in
+        // one stacked grid cell, so the cast stands as tall as its tallest
+        // answer and swapping never shifts the card.
         const APP_CSS: &str = include_str!("../static/app.css");
         assert!(APP_CSS
             .contains("html.js .pv-cast .entry {\n    grid-row: 2;\n    grid-column: 1;\n    visibility: hidden;\n}"));
@@ -3086,17 +3098,18 @@ mod tests {
         assert!(APP_CSS.contains("html:not(.js) .pv-index {\n    display: none;\n}"));
     }
 
-    /// One character to explain needs no ceremony: its entry shows from the
-    /// start (`.solo`, displayed by the stylesheet even under `html.js`) and
-    /// no index is offered.
+    /// The web cast sits on the open card under the hero (design note 30,
+    /// round 3), so it stays entirely quiet until a marked character is
+    /// clicked: no solo pre-show, no index row. A non-web card keeps both —
+    /// its cast still lives in a section of its own.
     #[test]
-    fn a_sole_cast_entry_shows_outright_with_no_index() {
+    fn the_web_cast_stays_quiet_until_asked() {
         let c = card("https://example.com/my%20file?q=1");
-        assert!(
-            c.contains(r#"<div class="entry solo" data-name="u0020""#),
-            "{c}"
-        );
+        assert!(c.contains(r#"<div class="entry" data-name="u0020""#), "{c}");
+        assert!(!c.contains("entry solo"), "{c}");
         assert!(!c.contains("pv-index"), "{c}");
+        let m = card("mailto:a@b.example?subject=Order%204192");
+        assert!(m.contains(r#"<div class="entry solo" data-name="u0020""#), "{m}");
         const APP_CSS: &str = include_str!("../static/app.css");
         assert!(APP_CSS
             .contains("html.js .pv-cast .entry.shown,\nhtml.js .pv-cast .entry.solo {\n    visibility: visible;\n}"));
@@ -3119,28 +3132,33 @@ mod tests {
     /// second line under its row: the inner `=` and `&` are that address's
     /// own grammar, and the domain it points at gets the bold.
     #[test]
-    fn a_carried_address_with_closed_escapes_reads_out_in_full() {
+    fn a_carried_address_reads_bare_inside_its_capsule() {
         let c = card(
             "https://example.com/media?url=https%3A%2F%2Fimg.example%2Fa.jpg%3Fw%3D1080%26s%3Dabc",
         );
         assert!(c.contains("Carries Another Address"), "{c}");
-        assert!(c.contains(r#"<span class="clbl">Reads as</span>"#), "{c}");
+        // Bare means real: the value decodes in place, the capsule is its
+        // boundary, and no second line restates it.
+        assert!(c.contains(r#"<span class="qv cv">"#), "{c}");
         assert!(c.contains(r#"<span class="reg">img.example</span>"#), "{c}");
         assert!(c.contains(r#"1080<span class="dl">&amp;</span>s"#), "{c}");
-        // A nested address with nothing closed already reads in full on its
-        // row, so no second line.
-        let plain = card("https://example.com/r?next=https%3A%2F%2Fother.example%2F");
-        assert!(!plain.contains("clbl"), "{plain}");
+        assert!(!c.contains("Reads as"), "{c}");
+        // A value with no structure inside earns no capsule.
+        let plain = card("https://example.com/r?q=share");
+        assert!(!plain.contains(" cv"), "{plain}");
     }
 
-    /// The cast leads the fold: names first, then the parts, then the record
-    /// (the user's call, 2026-08-20).
+    /// The cast answers under the hero: it renders between the headline and
+    /// the button, where a clicked character's entry appears (round 3).
     #[test]
-    fn the_cast_opens_the_fold() {
+    fn the_cast_sits_under_the_hero() {
         let c = card("https://example.com/my%20file?q=1");
+        let hero = c.find(r#"id="destination""#).expect("a hero");
         let cast = c.find(r#"<div class="pv-cast">"#).expect("a cast");
-        let slices = c.find(r#"<div class="pv-slices""#).expect("slices");
-        assert!(cast < slices, "{c}");
+        let button = c.find("Continue to").expect("a button");
+        assert!(hero < cast && cast < button, "{c}");
+        // And the slice table is gone from the web card entirely.
+        assert!(!c.contains("pv-slices"), "{c}");
     }
 
     /// A card whose only decoding is receipted %20 spaces skips the record:
@@ -3505,8 +3523,9 @@ mod tests {
         assert!(mixed.contains(r#"<span class="ps">a</span>"#), "{mixed}");
         assert!(mixed.contains(r#"<span class="qk">sid</span>"#), "{mixed}");
         assert!(mixed.contains(r#"<span class="qv">1</span>"#), "{mixed}");
-        // A keyless fragment is a value, not a key, and keeps `.seg`.
-        assert!(mixed.contains(r#"<span class="seg">f</span>"#), "{mixed}");
+        // A keyless fragment is a value, not a key — and wears the fragment's
+        // own teal (C1).
+        assert!(mixed.contains(r#"<span class="seg fg">f</span>"#), "{mixed}");
         // An `=`-shaped fragment unrolls first, so the OAuth case's keys ARE keys.
         let oauth = card("https://example.com/cb#access_token=abc&expires_in=3600");
         assert!(
@@ -3534,27 +3553,28 @@ mod tests {
             "a keyless fragment is a value too"
         );
         assert!(
-            APP_CSS.contains(
-                ".pv-url .qk {\n    color: var(--text-secondary);\n    font-weight: 700;\n}"
-            ),
-            "keys are the signposts: secondary, bold"
+            APP_CSS
+                .contains(".pv-url .qk {\n    color: var(--c-key);\n    font-weight: 700;\n}"),
+            "keys are the signposts: their own hue (C1), bold"
         );
-        // The port's own colour, defined once per theme.
-        assert_eq!(
-            APP_CSS.matches("--c-port:").count(),
-            2,
-            "--c-port needs a value in each theme"
-        );
+        // Every role hue is defined once per theme.
+        for var in ["--c-port:", "--c-path:", "--c-key:", "--c-frag:"] {
+            assert_eq!(
+                APP_CSS.matches(var).count(),
+                2,
+                "{var} needs a value in each theme"
+            );
+        }
         assert!(APP_CSS.contains("color: var(--c-port);"));
         // Still dim: the two things that really are inert.
         assert!(APP_CSS.contains(".pv-url .sch {\n    color: var(--text-tertiary);\n}"));
         assert!(APP_CSS.contains(".pv-url .pe {\n    color: var(--text-tertiary);\n}"));
         // A carried address inside a value: its punctuation recedes, and its
-        // domain keeps bold but never the wash -- that is spent once per page,
-        // on the headline's host.
+        // domain keeps bold but never the wash, the blue, or the size -- those
+        // are spent once per page, on the headline's host.
         assert!(APP_CSS.contains(".pv-url .dl {\n    color: var(--text-tertiary);\n}"));
         assert!(APP_CSS.contains(
-            ".pv-url .qv .reg,\n.pv-url .seg .reg {\n    font-size: 1em;\n    padding: 0;\n    background: none;\n}"
+            ".pv-url .qv .reg,\n.pv-url .seg .reg {\n    color: var(--text);\n    font-size: 1em;\n    padding: 0;\n    background: none;\n}"
         ));
         // The receipt rides the glyphs' own baseline as decoration, not a
         // border: line-height cannot push it away, and Safari draws it on a
@@ -3575,10 +3595,6 @@ mod tests {
     fn the_port_is_marked_on_every_surface() {
         let c = card("https://alice@example.com:8443/reset?next=x");
         assert!(c.contains(r#"<span class="port">8443</span>"#), "{c}");
-        assert!(
-            c.contains(r#"<span class="val port">"#),
-            "the slice row: {c}"
-        );
         // The runs preview.js rebuilds the edited line from carry it too.
         let model = card_model(&urlview::parse_uri("https://example.com:8443/x"));
         assert!(model.contains(r#"["port","8443"]"#), "{model}");
@@ -3589,7 +3605,7 @@ mod tests {
         // The fragment did not come along for the ride.
         assert!(
             card("https://example.com:8443/x#step-2")
-                .contains(r#"<span class="seg">step-2</span>"#)
+                .contains(r#"<span class="seg fg">step-2</span>"#)
         );
     }
 

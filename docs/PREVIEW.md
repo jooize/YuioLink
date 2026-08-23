@@ -120,26 +120,38 @@ we cannot stand behind.
 
 ---
 
-## 4. The fold
+## 4. Bare means real (design note 30)
 
-http(s) keeps its quiet single-line page and offers the parts behind
-`<details class="pv-parts">`. Every other scheme lists them outright.
+The http(s) card is **one voice**: the hero is the reading *and* the editor,
+and there is no fold. The rule (the user's, round 2): *anything shown bare is
+really that character; a `%` always begins an encoding; red always means
+hidden.*
 
-- The fold — and, on the other schemes, the slice list itself — appears **only
-  when it has something to add**: a part that can be unticked, or a value that
-  reads differently from the way it is stored. A bare path never folds; a plain
-  `ftp://` card and a `tel:` card show no rows at all.
-- It always arrives **closed**. The warn chips outside it say everything a
-  warning must say; opening is the reader's move, and clicking a marked
-  character still opens it to the cast entry naming that character.
-- Inside, the cast leads. With the script, a sole marked character shows its
-  naming entry outright; several collapse to a compact row of clickable
-  symbol tiles, each opening its entry. Without the script the full cast
-  simply shows and the tile row is dropped.
-- Warn chips always sit **outside** the fold. A warning that needs a click is a
-  warning that was not made.
-- The chevron is `::before` generated content, so a copy of the label never
-  arrives in the clipboard as "Show".
+- **Everything decodes**, with three exceptions: invisible/direction-changing
+  characters stay escaped and red; undecodable bytes stay escaped and dim;
+  and a `%` stays `%25` when the next two characters *of the reading* are
+  both hex digits (`pct-encoded = "%" HEXDIG HEXDIG` — only then could a bare
+  `%` fake an escape). `100%` and `50%off` read plainly; `a%2520b` stays
+  closed. A `#` in a path also stays closed — never legal raw there, always a
+  fake fragment if bare.
+- **The capsule** (`span.cv`) is the boundary that makes decoded `&` `=` `?`
+  `#` safe inside a value: a faint bounded pill saying "everything inside is
+  one piece of data". Earned, never decorative — only values carrying inner
+  structure or a whole address get one. A carried address reads bare inside
+  it: domain bold, its own delimiters dim, never the wash.
+- **C1 palette**: a hue per role — host blue (subdomain same hue, quieter),
+  path green, keys violet (`;params` dress as keys), fragment teal, port its
+  amber, userinfo danger red. The URL's own punctuation recedes to tertiary.
+- **The cast answers under the hero**: click a marked character and its entry
+  appears below the chips; on http(s) nothing shows until asked. The no-JS
+  page shows the full list.
+- **"Exactly as Stored" waits behind `<details class="pv-stored">`** ("Stored
+  Form"), rendered only when the reading differs from storage beyond
+  receipted `%20` spaces, with the drift line beside it: selecting the hero
+  copies the readable form; the Copy button copies the bytes.
+- Every other scheme keeps the classic register: slice list outright (only
+  when it has something to add), kept escapes, cast with solo/index, record
+  never collapsed.
 
 ---
 
@@ -158,7 +170,12 @@ it creates. The served markup has no checkboxes, no Copy buttons, and no split
 segment — a dead control is worse than no control, and un-hiding one after load
 is how this site earned its layout-shift history.
 
-| Fixed (checked + disabled) | Removable |
+On http(s) the editing lives **in the hero** (round 3): every removable part
+is wrapped in `span.hp[data-slice]` — click to strike, click again to
+restore, with the same selection/double-click guards the rows use. Other
+schemes keep the checkbox table.
+
+| Fixed (checked + disabled / never wrapped) | Removable |
 |----------------------------|-----------|
 | host, port, path, magnet `xt` | userinfo, path parameters, query parameters, fragment, every mailto address, sms body, magnet `dn`/`tr`, irc `?key`, ftp `;type` |
 

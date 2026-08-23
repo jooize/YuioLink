@@ -474,10 +474,18 @@ fn hierarchical(stored: &str, scheme: &str) -> UriView {
         });
     }
 
+    // Bare-means-real is http(s)-only: the one-run schemes (ftp, irc)
+    // promise character-identity with storage instead, and get the classic
+    // register.
+    let read = if matches!(scheme, "http" | "https") {
+        ValueRead::Web
+    } else {
+        ValueRead::Classic
+    };
     let (path, query, fragment) = split_tail(tail);
-    slices.extend(path_slices(path));
-    slices.extend(query_slices(query, "?"));
-    slices.extend(fragment_slices(fragment));
+    slices.extend(path_slices(path, read));
+    slices.extend(query_slices(query, "?", read));
+    slices.extend(fragment_slices(fragment, read));
 
     UriView {
         scheme: scheme.to_string(),
@@ -507,10 +515,28 @@ fn split_tail(tail: &str) -> (&str, &str, &str) {
     }
 }
 
+/// How a scheme's values are read: the classic register, or bare-means-real
+/// for http(s) (design note 30).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ValueRead {
+    Classic,
+    Web,
+}
+
+impl ValueRead {
+    /// Read one value in this register. `in_path` matters only to Web.
+    fn read(self, value: &str, in_path: bool) -> Vec<Piece> {
+        match self {
+            ValueRead::Classic => decode_for_reading(value),
+            ValueRead::Web => web_reading(value, in_path),
+        }
+    }
+}
+
 /// The path, cut so that each `;key=value` segment parameter is its own
 /// removable slice and the segments around it stay whole. In the ordinary case
 /// — no parameters anywhere — this is a single fixed slice.
-fn path_slices(path: &str) -> Vec<Slice> {
+fn path_slices(path: &str, read: ValueRead) -> Vec<Slice> {
     let mut out = Vec::new();
     let mut plain = String::new();
     for (i, segment) in path.split('/').enumerate() {
@@ -522,7 +548,7 @@ fn path_slices(path: &str) -> Vec<Slice> {
         plain.push_str(bits.next().unwrap_or(""));
         for param in bits {
             if !plain.is_empty() {
-                out.push(plain_path_slice(std::mem::take(&mut plain)));
+                out.push(plain_path_slice(std::mem::take(&mut plain), read));
             }
             let (key, equals, value) = split_pair(param);
             out.push(Slice {
@@ -530,25 +556,25 @@ fn path_slices(path: &str) -> Vec<Slice> {
                 delim: ";".to_string(),
                 key: Some(key.to_string()),
                 equals,
-                display: decode_for_reading(value),
+                display: read.read(value, false),
                 value: value.to_string(),
                 removable: true,
             });
         }
     }
     if !plain.is_empty() {
-        out.push(plain_path_slice(plain));
+        out.push(plain_path_slice(plain, read));
     }
     out
 }
 
-fn plain_path_slice(path: String) -> Slice {
+fn plain_path_slice(path: String, read: ValueRead) -> Slice {
     Slice {
         role: Role::Path,
         delim: String::new(),
         key: None,
         equals: false,
-        display: decode_for_reading(&path),
+        display: read.read(&path, true),
         value: path,
         // The path IS the destination: the editing strips what rides along, not
         // where the link points. And nearly every URL has one, so a removable
@@ -560,7 +586,7 @@ fn plain_path_slice(path: String) -> Slice {
 /// `?k=v&k2=v2` as one slice per pair, in stored order, repeats kept. `lead` is
 /// the character that introduces the first pair (`?` everywhere except an
 /// `&`-shaped fragment, which reuses `#`).
-fn query_slices(query: &str, lead: &str) -> Vec<Slice> {
+fn query_slices(query: &str, lead: &str, read: ValueRead) -> Vec<Slice> {
     let body = query.strip_prefix(lead).unwrap_or(query);
     if query.is_empty() {
         return Vec::new();
@@ -578,7 +604,10 @@ fn query_slices(query: &str, lead: &str) -> Vec<Slice> {
                 },
                 key: Some(key.to_string()),
                 equals,
-                display: structure_value(decode_for_reading(value)),
+                display: match read {
+                    ValueRead::Classic => structure_value(decode_for_reading(value)),
+                    ValueRead::Web => web_reading(value, false),
+                },
                 value: value.to_string(),
                 removable: true,
             }
@@ -590,7 +619,7 @@ fn query_slices(query: &str, lead: &str) -> Vec<Slice> {
 /// opaque to the network. An `=`/`&`-shaped one (the OAuth implicit flow, which
 /// is how a bearer token ends up in a shared link) unrolls on `&` only, so
 /// `#a=b,c=d` stays one row with the comma inside the value.
-fn fragment_slices(fragment: &str) -> Vec<Slice> {
+fn fragment_slices(fragment: &str, read: ValueRead) -> Vec<Slice> {
     if fragment.is_empty() {
         return Vec::new();
     }
@@ -610,7 +639,7 @@ fn fragment_slices(fragment: &str) -> Vec<Slice> {
                     },
                     key: Some(key.to_string()),
                     equals,
-                    display: decode_for_reading(value),
+                    display: read.read(value, false),
                     value: value.to_string(),
                     removable: true,
                 }
@@ -622,7 +651,7 @@ fn fragment_slices(fragment: &str) -> Vec<Slice> {
         delim: "#".to_string(),
         key: None,
         equals: false,
-        display: decode_for_reading(body),
+        display: read.read(body, false),
         value: body.to_string(),
         removable: true,
     }]
@@ -641,7 +670,7 @@ fn mailto(stored: &str, scheme: &str) -> UriView {
         None => (rest, ""),
     };
     let mut slices = recipient_slices(body, Role::Recipient);
-    slices.extend(query_slices(query, "?"));
+    slices.extend(query_slices(query, "?", ValueRead::Classic));
     // An address is an address wherever it appears, so `cc` and `bcc` read the
     // way the recipients beside them do.
     for slice in &mut slices {
@@ -711,7 +740,7 @@ fn sms(stored: &str, scheme: &str) -> UriView {
         None => (rest, ""),
     };
     let mut slices = recipient_slices(body, Role::Recipient);
-    slices.extend(query_slices(query, "?"));
+    slices.extend(query_slices(query, "?", ValueRead::Classic));
     UriView {
         scheme: scheme.to_string(),
         tier: Tier::Handoff,
@@ -751,7 +780,7 @@ fn recipient_slices(body: &str, role: Role) -> Vec<Slice> {
 fn magnet(stored: &str, scheme: &str) -> UriView {
     let prefix = format!("{scheme}:");
     let rest = stored.get(prefix.len()..).unwrap_or("");
-    let mut slices = query_slices(rest, "?");
+    let mut slices = query_slices(rest, "?", ValueRead::Classic);
     for slice in &mut slices {
         // Only `xt` identifies the data. `dn` is a name the link's creator
         // chose and `tr` is a tracker you would announce to; strip every `tr`
@@ -788,7 +817,7 @@ fn opaque(stored: &str, scheme: &str) -> UriView {
         value: body.to_string(),
         removable: false,
     }];
-    slices.extend(query_slices(query, "?"));
+    slices.extend(query_slices(query, "?", ValueRead::Classic));
     UriView {
         scheme: scheme.to_string(),
         tier: Tier::Handoff,
@@ -958,47 +987,6 @@ fn uri_value_pieces(text: &str) -> Option<Vec<Piece>> {
     Some(out)
 }
 
-/// A carried address, opened one level for reading.
-///
-/// The slice keeps `%3D`/`%26` closed so they cannot redraw the *outer*
-/// URL's structure on screen. This line is labeled a reading of the address
-/// the value carries, so the inner `&`, `=`, `#` are that address's own
-/// grammar and open into it. One level only — a stored `%2520` opens to the
-/// `%20` it spells, never further — and anything invisible or undecodable
-/// stays closed and marked, as everywhere.
-pub(crate) fn carried_reading(value: &str) -> Vec<Piece> {
-    let mut opened: Vec<Piece> = Vec::new();
-    for piece in decode_for_reading(value) {
-        match piece {
-            Piece::Escape(run) => {
-                for (c, raw) in escape_run_pairs(&run) {
-                    let p = if c == char::REPLACEMENT_CHARACTER || is_invisible(c) {
-                        Piece::Escape(raw)
-                    } else {
-                        Piece::Text(c.to_string())
-                    };
-                    match (opened.last_mut(), &p) {
-                        (Some(Piece::Text(prev)), Piece::Text(s)) => prev.push_str(s),
-                        _ => opened.push(p),
-                    }
-                }
-            }
-            p => match (opened.last_mut(), &p) {
-                (Some(Piece::Text(prev)), Piece::Text(s)) => prev.push_str(s),
-                _ => opened.push(p),
-            },
-        }
-    }
-    // When everything opened, re-read the whole line as the address it is:
-    // domain bold, its own delimiters dim.
-    if opened.iter().all(|p| matches!(p, Piece::Text(_))) {
-        let text: String = opened.iter().map(Piece::text).collect();
-        if let Some(structured) = uri_value_pieces(&text) {
-            return structured;
-        }
-    }
-    opened
-}
 
 /// Give a decoded value its structure back, where it turns out to have some.
 /// Only when nothing needed marking: an escape that stayed escaped, or a space
@@ -1045,17 +1033,9 @@ fn opaque_pieces(scheme: &str, body: &str) -> Vec<Piece> {
 /// prevent.
 const STRUCTURE: [char; 4] = ['&', '=', '#', '%'];
 
-/// Decode a stored value for reading, and mark what could not be decoded
-/// honestly.
-///
-/// The rule in one line: values decode, except the four structure characters
-/// (which stay escaped and dim) and anything invisible or direction-changing
-/// (which stays escaped and red, with its chip). A space that came from `%20`
-/// is drawn with a dotted underline; a literal stored space — legal only in the
-/// cannot-be-a-base schemes, since the URL spec percent-encodes the rest — is
-/// drawn bare. Three appearances, three meanings, no overlap.
-pub fn decode_for_reading(value: &str) -> Vec<Piece> {
-    // (character, the escape it came from if it was one)
+/// Cut a stored value into `(character, the escape it came from if any)`
+/// pairs — the shared front half of every reading.
+fn decode_chars(value: &str) -> Vec<(char, Option<String>)> {
     let mut chars: Vec<(char, Option<String>)> = Vec::new();
     let bytes = value.as_bytes();
     let mut i = 0;
@@ -1100,7 +1080,21 @@ pub fn decode_for_reading(value: &str) -> Vec<Piece> {
             i += c.len_utf8();
         }
     }
+    chars
+}
 
+/// Decode a stored value for reading, and mark what could not be decoded
+/// honestly. This is the classic register, still worn by every non-http(s)
+/// scheme.
+///
+/// The rule in one line: values decode, except the four structure characters
+/// (which stay escaped and dim) and anything invisible or direction-changing
+/// (which stays escaped and red, with its chip). A space that came from `%20`
+/// is drawn with a dotted underline; a literal stored space — legal only in the
+/// cannot-be-a-base schemes, since the URL spec percent-encodes the rest — is
+/// drawn bare. Three appearances, three meanings, no overlap.
+pub fn decode_for_reading(value: &str) -> Vec<Piece> {
+    let chars = decode_chars(value);
     let padded = padding_mask(&chars);
     let mut out: Vec<Piece> = Vec::new();
     for (idx, (c, escape)) in chars.iter().enumerate() {
@@ -1116,16 +1110,98 @@ pub fn decode_for_reading(value: &str) -> Vec<Piece> {
             Some(_) if *c == ' ' => Piece::DecodedSpace,
             _ => Piece::Text(c.to_string()),
         };
-        // Merge with the previous piece where merging keeps the meaning.
-        match (out.last_mut(), &piece) {
-            (Some(Piece::Text(prev)), Piece::Text(s)) => prev.push_str(s),
-            (Some(Piece::Padding(prev)), Piece::Padding(s)) => prev.push_str(s),
-            (Some(Piece::Escape(prev)), Piece::Escape(s)) => prev.push_str(s),
-            (Some(Piece::BadEscape(prev)), Piece::BadEscape(s)) => prev.push_str(s),
-            _ => out.push(piece),
+        push_merged(&mut out, piece);
+    }
+    out
+}
+
+/// Merge a piece into the list where merging keeps the meaning.
+fn push_merged(out: &mut Vec<Piece>, piece: Piece) {
+    match (out.last_mut(), &piece) {
+        (Some(Piece::Text(prev)), Piece::Text(s)) => prev.push_str(s),
+        (Some(Piece::Padding(prev)), Piece::Padding(s)) => prev.push_str(s),
+        (Some(Piece::Escape(prev)), Piece::Escape(s)) => prev.push_str(s),
+        (Some(Piece::BadEscape(prev)), Piece::BadEscape(s)) => prev.push_str(s),
+        _ => out.push(piece),
+    }
+}
+
+/// The bare-means-real register, worn by http(s) cards (design note 30, the
+/// user's rule): anything shown bare is really that character, a `%` always
+/// begins an encoding, red always means hidden.
+///
+/// Everything decodes, with exactly three exceptions:
+/// - anything invisible or direction-changing stays escaped and red;
+/// - bytes that are not valid text stay escaped and dim;
+/// - a literal `%` stays `%25` when the next two characters *of the reading*
+///   are both hex digits — a bare `%` there would spell a fake escape
+///   (RFC 3986: `pct-encoded = "%" HEXDIG HEXDIG`) and poison the rule for
+///   everything after it. The check runs on the reading, not the storage, so
+///   `%25%32%30` (which decodes to `%`, `2`, `0`) is caught too.
+///
+/// Decoded structure characters come back as [`Piece::Delim`] in a value and
+/// plain text in a path (where `&` and `=` are legal raw anyway); the capsule
+/// — [`needs_capsule`] — is the boundary that makes the value case safe. The
+/// one structural character with no such home is `#` in a path: never legal
+/// raw there, always a fake fragment if bare, so it alone stays escaped.
+fn web_reading(value: &str, in_path: bool) -> Vec<Piece> {
+    let chars = decode_chars(value);
+    let padded = padding_mask(&chars);
+    let hex_follows = |idx: usize| {
+        matches!(
+            (chars.get(idx + 1), chars.get(idx + 2)),
+            (Some((a, _)), Some((b, _))) if a.is_ascii_hexdigit() && b.is_ascii_hexdigit()
+        )
+    };
+    let mut out: Vec<Piece> = Vec::new();
+    for (idx, (c, escape)) in chars.iter().enumerate() {
+        let piece = match escape {
+            Some(raw) if *c == char::REPLACEMENT_CHARACTER => Piece::Escape(raw.clone()),
+            Some(raw) if is_invisible(*c) => Piece::BadEscape(raw.clone()),
+            // A stored `%` that must stay closed shows the encoding of the
+            // character; the raw storage may even have been a literal `%`
+            // (only reachable through decodes landing hex beside it), and
+            // the record holds that truth.
+            _ if *c == '%' && hex_follows(idx) => Piece::Escape("%25".to_string()),
+            _ if is_invisible(*c) && *c != ' ' => Piece::BadEscape(escaped(*c)),
+            _ if *c == '#' && in_path => {
+                Piece::Escape(escape.clone().unwrap_or_else(|| escaped(*c)))
+            }
+            _ if !in_path && matches!(c, '&' | '=' | '?' | '#') => Piece::Delim(c.to_string()),
+            _ if padded[idx] => Piece::Padding(c.to_string()),
+            Some(_) if *c == ' ' => Piece::DecodedSpace,
+            _ => Piece::Text(c.to_string()),
+        };
+        push_merged(&mut out, piece);
+    }
+    // A value that is a whole web address gets read as one: domain bold,
+    // its own delimiters dim. Only when nothing needed marking — a red
+    // escape or a receipted space is the more important thing to say.
+    if !in_path
+        && out
+            .iter()
+            .all(|p| matches!(p, Piece::Text(_) | Piece::Delim(_)))
+    {
+        let text: String = out.iter().map(Piece::text).collect();
+        if let Some(structured) = uri_value_pieces(&text) {
+            return structured;
         }
     }
     out
+}
+
+/// True when this reading needs the capsule — the visible boundary that lets
+/// its inner structure read as its own. Earned, never decorative: a bare
+/// `&`, `=`, `?`, or `#` inside the value, or a whole carried address —
+/// including one whose kept escapes blocked the structured re-read (a
+/// `%25` in the middle of an otherwise plain address still leaves it an
+/// address, and the boundary is the point).
+pub(crate) fn needs_capsule(display: &[Piece]) -> bool {
+    display.iter().any(|p| match p {
+        Piece::Domain(_) => true,
+        Piece::Delim(d) => matches!(d.as_str(), "&" | "=" | "?" | "#"),
+        _ => false,
+    }) || carries_an_address(display)
 }
 
 /// Which characters are padding: a space in a run of two or more, or a space at
@@ -1780,6 +1856,70 @@ mod tests {
         assert!(busy.has(Hazard::UsernameInTheAddress));
         assert!(busy.has(Hazard::CarriesAnotherAddress));
         assert!(busy.fold_is_worth_it());
+    }
+
+    /// Bare means real (design note 30): on http(s), a value's structure
+    /// characters decode — `&`, `=`, `?`, `#` come back as dim delimiters
+    /// inside the capsule's boundary — while the classic register keeps them
+    /// escaped on every other scheme.
+    #[test]
+    fn web_values_read_bare_and_classic_values_stay_escaped() {
+        let web = parse_uri("https://example.com/s?q=a%26b");
+        let q = web.param("q").unwrap();
+        let read: String = q.display.iter().map(Piece::text).collect();
+        assert_eq!(read, "a&b");
+        assert!(q.display.iter().any(|p| matches!(p, Piece::Delim(d) if d == "&")));
+        assert!(needs_capsule(&q.display));
+        // A value with no structure inside earns no capsule.
+        let plain = parse_uri("https://example.com/s?q=share");
+        assert!(!needs_capsule(&plain.param("q").unwrap().display));
+        // The classic register is untouched.
+        let mail = parse_uri("mailto:a@b.example?subject=a%26b");
+        let s = mail.param("subject").unwrap();
+        assert!(s.display.iter().any(|p| matches!(p, Piece::Escape(e) if e == "%26")));
+    }
+
+    /// The percent, refined (the user's RFC 3986 point, round 3): `%25` opens
+    /// to a bare `%` whenever the next two characters of the READING are not
+    /// both hex digits — only then could it be mistaken for an encoding.
+    #[test]
+    fn the_percent_opens_only_when_it_cannot_fake_an_escape() {
+        let read = |url: &str, key: &str| -> String {
+            parse_uri(url)
+                .param(key)
+                .unwrap()
+                .display
+                .iter()
+                .map(Piece::text)
+                .collect()
+        };
+        // Nothing hex follows: bare, like the real-world percents.
+        assert_eq!(read("https://example.com/s?discount=100%25", "discount"), "100%");
+        assert_eq!(read("https://example.com/s?t=50%25off", "t"), "50%off");
+        // "20" IS hex: a bare % would spell a fake %20, so it stays closed.
+        let v = parse_uri("https://example.com/s?f=a%2520b.jpg");
+        let f = v.param("f").unwrap();
+        assert_eq!(
+            f.display.iter().map(Piece::text).collect::<String>(),
+            "a%2520b.jpg"
+        );
+        assert!(f.display.iter().any(|p| matches!(p, Piece::Escape(e) if e == "%25")));
+        // The check runs on the reading, not the storage: %25%32%30 decodes
+        // to `%`, `2`, `0` — two innocent decodes conspiring — and is caught.
+        assert_eq!(read("https://example.com/s?f=%25%32%30", "f"), "%2520");
+    }
+
+    #[test]
+    fn a_hash_in_a_path_stays_closed_but_opens_inside_a_capsule() {
+        // Never legal raw in a path, always a fake fragment if bare.
+        let v = parse_uri("https://example.com/a%23b");
+        let p = v.first(Role::Path).unwrap();
+        assert!(p.display.iter().any(|p| matches!(p, Piece::Escape(e) if e == "%23")));
+        // Inside a value the capsule bounds it, so it reads bare and dim.
+        let v = parse_uri("https://example.com/s?q=a%23b");
+        let q = v.param("q").unwrap();
+        assert_eq!(q.display.iter().map(Piece::text).collect::<String>(), "a#b");
+        assert!(needs_capsule(&q.display));
     }
 
     #[test]

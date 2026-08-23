@@ -34,6 +34,13 @@
        own #c77a00 would have been 3.10:1, a new contrast failure. */
     --c-port: #995c00;
 
+    /* C1 (design note 30, round 3): a hue per URL role, in the ink. Shades
+       are darker than the round-2 mockup's so 13.5px text clears AA on the
+       glass, the same bar --c-port was tuned against. */
+    --c-path: #1e7a49;
+    --c-key: #6f4fc3;
+    --c-frag: #0b6e6e;
+
     --bg-1: #e7e8ec;
     --bg-2: #f6f7f9;
     --glow-1: rgba(0, 122, 255, 0.20);
@@ -80,6 +87,11 @@
         /* The same hue at the weight dark needs, and the exact amber .btn--go
            already ends its gradient on. 6.94:1 on the lightest glass. */
         --c-port: #ff9f0a;
+
+        /* The same three roles, lifted for the dark card. */
+        --c-path: #4fbf85;
+        --c-key: #b39ae8;
+        --c-frag: #3fb8b8;
 
         --bg-1: #121214;
         --bg-2: #202024;
@@ -1440,16 +1452,21 @@ html.js .custom-field:not(.open) {
     color: var(--text-tertiary);
 }
 
+/* C1 (design note 30, round 3): the hue does the anatomy, so the URL's own
+   punctuation recedes to tertiary — the delimiters stopped being the accent
+   the day every region got an ink of its own. */
 .pv-url .pn {
-    color: var(--accent);
+    color: var(--text-tertiary);
 }
 
+/* The subdomain belongs to the host, so it keeps the host's blue — at half
+   strength (round 3: "same hue, quieter"). reddit.com still lands hardest. */
 .pv-url .sub {
-    color: var(--text-secondary);
+    color: color-mix(in srgb, var(--accent) 55%, var(--text-tertiary));
 }
 
 .pv-url .reg {
-    color: var(--text);
+    color: var(--accent);
     font-weight: 700;
     font-size: 1.06em;
     padding: 1px 4px;
@@ -1468,7 +1485,7 @@ html.js .custom-field:not(.open) {
    and escapes. The path takes colour but NOT weight: bold still means one thing
    site-wide, and that thing is the registrable domain. */
 .pv-url .ps {
-    color: var(--text);
+    color: var(--c-path);
 }
 
 /* A keyless fragment and a refused scheme's printed body: content, so they read
@@ -1476,6 +1493,11 @@ html.js .custom-field:not(.open) {
    has its own colour now.) */
 .pv-url .seg {
     color: var(--text);
+}
+
+/* The fragment, in its own teal (C1). */
+.pv-url .fg {
+    color: var(--c-frag);
 }
 
 /* The port, in its own amber, wherever it appears. Regular weight: it is
@@ -1496,7 +1518,7 @@ html.js .custom-field:not(.open) {
    keeps the ranking unambiguous — the registrable domain is still the only thing
    wearing bold AND full colour AND the wash. */
 .pv-url .qk {
-    color: var(--text-secondary);
+    color: var(--c-key);
     font-weight: 700;
 }
 
@@ -2055,24 +2077,6 @@ html.js .custom-field:not(.open) {
     font-weight: 700;
 }
 
-/* A query value that is itself a web address, opened one level under its
-   row. The row keeps %3D and %26 closed so they cannot redraw the outer
-   URL's structure on screen; this line is labeled a reading, where the
-   inner = and & are the carried address's own grammar and open into it. */
-.pv-slice .carried {
-    display: block;
-    margin-top: 2px;
-    font-size: 11.5px;
-    overflow-wrap: anywhere;
-}
-
-.pv-slice .carried .clbl {
-    font-family: var(--font);
-    font-size: 10.5px;
-    font-style: italic;
-    color: var(--text-tertiary);
-    margin-right: 5px;
-}
 
 /* Userinfo goes danger red in its slice and on the URL line, co-firing with
    its chip. Not amber: amber is the button language for "you leave". */
@@ -2317,76 +2321,62 @@ html:not(.js) .pv-index {
     color: var(--danger);
 }
 
-/* The fold, for http(s) only: the everyday page stays one quiet line and the
-   parts are an offer. The chevron is an inline SVG (no text content), so a
-   selection or a copy never picks it up — it used to arrive in the clipboard
-   as "Show" back when it was a text glyph. */
-.pv-parts {
+/* The record behind a small native disclosure (design note 30, round 3:
+   record = link, driftnote = line). Deliberately the quietest control on the
+   card: the hero is the reading, and this is the reference for the reader
+   who wants the bytes. */
+.pv-stored {
     display: block;
     margin-top: 12px;
 }
 
-/* The lid wears the site's own "there is more" register — the main page's
-   "Security ⌄": accent 600 with a turning chevron, no bar. The old field-
-   dressed bar was the heaviest element on a quiet card, dressed stronger
-   than the URL it served (retired 2026-08-19 at the user's call). */
-.pv-parts-lid {
+.pv-stored-lid {
     list-style: none;
     cursor: pointer;
-    display: block;
-    box-sizing: border-box;
-    width: 100%;
     text-align: center;
     font-family: var(--font);
-    font-size: 12.5px;
-    font-weight: 600;
-    line-height: 1.4;
-    color: var(--accent);
-    padding: 7px 6px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--text-tertiary);
 }
 
-.pv-parts-lid:hover {
-    filter: brightness(1.12);
+.pv-stored-lid:hover {
+    color: var(--text-secondary);
 }
 
-.pv-parts-lid::-webkit-details-marker {
+.pv-stored-lid::-webkit-details-marker {
     display: none;
 }
 
-.pv-parts-lid::marker {
+.pv-stored-lid::marker {
     content: "";
 }
 
-.pv-parts-lid .chev {
-    margin-left: 5px;
-    vertical-align: 1px;
+.pv-stored-lid::after {
+    content: " \25BE";
 }
 
-.pv-parts[open] .pv-parts-lid .chev {
-    transform: rotate(180deg);
+.pv-stored[open] .pv-stored-lid::after {
+    content: " \25B4";
 }
 
-.pv-parts .when-open {
-    display: none;
+.pv-stored .rawline {
+    margin-top: 8px;
 }
 
-.pv-parts[open] .when-open {
-    display: inline;
-}
-
-.pv-parts[open] .when-closed {
-    display: none;
-}
-
-/* The record inside the fold sits under the last slice row, keeping its own
-   top rule so it still reads as a register change. */
-.pv-parts .rawline {
-    margin-top: 10px;
+/* The drift, named once, where the bytes live. */
+.pv-drift {
+    display: block;
+    margin-top: 4px;
+    font: italic 400 10.5px/1.5 var(--font);
+    color: var(--text-tertiary);
+    text-align: left;
 }
 
 /* The two raw lines share one dress. "Exactly as stored" is the record — on
-   http(s) it lives inside the fold, which arrives closed and opens at the
-   reader's call; everywhere else it never collapses. "After your edits" is
+   http(s) it lives behind the Stored Form disclosure; everywhere else it
+   never collapses. "After your edits" is
    the tool and appears only when the rebuilt string differs. Both are copied by
    explicit buttons — there are no selection tricks anywhere on this page. */
 .rawline {
@@ -2647,17 +2637,62 @@ html:not(.js) .pv-index {
 
 /* An address carried inside a value: its own punctuation recedes to the
    encoding-noise grey rather than reading as the URL's structure, and its
-   domain keeps bold but NOT the wash or the size bump — the wash is spent
-   once per page, on the headline's host. */
+   domain keeps bold but NOT the wash, the blue, or the size bump — those are
+   spent once per page, on the headline's host. */
 .pv-url .dl {
     color: var(--text-tertiary);
 }
 
 .pv-url .qv .reg,
 .pv-url .seg .reg {
+    color: var(--text);
     font-size: 1em;
     padding: 0;
     background: none;
+}
+
+/* The capsule (design note 30): one value, bounded. The faint pill says
+   "everything inside is one piece of data" — the boundary is what lets the
+   value's inner & = ? # read bare as its own grammar rather than the URL's.
+   Earned, never decorative (see urlview::needs_capsule); clone keeps rounded
+   ends on every wrapped line. */
+.pv-url .cv {
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+    border-radius: 6px;
+    padding: 1px 4px;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+}
+
+/* A removable hero part is the editor (round 3): click to strike, click
+   again to restore. The affordance exists only with the script — without it
+   the wrapper is inert text — and the strike is the same red the table rows
+   used to wear. */
+html.js .pv-url .hp {
+    cursor: pointer;
+    border-radius: 5px;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+}
+
+html.js .pv-url .hp:hover {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.pv-url .hp.off,
+.pv-url .hp.off * {
+    color: var(--text-tertiary) !important;
+}
+
+.pv-url .hp.off {
+    opacity: 0.55;
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
+.pv-url .hp.off .reg,
+.pv-url .hp.off .cv {
+    background: transparent;
 }
 
 /* Tier 3: printed, never linked, and given no control at all — not a disabled

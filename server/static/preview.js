@@ -49,15 +49,21 @@
     class Card {
         constructor() {
             this.action = document.querySelector(".pv-btn.go");
+            // The model rides the hero on http(s) — where the hero IS the
+            // editor (design note 30, round 3) — and the slice list on every
+            // other scheme, which keeps its checkbox table.
             this.slices = document.querySelector(".pv-slices[data-card]");
-            this.model = readModel(this.slices);
+            this.hero = document.querySelector(".pv-url[data-card]");
+            this.model = readModel(this.hero || this.slices);
             this.rows = [];
+            this.heroParts = [];
             this.edited = null;
         }
 
         wire() {
             copyShortcut();
-            if (this.model) this.buildRows();
+            if (this.model && this.slices) this.buildRows();
+            if (this.model && this.hero) this.buildHeroParts();
             this.buildCast();
             this.buildSplit();
             this.buildRawCopyButtons();
@@ -74,15 +80,13 @@
         /**
          * The cast answers when asked. Every element the server tagged with
          * `data-tell` becomes a control — the marked characters in the values
-         * and the symbol tiles of the cast's index alike: clicking one opens
-         * the fold if it was closed and shows the one cast entry that names
-         * the character, pulsing once. One answer at a time; asking another
-         * swaps it. A click only ever opens — asking the same character
-         * again re-pulses its entry rather than blanking it, and putting the
-         * answers away is what closing the fold does (the user's call:
-         * toggling read as confusion). Without this script the stylesheet
-         * shows the whole cast instead, so nothing here is the only way to
-         * the information.
+         * and the symbol tiles of the cast's index alike: clicking one shows
+         * the cast entry that names the character, pulsing once. One answer
+         * at a time; asking another swaps it. A click only ever opens —
+         * asking the same character again re-pulses its entry rather than
+         * blanking it (the user's call: toggling read as confusion). Without
+         * this script the stylesheet shows the whole cast instead, so
+         * nothing here is the only way to the information.
          */
         buildCast() {
             const cast = document.querySelector(".pv-cast");
@@ -107,8 +111,6 @@
                         shown.classList.remove("shown"),
                     );
                     wired.forEach((m) => m.setAttribute("aria-expanded", "false"));
-                    const fold = cast.closest("details");
-                    if (fold) fold.open = true;
                     void entry.offsetWidth; // restart the pulse
                     entry.classList.add("shown");
                     mark.setAttribute("aria-expanded", "true");
@@ -181,17 +183,62 @@
             row.addEventListener("dblclick", () => clearTimeout(pending));
         }
 
+        /**
+         * The hero as the editor (design note 30, round 3): every removable
+         * part the server wrapped in `.hp[data-slice]` strikes on click and
+         * restores on the next. The same guards the rows use — a click that
+         * left a selection behind is a selection, a double-click word-select
+         * cancels the pending toggle — and the same removal-only model: the
+         * host, port, and path are never wrapped, so they can never strike.
+         */
+        buildHeroParts() {
+            this.hero.querySelectorAll(".hp[data-slice]").forEach((el) => {
+                const part = this.model.byIndex.get(Number(el.getAttribute("data-slice")));
+                if (!part || part.fixed) return;
+                this.heroParts.push({ part, el });
+                el.setAttribute("role", "switch");
+                el.setAttribute("aria-checked", "true");
+                el.setAttribute("tabindex", "0");
+                el.setAttribute("aria-label", keepLabel(part));
+                let pending = null;
+                el.addEventListener("click", (event) => {
+                    if (event.detail > 1) return;
+                    clearTimeout(pending);
+                    pending = setTimeout(() => {
+                        const selection = window.getSelection();
+                        if (selection && !selection.isCollapsed) return;
+                        this.toggleHeroPart(el);
+                    }, TOGGLE_DELAY_MS);
+                });
+                el.addEventListener("dblclick", () => clearTimeout(pending));
+                el.addEventListener("keydown", (event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    this.toggleHeroPart(el);
+                });
+            });
+        }
+
+        toggleHeroPart(el) {
+            el.classList.toggle("off");
+            el.setAttribute("aria-checked", String(!el.classList.contains("off")));
+            this.refresh();
+        }
+
         // ------------------------------------------------------------------
         // Rebuilding
         // ------------------------------------------------------------------
 
-        /** Re-read the boxes and bring the whole card back into agreement. */
+        /** Re-read the controls and bring the whole card back into agreement. */
         refresh() {
             this.applyFloor();
             const kept = new Set();
             this.rows.forEach(({ part, row, box }) => {
                 if (box.checked) kept.add(part.i);
                 row.classList.toggle("off", !box.checked);
+            });
+            this.heroParts.forEach(({ part, el }) => {
+                if (!el.classList.contains("off")) kept.add(part.i);
             });
             const built = build(this.model, kept);
             if (this.action) this.action.setAttribute("href", built.raw);
