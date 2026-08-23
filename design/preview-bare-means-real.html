@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Bare means real</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ===================================================================
+       MOCKUP-ONLY scaffolding
+       =================================================================== */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1160px; margin: 48px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .mock-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+      justify-content: center; padding: 0 16px; }
+    .cap { display: block; text-align: center; margin: 0 0 10px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .note { max-width: 460px; margin: 12px auto 0; font: 400 12.5px/1.55 var(--font);
+      color: var(--text-secondary); text-align: left; }
+    .note b { color: var(--text); font-weight: 600; }
+    .note code { font-family: var(--font-mono); font-size: .95em; }
+    .fixnote { max-width: 1160px; margin: 0 auto 20px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); box-sizing: border-box; }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .fixnote ul { margin: 6px 0 0; padding-left: 20px; }
+    .fixnote li { margin: 3px 0; }
+    .fixnote table { border-collapse: collapse; margin: 8px 0 2px; }
+    .fixnote td, .fixnote th { text-align: left; padding: 3px 18px 3px 0;
+      font: 400 12.5px/1.5 var(--font); vertical-align: top; }
+    .fixnote th { font-weight: 600; color: var(--text); }
+    .win { width: min(100%, 460px); }
+    .app-window.win { margin: 0; padding: 22px 20px 18px; overflow: visible; }
+    .win + .app-window.win { margin-top: 12px; }
+    .pv-url { margin-top: 0; }
+    .voice { display: block; margin: 14px 0 3px; font: 600 10px/1.4 var(--font);
+      letter-spacing: .06em; text-transform: uppercase; color: var(--text-tertiary); }
+
+    /* ===================================================================
+       CANDIDATES — the capsule
+       =================================================================== */
+    /* One value, bounded. The faint pill says "everything inside is one
+       piece of data": the boundary is what lets the inner & and = decode
+       without reading as the outer URL's structure. clone keeps rounded
+       ends on every wrapped line. */
+    .cv { background: color-mix(in srgb, var(--text) 6%, transparent);
+      border-radius: 6px; padding: 1px 4px; margin: 0 1px;
+      -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+    /* Inside the capsule the value's own punctuation is tertiary — quieter
+       than the outer delimiters, which keep the accent. */
+    .cv .idl { color: var(--text-tertiary); }
+    /* A domain inside a value: bold (bold marks a domain, site-wide), but
+       never the accent wash — that is spent once, on the real destination. */
+    .cv .ireg { font-weight: 700; }
+    /* B only: the capsule announces itself. Generated content, so a copy
+       never picks it up. */
+    .cv.mark::before { content: "\21AA"; font-family: var(--font);
+      font-size: .8em; color: var(--text-tertiary); margin-right: 3px; }
+
+    /* ===================================================================
+       CANDIDATES — the sectioned hero (the "more colors" direction)
+       =================================================================== */
+    .sec { padding: 1px 3px; border-radius: 5px;
+      -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+    .sec.s-host  { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    .sec.s-path  { background: color-mix(in srgb, #2f9e63 12%, transparent); }
+    .sec.s-query { background: color-mix(in srgb, #8e6fd8 12%, transparent); }
+    .legend { display: flex; gap: 16px; justify-content: center; margin-top: 10px;
+      font: 500 11px/1.4 var(--font); color: var(--text-secondary); }
+    .legend .sw { display: inline-block; width: 10px; height: 10px;
+      border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+    /* ===================================================================
+       CANDIDATES — the table under the rule
+       =================================================================== */
+    /* Group labels: the table says what each run of rows IS. */
+    .grp { margin-top: 12px; padding-bottom: 2px;
+      font: 600 10px/1.4 var(--font); letter-spacing: .06em;
+      text-transform: uppercase; color: var(--text-tertiary); text-align: left; }
+    .grp:first-child { margin-top: 0; }
+    .grp + .pv-slice { border-top: none; }
+    /* A red escape names itself in place: the mini dotted tile is generated
+       content, so what ⌘C yields is still exactly the escape. */
+    .bad[data-sym]::after { content: attr(data-sym); display: inline-block;
+      margin-left: 4px; padding: 1px 4px; border: 1.2px dotted var(--danger);
+      border-radius: 4px; font: 700 7.5px/1.3 var(--font-mono);
+      letter-spacing: .04em; color: var(--danger); vertical-align: 2px; }
+  </style>
+</head>
+<body>
+
+<div class="wrap" style="padding-top:26px">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 30 · nothing on this page is live</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Bare means real — one reading, one record</h1>
+</div>
+
+<div class="fixnote">
+  <b>Your rule, taken seriously.</b> <em>Anything shown bare is really that character.
+  A <code>%</code> always begins an encoding. Red always means hidden.</em> Follow it to
+  the end and the card needs exactly <b>two</b> voices instead of four: <b>the reading</b>
+  (hero and table, same register everywhere) and <b>the record</b> ("Exactly as Stored",
+  unchanged, the single place the raw bytes live). The "Reads as" line dies. The only
+  things that ever stay percent-encoded are the three that must:
+  <table>
+    <tr><th>shown</th><th>means</th></tr>
+    <tr><td>bare character</td><td>really that character — trust your eyes</td></tr>
+    <tr><td>dim <code>%25</code></td><td>a literal percent sign. It can never decode: a bare
+      <code>%</code> would start a fake encoding and break the rule for everything after it</td></tr>
+    <tr><td>red <code>%E2%80%8B</code> + tile</td><td>a hidden character — invisible or
+      direction-changing, named in the cast</td></tr>
+    <tr><td>dim <code>%EF%BF%BD</code>-style run</td><td>bytes that are not text — nothing honest to draw</td></tr>
+  </table>
+  What used to keep <code>&amp;</code>, <code>=</code>, <code>#</code> encoded was the fear
+  they would redraw the outer URL on screen. The fix is not encoding — it is a
+  <b>boundary</b>: give the value a visible edge (the capsule below) and the punctuation
+  inside it plainly belongs to the value, not the URL.
+</div>
+
+<p class="mock-h">1 · today — four voices for one string</p>
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">Baseline — what /helper renders now</span>
+    <div class="app-window win">
+      <span class="voice">Voice 1 — the hero</span>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">reddit.com</span><span class="pn">/</span><span class="ps">media</span><span class="pn">?</span><span class="qk">url</span><span class="pn">=</span><span class="qv">https<span class="dl">://</span>preview.redd.it<span class="dl">/</span>new-pc-upgrade-3x-55-lg-g5-oled-tvs-v0-qz9y97z5vhch1.jpg?width<span class="pe">%3D</span>1080<span class="pe">%26</span>crop<span class="pe">%3D</span>smart<span class="pe">%26</span>auto<span class="pe">%3D</span>webp<span class="pe">%26</span>s<span class="pe">%3D</span>f768b6aff493732ba8a8b81ff7a1075bca1242cd</span></code>
+      <span class="voice">Voice 2 — the row</span>
+      <div class="pv-slices" style="margin-top:4px">
+        <div class="pv-slice"><span class="txt"><span class="dl">?</span><span class="k">url</span><span class="dl">=</span><span class="val">https<span class="dl">://</span><span class="reg">redd.it</span>…width<span class="pct">%3D</span>1080<span class="pct">%26</span>crop<span class="pct">%3D</span>smart…</span>
+        <span class="carried"><span class="clbl">Reads as</span>https<span class="dl">://</span>preview.<span class="reg">redd.it</span><span class="dl">/</span>new-pc-upgrade…jpg<span class="dl">?</span>width<span class="dl">=</span>1080<span class="dl">&amp;</span>crop<span class="dl">=</span>smart<span class="dl">&amp;</span>auto<span class="dl">=</span>webp…</span>
+        </span></div>
+      </div>
+      <span class="voice">Voice 3 — the record</span>
+      <code class="rawline" style="margin-top:2px"><span class="str"><span class="sch">https://</span>www.reddit.com/media<span class="dl">?</span><span class="k">url</span><span class="dl">=</span>https<span class="pct">%3A%2F%2F</span>preview.redd.it<span class="pct">%2F</span>new-pc-upgrade-3x-55-lg-g5-oled-tvs-v0-qz9y97z5vhch1.jpg<span class="pct">%3F</span>width<span class="pct">%3D</span>1080<span class="pct">%26</span>crop<span class="pct">%3D</span>smart<span class="pct">%26</span>auto<span class="pct">%3D</span>webp<span class="pct">%26</span>s<span class="pct">%3D</span>f768b6aff493732ba8a8b81ff7a1075bca1242cd</span></code>
+    </div>
+    <p class="note"><b>The mess, honestly.</b> The hero half-decodes (<code>://</code> opened,
+      <code>%3D</code> not). The row repeats that. "Reads as" opens the rest. The record
+      closes everything again. Four renderings, three different rules about what decodes —
+      the reader has to learn all three.</p>
+  </div>
+</div>
+
+<p class="mock-h">2 · the capsule — one reading, everywhere</p>
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">A — the bounded value</span>
+    <div class="app-window win">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">reddit.com</span><span class="pn">/</span><span class="ps">media</span><span class="pn">?</span><span class="qk">url</span><span class="pn">=</span><span class="qv cv">https<span class="idl">://</span>preview.<span class="ireg">redd.it</span><span class="idl">/</span>new-pc-upgrade-3x-55-lg-g5-oled-tvs-v0-qz9y97z5vhch1.jpg<span class="idl">?</span>width<span class="idl">=</span>1080<span class="idl">&amp;</span>crop<span class="idl">=</span>smart<span class="idl">&amp;</span>auto<span class="idl">=</span>webp<span class="idl">&amp;</span>s<span class="idl">=</span>f768b6aff493732ba8a8b81ff7a1075bca1242cd</span></code>
+    </div>
+    <div class="app-window win">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">docs</span><span class="pn">?</span><span class="qk">ref</span><span class="pn">=</span><span class="qv">newsletter</span></code>
+    </div>
+    <p class="note"><b>Fully decoded, one register.</b> The whole carried address reads
+      bare. Outer delimiters keep the accent; the capsule's own punctuation goes
+      tertiary — two clearly different inks. <code>redd.it</code> is bold (bold marks a
+      domain) but never washed — the wash stays unique to
+      <b>reddit.com</b>, the domain you are actually dealing with. The everyday card
+      below is under the same rule and hasn't changed at all: a plain value needs no
+      boundary, so it gets none.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">B — A, and the capsule announces itself</span>
+    <div class="app-window win">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">reddit.com</span><span class="pn">/</span><span class="ps">media</span><span class="pn">?</span><span class="qk">url</span><span class="pn">=</span><span class="qv cv mark">https<span class="idl">://</span>preview.<span class="ireg">redd.it</span><span class="idl">/</span>new-pc-upgrade-3x-55-lg-g5-oled-tvs-v0-qz9y97z5vhch1.jpg<span class="idl">?</span>width<span class="idl">=</span>1080<span class="idl">&amp;</span>crop<span class="idl">=</span>smart<span class="idl">&amp;</span>auto<span class="idl">=</span>webp<span class="idl">&amp;</span>s<span class="idl">=</span>f768b6aff493732ba8a8b81ff7a1075bca1242cd</span></code>
+    </div>
+    <p class="note"><b>The ↪ says "an address rides inside this link."</b> Generated
+      content, so a copy never picks it up. It pairs with the "Carries Another Address"
+      chip: the chip warns, the mark points. Cost: one more glyph on the line that is
+      not a character of the URL — the only such glyph anywhere on the card. If that
+      feels like a lie waiting to be misread, A is the same design without it.</p>
+  </div>
+</div>
+
+<p class="mock-h">3 · the sectioned hero — the "more colors" direction</p>
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">C — every region a tint</span>
+    <div class="app-window win">
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sec s-host"><span class="sub">www.</span><span class="reg">reddit.com</span></span><span class="pn">/</span><span class="sec s-path"><span class="ps">media</span></span><span class="pn">?</span><span class="sec s-query"><span class="qk">url</span><span class="pn">=</span><span class="qv">https<span class="idl">://</span>preview.<span class="ireg">redd.it</span><span class="idl">/</span>new-pc-upgrade-3x-55-lg-g5-oled-tvs-v0-qz9y97z5vhch1.jpg<span class="idl">?</span>width<span class="idl">=</span>1080<span class="idl">&amp;</span>crop<span class="idl">=</span>smart<span class="idl">&amp;</span>auto<span class="idl">=</span>webp<span class="idl">&amp;</span>s<span class="idl">=</span>f768b6aff493732ba8a8b81ff7a1075bca1242cd</span></span></code>
+      <div class="legend">
+        <span><span class="sw" style="background: color-mix(in srgb, var(--accent) 30%, transparent)"></span>site</span>
+        <span><span class="sw" style="background: color-mix(in srgb, #2f9e63 30%, transparent)"></span>path</span>
+        <span><span class="sw" style="background: color-mix(in srgb, #8e6fd8 30%, transparent)"></span>query</span>
+      </div>
+    </div>
+    <p class="note"><b>What "what is what" costs.</b> Three hues plus a legend to learn,
+      on every card, forever — and the tints crowd out the one background that carries
+      meaning today (the red of the lookalike warning) and the capsule, which now has no
+      quiet ink left to draw itself with. My honest read: anatomy labels belong in the
+      table, where each row already IS one part and a word can name it for free —
+      section 4. But it is here to be seen, not argued away.</p>
+  </div>
+</div>
+
+<p class="mock-h">4 · the table under the rule</p>
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">D — grouped, bare, and the tiles come to the characters</span>
+    <div class="app-window win">
+      <div class="pv-slices" style="margin-top:0">
+        <div class="grp">Path</div>
+        <div class="pv-slice"><span class="txt"><span class="val"><span class="dl">/</span>media</span></span></div>
+        <div class="grp">Query</div>
+        <div class="pv-slice"><span class="txt"><span class="dl">?</span><span class="k">url</span><span class="dl">=</span><span class="val cv">https<span class="idl">://</span>preview.<span class="ireg">redd.it</span><span class="idl">/</span>new-pc-upgrade-3x-55-lg-g5-oled-tvs-v0-qz9y97z5vhch1.jpg<span class="idl">?</span>width<span class="idl">=</span>1080<span class="idl">&amp;</span>crop<span class="idl">=</span>smart<span class="idl">&amp;</span>auto<span class="idl">=</span>webp<span class="idl">&amp;</span>s<span class="idl">=</span>f768b6aff493732ba8a8b81ff7a1075bca1242cd</span></span></div>
+        <div class="pv-slice"><span class="txt"><span class="dl">&amp;</span><span class="k">note</span><span class="dl">=</span><span class="val">check<span class="dsp"> </span>this<span class="bad" data-sym="ZWSP">%E2%80%8B</span>out</span></span></div>
+      </div>
+      <code class="rawline"><span class="lbl">Exactly as Stored</span><span class="str"><span class="sch">https://</span>www.reddit.com/media<span class="dl">?</span><span class="k">url</span><span class="dl">=</span>https<span class="pct">%3A%2F%2F</span>preview.redd.it<span class="pct">%2F</span>new-pc-upgrade-3x-55-lg-g5-oled-tvs-v0-qz9y97z5vhch1.jpg<span class="pct">%3F</span>width<span class="pct">%3D</span>1080<span class="pct">%26</span>crop<span class="pct">%3D</span>smart<span class="pct">%26</span>auto<span class="pct">%3D</span>webp<span class="pct">%26</span>s<span class="pct">%3D</span>f768b6aff493732ba8a8b81ff7a1075bca1242cd<span class="dl">&amp;</span><span class="k">note</span><span class="dl">=</span>check<span class="pct">%20</span>this<span class="pct">%E2%80%8B</span>out</span></code>
+    </div>
+    <p class="note"><b>Three of your ideas land here at once.</b> The group label says
+      what a row is (sectioning, without hues). The value wears the same capsule and the
+      same bare reading as the hero — no "Reads as", nothing to cross-reference. And the
+      red escape names itself in place: the mini dotted <b>ZWSP</b> tile is generated
+      content, so selecting the row still copies exactly <code>%E2%80%8B</code> — the
+      full cast entry stays one click away for the prose. The record below is untouched:
+      still the only place the stored bytes live, now the only <em>second</em> voice on
+      the whole card.</p>
+  </div>
+</div>
+
+<p class="mock-h">5 · the awkward squad — where the rule is tested</p>
+<div class="mock-row">
+  <div class="win">
+    <span class="cap">The double escape — /dugout, uncorrected vs the rule</span>
+    <div class="app-window win">
+      <span class="voice">Today's "Reads as" — confusing as hell, agreed</span>
+      <code class="pv-url" style="font-size:14px"><span class="qv">…<span class="dl">/</span>a%20b.jpg</span></code>
+      <span class="voice">Under the rule</span>
+      <code class="pv-url" style="font-size:14px"><span class="qv cv">https<span class="idl">://</span><span class="ireg">img.example</span><span class="idl">/</span>a<span class="pe">%25</span>20b.jpg</span></code>
+    </div>
+    <p class="note"><b><code>%25</code> never opens, and the confusion dies with it.</b>
+      Today's line opened <code>%2520</code> one level and printed <code>%20</code> —
+      an escape-shaped thing that is actually literal text, exactly what your rule
+      forbids. Under bare-means-real the percent stays dim <code>%25</code> and the
+      <code>20</code> after it is bare, real text. One glance still needs the cast to
+      say "that is a literal percent sign" — but it never <em>lies</em>.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">The hidden character — /policy, already right</span>
+    <div class="app-window win">
+      <code class="pv-url" style="font-size:14px"><span class="qv cv">https<span class="idl">://</span><span class="ireg">img.example</span><span class="idl">/</span>photo<span class="bad" data-sym="ZWSP">%E2%80%8B</span>.jpg</span></code>
+    </div>
+    <p class="note"><b>Red is the one register the rule never touches.</b> You liked
+      /policy because it already obeys: the invisible stays encoded, stays red, and now
+      also names itself in place. Bare means real <em>because</em> hidden things are
+      never allowed to be bare.</p>
+  </div>
+
+  <div class="win">
+    <span class="cap">A plain value with structure inside — a%26b</span>
+    <div class="app-window win">
+      <code class="pv-url" style="font-size:14px"><span class="pn">?</span><span class="qk">q</span><span class="pn">=</span><span class="qv cv">a<span class="idl">&amp;</span>b</span><span class="pn">&amp;</span><span class="qk">page</span><span class="pn">=</span><span class="qv">2</span></code>
+    </div>
+    <p class="note"><b>The capsule is earned, not decorative.</b> Rule: a value gets the
+      capsule exactly when its bare reading contains something that could be mistaken
+      for the URL's own structure — an inner <code>&amp;</code>, <code>=</code>,
+      <code>?</code>, or a whole address. <code>a&amp;b</code> qualifies; <code>2</code>
+      does not. Everyday links stay exactly as quiet as they are today. Note the two
+      ampersands: one tertiary inside the pill, one accent outside — same glyph, two
+      inks, no ambiguity.</p>
+  </div>
+</div>
+
+<div class="fixnote" style="margin-top:44px">
+  <b>What dies, what stays, what's open.</b>
+  <ul>
+    <li><b>Dies:</b> the "Reads as" line; the one-level-open rule and its fake
+      <code>%20</code>; the cast entries for <code>&amp;</code>/<code>=</code>/<code>#</code>
+      ("kept escaped so it cannot read as…") — inside a capsule they are simply real.</li>
+    <li><b>Stays:</b> "Exactly as Stored", byte-for-byte, the single record; red hidden
+      characters and their cast; the dotted <code>%20</code>-space receipt (bare means
+      real — the dots add <em>provenance</em>, they never contradict it); the warn chips;
+      the bold-vs-wash split between a domain and <em>the</em> domain.</li>
+    <li><b>Open — the copy question:</b> selecting the hero already yields a reading, not
+      the stored bytes (that is why the record exists). Under the rule the gap widens:
+      a copied capsule pastes <code>&amp;</code> where storage has <code>%26</code> — a
+      link that <em>reaches a different place</em> if re-shared. Same answer as today,
+      said louder: the Copy button copies storage, and the record is always on the card
+      whenever any capsule is. Worth sitting with before committing.</li>
+    <li><b>Open — nesting:</b> an address inside an address (rare, real) would want a
+      capsule inside a capsule. Two tints of the same grey stack legibly, but three
+      would not; probably the inner one keeps its escapes, and the rule states one
+      level of boundary, honestly.</li>
+  </ul>
+</div>
+
+</body>
+</html>
