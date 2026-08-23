@@ -2055,6 +2055,25 @@ html.js .custom-field:not(.open) {
     font-weight: 700;
 }
 
+/* A query value that is itself a web address, opened one level under its
+   row. The row keeps %3D and %26 closed so they cannot redraw the outer
+   URL's structure on screen; this line is labeled a reading, where the
+   inner = and & are the carried address's own grammar and open into it. */
+.pv-slice .carried {
+    display: block;
+    margin-top: 2px;
+    font-size: 11.5px;
+    overflow-wrap: anywhere;
+}
+
+.pv-slice .carried .clbl {
+    font-family: var(--font);
+    font-size: 10.5px;
+    font-style: italic;
+    color: var(--text-tertiary);
+    margin-right: 5px;
+}
+
 /* Userinfo goes danger red in its slice and on the URL line, co-firing with
    its chip. Not amber: amber is the button language for "you leave". */
 .pv-slice.usr .txt {
@@ -2153,6 +2172,13 @@ html.js .pv-cast .entry {
     grid-row: 2;
     grid-column: 1;
     visibility: hidden;
+}
+
+/* Until a character has been asked, the deck holds no room at all: the
+   stacked answers rejoin the layout the moment one shows, so the one-time
+   growth happens on the first ask and swapping still shifts nothing. */
+html.js .pv-cast:not(:has(.entry.shown, .entry.solo)) .entry {
+    display: none;
 }
 
 /* A sole entry needs no asking: it shows from the start -- and without the

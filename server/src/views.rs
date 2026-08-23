@@ -1309,11 +1309,32 @@ fn slice_rows(uri: &UriView, rows: &[&urlview::Slice]) -> Markup {
                             @if slice.role == Role::Path { (path_slices_markup(&slice.display)) }
                             @else { (pieces(&slice.display, PieceStyle::Slice)) }
                         }
+                        // A value that is itself a web address, shown with
+                        // escapes kept closed, earns a second line reading
+                        // it opened (the user's ask, 2026-08-21).
+                        @if carried_line_worth_it(slice) {
+                            span.carried {
+                                span.clbl { "Reads as" }
+                                (pieces(&urlview::carried_reading(&slice.value), PieceStyle::Slice))
+                            }
+                        }
                     }
                 }
             }
         }
     }
+}
+
+/// True when this query value is a complete web address whose reading kept
+/// escapes closed — the one case where an opened second line adds something.
+/// A nested address with nothing closed already reads in full on its row.
+fn carried_line_worth_it(slice: &urlview::Slice) -> bool {
+    slice.role == Role::Query
+        && slice
+            .display
+            .iter()
+            .any(|p| matches!(p, Piece::Escape(_)))
+        && urlview::carries_an_address(&slice.display)
 }
 
 /// The extra class a slice's value carries, if any.
@@ -3092,6 +3113,24 @@ mod tests {
     fn a_card_with_no_marked_characters_has_no_cast() {
         let c = card("https://example.com/plain?q=1");
         assert!(!c.contains("pv-cast"), "{c}");
+    }
+
+    /// A carried address whose reading kept escapes closed earns an opened
+    /// second line under its row: the inner `=` and `&` are that address's
+    /// own grammar, and the domain it points at gets the bold.
+    #[test]
+    fn a_carried_address_with_closed_escapes_reads_out_in_full() {
+        let c = card(
+            "https://example.com/media?url=https%3A%2F%2Fimg.example%2Fa.jpg%3Fw%3D1080%26s%3Dabc",
+        );
+        assert!(c.contains("Carries Another Address"), "{c}");
+        assert!(c.contains(r#"<span class="clbl">Reads as</span>"#), "{c}");
+        assert!(c.contains(r#"<span class="reg">img.example</span>"#), "{c}");
+        assert!(c.contains(r#"1080<span class="dl">&amp;</span>s"#), "{c}");
+        // A nested address with nothing closed already reads in full on its
+        // row, so no second line.
+        let plain = card("https://example.com/r?next=https%3A%2F%2Fother.example%2F");
+        assert!(!plain.contains("clbl"), "{plain}");
     }
 
     /// The cast leads the fold: names first, then the parts, then the record

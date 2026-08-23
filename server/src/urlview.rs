@@ -918,7 +918,10 @@ fn uri_value_pieces(text: &str) -> Option<Vec<Piece>> {
     if !scheme_ok {
         return None;
     }
-    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    // `&` and `=` cannot appear in a host, so they end the authority too —
+    // otherwise a decoded `https://good.example&x=1` would bold the junk
+    // right into the domain.
+    let end = rest.find(['/', '?', '#', '&', '=']).unwrap_or(rest.len());
     let (authority, tail) = rest.split_at(end);
     let (host, port) = match authority.rsplit_once(':') {
         Some((h, p)) if !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()) => (h, Some(p)),
@@ -936,15 +939,65 @@ fn uri_value_pieces(text: &str) -> Option<Vec<Piece>> {
         out.push(Piece::Delim(":".to_string()));
         out.push(Piece::Text(p.to_string()));
     }
-    for (n, segment) in tail.split('/').enumerate() {
-        if n > 0 {
-            out.push(Piece::Delim("/".to_string()));
-        }
-        if !segment.is_empty() {
-            out.push(Piece::Text(segment.to_string()));
+    // The tail in the address's own grammar: every structural character a
+    // delimiter, the runs between them tokens.
+    let mut token = String::new();
+    for c in tail.chars() {
+        if matches!(c, '/' | '?' | '&' | '=' | '#') {
+            if !token.is_empty() {
+                out.push(Piece::Text(std::mem::take(&mut token)));
+            }
+            out.push(Piece::Delim(c.to_string()));
+        } else {
+            token.push(c);
         }
     }
+    if !token.is_empty() {
+        out.push(Piece::Text(token));
+    }
     Some(out)
+}
+
+/// A carried address, opened one level for reading.
+///
+/// The slice keeps `%3D`/`%26` closed so they cannot redraw the *outer*
+/// URL's structure on screen. This line is labeled a reading of the address
+/// the value carries, so the inner `&`, `=`, `#` are that address's own
+/// grammar and open into it. One level only — a stored `%2520` opens to the
+/// `%20` it spells, never further — and anything invisible or undecodable
+/// stays closed and marked, as everywhere.
+pub(crate) fn carried_reading(value: &str) -> Vec<Piece> {
+    let mut opened: Vec<Piece> = Vec::new();
+    for piece in decode_for_reading(value) {
+        match piece {
+            Piece::Escape(run) => {
+                for (c, raw) in escape_run_pairs(&run) {
+                    let p = if c == char::REPLACEMENT_CHARACTER || is_invisible(c) {
+                        Piece::Escape(raw)
+                    } else {
+                        Piece::Text(c.to_string())
+                    };
+                    match (opened.last_mut(), &p) {
+                        (Some(Piece::Text(prev)), Piece::Text(s)) => prev.push_str(s),
+                        _ => opened.push(p),
+                    }
+                }
+            }
+            p => match (opened.last_mut(), &p) {
+                (Some(Piece::Text(prev)), Piece::Text(s)) => prev.push_str(s),
+                _ => opened.push(p),
+            },
+        }
+    }
+    // When everything opened, re-read the whole line as the address it is:
+    // domain bold, its own delimiters dim.
+    if opened.iter().all(|p| matches!(p, Piece::Text(_))) {
+        let text: String = opened.iter().map(Piece::text).collect();
+        if let Some(structured) = uri_value_pieces(&text) {
+            return structured;
+        }
+    }
+    opened
 }
 
 /// Give a decoded value its structure back, where it turns out to have some.
@@ -1213,7 +1266,7 @@ fn detect_hazards(view: &UriView) -> Vec<Hazard> {
 /// True when a parameter's value is itself a complete web address — the shape
 /// an open redirect wears, and one worth saying out loud whether or not it is
 /// being used as one.
-fn carries_an_address(display: &[Piece]) -> bool {
+pub(crate) fn carries_an_address(display: &[Piece]) -> bool {
     let text: String = display.iter().map(Piece::text).collect();
     let lower = text.trim().to_ascii_lowercase();
     (lower.starts_with("http://") || lower.starts_with("https://"))
