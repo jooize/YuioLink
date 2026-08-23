@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>YuioLink — Bare means real, the decision board</title>
+  <link rel="stylesheet" href="../server/static/app.css">
+  <style>
+    /* ================= scaffolding ================= */
+    body { padding: 24px 0 90px; background:
+      repeating-linear-gradient(135deg, var(--bg-1), var(--bg-1) 1px, var(--bg-2) 1px, var(--bg-2) 22px); }
+    .wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px; }
+    .mock-h { max-width: 1240px; margin: 40px auto 10px; padding: 0 20px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .05em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .fixnote { max-width: 1240px; margin: 0 auto 16px; padding: 14px 20px;
+      border-radius: var(--radius-control); background: var(--card-bg);
+      border: .5px solid var(--card-border); font: 400 13px/1.65 var(--font);
+      color: var(--text-secondary); box-sizing: border-box; }
+    .fixnote b { color: var(--text); }
+    .fixnote code { font-family: var(--font-mono); font-size: .92em; }
+    .fixnote table { border-collapse: collapse; margin: 8px 0 2px; }
+    .fixnote td, .fixnote th { text-align: left; padding: 2px 16px 2px 0;
+      font: 400 12.5px/1.5 var(--font); vertical-align: top; }
+    .fixnote th { font-weight: 600; color: var(--text); }
+
+    .board { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+      max-width: 1240px; margin: 0 auto; padding: 0 20px; }
+    .panel { width: 340px; flex: none; border-radius: var(--radius-control);
+      background: var(--card-bg); border: .5px solid var(--card-border);
+      padding: 16px 18px 18px; box-sizing: border-box;
+      position: sticky; top: 16px; }
+    @media (max-width: 780px) { .panel { position: static; width: 100%; } }
+    .stage { flex: 1; min-width: 320px; }
+    .panel h2 { font: 600 13px/1.3 var(--font); margin: 0 0 4px; color: var(--text); }
+    .panel fieldset { border: none; margin: 0; padding: 10px 0 2px;
+      border-top: .5px solid var(--card-border); }
+    .panel fieldset:first-of-type { border-top: none; padding-top: 4px; }
+    .panel legend { font: 600 10.5px/1.4 var(--font); letter-spacing: .05em;
+      text-transform: uppercase; color: var(--text-tertiary); padding: 0 0 3px; }
+    .panel label { display: flex; gap: 7px; align-items: baseline;
+      font: 400 12.5px/1.5 var(--font); color: var(--text); cursor: pointer;
+      padding: 1px 0; }
+    .panel label input { flex: none; accent-color: var(--accent); margin: 0;
+      position: relative; top: 1px; }
+    .panel label.off { opacity: .4; cursor: default; }
+    .panel .why { font: 400 11px/1.45 var(--font); color: var(--text-tertiary);
+      margin: 2px 0 4px 21px; }
+    .panel .rec { font: 600 9px/1.3 var(--font); letter-spacing: .05em;
+      color: var(--accent); text-transform: uppercase; margin-left: 4px; }
+    #summary { width: 100%; box-sizing: border-box; margin-top: 12px;
+      font: 400 11px/1.5 var(--font-mono); color: var(--text);
+      background: var(--field-bg); border: .5px solid var(--field-border);
+      border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; }
+    #copybtn { margin-top: 8px; width: 100%; }
+    .btnish { font: 600 12px/1.6 var(--font); padding: 6px 12px;
+      border-radius: 999px; cursor: pointer; color: var(--text);
+      background: transparent; border: .5px solid var(--card-border); }
+    .btnish:hover { border-color: var(--text-tertiary); }
+
+    .cap { display: block; text-align: center; margin: 18px 0 10px;
+      font: 600 12px/1.4 var(--font); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-tertiary); }
+    .app-window.win { margin: 0; padding: 22px 20px 18px; overflow: visible; }
+    .note { max-width: 620px; margin: 10px auto 0; font: 400 12.5px/1.55 var(--font);
+      color: var(--text-secondary); text-align: left; }
+    .note b { color: var(--text); font-weight: 600; }
+    .note code { font-family: var(--font-mono); font-size: .95em; }
+    .pv-url { margin-top: 0; }
+
+    /* ================= the hero, role-classed ================= */
+    /* Hues (round 2's, dark-tuned below). */
+    .stage { --h-path: #2f9e63; --h-key: #8e6fd8; --h-frag: #0e8f8f; --h-port: #b3543a; }
+    @media (prefers-color-scheme: dark) {
+      .stage { --h-path: #4fbf85; --h-key: #b39ae8; --h-frag: #3fb8b8; --h-port: #d97a5f; }
+    }
+    .r-sch { color: var(--text-tertiary); }
+    .r-usr { color: var(--danger); font-weight: 700; }
+    .r-reg { font-weight: 700; background: color-mix(in srgb, var(--accent) 13%, transparent);
+      border-radius: 4px; padding: 0 2px; }
+    .r-port { color: var(--h-port); }
+    .cv { background: color-mix(in srgb, var(--text) 6%, transparent);
+      border-radius: 6px; padding: 1px 4px; margin: 0 1px;
+      -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+    .cv .idl { color: var(--text-tertiary); }
+    .cv .ireg { font-weight: 700; }
+
+    /* frugal palette (today's) */
+    .p-frugal .r-dl { color: var(--accent); }
+    .p-frugal .r-sub { color: var(--text); }
+    .p-frugal .r-path { color: var(--text); }
+    .p-frugal .r-key { color: var(--text); font-weight: 700; }
+    .p-frugal .r-frag { color: var(--text); }
+    .p-frugal .r-pp-key { font-weight: 700; }
+
+    /* C1: a hue per role, in the ink */
+    .p-c1 .r-dl { color: var(--text-tertiary); }
+    .p-c1 .r-reg { color: var(--accent); }
+    .p-c1 .r-path { color: var(--h-path); }
+    .p-c1 .r-key { color: var(--h-key); font-weight: 700; }
+    .p-c1 .r-frag { color: var(--h-frag); }
+    /* subdomain differentiation, the two candidates */
+    .p-c1.sub-hue .r-sub { color: color-mix(in srgb, var(--accent) 55%, var(--text-tertiary)); }
+    .p-c1.sub-grey .r-sub { color: var(--text-secondary); }
+    /* the ;sid path parameter, the two candidates */
+    .p-c1.pp-key .r-pp-key { color: var(--h-key); font-weight: 700; }
+    .p-c1.pp-key .r-pp-val { color: var(--text); }
+    .p-c1.pp-path .r-pp-key { color: var(--h-path); font-weight: 700; }
+    .p-c1.pp-path .r-pp-val { color: var(--h-path); }
+
+    /* hero editing: parts strike when off; clickable only in hero mode */
+    .edit-hero [data-part] { cursor: pointer; border-radius: 4px; }
+    .edit-hero [data-part]:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+    [data-part].off, [data-part].off * { color: var(--text-tertiary) !important; }
+    [data-part].off { opacity: .55; text-decoration: line-through;
+      text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent); }
+    [data-part].off .r-reg, [data-part].off.cv, [data-part].off .cv { background: transparent; }
+    .edit-table [data-part] { cursor: text; }
+
+    /* fold + table + record blocks toggle by state */
+    .lid { text-align: center; margin-top: 12px; font: 600 12.5px/1.4 var(--font);
+      color: var(--accent); }
+    .reclink { display: block; text-align: center; margin-top: 10px;
+      font: 500 11px/1.4 var(--font); color: var(--text-tertiary);
+      background: none; border: none; cursor: pointer; width: 100%; }
+    .reclink:hover { color: var(--text-secondary); }
+    .hidden { display: none !important; }
+    .driftline { display: block; margin-top: 4px; font: 400 10.5px/1.5 var(--font);
+      font-style: italic; color: var(--text-tertiary); text-align: left; }
+  </style>
+</head>
+<body>
+
+<div class="wrap" style="padding-top:26px">
+  <p class="mock-h" style="margin-top:8px">YuioLink · design note 30, round 3 · interactive — your picks build a summary to paste back</p>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Bare means real — the decision board</h1>
+</div>
+
+<div class="fixnote">
+  <b>Settled, no longer on the board.</b>
+  <table>
+    <tr><td><b>Percent check on the reading</b></td><td>Yes, it is the correct way — the reader
+      judges ambiguity where the reader looks. A storage-level check would pass
+      <code>%25%32%30</code> and let two innocent decodes conspire to spell <code>%20</code>
+      on screen. Any rule that inspects what ends up next to what must run on what ends up.</td></tr>
+    <tr><td><b>Copy drift: accepted</b></td><td>Your call, and I agree with your reasoning —
+      the Continue button is the intended path and it is right there. No interception, no
+      unselectable hero (that punishes reading to prevent a misuse we cannot even see).
+      Whether one quiet italic line names it stays on the board below, tied to the record.</td></tr>
+    <tr><td><b>C1, with subdomains told apart</b></td><td>In. Two candidate subdomain inks
+      are on the board.</td></tr>
+  </table>
+  <b>Does host·path·key·value·fragment cover everything?</b> Almost — here is the full
+  inventory for web cards. <code>;sid=9f2c</code> is an RFC 3986 <em>path parameter</em>
+  (a key=value riding a path segment): whether it dresses as key-stuff or path-stuff is
+  a toggle below. Not on the board because they already have non-negotiable ink:
+  <b>userinfo</b> (danger red — it is a warning, not anatomy), <b>port</b> (its own
+  colour, ships today), <b>scheme</b> (tertiary), the <b>capsule</b> interior (tertiary
+  delims, bold-never-washed domain). Non-web cards (mailto, tel, magnet…) keep their
+  own headline language — C1 is for the URL grammar, which they do not have.
+</div>
+
+<div class="board">
+  <div class="panel">
+    <h2>The board</h2>
+
+    <fieldset id="f-palette">
+      <legend>Palette</legend>
+      <label><input type="radio" name="palette" value="c1" checked> C1 — hue per role<span class="rec">picked</span></label>
+      <label><input type="radio" name="palette" value="frugal"> Frugal (today) — for comparison</label>
+    </fieldset>
+
+    <fieldset id="f-sub">
+      <legend>Subdomain, in C1</legend>
+      <label><input type="radio" name="sub" value="hue" checked> Same hue, quieter<span class="rec">rec</span></label>
+      <div class="why">www. belongs to the host, so it keeps the host's blue — at half strength. reddit.com still lands hardest.</div>
+      <label><input type="radio" name="sub" value="grey"> Plain grey</label>
+      <div class="why">Differentiation by absence: only the registrable domain gets any blue at all.</div>
+    </fieldset>
+
+    <fieldset id="f-pp">
+      <legend>;sid=9f2c dresses as</legend>
+      <label><input type="radio" name="pp" value="key" checked> Key-stuff (violet)<span class="rec">rec</span></label>
+      <div class="why">It IS a key=value; violet says "rider", which is what it is and why it's removable.</div>
+      <label><input type="radio" name="pp" value="path"> Path-stuff (green)</label>
+      <div class="why">It rides the path, so it wears the path's coat. Costs: green then means two different trust levels.</div>
+    </fieldset>
+
+    <fieldset id="f-edit">
+      <legend>Removing parameters</legend>
+      <label><input type="radio" name="edit" value="hero" checked> Click them in the hero<span class="rec">try it →</span></label>
+      <div class="why">Your idea. Strike-through where the thing is. Costs: small touch targets, and the hero gains a click behaviour it never had.</div>
+      <label><input type="radio" name="edit" value="table"> Checkbox table in the fold (today)</label>
+      <div class="why">Native checkboxes: keyboard, screen reader, fat fingers all free. Costs: the whole table repeats the hero.</div>
+    </fieldset>
+
+    <fieldset id="f-fold">
+      <legend>Show URL Details</legend>
+      <label><input type="radio" name="fold" value="drop" checked> Drop it<span class="rec">only with hero editing</span></label>
+      <div class="why">With hero editing + capsule there is little left to fold. The cast then answers as a line that appears under the hero when a character is clicked.</div>
+      <label><input type="radio" name="fold" value="keep"> Keep it</label>
+      <div class="why">Still the home of the table (if kept), the cast, and the record.</div>
+    </fieldset>
+
+    <fieldset id="f-record">
+      <legend>"Exactly as Stored"</legend>
+      <label><input type="radio" name="record" value="link" checked> Behind a small "Stored form" link<span class="rec">rec if fold drops</span></label>
+      <label><input type="radio" name="record" value="fold"> Last line of the fold</label>
+      <label><input type="radio" name="record" value="gone"> Gone entirely</label>
+      <div class="why">My floor: some path to the bytes must exist — "gone" means trust rests wholly on our styling. But it is your board.</div>
+    </fieldset>
+
+    <fieldset id="f-drift">
+      <legend>Name the copy drift?</legend>
+      <label><input type="radio" name="drift" value="none" checked> No — accepted silently<span class="rec">your lean</span></label>
+      <label><input type="radio" name="drift" value="line"> One italic line beside the record</label>
+    </fieldset>
+
+    <div id="summary" aria-live="polite"></div>
+    <button id="copybtn" class="btnish">Copy the summary</button>
+  </div>
+
+  <div class="stage p-c1 sub-hue pp-key edit-hero" id="stage">
+    <span class="cap">The kitchen sink — every role at once (userinfo + port included deliberately)</span>
+    <div class="app-window win">
+      <code class="pv-url" id="hero"><span class="r-sch">https</span><span class="r-dl">://</span><span data-part="userinfo"><span class="r-usr">alice@</span></span><span class="r-sub">www.</span><span class="r-reg">reddit.com</span><span class="r-dl">:</span><span class="r-port">8443</span><span class="r-dl">/</span><span class="r-path">media</span><span data-part="sid"><span class="r-dl">;</span><span class="r-pp-key">sid</span><span class="r-dl">=</span><span class="r-pp-val">9f2c</span></span><span data-part="url"><span class="r-dl">?</span><span class="r-key">url</span><span class="r-dl">=</span><span class="cv">https<span class="idl">://</span>preview.<span class="ireg">redd.it</span><span class="idl">/</span>new-pc-upgrade-3x-55-lg-g5-oled-tvs-v0-qz9y97z5vhch1.jpg<span class="idl">?</span>width<span class="idl">=</span>1080<span class="idl">&amp;</span>crop<span class="idl">=</span>smart<span class="idl">&amp;</span>auto<span class="idl">=</span>webp<span class="idl">&amp;</span>s<span class="idl">=</span>f768b6aff493732ba8a8b81ff7a1075bca1242cd</span></span><span data-part="q"><span class="r-dl">&amp;</span><span class="r-key">q</span><span class="r-dl">=</span><span class="cv">a<span class="idl">&amp;</span>b</span></span><span data-part="frag"><span class="r-dl">#</span><span class="r-frag">comments</span></span></code>
+
+      <div class="pv-facts" style="margin-top:12px"><span class="pv-fact warn"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"></circle><path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path><circle cx="8" cy="11.2" r=".95" fill="currentColor"></circle></svg>Username in the Address</span><span class="pv-fact warn"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"></circle><path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path><circle cx="8" cy="11.2" r=".95" fill="currentColor"></circle></svg>Carries Another Address</span></div>
+
+      <div id="foldblock">
+        <div class="lid">Hide URL Details</div>
+        <div class="pv-slices" id="tableblock" style="margin-top:8px">
+          <div class="pv-slice"><span class="txt"><span class="r-usr">alice@</span></span></div>
+          <div class="pv-slice"><span class="txt"><span class="r-dl">;</span><span class="r-pp-key">sid</span><span class="r-dl">=</span><span class="r-pp-val">9f2c</span></span></div>
+          <div class="pv-slice"><span class="txt"><span class="r-dl">?</span><span class="r-key">url</span><span class="r-dl">=</span><span class="cv" style="font-size:.95em">https<span class="idl">://</span>preview.<span class="ireg">redd.it</span><span class="idl">/</span>new-pc-…jpg<span class="idl">?</span>width<span class="idl">=</span>1080<span class="idl">&amp;</span>crop<span class="idl">=</span>smart…</span></span></div>
+          <div class="pv-slice"><span class="txt"><span class="r-dl">&amp;</span><span class="r-key">q</span><span class="r-dl">=</span><span class="cv">a<span class="idl">&amp;</span>b</span></span></div>
+          <div class="pv-slice"><span class="txt"><span class="r-dl">#</span><span class="r-frag">comments</span></span></div>
+        </div>
+        <code class="rawline" id="rec-fold"><span class="lbl"><span>Exactly as Stored</span><span class="copybtn">Copy</span></span><span class="str" style="color:var(--text-tertiary); font-size:10.5px">https://alice@www.reddit.com:8443/media;sid=9f2c?url=https%3A%2F%2Fpreview.redd.it%2F…jpg%3Fwidth%3D1080%26crop%3Dsmart%26auto%3Dwebp%26s%3Df768…&amp;q=a%26b#comments</span><span class="driftline" id="drift-fold">Selecting copies the readable form; Copy copies the link exactly.</span></code>
+      </div>
+
+      <button class="reclink" id="rec-link" type="button">Stored form ▿</button>
+      <code class="rawline hidden" id="rec-link-body"><span class="lbl"><span>Exactly as Stored</span><span class="copybtn">Copy</span></span><span class="str" style="color:var(--text-tertiary); font-size:10.5px">https://alice@www.reddit.com:8443/media;sid=9f2c?url=https%3A%2F%2Fpreview.redd.it%2F…jpg%3Fwidth%3D1080%26crop%3Dsmart%26auto%3Dwebp%26s%3Df768…&amp;q=a%26b#comments</span><span class="driftline" id="drift-link">Selecting copies the readable form; Copy copies the link exactly.</span></code>
+    </div>
+
+    <p class="note" id="herohint"><b>Hero editing is live on this page — click
+      <code>alice@</code>, <code>;sid=9f2c</code>, <code>?url=…</code>, <code>&amp;q=a&amp;b</code>,
+      or <code>#comments</code></b> to strike them, click again to restore. In the real thing
+      the Continue button rebuilds on every strike, the same removal-only model as today —
+      the host, port, and path never strike. Judge with your thumb in mind: on a phone
+      these targets are small, and <code>;sid</code> sits one bad tap from <code>?url</code>.</p>
+
+    <p class="note"><b>What the fold still holds if it lives</b> — the table (only if you
+      keep table editing), the record (if you put it there), and nothing else. The cast no
+      longer needs it: with the deck gone, a clicked character can answer directly under
+      the hero. If you drop the fold AND table editing, every card is closed-card only:
+      hero, chips, button.</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const stage = document.getElementById("stage");
+  const state = { palette: "c1", sub: "hue", pp: "key", edit: "hero",
+                  fold: "drop", record: "link", drift: "none" };
+
+  const radios = document.querySelectorAll('.panel input[type="radio"]');
+  radios.forEach((r) => r.addEventListener("change", () => {
+    state[r.name] = r.value;
+    constrain(r.name);
+    apply();
+  }));
+
+  /* Dependent choices: table editing needs the fold; a dropped fold cannot
+     hold the record; a gone record has nothing to hang the drift line on. */
+  const set = (name, value) => {
+    state[name] = value;
+    document.querySelector(`input[name="${name}"][value="${value}"]`).checked = true;
+  };
+  const allow = (name, value, ok) => {
+    const input = document.querySelector(`input[name="${name}"][value="${value}"]`);
+    input.disabled = !ok;
+    input.closest("label").classList.toggle("off", !ok);
+  };
+  const constrain = (changed) => {
+    if (state.edit === "table" && state.fold === "drop") set("fold", "keep");
+    allow("fold", "drop", state.edit === "hero");
+    if (state.fold === "drop" && state.record === "fold") set("record", "link");
+    allow("record", "fold", state.fold === "keep");
+    if (state.record === "gone" && state.drift === "line") set("drift", "none");
+    allow("drift", "line", state.record !== "gone");
+  };
+
+  const apply = () => {
+    stage.className = "stage p-" + state.palette + " sub-" + state.sub +
+      " pp-" + state.pp + " edit-" + state.edit;
+    document.getElementById("foldblock").classList.toggle("hidden", state.fold !== "keep");
+    document.getElementById("tableblock").classList.toggle("hidden", state.edit !== "table");
+    document.getElementById("rec-fold").classList.toggle("hidden", state.record !== "fold");
+    const linky = state.record === "link";
+    document.getElementById("rec-link").classList.toggle("hidden", !linky);
+    if (!linky) document.getElementById("rec-link-body").classList.add("hidden");
+    document.getElementById("drift-fold").classList.toggle("hidden", state.drift !== "line");
+    document.getElementById("drift-link").classList.toggle("hidden", state.drift !== "line");
+    document.getElementById("herohint").style.display = state.edit === "hero" ? "" : "none";
+    summary();
+  };
+
+  document.getElementById("rec-link").addEventListener("click", () => {
+    const body = document.getElementById("rec-link-body");
+    body.classList.toggle("hidden");
+  });
+
+  /* Hero editing demo: strike a removable part, click again to restore. */
+  document.querySelectorAll("#hero [data-part]").forEach((part) => {
+    part.addEventListener("click", () => {
+      if (state.edit !== "hero") return;
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) return;
+      part.classList.toggle("off");
+      summary();
+    });
+  });
+
+  const summary = () => {
+    const struck = [...document.querySelectorAll("#hero [data-part].off")]
+      .map((p) => p.getAttribute("data-part"));
+    document.getElementById("summary").textContent =
+`bare-means-real round 3 picks:
+  palette:   ${state.palette}
+  subdomain: ${state.sub === "hue" ? "same hue, quieter" : "plain grey"}
+  ;params:   ${state.pp === "key" ? "key-stuff (violet)" : "path-stuff (green)"}
+  editing:   ${state.edit === "hero" ? "click in hero" : "table in fold"}
+  fold:      ${state.fold}
+  record:    ${state.record}
+  driftnote: ${state.drift}
+  (struck in demo: ${struck.length ? struck.join(", ") : "none"})`;
+  };
+
+  document.getElementById("copybtn").addEventListener("click", async (event) => {
+    const text = document.getElementById("summary").textContent;
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      const range = document.createRange();
+      range.selectNodeContents(document.getElementById("summary"));
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    event.target.textContent = "Copied — paste it back to Claude";
+    setTimeout(() => { event.target.textContent = "Copy the summary"; }, 1600);
+  });
+
+  constrain();
+  apply();
+})();
+</script>
+
+</body>
+</html>
