@@ -65,6 +65,7 @@
             if (this.model && this.slices) this.buildRows();
             if (this.model && this.hero) this.buildHeroParts();
             this.buildCast();
+            this.buildNoteChips();
             this.buildSplit();
             this.buildRawCopyButtons();
             if (this.model) {
@@ -120,6 +121,43 @@
                     if (event.key !== "Enter" && event.key !== " ") return;
                     event.preventDefault();
                     tell(event);
+                });
+            });
+        }
+
+        /**
+         * A warn chip with more to say answers on click (the user's call,
+         * 2026-08-24): the note behind it appears in the deck under the
+         * chips — one at a time, click again to put it away, ask another to
+         * swap. Without the script the notes show in full, so nothing here
+         * is the only way to the information.
+         */
+        buildNoteChips() {
+            const chips = document.querySelectorAll(".pv-fact[data-note]");
+            chips.forEach((chip) => {
+                const note = document.querySelector(
+                    '.pv-note[data-note-for="' + chip.getAttribute("data-note") + '"]',
+                );
+                if (!note) return;
+                chip.setAttribute("role", "button");
+                chip.setAttribute("tabindex", "0");
+                chip.setAttribute("aria-expanded", "false");
+                const flip = () => {
+                    const open = note.classList.contains("shown");
+                    document
+                        .querySelectorAll(".pv-notes .pv-note.shown")
+                        .forEach((n) => n.classList.remove("shown"));
+                    chips.forEach((c) => c.setAttribute("aria-expanded", "false"));
+                    if (!open) {
+                        note.classList.add("shown");
+                        chip.setAttribute("aria-expanded", "true");
+                    }
+                };
+                chip.addEventListener("click", flip);
+                chip.addEventListener("keydown", (event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    flip();
                 });
             });
         }

@@ -1029,6 +1029,9 @@ fn card_body(uri: &UriView, href: &str) -> Markup {
         (headline(uri, &numbers))
         @if let Some(w) = uri.idn_warning() { (idn_panel(w)) }
         (chip_row(uri, &numbers))
+        // A chip with more to say answers on click: its note appears here
+        // (the user's call, 2026-08-24). No-JS shows the notes in full.
+        (hazard_notes(uri))
         // On http(s) the cast answers directly under the hero: click a
         // marked character and its entry appears here (the fold that used
         // to house it is gone — design note 30, round 3). The no-JS page
@@ -1765,7 +1768,8 @@ fn place_markup(p: &CastPlace) -> Markup {
             CastPlace::Fragment => { "the fragment" }
             CastPlace::Query => { "the query" }
             CastPlace::Address => { "the address" }
-            CastPlace::Key(k) => { code { (k) } }
+            // The key wears its own ink here too, matching the hero.
+            CastPlace::Key(k) => { code.k { (k) } }
         }
     }
 }
@@ -1826,8 +1830,15 @@ fn warn_chip(hazard: Hazard) -> Markup {
         Hazard::PaddedWithSpaces => "Padded With Spaces",
         Hazard::CarriesAnotherAddress => "Carries Another Address",
     };
+    // The chips with a note behind them carry its name; preview.js makes
+    // them controls, and without the script the note shows in full anyway.
+    let note = match hazard {
+        Hazard::UsernameInTheAddress => Some("user"),
+        Hazard::CarriesAnotherAddress => Some("carries"),
+        _ => None,
+    };
     html! {
-        span.pv-fact.warn {
+        span.pv-fact.warn data-note=[note] {
             @if hazard == Hazard::NotEncrypted { (open_padlock_icon()) } @else { (alert_icon()) }
             (words)
         }
@@ -1864,19 +1875,6 @@ fn open_padlock_icon() -> Markup {
 /// to skip the ones that matter.
 fn notes(uri: &UriView) -> Markup {
     let mut out: Vec<Markup> = Vec::new();
-
-    if uri.has(Hazard::UsernameInTheAddress) {
-        let domain = uri.card_domain();
-        out.push(html! {
-            "Text before the " code { "@" } " is a login name, not part of the address — "
-            "this page is on " code { (domain) } "."
-        });
-    }
-    if uri.has(Hazard::CarriesAnotherAddress) {
-        out.push(html! {
-            "One parameter is itself a complete web address on a different domain."
-        });
-    }
     match uri.scheme.as_str() {
         "magnet" => out.push(html! {
             "Only " code { "xt" } " identifies the data. " code { "dn" } " is a name the "
@@ -1929,6 +1927,39 @@ fn notes(uri: &UriView) -> Markup {
     }
 
     html! { @for note in out { span.pv-note { (note) } } }
+}
+
+/// The two hazard notes fold behind their chips (the user's call,
+/// 2026-08-24): the chip warns, clicking it explains. preview.js wires the
+/// chips; the no-JS page shows the notes in full — the split lives in the
+/// stylesheet, keyed on `html.js`, the same deck the cast uses.
+fn hazard_notes(uri: &UriView) -> Markup {
+    let mut out: Vec<(&str, Markup)> = Vec::new();
+    if uri.has(Hazard::UsernameInTheAddress) {
+        let domain = uri.card_domain();
+        out.push((
+            "user",
+            html! {
+                "Text before the " code { "@" } " is a login name, not part of "
+                "the address. The destination is " code { (domain) } "."
+            },
+        ));
+    }
+    if uri.has(Hazard::CarriesAnotherAddress) {
+        out.push((
+            "carries",
+            html! {
+                "One parameter is itself a complete web address on a different domain."
+            },
+        ));
+    }
+    html! {
+        @if !out.is_empty() {
+            div.pv-notes {
+                @for (id, note) in &out { span.pv-note data-note-for=(id) { (note) } }
+            }
+        }
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -3132,6 +3163,36 @@ mod tests {
     /// second line under its row: the inner `=` and `&` are that address's
     /// own grammar, and the domain it points at gets the bold.
     #[test]
+    /// The hazard notes fold behind their chips: the chip carries the note's
+    /// name, the note waits in the deck, and the no-JS stylesheet shows the
+    /// deck in full. The wording avoids "this page", which read as the
+    /// YuioLink page rather than the destination (the user, 2026-08-24).
+    #[test]
+    fn hazard_notes_fold_behind_their_chips() {
+        let c = card("https://alice@example.com/x?next=https%3A%2F%2Fother.example%2F");
+        assert!(
+            c.contains(r#"<span class="pv-fact warn" data-note="user">"#),
+            "{c}"
+        );
+        assert!(
+            c.contains(r#"<span class="pv-fact warn" data-note="carries">"#),
+            "{c}"
+        );
+        assert!(c.contains(r#"<div class="pv-notes">"#), "{c}");
+        assert!(
+            c.contains(r#"<span class="pv-note" data-note-for="user">"#),
+            "{c}"
+        );
+        assert!(c.contains("The destination is <code>example.com</code>."), "{c}");
+        assert!(!c.contains("this page is on"), "{c}");
+        const APP_CSS: &str = include_str!("../static/app.css");
+        assert!(APP_CSS.contains("html.js .pv-notes:not(:has(.pv-note.shown)) .pv-note {"));
+        // A chip with nothing more to say is not a control.
+        let plain = card("http://example.com/pay");
+        assert!(!plain.contains("data-note"), "{plain}");
+    }
+
+    #[test]
     fn a_carried_address_reads_bare_inside_its_capsule() {
         let c = card(
             "https://example.com/media?url=https%3A%2F%2Fimg.example%2Fa.jpg%3Fw%3D1080%26s%3Dabc",
@@ -3557,8 +3618,14 @@ mod tests {
                 .contains(".pv-url .qk {\n    color: var(--c-key);\n    font-weight: 700;\n}"),
             "keys are the signposts: their own hue (C1), bold"
         );
-        // Every role hue is defined once per theme.
-        for var in ["--c-port:", "--c-path:", "--c-key:", "--c-frag:"] {
+        // Every role hue is defined once per theme. The host never uses
+        // --accent raw: 4.02:1 on white is an AA fail, so it has its own
+        // darker blue, and the subdomain a steel of the same hue.
+        assert!(APP_CSS.contains(".pv-url .reg {\n    color: var(--c-host);"));
+        assert!(APP_CSS.contains(".pv-url .sub {\n    color: var(--c-sub);\n}"));
+        for var in [
+            "--c-port:", "--c-host:", "--c-sub:", "--c-path:", "--c-key:", "--c-frag:",
+        ] {
             assert_eq!(
                 APP_CSS.matches(var).count(),
                 2,

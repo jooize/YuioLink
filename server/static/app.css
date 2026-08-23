@@ -36,7 +36,11 @@
 
     /* C1 (design note 30, round 3): a hue per URL role, in the ink. Shades
        are darker than the round-2 mockup's so 13.5px text clears AA on the
-       glass, the same bar --c-port was tuned against. */
+       glass, the same bar --c-port was tuned against. The host cannot use
+       --accent raw (4.02:1 on white, an AA fail); --c-host is the same blue
+       taken dark enough, and --c-sub the quieter steel of the same hue. */
+    --c-host: #0062cc;
+    --c-sub: #486f92;
     --c-path: #1e7a49;
     --c-key: #6f4fc3;
     --c-frag: #0b6e6e;
@@ -88,7 +92,9 @@
            already ends its gradient on. 6.94:1 on the lightest glass. */
         --c-port: #ff9f0a;
 
-        /* The same three roles, lifted for the dark card. */
+        /* The same roles, lifted for the dark card. */
+        --c-host: #4da3ff;
+        --c-sub: #7fa8cc;
         --c-path: #4fbf85;
         --c-key: #b39ae8;
         --c-frag: #3fb8b8;
@@ -1459,14 +1465,15 @@ html.js .custom-field:not(.open) {
     color: var(--text-tertiary);
 }
 
-/* The subdomain belongs to the host, so it keeps the host's blue — at half
-   strength (round 3: "same hue, quieter"). reddit.com still lands hardest. */
+/* The subdomain belongs to the host, so it keeps the host's blue — quieter,
+   a steel of the same hue (round 3: "same hue, quieter"), still AA.
+   reddit.com lands hardest. */
 .pv-url .sub {
-    color: color-mix(in srgb, var(--accent) 55%, var(--text-tertiary));
+    color: var(--c-sub);
 }
 
 .pv-url .reg {
-    color: var(--accent);
+    color: var(--c-host);
     font-weight: 700;
     font-size: 1.06em;
     padding: 1px 4px;
@@ -2321,6 +2328,14 @@ html:not(.js) .pv-index {
     color: var(--danger);
 }
 
+/* A key named in the cast wears the key's own ink, matching the hero —
+   after the warn override on purpose, so `in url` stays violet even in a
+   red entry: it points at the hero, not at the danger. */
+.pv-cast .what code.k {
+    color: var(--c-key);
+    font-weight: 700;
+}
+
 /* The record behind a small native disclosure (design note 30, round 3:
    record = link, driftnote = line). Deliberately the quietest control on the
    card: the hero is the reading, and this is the reference for the reader
@@ -2467,6 +2482,38 @@ html:not(.js) .pv-index {
 .copybtn.done {
     color: var(--switch-on);
     border-color: transparent;
+}
+
+/* The hazard notes fold behind their chips (2026-08-24): the chip warns, a
+   click explains. Same deck as the cast — stacked in one cell, hidden by
+   visibility so nothing shifts between answers, and no room at all until a
+   chip is asked. The no-JS page shows them in full. */
+html.js .pv-notes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+html.js .pv-notes .pv-note {
+    grid-row: 1;
+    grid-column: 1;
+    visibility: hidden;
+}
+
+html.js .pv-notes .pv-note.shown {
+    visibility: visible;
+}
+
+html.js .pv-notes:not(:has(.pv-note.shown)) .pv-note {
+    display: none;
+}
+
+/* The chip that has more to say is a control — with the script. */
+html.js .pv-fact[data-note] {
+    cursor: pointer;
+}
+
+html.js .pv-fact[data-note]:hover {
+    filter: brightness(1.18);
 }
 
 /* A note appears only where the standard opens a gap between what is shown and
