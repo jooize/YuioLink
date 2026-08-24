@@ -3465,6 +3465,15 @@ html.history-collapsed .history-body {
     cursor: pointer;
 }
 
+/* The pre-audit Apple orange, dark only (the user, 2026-08-25: calmer than
+   --warn's yellow there). 5.9:1 on the dark row; on the light glass it is
+   1.9:1, so light keeps the deep amber --warn. */
+@media (prefers-color-scheme: dark) {
+    .history-tomb-clear {
+        color: #ff9500;
+    }
+}
+
 .history-tomb-clear:hover {
     text-decoration: underline;
 }
