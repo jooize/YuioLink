@@ -15,9 +15,14 @@
     --accent-text: #0062d8;
     --result-text: #0a7854;
     --purple-text: #9546bd;
-    /* Deep enough that the green countdown/confirmation text clears 4.5:1 on
-       the glass; the toggle fill darkens a step with it, which still reads on. */
-    --switch-on: #289945;
+    /* The toggle track keeps Apple's native green -- deliberate (the user,
+       2026-08-24): the audit's darkened track read as wrong, the state is
+       also carried by the knob position and its label, and native is what a
+       macOS-shaped control should look like. Green GLYPHS -- the copied
+       ticks, the state ring -- cannot afford that on the light glass and
+       wear the darkened twin (3.07:1, the 3:1 non-text bar). */
+    --switch-on: #34c759;
+    --switch-on-text: #289945;
     --switch-off: rgba(120, 120, 128, 0.32);
     --result: #10b981;
     --warn: #975d00;
@@ -94,8 +99,8 @@
         --accent-text: #48a3ff;
         --result-text: #34d399;
         --purple-text: #c770f5;
-        /* The dark card has headroom; the Apple green stays. */
-        --switch-on: #34c759;
+        /* The dark card has headroom; the glyph twin is the native green. */
+        --switch-on-text: #34c759;
         --switch-off: rgba(120, 120, 128, 0.5);
         --result: #34d399;
         --warn: #ffd60a;
@@ -985,7 +990,7 @@ html.js .custom-field:not(.open) {
     content: "\2713";
     margin-left: 0.4em;
     font-weight: 700;
-    color: var(--switch-on);
+    color: var(--switch-on-text);
     opacity: 0;
     transition: opacity 0.18s ease;
 }
@@ -1213,7 +1218,7 @@ html.js .custom-field:not(.open) {
 }
 
 .result-copy.copied {
-    color: var(--switch-on);
+    color: var(--switch-on-text);
     background: color-mix(in srgb, var(--switch-on) 18%, transparent);
     border-color: color-mix(in srgb, var(--switch-on) 30%, transparent);
 }
@@ -1261,8 +1266,8 @@ html.js .custom-field:not(.open) {
    ring so it still reads on a 1x display. Inset, and never a wider border — a
    thicker edge would reflow the monospace text inside it. */
 .text-body.copied {
-    border-color: var(--switch-on);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--switch-on) 55%, transparent);
+    border-color: var(--switch-on-text);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--switch-on-text) 55%, transparent);
     transition-duration: 0.1s;
 }
 
@@ -1480,7 +1485,7 @@ html.js .custom-field:not(.open) {
     content: "\2713";
     margin-left: 0.4em;
     font-weight: 700;
-    color: var(--switch-on);
+    color: var(--switch-on-text);
     opacity: 0;
     transition: opacity 0.18s ease;
 }
@@ -1684,7 +1689,7 @@ html.js .custom-field:not(.open) {
 
 .pv-revealed::before {
     content: "\2713\00a0";
-    color: var(--switch-on);
+    color: var(--switch-on-text);
     font-weight: 700;
 }
 
@@ -1811,7 +1816,7 @@ html.js .custom-field:not(.open) {
     content: "\2713";
     margin-left: 0.4em;
     font-weight: 700;
-    color: var(--switch-on);
+    color: var(--switch-on-text);
     opacity: 0;
     transition: opacity 0.18s ease;
 }
@@ -2367,11 +2372,19 @@ html:not(.js) .pv-index {
     color: var(--danger);
 }
 
-/* A key named in the cast wears the key's own ink, matching the hero —
-   after the warn override on purpose, so `in url` stays violet even in a
-   red entry: it points at the hero, not at the danger. */
-.pv-cast .what code.k {
+/* A key named in the cast wears the key's own ink, matching the hero: it
+   points at the hero, not at the danger. `.entry` is load-bearing — it lifts
+   this to the warn override's specificity (0,4,1), where source order makes
+   it win; without it a red entry painted its key place red (found live
+   2026-08-24: a hidden character IN a key is always a warn entry). */
+.pv-cast .entry .what code.k {
     color: var(--c-key);
+    font-weight: 700;
+}
+
+/* The mark inside a place key stays the mark: red, like the hero draws it. */
+.pv-cast .what .bad {
+    color: var(--danger);
     font-weight: 700;
 }
 
@@ -2527,7 +2540,7 @@ html:not(.js) .pv-index {
 }
 
 .copybtn.done {
-    color: var(--switch-on);
+    color: var(--switch-on-text);
     border-color: transparent;
 }
 
@@ -3156,7 +3169,7 @@ html.history-collapsed .history-body {
     flex: none;
     font-size: 14px;
     font-weight: 700;
-    color: var(--switch-on);
+    color: var(--switch-on-text);
     opacity: 0;
     transition: opacity 0.18s ease;
 }
@@ -3283,7 +3296,7 @@ html.history-collapsed .history-body {
 }
 
 .history-copy.copied {
-    color: var(--switch-on);
+    color: var(--switch-on-text);
 }
 
 .history-remove {

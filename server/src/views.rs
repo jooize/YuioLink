@@ -1815,8 +1815,10 @@ fn place_markup(p: &CastPlace) -> Markup {
             CastPlace::Fragment => { span.pl-frag { "the fragment" } }
             CastPlace::Query => { span.pl-query { "the query" } }
             CastPlace::Address => { "the address" }
-            // The key wears its own ink here too, matching the hero.
-            CastPlace::Key(k) => { code.k { (k) } }
+            // The key wears its own ink here too, matching the hero — read
+            // through key_reading, so a hidden character inside the key is
+            // red here exactly as it is up there, and the rest stays violet.
+            CastPlace::Key(k) => { code.k { (pieces(&urlview::key_reading(k), PieceStyle::Slice)) } }
         }
     }
 }
@@ -3300,8 +3302,18 @@ mod tests {
             c.contains(r#"<span class="pv-fact warn" data-cast="u200b">"#),
             "{c}"
         );
-        // The entry names the key as its place, escape and all.
-        assert!(c.contains(r#"in <code class="k">%E2%80%8Bref</code>"#), "{c}");
+        // The entry names the key as its place — the hidden character red,
+        // the rest of the key in the key's own violet, matching the hero.
+        assert!(
+            c.contains(r#"in <code class="k"><span class="bad" data-tell="u200b""#),
+            "{c}"
+        );
+        assert!(c.contains(r#">%E2%80%8B</span>ref</code>"#), "{c}");
+        const APP_CSS_K: &str = include_str!("../static/app.css");
+        // `.entry` is load-bearing: it outranks the warn override, so a red
+        // entry's key place stays violet.
+        assert!(APP_CSS_K.contains(".pv-cast .entry .what code.k {"));
+        assert!(APP_CSS_K.contains(".pv-cast .what .bad {"));
         // The rest of the key stays verbatim beside the mark.
         assert!(c.contains(r#"</span>ref</span>"#), "{c}");
 
