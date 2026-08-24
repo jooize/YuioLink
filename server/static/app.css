@@ -4,10 +4,19 @@
     --accent: #007aff;
     --accent-hover: #2b90ff;
     --accent-press: #0066d6;
-    --switch-on: #34c759;
+    /* Text/glyph twins (July WCAG audit): the fill colours fail 4.5:1 as small
+       text on the light glass (worst case #e2ecf9), so glyphs take these darker
+       inks while --accent/--result/--purple stay for fills, borders, washes,
+       and focus rings. */
+    --accent-text: #0058bf;
+    --result-text: #0a7854;
+    --purple-text: #9546bd;
+    /* Deep enough that the green countdown/confirmation text clears 4.5:1 on
+       the glass; the toggle fill darkens a step with it, which still reads on. */
+    --switch-on: #289945;
     --switch-off: rgba(120, 120, 128, 0.32);
     --result: #10b981;
-    --warn: #c77a00;
+    --warn: #975d00;
     --danger: #d70015;
     /* "Text" kind word — orange, warm against the blue Redirect and the green
        expiry time beside it on the meta line. Deep enough for ~4.7:1 on the
@@ -40,8 +49,8 @@
        --accent raw (4.02:1 on white, an AA fail); --c-host is the same blue
        taken dark enough, and --c-sub the quieter steel of the same hue. */
     --c-host: #0062cc;
-    --c-sub: #486f92;
-    --c-path: #1e7a49;
+    --c-sub: #416785;
+    --c-path: #197143;
     --c-key: #6f4fc3;
     --c-frag: #0b6e6e;
 
@@ -51,8 +60,11 @@
     --glow-2: rgba(255, 64, 129, 0.14);
 
     --text: #1d1d1f;
-    --text-secondary: rgba(60, 60, 67, 0.6);
-    --text-tertiary: rgba(60, 60, 67, 0.4);
+    /* Alphas lifted (audit): .6/.4 fell under 4.5:1 and 3:1 on the light glass.
+       The tertiary bump also carries the quiet URL punctuation (scheme, dim
+       delimiters, capsule innards) over the 3:1 non-text bar. */
+    --text-secondary: rgba(60, 60, 67, 0.74);
+    --text-tertiary: rgba(60, 60, 67, 0.58);
 
     --card-bg: rgba(255, 255, 255, 0.58);
     --card-border: rgba(255, 255, 255, 0.7);
@@ -75,10 +87,16 @@
         --accent: #0a84ff;
         --accent-hover: #3d9bff;
         --accent-press: #0a6fd6;
+        --accent-text: #48a3ff;
+        --result-text: #34d399;
+        --purple-text: #c770f5;
+        /* The dark card has headroom; the Apple green stays. */
+        --switch-on: #34c759;
         --switch-off: rgba(120, 120, 128, 0.5);
         --result: #34d399;
         --warn: #ffd60a;
-        --danger: #ff453a;
+        /* Lifted a step (audit): #ff453a was under 4.5:1 on the dark glass. */
+        --danger: #ff5d54;
         --text-kind: #ff9f0a;
         --purple: #bf5af2;
         /* On the dark card there is headroom, so the purple lifts rather than
@@ -87,7 +105,8 @@
         /* Dark inverts the pairing: the alt word goes pale, the accent stays mid. */
         --c-public: #ff6fb5;
         --c-secret: #30d158;
-        --c-once: #bf5af2;
+        /* Lifted (audit): #bf5af2 was under 4.5:1 on the dark glass. */
+        --c-once: #c770f5;
         /* The same hue at the weight dark needs, and the exact amber .btn--go
            already ends its gradient on. 6.94:1 on the lightest glass. */
         --c-port: #ff9f0a;
@@ -106,7 +125,8 @@
 
         --text: #f5f5f7;
         --text-secondary: rgba(235, 235, 245, 0.6);
-        --text-tertiary: rgba(235, 235, 245, 0.35);
+        /* Lifted (audit): .35 fell under the 3:1 non-text bar on the dark glass. */
+        --text-tertiary: rgba(235, 235, 245, 0.45);
 
         --card-bg: rgba(40, 40, 44, 0.55);
         --card-border: rgba(255, 255, 255, 0.12);
@@ -217,7 +237,7 @@ header h1 {
 /* "Link" in the accent, so the wordmark carries the brand colour itself — the
    same treatment the share card uses, on every page that shows the masthead. */
 .wm-link {
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 /* Top-left way out to the site root: a diagonal up-left arrow in a circular
@@ -341,7 +361,7 @@ textarea.form-control {
     margin: 0 0 7px;
     font-size: 12.5px;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 /* iOS-style segmented control (Expires in, Limit), built from native radios so it
@@ -722,7 +742,7 @@ html.js .custom-field:not(.open) {
     align-items: center;
     gap: 4px;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--accent-text);
     white-space: nowrap;
 }
 
@@ -812,7 +832,9 @@ html.js .custom-field:not(.open) {
     font-weight: 600;
     letter-spacing: -0.01em;
     color: #fff;
-    background: linear-gradient(180deg, var(--accent-hover), var(--accent));
+    /* Deeper than --accent (audit): white 16px text needs 4.5:1 against the
+       whole gradient, and the system blues stop short. Same pair both themes. */
+    background: linear-gradient(180deg, #0f6fe0, #005cc4);
     border: none;
     border-radius: var(--radius-control);
     padding: 12px 18px;
@@ -824,8 +846,11 @@ html.js .custom-field:not(.open) {
     appearance: none;
 }
 
+/* Darken, not lighten (audit): brightening lifts the blue past what the fixed
+   white text can follow. Dark-text buttons (amber Continue, Clear) opt back
+   into the classic lightening below. */
 .btn:hover {
-    filter: brightness(1.05);
+    filter: brightness(0.96);
 }
 
 .btn:active {
@@ -867,7 +892,8 @@ html.js .custom-field:not(.open) {
     font-weight: 600;
     border-radius: 0 var(--radius-control) var(--radius-control) 0;
     background: linear-gradient(180deg, #ff9f0a, #ff9500);
-    color: #fff;
+    /* Dark ink like the amber Continue: white on this amber is 2.2:1. */
+    color: #241a05;
 }
 
 .split-clear:hover {
@@ -926,7 +952,7 @@ html.js .custom-field:not(.open) {
     line-height: 1.1;
     letter-spacing: -0.01em;
     margin-bottom: 4px;
-    color: var(--accent);
+    color: var(--accent-text);
     user-select: text;
 }
 
@@ -1000,7 +1026,7 @@ html.js .custom-field:not(.open) {
    and retired: the case already marks the boundary, and the second colour
    asked to be decoded as meaning. */
 .nw-0,
-.nw-1 { color: var(--accent); }
+.nw-1 { color: var(--accent-text); }
 
 .nw + .nw,
 .nwg + .nwg { margin-left: 0.09em; }
@@ -1041,9 +1067,10 @@ html.js .custom-field:not(.open) {
 }
 
 /* Time left reads green (alive) by default, then warns as the deadline nears.
-   Mixed a step toward the text colour so it sits quieter than the switch green. */
+   The result-green text ink, not the switch green: the old mix toward --text
+   computed to ~3.7:1 on the light glass (audit). */
 .countdown {
-    color: color-mix(in srgb, var(--switch-on) 82%, var(--text));
+    color: var(--result-text);
     font-weight: 600;
 }
 
@@ -1096,7 +1123,7 @@ html.js .custom-field:not(.open) {
 }
 
 .result-preview {
-    color: var(--purple);
+    color: var(--purple-text);
 }
 
 .result-delete {
@@ -1161,7 +1188,7 @@ html.js .custom-field:not(.open) {
     font-family: inherit;
     font-size: 15px;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--accent-text);
     background: color-mix(in srgb, var(--accent) 12%, transparent);
     border: 0.5px solid color-mix(in srgb, var(--accent) 22%, transparent);
     border-radius: var(--radius-control);
@@ -1271,7 +1298,7 @@ html.js .custom-field:not(.open) {
     font-family: inherit;
     font-size: 12.5px;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--accent-text);
     background: color-mix(in srgb, var(--card-bg) 70%, var(--field-bg));
     border: 0.5px solid color-mix(in srgb, var(--accent) 32%, transparent);
     border-radius: 999px;
@@ -1331,7 +1358,7 @@ html.js .custom-field:not(.open) {
 }
 
 .kicker .kind-redirect {
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 .kicker .kind-text {
@@ -1380,7 +1407,7 @@ html.js .custom-field:not(.open) {
    every OS instead of whatever the local UI font draws. */
 .pv-arrow {
     display: block;
-    color: var(--accent);
+    color: var(--accent-text);
     margin: 14px 0;
 }
 
@@ -1602,6 +1629,10 @@ html.js .custom-field:not(.open) {
     background: linear-gradient(180deg, #ffb52e, #ff9f0a);
     color: #241a05;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.btn--go:hover {
+    filter: brightness(1.05);
 }
 
 .btn--go:focus-visible {
@@ -2058,7 +2089,7 @@ html.js .custom-field:not(.open) {
 }
 
 .pv-slice .txt .dl {
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 .pv-slice .txt .k {
@@ -2424,7 +2455,7 @@ html:not(.js) .pv-index {
 }
 
 .rawline .dl {
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 .rawline .k {
@@ -2454,7 +2485,7 @@ html:not(.js) .pv-index {
 }
 
 .rawline.edited .lbl {
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 .rawline.edited.show {
@@ -2810,7 +2841,7 @@ html.js .pv-url .hp:hover {
     align-items: center;
     padding: 6px 13px;
     font-weight: 500;
-    color: var(--accent);
+    color: var(--accent-text);
     background: color-mix(in srgb, var(--accent) 14%, transparent);
     text-decoration: none;
     white-space: nowrap;
@@ -2958,7 +2989,7 @@ html.history-collapsed .history-body {
 .history-title {
     font-size: 12.5px;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 /* Grouped inset (mockup "A · grouped inset"): one rounded panel holding the rows,
@@ -3044,7 +3075,7 @@ html.history-collapsed .history-body {
 }
 
 .kind-word.redirect {
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 .kind-word.text {
@@ -3224,11 +3255,11 @@ html.history-collapsed .history-body {
 }
 
 .history-show {
-    color: var(--purple);
+    color: var(--purple-text);
 }
 
 .history-copy {
-    color: var(--accent);
+    color: var(--accent-text);
 }
 
 .history-copy.copied {
@@ -3391,7 +3422,7 @@ html.history-collapsed .history-body {
     flex: none;
     font-family: inherit;
     font-size: 12px;
-    color: #ff9500;
+    color: var(--warn);
     background: none;
     border: 0;
     padding: 4px 2px;
@@ -3570,7 +3601,7 @@ html.history-collapsed .history-body {
     width: 100%;
     padding: 11px 14px;
     font: 600 14px/1.2 var(--font);
-    color: var(--accent);
+    color: var(--accent-text);
     background: none;
     border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
     border-radius: var(--radius-control);
@@ -3889,7 +3920,7 @@ main p.help-note {
 }
 
 a {
-    color: var(--accent);
+    color: var(--accent-text);
     text-decoration: none;
 }
 
