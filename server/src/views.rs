@@ -20,14 +20,41 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// compiled. Bump it alongside the workspace version.
 const RELEASE_DATE: &str = "2026-08-20";
 
-/// A static asset's URL, stamped with the release it belongs to.
+/// A static asset's URL, stamped with the release it belongs to and a
+/// fingerprint of the embedded assets.
 ///
 /// The stamp is what lets the handlers answer `immutable` with a year of
 /// `max-age`: a deploy changes the query, which is a new cache key, so a client
 /// picks up new CSS without ever revalidating the old. Unversioned URLs and a
-/// long `max-age` are the combination that strands a stale stylesheet.
+/// long `max-age` are the combination that strands a stale stylesheet — and so
+/// was the version alone: iterative deploys at one version served the old CSS
+/// until a forced reload. The fingerprint changes when the bytes do, which is
+/// the actual question a cache key answers.
 fn asset_url(path: &str) -> String {
-    format!("{path}?v={VERSION}")
+    format!("{path}?v={VERSION}-{stamp}", stamp = asset_stamp())
+}
+
+/// An FNV-1a fingerprint over every embedded static asset, computed once per
+/// process. Not cryptographic — it only has to change when the bytes do. One
+/// combined stamp for all four files keeps every page's references in step;
+/// the files are small enough that over-busting three of them costs nothing.
+fn asset_stamp() -> &'static str {
+    static STAMP: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    STAMP.get_or_init(|| {
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+        for file in [
+            include_str!("../static/app.css"),
+            include_str!("../static/app.js"),
+            include_str!("../static/text.js"),
+            include_str!("../static/preview.js"),
+        ] {
+            for byte in file.bytes() {
+                hash ^= u64::from(byte);
+                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+        }
+        format!("{hash:016x}")
+    })
 }
 
 /// The inline head script: everything that has to be true before the first paint.
@@ -3199,6 +3226,21 @@ mod tests {
             c.contains(r#"3 times, in <span class="pl-path">the path</span>"#),
             "{c}"
         );
+    }
+
+    /// Iterative deploys at one version used to strand the year-long
+    /// `immutable` cache on stale CSS (found live 2026-08-24); the asset URL
+    /// now carries a fingerprint of the embedded assets beside the version.
+    #[test]
+    fn asset_urls_carry_a_content_fingerprint() {
+        let url = asset_url("/static/app.css");
+        assert!(
+            url.starts_with(&format!("/static/app.css?v={VERSION}-")),
+            "{url}"
+        );
+        let stamp = url.rsplit('-').next().unwrap();
+        assert_eq!(stamp.len(), 16, "{url}");
+        assert!(stamp.chars().all(|c| c.is_ascii_hexdigit()), "{url}");
     }
 
     #[test]

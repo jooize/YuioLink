@@ -1305,11 +1305,12 @@ macro_rules! static_asset {
                 [
                     (header::CONTENT_TYPE, $mime),
                     // A year, and immutable. Safe only because every reference
-                    // to these files carries `?v=<version>` (see `asset_url` in
-                    // views): a deploy changes the query, which is a different
-                    // cache key, so a client never has to be told to re-check.
-                    // Without that versioning this would strand a stale asset
-                    // in caches for a year.
+                    // to these files carries `?v=<version>-<fingerprint>` (see
+                    // `asset_url` in views): any rebuild with changed bytes
+                    // changes the query, which is a different cache key, so a
+                    // client never has to be told to re-check. Without that
+                    // stamping this would strand a stale asset in caches for a
+                    // year.
                     (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
                 ],
                 include_str!(concat!("../static/", $file)),
