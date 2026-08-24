@@ -7,8 +7,12 @@
     /* Text/glyph twins (July WCAG audit): the fill colours fail 4.5:1 as small
        text on the light glass (worst case #e2ecf9), so glyphs take these darker
        inks while --accent/--result/--purple stay for fills, borders, washes,
-       and focus rings. */
-    --accent-text: #0058bf;
+       and focus rings. LARGE text (the wordmark, the result hero word) is held
+       to the 3:1 large-text bar instead, which vivid --accent passes -- those
+       sites keep it. The blue here is the brightest of the hue that still
+       clears 4.5:1 on the worst-case glass (4.71:1), not the audit's deeper
+       #0058bf (5.59:1) -- the extra margin read as dullness. */
+    --accent-text: #0062d8;
     --result-text: #0a7854;
     --purple-text: #9546bd;
     /* Deep enough that the green countdown/confirmation text clears 4.5:1 on
@@ -235,9 +239,11 @@ header h1 {
 }
 
 /* "Link" in the accent, so the wordmark carries the brand colour itself — the
-   same treatment the share card uses, on every page that shows the masthead. */
+   same treatment the share card uses, on every page that shows the masthead.
+   Vivid on purpose: at 28px+ this is large text, held to the 3:1 bar, which
+   #007aff clears on the worst-case glass. */
 .wm-link {
-    color: var(--accent-text);
+    color: var(--accent);
 }
 
 /* Top-left way out to the site root: a diagonal up-left arrow in a circular
@@ -952,7 +958,8 @@ html.js .custom-field:not(.open) {
     line-height: 1.1;
     letter-spacing: -0.01em;
     margin-bottom: 4px;
-    color: var(--accent-text);
+    /* Vivid: 24px+ bold is large text (3:1 bar), which --accent clears. */
+    color: var(--accent);
     user-select: text;
 }
 
@@ -1404,10 +1411,11 @@ html.js .custom-field:not(.open) {
 }
 
 /* An inline SVG (not a U+2193 character) so the arrow has the same shape on
-   every OS instead of whatever the local UI font draws. */
+   every OS instead of whatever the local UI font draws. Vivid: a pictorial
+   mark is non-text (3:1 bar), which --accent clears. */
 .pv-arrow {
     display: block;
-    color: var(--accent-text);
+    color: var(--accent);
     margin: 14px 0;
 }
 
