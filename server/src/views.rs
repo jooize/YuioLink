@@ -1156,7 +1156,9 @@ fn one_run_body(uri: &UriView) -> Markup {
                 Role::Path => (path_run(&slice.value)),
                 _ => {
                     @if !slice.delim.is_empty() { span.dl { (slice.delim) } wbr; }
-                    @if let Some(k) = &slice.key { span.k { (k) } }
+                    @if let Some(k) = &slice.key {
+                        span.k { (pieces(&urlview::key_reading(k), PieceStyle::Headline)) }
+                    }
                     @if slice.equals { span.dl { "=" } }
                     (pieces(&slice.display, PieceStyle::Headline))
                 }
@@ -1281,7 +1283,9 @@ fn slice_rows(uri: &UriView, rows: &[&urlview::Slice]) -> Markup {
                 div class=(slice_class(slice)) data-slice=(index_of(uri, slice)) {
                     span.txt {
                         @if !slice.delim.is_empty() { span.dl { (slice.delim) } }
-                        @if let Some(k) = &slice.key { span.k { (k) } }
+                        @if let Some(k) = &slice.key {
+                            span.k { (pieces(&urlview::key_reading(k), PieceStyle::Slice)) }
+                        }
                         @if slice.equals { span.dl { "=" } }
                         // The value is one inline block, so a long one (a
                         // magnet hash) drops to its own line whole instead of
@@ -1596,6 +1600,18 @@ fn cast_entries(uri: &UriView) -> Vec<CastEntry> {
             continue;
         }
         let place = place_of(slice);
+        // A key's hidden characters mark red in the render (key_reading), so
+        // they answer here like any other mark. Keys are otherwise verbatim —
+        // only the invisible arm can produce an entry.
+        if let Some(k) = &slice.key {
+            for piece in urlview::key_reading(k) {
+                if let Piece::BadEscape(s) = piece {
+                    for (c, raw) in urlview::escape_run_pairs(&s) {
+                        note(c, raw, CastKind::Hidden, place.clone(), 1);
+                    }
+                }
+            }
+        }
         for piece in &slice.display {
             match piece {
                 Piece::DecodedSpace => {
@@ -1760,13 +1776,17 @@ fn cast_tail(e: &CastEntry) -> Markup {
     }
 }
 
+/// The place words wear the role ink of the region they name, matching the
+/// hero: path green, fragment teal, the query the key violet (the nearest hue
+/// the region has), the username the danger red its own render uses. The
+/// address — the non-web catch-all — stays plain.
 fn place_markup(p: &CastPlace) -> Markup {
     html! {
         @match p {
-            CastPlace::Path => { "the path" }
-            CastPlace::Username => { "the username" }
-            CastPlace::Fragment => { "the fragment" }
-            CastPlace::Query => { "the query" }
+            CastPlace::Path => { span.pl-path { "the path" } }
+            CastPlace::Username => { span.pl-user { "the username" } }
+            CastPlace::Fragment => { span.pl-frag { "the fragment" } }
+            CastPlace::Query => { span.pl-query { "the query" } }
             CastPlace::Address => { "the address" }
             // The key wears its own ink here too, matching the hero.
             CastPlace::Key(k) => { code.k { (k) } }
@@ -1793,8 +1813,9 @@ fn structure_reason(c: char) -> &'static str {
 /// icon and words, no background. The contrast carries the meaning.
 fn chip_row(uri: &UriView, numbers: &[phone::Number]) -> Markup {
     let pooled = numbers.len() == 1;
+    let entries = cast_entries(uri);
     let chips = html! {
-        @for hazard in &uri.hazards { (warn_chip(*hazard)) }
+        @for hazard in &uri.hazards { (warn_chip(*hazard, &entries)) }
         @if pooled { (number_chips(&numbers[0])) }
     };
     let empty = uri.hazards.is_empty() && !pooled;
@@ -1822,7 +1843,7 @@ fn number_chips(n: &phone::Number) -> Markup {
     }
 }
 
-fn warn_chip(hazard: Hazard) -> Markup {
+fn warn_chip(hazard: Hazard, entries: &[CastEntry]) -> Markup {
     let words = match hazard {
         Hazard::NotEncrypted => "Not Encrypted",
         Hazard::UsernameInTheAddress => "Username in the Address",
@@ -1837,8 +1858,25 @@ fn warn_chip(hazard: Hazard) -> Markup {
         Hazard::CarriesAnotherAddress => Some("carries"),
         _ => None,
     };
+    // The chips whose evidence lives in the cast carry their entries' ids;
+    // preview.js steps through them on click, the same deck the marks open.
+    let cast = match hazard {
+        Hazard::HiddenCharacters => {
+            let ids: Vec<&str> = entries
+                .iter()
+                .filter(|e| e.kind == CastKind::Hidden)
+                .map(|e| e.id.as_str())
+                .collect();
+            (!ids.is_empty()).then(|| ids.join(" "))
+        }
+        Hazard::PaddedWithSpaces => entries
+            .iter()
+            .any(|e| e.kind == CastKind::Padding)
+            .then(|| "pad".to_string()),
+        _ => None,
+    };
     html! {
-        span.pv-fact.warn data-note=[note] {
+        span.pv-fact.warn data-note=[note] data-cast=[cast] {
             @if hazard == Hazard::NotEncrypted { (open_padlock_icon()) } @else { (alert_icon()) }
             (words)
         }
@@ -2201,7 +2239,11 @@ fn url_line_parts(uri: &UriView) -> Markup {
                     // A tail's key is a signpost, so it takes the bold the
                     // raw lines have always given it. `.seg` is left to the
                     // port, which is not a key and must not read as one.
-                    @if let Some(k) = &slice.key { span.qk { (k) } }
+                    // Read through key_reading: verbatim, except an
+                    // invisible goes red with its mark.
+                    @if let Some(k) = &slice.key {
+                        span.qk { (pieces(&urlview::key_reading(k), PieceStyle::Url)) }
+                    }
                     @if slice.equals { span.pn { "=" } wbr; }
                     span class=(hero_value_class(slice, "qv")) {
                         (pieces(&slice.display, PieceStyle::Url))
@@ -3113,7 +3155,10 @@ mod tests {
         );
         assert!(c.contains("The empty box is the character."), "{c}");
         // Names, codepoints, provenance, place.
-        assert!(c.contains("stored as <code>%20</code>, in the path"), "{c}");
+        assert!(
+            c.contains(r#"stored as <code>%20</code>, in <span class="pl-path">the path</span>"#),
+            "{c}"
+        );
         assert!(c.contains("zero-width space"), "{c}");
         assert!(c.contains("U+200B"), "{c}");
         // Every mark points at its entry.
@@ -3150,7 +3195,10 @@ mod tests {
     fn the_cast_collapses_repeats_to_one_entry_with_a_count() {
         let c = card("https://example.com/a%20b%20c%20d");
         assert_eq!(c.matches(r#"data-name="u0020""#).count(), 1, "{c}");
-        assert!(c.contains("3 times, in the path"), "{c}");
+        assert!(
+            c.contains(r#"3 times, in <span class="pl-path">the path</span>"#),
+            "{c}"
+        );
     }
 
     #[test]
@@ -3190,6 +3238,68 @@ mod tests {
         // A chip with nothing more to say is not a control.
         let plain = card("http://example.com/pay");
         assert!(!plain.contains("data-note"), "{plain}");
+    }
+
+    /// A hidden character in a parameter KEY marks red, chips, and answers in
+    /// the cast, the same as one in a value. Found 2026-08-24: keys rendered
+    /// verbatim with none of the invisible machinery, so a stored
+    /// `?%E2%80%8Bref=1` showed a plain unmarked key. Keys are still never
+    /// decoded — the escape stays on screen — the invisible just goes red.
+    #[test]
+    fn a_hidden_character_in_a_key_is_marked_and_cast() {
+        let c = card("https://example.com/x?%E2%80%8Bref=1");
+        // The key's escape wears the red mark, wired to the cast.
+        assert!(
+            c.contains(r#"<span class="qk"><span class="bad" data-tell="u200b""#),
+            "{c}"
+        );
+        // The chip fires, and carries its entry for the click-to-step wiring.
+        assert!(
+            c.contains(r#"<span class="pv-fact warn" data-cast="u200b">"#),
+            "{c}"
+        );
+        // The entry names the key as its place, escape and all.
+        assert!(c.contains(r#"in <code class="k">%E2%80%8Bref</code>"#), "{c}");
+        // The rest of the key stays verbatim beside the mark.
+        assert!(c.contains(r#"</span>ref</span>"#), "{c}");
+
+        // Padding steps through its chip the same way.
+        let padded = card("https://example.com/x?q=a%20%20%20b");
+        assert!(
+            padded.contains(r#"<span class="pv-fact warn" data-cast="pad">"#),
+            "{padded}"
+        );
+
+        // A card with nothing hidden tags no chip with a cast.
+        let plain = card("https://example.com/x?ref=1");
+        assert!(!plain.contains("data-cast"), "{plain}");
+    }
+
+    /// The cast's place words wear the ink of the region they point at,
+    /// matching the hero — the same treatment the key place already had.
+    #[test]
+    fn cast_place_words_wear_their_role_ink() {
+        // One place per card: a character seen in two places collapses to one
+        // entry saying "in 2 places", with no place word at all.
+        let c = card("https://example.com/my%20file");
+        assert!(
+            c.contains(r#"<span class="pl-path">the path</span>"#),
+            "{c}"
+        );
+        let f = card("https://example.com/x#a%20b");
+        assert!(
+            f.contains(r#"<span class="pl-frag">the fragment</span>"#),
+            "{f}"
+        );
+        const APP_CSS: &str = include_str!("../static/app.css");
+        for rule in [
+            ".pv-cast .what .pl-path { color: var(--c-path); }",
+            ".pv-cast .what .pl-frag { color: var(--c-frag); }",
+            ".pv-cast .what .pl-query { color: var(--c-key); }",
+            ".pv-cast .what .pl-user { color: var(--danger); }",
+        ] {
+            assert!(APP_CSS.contains(rule), "missing rule: {rule}");
+        }
     }
 
     #[test]

@@ -65,6 +65,7 @@
             if (this.model && this.slices) this.buildRows();
             if (this.model && this.hero) this.buildHeroParts();
             this.buildCast();
+            this.buildCastChips();
             this.buildNoteChips();
             this.buildSplit();
             this.buildRawCopyButtons();
@@ -93,6 +94,7 @@
             const cast = document.querySelector(".pv-cast");
             if (!cast) return;
             const wired = [];
+            this.castMarks = wired;
             document.querySelectorAll("[data-tell]").forEach((mark) => {
                 const name = mark.getAttribute("data-tell");
                 const entry = cast.querySelector('.entry[data-name="' + name + '"]');
@@ -112,6 +114,10 @@
                         shown.classList.remove("shown"),
                     );
                     wired.forEach((m) => m.setAttribute("aria-expanded", "false"));
+                    // A chip mid-cycle loses its place when a mark answers.
+                    document
+                        .querySelectorAll(".pv-fact[data-cast]")
+                        .forEach((c) => c.setAttribute("aria-expanded", "false"));
                     void entry.offsetWidth; // restart the pulse
                     entry.classList.add("shown");
                     mark.setAttribute("aria-expanded", "true");
@@ -121,6 +127,54 @@
                     if (event.key !== "Enter" && event.key !== " ") return;
                     event.preventDefault();
                     tell(event);
+                });
+            });
+        }
+
+        /**
+         * The Hidden Characters and Padded With Spaces chips point at cast
+         * entries rather than notes (the user's ask, 2026-08-24): the server
+         * tags each with its entries' ids, and clicking steps through them
+         * in the deck — nothing shown opens the first, another click the
+         * next, and one past the last puts the deck away. The same `.shown`
+         * mechanics the marks use, so a chip and a mark never fight over
+         * the deck.
+         */
+        buildCastChips() {
+            const cast = document.querySelector(".pv-cast");
+            if (!cast) return;
+            document.querySelectorAll(".pv-fact[data-cast]").forEach((chip) => {
+                const entries = chip
+                    .getAttribute("data-cast")
+                    .split(" ")
+                    .map((name) => cast.querySelector('.entry[data-name="' + name + '"]'))
+                    .filter(Boolean);
+                if (!entries.length) return;
+                chip.setAttribute("role", "button");
+                chip.setAttribute("tabindex", "0");
+                chip.setAttribute("aria-expanded", "false");
+                const step = () => {
+                    const at = entries.findIndex((e) => e.classList.contains("shown"));
+                    cast.querySelectorAll(".entry.shown").forEach((shown) =>
+                        shown.classList.remove("shown"),
+                    );
+                    (this.castMarks || []).forEach((m) =>
+                        m.setAttribute("aria-expanded", "false"),
+                    );
+                    // An entry someone else showed still counts as this chip's
+                    // place when it is in the list; a foreign one restarts.
+                    const next = at + 1;
+                    if (next < entries.length) {
+                        void entries[next].offsetWidth; // restart the pulse
+                        entries[next].classList.add("shown");
+                    }
+                    chip.setAttribute("aria-expanded", String(next < entries.length));
+                };
+                chip.addEventListener("click", step);
+                chip.addEventListener("keydown", (event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    step();
                 });
             });
         }

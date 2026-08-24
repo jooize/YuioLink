@@ -1279,6 +1279,51 @@ pub(crate) fn escape_run_pairs(run: &str) -> Vec<(char, String)> {
     }
 }
 
+/// A parameter key, read for display. Keys are never decoded — what is stored
+/// is what shows — with one exception: nothing invisible may pass unmarked.
+/// An escape run that decodes to an invisible or direction-changing character
+/// goes red as [`Piece::BadEscape`], still wearing its escape; a raw invisible
+/// character shows as its escape, red. The create path cannot store a raw
+/// invisible in a key (the url crate percent-encodes non-ASCII in queries),
+/// so the raw arm guards legacy or tampered rows only — but the escaped form
+/// IS storable through creation, and used to render as plain unmarked text.
+pub(crate) fn key_reading(key: &str) -> Vec<Piece> {
+    let bytes = key.as_bytes();
+    let mut out: Vec<Piece> = Vec::new();
+    let mut i = 0;
+    while i < key.len() {
+        let escape_at =
+            |j: usize| bytes.get(j) == Some(&b'%') && hex(bytes.get(j + 1)).is_some() && hex(bytes.get(j + 2)).is_some();
+        if escape_at(i) {
+            let start = i;
+            while escape_at(i) {
+                i += 3;
+            }
+            // Undecodable runs come back as one replacement-character pair
+            // holding the whole run; the replacement character is not
+            // invisible, so the run stays verbatim text.
+            for (c, raw) in escape_run_pairs(&key[start..i]) {
+                let piece = if is_invisible(c) && c != ' ' {
+                    Piece::BadEscape(raw)
+                } else {
+                    Piece::Text(raw)
+                };
+                push_merged(&mut out, piece);
+            }
+        } else {
+            let c = key[i..].chars().next().expect("in-bounds index");
+            i += c.len_utf8();
+            let piece = if is_invisible(c) && c != ' ' {
+                Piece::BadEscape(escaped(c))
+            } else {
+                Piece::Text(c.to_string())
+            };
+            push_merged(&mut out, piece);
+        }
+    }
+    out
+}
+
 /// Invisible, zero-width, or direction-changing. These are the characters that
 /// let a stored string read as one thing and act as another, so they are never
 /// decoded for display — the reader sees the escape and the chip.
@@ -1314,11 +1359,14 @@ fn detect_hazards(view: &UriView) -> Vec<Hazard> {
     if view.slices.iter().any(|s| s.role == Role::Userinfo) {
         out.push(Hazard::UsernameInTheAddress);
     }
-    if view
-        .slices
-        .iter()
-        .any(|s| s.display.iter().any(|p| matches!(p, Piece::BadEscape(_))))
-    {
+    // Keys can hide characters too — an escaped ZWSP in a key renders red the
+    // same way one in a value does, so the chip must fire for both.
+    if view.slices.iter().any(|s| {
+        s.display.iter().any(|p| matches!(p, Piece::BadEscape(_)))
+            || s.key
+                .as_deref()
+                .is_some_and(|k| key_reading(k).iter().any(|p| matches!(p, Piece::BadEscape(_))))
+    }) {
         out.push(Hazard::HiddenCharacters);
     }
     if view
@@ -1841,6 +1889,37 @@ mod tests {
         assert!(read.contains("%E2%80%AE"), "{read}");
         // Ordinary escapes are not hidden characters.
         assert!(!parse_uri("https://example.com/a%20b%2Fc").has(Hazard::HiddenCharacters));
+    }
+
+    #[test]
+    fn a_key_reads_verbatim_except_its_invisibles_go_red() {
+        // The escaped form is storable through creation; the chip must fire.
+        let v = parse_uri("https://example.com/x?%E2%80%8Bref=1");
+        assert!(v.has(Hazard::HiddenCharacters));
+        let read = key_reading("%E2%80%8Bref");
+        assert_eq!(
+            read,
+            vec![
+                Piece::BadEscape("%E2%80%8B".to_string()),
+                Piece::Text("ref".to_string()),
+            ]
+        );
+        // Ordinary escapes in a key stay verbatim text — keys never decode.
+        assert_eq!(
+            key_reading("a%20b"),
+            vec![Piece::Text("a%20b".to_string())]
+        );
+        // A raw invisible cannot arrive via creation (the url crate encodes
+        // it), but a legacy or tampered row must still show its escape, red.
+        assert_eq!(
+            key_reading("\u{200b}ref"),
+            vec![
+                Piece::BadEscape("%E2%80%8B".to_string()),
+                Piece::Text("ref".to_string()),
+            ]
+        );
+        // A plain key is one plain run.
+        assert_eq!(key_reading("ref"), vec![Piece::Text("ref".to_string())]);
     }
 
     #[test]

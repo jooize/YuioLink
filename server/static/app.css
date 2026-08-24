@@ -2367,6 +2367,14 @@ html:not(.js) .pv-index {
     font-weight: 700;
 }
 
+/* The other place words wear their region's ink the same way: they point at
+   where in the hero the character sits. The username takes the danger red
+   its own render uses; the non-web "address" stays plain. */
+.pv-cast .what .pl-path { color: var(--c-path); }
+.pv-cast .what .pl-frag { color: var(--c-frag); }
+.pv-cast .what .pl-query { color: var(--c-key); }
+.pv-cast .what .pl-user { color: var(--danger); }
+
 /* The record behind a small native disclosure (design note 30, round 3:
    record = link, driftnote = line). Deliberately the quietest control on the
    card: the hero is the reading, and this is the reference for the reader
@@ -2538,12 +2546,16 @@ html.js .pv-notes:not(:has(.pv-note.shown)) .pv-note {
     display: none;
 }
 
-/* The chip that has more to say is a control — with the script. */
-html.js .pv-fact[data-note] {
+/* The chip that has more to say is a control — with the script. The cast
+   chips (Hidden Characters, Padded With Spaces) join in: their answers are
+   deck entries rather than notes, stepped through on click. */
+html.js .pv-fact[data-note],
+html.js .pv-fact[data-cast] {
     cursor: pointer;
 }
 
-html.js .pv-fact[data-note]:hover {
+html.js .pv-fact[data-note]:hover,
+html.js .pv-fact[data-cast]:hover {
     filter: brightness(1.18);
 }
 
