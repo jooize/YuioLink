@@ -844,8 +844,10 @@ html.js .custom-field:not(.open) {
     letter-spacing: -0.01em;
     color: #fff;
     /* Deeper than --accent (audit): white 16px text needs 4.5:1 against the
-       whole gradient, and the system blues stop short. Same pair both themes. */
-    background: linear-gradient(180deg, #0f6fe0, #005cc4);
+       whole gradient, and the system blues stop short. Same pair both themes.
+       Brightest stops that still clear the bar (4.59:1 top, 5.13:1 bottom) --
+       the first pass's #005cc4 bottom (6.31:1) read as needlessly dark. */
+    background: linear-gradient(180deg, #1072e6, #0069e0);
     border: none;
     border-radius: var(--radius-control);
     padding: 12px 18px;
@@ -859,9 +861,10 @@ html.js .custom-field:not(.open) {
 
 /* Darken, not lighten (audit): brightening lifts the blue past what the fixed
    white text can follow. Dark-text buttons (amber Continue, Clear) opt back
-   into the classic lightening below. */
+   into the classic lightening below. 0.9 because the first pass's 0.96 was
+   barely perceptible -- darkening only adds contrast, so it can afford it. */
 .btn:hover {
-    filter: brightness(0.96);
+    filter: brightness(0.9);
 }
 
 .btn:active {
