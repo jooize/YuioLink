@@ -3456,11 +3456,14 @@ html.history-collapsed .history-body {
     color: var(--text-secondary);
 }
 
+/* Green, not --warn (the user, 2026-08-25): clearing a tombstone is the same
+   safe tidying act as Clear Expired, and every AA orange on the light glass
+   is brown. 4.7:1 on the light row. */
 .history-tomb-clear {
     flex: none;
     font-family: inherit;
     font-size: 12px;
-    color: var(--warn);
+    color: var(--result-text);
     background: none;
     border: 0;
     padding: 4px 2px;
@@ -3469,7 +3472,7 @@ html.history-collapsed .history-body {
 
 /* The pre-audit Apple orange, dark only (the user, 2026-08-25: calmer than
    --warn's yellow there). 5.9:1 on the dark row; on the light glass it is
-   1.9:1, so light keeps the deep amber --warn. */
+   1.9:1, hence the green above. */
 @media (prefers-color-scheme: dark) {
     .history-tomb-clear {
         color: #ff9500;
