@@ -1131,9 +1131,10 @@ pub async fn colophon() -> Response {
 
 /// `GET /legal` — who provides the service, what it stores, and the terms it is
 /// offered under. Fully static, like the colophon; the contact addresses are
-/// placeholders until publishable ones exist.
+/// placeholders until publishable ones exist. The page lives in its own module
+/// so its git history doubles as the public record of past terms.
 pub async fn legal() -> Response {
-    Html(views::legal_page().into_string()).into_response()
+    Html(crate::legal::legal_page().into_string()).into_response()
 }
 
 /// `GET /stats` — the public, aggregate-only counters. Reads three cheap queries

@@ -2,6 +2,7 @@ mod card;
 mod config;
 mod db;
 mod error;
+mod legal;
 mod phone;
 mod ratelimit;
 mod security;
