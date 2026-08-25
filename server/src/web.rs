@@ -101,6 +101,7 @@ pub fn router(state: AppState) -> Router {
         .route("/help", get(help))
         .route("/colophon", get(colophon))
         .route("/legal", get(legal))
+        .route("/legal/{version}", get(legal_version))
         .route("/stats", get(stats))
         .nest("/api/v0", api_routes())
         .route("/create", post(create_plain))
@@ -1131,10 +1132,19 @@ pub async fn colophon() -> Response {
 
 /// `GET /legal` — who provides the service, what it stores, and the terms it is
 /// offered under. Fully static, like the colophon; the contact addresses are
-/// placeholders until publishable ones exist. The page lives in its own module
-/// so its git history doubles as the public record of past terms.
+/// placeholders until publishable ones exist.
 pub async fn legal() -> Response {
     Html(crate::legal::legal_page().into_string()).into_response()
+}
+
+/// `GET /legal/{version}` — one dated version of the terms, current or
+/// archived. The archive ships in the binary (see `legal::VERSIONS`), so past
+/// terms stay readable without depending on anything outside this server.
+pub async fn legal_version(Path(version): Path<String>) -> Response {
+    match crate::legal::legal_version_page(&version) {
+        Some(page) => Html(page.into_string()).into_response(),
+        None => AppError::NotFound.into_response(),
+    }
 }
 
 /// `GET /stats` — the public, aggregate-only counters. Reads three cheap queries
@@ -2080,6 +2090,16 @@ mod tests {
         let (s, _, home) = send(&st, get("/")).await;
         assert_eq!(s, StatusCode::OK);
         assert!(home.contains("href=\"/legal\""), "{home}");
+
+        // The archive is self-hosted: the current version answers at its own
+        // dated address too, and a date that never was is a plain 404.
+        let (date, _) = *crate::legal::VERSIONS.last().unwrap();
+        assert!(body.contains(&format!("href=\"/legal/{date}\"")), "{body}");
+        let (s, _, dated) = send(&st, get(&format!("/legal/{date}"))).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(dated.contains("current, in effect since this date"), "{dated}");
+        let (s, _, _) = send(&st, get("/legal/1999-01-01")).await;
+        assert_eq!(s, StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]

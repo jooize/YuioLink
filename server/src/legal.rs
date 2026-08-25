@@ -1,27 +1,30 @@
-//! `/legal` — the terms page, alone in its own file on purpose: the page links
-//! to this file's commit history as the public record of every past version of
-//! the terms. Keep the path stable (`server/src/legal.rs`) — renaming or moving
-//! the file breaks that link and orphans the history it promises.
+//! `/legal` — the terms page and its own archive. Every version of the terms
+//! ships inside the binary: the last entry of [`VERSIONS`] is the current terms
+//! at `/legal`, and every earlier entry stays readable at `/legal/<date>` — the
+//! promise of past versions depends on nothing but the running server (no
+//! repository host, no external archive). To change the terms, append a new
+//! dated entry to [`VERSIONS`] and edit only it: the freeze test pins the
+//! rendered bytes of every non-final entry, so published history cannot be
+//! rewritten, only added to.
 
-use crate::views::{document_full, external_mark, home_chip};
+use crate::views::{document_full, home_chip};
 use maud::{html, Markup};
 
-/// The legal page: who provides the service, what it keeps while a link lives,
-/// and the terms it is offered under — plain words first, the legal terms where
-/// they matter. Every claim in it restates something the code enforces (the
-/// seven-day ceiling, the reaper, the in-memory rate buckets, the aggregate-only
-/// stats); when one of those changes, this page must change with it. The contact
-/// addresses are placeholders (`span.ph`) until publishable ones exist.
-pub fn legal_page() -> Markup {
-    let body = html! {
-        (home_chip("/", "Back to YuioLink"))
-        h2.help-title { "Legal" }
-        p.help-lead {
-            "Who provides this service, what it keeps while a link lives, and "
-            "the terms you use it under — in plain words, with the legal terms "
-            "where they matter."
-        }
+/// Every version of the terms, oldest first. The date is the day a version took
+/// effect, and its permanent address (`/legal/<date>`). The LAST entry is the
+/// current terms; every earlier entry is frozen — see the module doc.
+pub const VERSIONS: &[(&str, fn() -> Markup)] = &[("2026-08-25", terms_2026_08_25)];
 
+/// The terms as they took effect 2026-08-25 — the first version. Frozen the
+/// moment a later entry exists: after that, edits belong in the new entry.
+///
+/// Every claim in here restates something the code enforces (the seven-day
+/// ceiling, the reaper, the in-memory rate buckets, the aggregate-only stats);
+/// when one of those changes, a new version of this page must change with it.
+/// The contact addresses are placeholders (`span.ph`) until publishable ones
+/// exist.
+fn terms_2026_08_25() -> Markup {
+    html! {
         h3.help-h #operator { "Who provides this" }
         p.help-p {
             "YuioLink is a personal, non-commercial project operated by jooize "
@@ -122,15 +125,65 @@ pub fn legal_page() -> Markup {
         h3.help-h #changes { "Changes" }
         p.help-p {
             "These terms may change as the service does. A change takes effect "
-            "when it is published here, and the Updated date in the footer of "
-            "the front page moves with it. Because every link expires within "
-            "seven days, no link ever outlives the terms it was created under "
-            "by more than a week. And every past version of this page stays "
-            "public: it is kept in one file of the project's source, so its "
-            a.ext href="https://github.com/jooize/YuioLink/commits/main/server/src/legal.rs" {
-                "complete history" (external_mark())
+            "when it is published, as a new dated version of this page — and "
+            "every version, this one and each one before it, keeps its own "
+            "permanent address on this site, listed at the end of the page. "
+            "Because every link expires within seven days, no link ever "
+            "outlives the terms it was created under by more than a week."
+        }
+    }
+}
+
+/// `GET /legal` — the current terms, with the version list under them.
+pub fn legal_page() -> Markup {
+    let (date, terms) = *VERSIONS.last().expect("at least one terms version");
+    page(date, terms(), true)
+}
+
+/// `GET /legal/<date>` — one version by its date, current or archived; `None`
+/// for a date that never was.
+pub fn legal_version_page(date: &str) -> Option<Markup> {
+    let idx = VERSIONS.iter().position(|(d, _)| *d == date)?;
+    let (d, terms) = VERSIONS[idx];
+    Some(page(d, terms(), idx == VERSIONS.len() - 1))
+}
+
+/// The chrome every version shares: title, lead, the archived-version notice
+/// where one is due, the version list, the footer. The notice and the list live
+/// out here rather than in the versioned bodies, so freezing a version never
+/// freezes its own successor list.
+fn page(date: &str, terms: Markup, current: bool) -> Markup {
+    let last = VERSIONS.len() - 1;
+    let body = html! {
+        (home_chip("/", "Back to YuioLink"))
+        h2.help-title { "Legal" }
+        p.help-lead {
+            "Who provides this service, what it keeps while a link lives, and "
+            "the terms you use it under — in plain words, with the legal terms "
+            "where they matter."
+        }
+
+        @if !current {
+            p.legal-past {
+                "This is a past version of the terms, in effect from "
+                (date)
+                " until it was replaced. The "
+                a href="/legal" { "current terms" }
+                " apply today."
             }
-            " is readable by anyone, back to the day the page first appeared."
+        }
+
+        (terms)
+
+        h3.help-h #versions { "Versions" }
+        ul.legal-versions {
+            @for (i, (d, _)) in VERSIONS.iter().enumerate().rev() {
+                li {
+                    a href=(format!("/legal/{d}")) { (d) }
+                    @if i == last { " — current, in effect since this date" }
+                    @else { " — replaced " (VERSIONS[i + 1].0) }
+                }
+            }
         }
 
         footer { a href="/" { "Back to YuioLink" } }
@@ -139,8 +192,64 @@ pub fn legal_page() -> Markup {
         "YuioLink — Legal",
         html! {
             meta name="description" content="Who provides YuioLink, what it stores while a link lives, and the terms it is offered under: every link expires within seven days, no accounts, no tracking.";
+            // Archived versions stay readable but point search engines at the
+            // current page instead of themselves.
+            @if !current {
+                meta name="robots" content="noindex";
+            }
         },
         body,
         html! {},
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The rendered bytes of every ARCHIVED version, pinned by FNV-1a hash.
+    /// Appending a new version to [`VERSIONS`] freezes the previously-last
+    /// entry: add its (date, hash) here — a failing run prints the hash.
+    /// Editing a frozen version fails this test; that is the point.
+    const FROZEN: &[(&str, u64)] = &[];
+
+    fn fnv1a(s: &str) -> u64 {
+        s.bytes()
+            .fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
+                (h ^ b as u64).wrapping_mul(0x0000_0100_0000_01b3)
+            })
+    }
+
+    #[test]
+    fn archived_terms_never_change() {
+        for (i, (date, terms)) in VERSIONS.iter().enumerate() {
+            if i == VERSIONS.len() - 1 {
+                continue; // the current version is the one allowed to change
+            }
+            let hash = fnv1a(&terms().into_string());
+            let pinned = FROZEN.iter().find(|(d, _)| d == date).map(|(_, h)| *h);
+            assert_eq!(
+                pinned,
+                Some(hash),
+                "archived terms {date} changed or is unpinned; its hash is {hash:#018x}"
+            );
+        }
+    }
+
+    #[test]
+    fn versions_are_dated_in_order() {
+        // Oldest first, strictly — the chrome derives "current" and each
+        // version's replacement date from this order.
+        assert!(VERSIONS.windows(2).all(|w| w[0].0 < w[1].0));
+        // ISO dates only: they sort as strings and are safe path segments.
+        for (d, _) in VERSIONS {
+            assert!(
+                d.len() == 10
+                    && d.bytes()
+                        .enumerate()
+                        .all(|(i, b)| if i == 4 || i == 7 { b == b'-' } else { b.is_ascii_digit() }),
+                "{d} is not YYYY-MM-DD"
+            );
+        }
+    }
 }
