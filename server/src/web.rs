@@ -100,6 +100,7 @@ pub fn router(state: AppState) -> Router {
         // unreachable for its whole life (a GET lands on this route, not the link).
         .route("/help", get(help))
         .route("/colophon", get(colophon))
+        .route("/legal", get(legal))
         .route("/stats", get(stats))
         .nest("/api/v0", api_routes())
         .route("/create", post(create_plain))
@@ -1128,6 +1129,13 @@ pub async fn colophon() -> Response {
     Html(views::colophon_page().into_string()).into_response()
 }
 
+/// `GET /legal` — who provides the service, what it stores, and the terms it is
+/// offered under. Fully static, like the colophon; the contact addresses are
+/// placeholders until publishable ones exist.
+pub async fn legal() -> Response {
+    Html(views::legal_page().into_string()).into_response()
+}
+
 /// `GET /stats` — the public, aggregate-only counters. Reads three cheap queries
 /// and renders them; a failure on any one degrades to zeroes rather than a 500,
 /// since a broken counter is never worth an error page.
@@ -2056,6 +2064,21 @@ mod tests {
         let (s, _, home) = send(&st, get("/")).await;
         assert_eq!(s, StatusCode::OK);
         assert!(home.contains("href=\"/colophon\""), "{home}");
+    }
+
+    #[tokio::test]
+    async fn legal_page_states_the_terms_and_is_linked_from_home() {
+        let st = test_state().await;
+        let (s, _, body) = send(&st, get("/legal")).await;
+        assert_eq!(s, StatusCode::OK);
+        // The load-bearing claims: the lifetime ceiling, the as-is offering, and
+        // the placeholder contacts that must be replaced before they are real.
+        for claim in ["seven days", "as is", "to be published"] {
+            assert!(body.contains(claim), "legal should state {claim:?}: {body}");
+        }
+        let (s, _, home) = send(&st, get("/")).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(home.contains("href=\"/legal\""), "{home}");
     }
 
     #[tokio::test]
