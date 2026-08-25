@@ -2213,7 +2213,7 @@ fn pieces(parts: &[Piece], style: PieceStyle) -> Markup {
                 // entry for its character (preview.js wires the click) and the
                 // title is the hover crumb the no-JS page keeps.
                 Piece::DecodedSpace => { span.dsp data-tell="u0020" title="space U+0020" { " " } }
-                Piece::Padding(s) => { span.bad data-tell="pad" title="space U+0020, padding" { (s) } }
+                Piece::Padding(s) => { span.bad.pad data-tell="pad" title="space U+0020, padding" { (s) } }
                 Piece::Escape(s) => {
                     @let (tell, title) = mark_meta(s);
                     @if style == PieceStyle::Url { span.pe data-tell=(tell) title=(title) { (s) } }
@@ -3812,11 +3812,29 @@ mod tests {
         // The receipt rides the glyphs' own baseline as decoration, not a
         // border: line-height cannot push it away, and Safari draws it on a
         // lone space (verified on-device 2026-08-20, design note 28).
+        let dsp = APP_CSS
+            .split(".dsp {")
+            .nth(1)
+            .and_then(|rest| rest.split('}').next())
+            .expect("app.css styles .dsp");
         assert!(
-            APP_CSS.contains(
-                ".dsp {\n    text-decoration: underline dotted var(--text-tertiary) 1px;\n    text-underline-offset: 2px;\n}"
-            ),
+            dsp.contains("text-decoration: underline dotted var(--text-tertiary) 1px;")
+                && dsp.contains("text-underline-offset: 2px;"),
             "the dotted receipt must be text-decoration, not border-bottom"
+        );
+        // pre, or the receipt dies at the wrap: the line breaker prefers a
+        // collapsible space and removes it at the line end -- the hero would
+        // render the URL missing a character. Same for a padding run, which
+        // normal collapsing squeezes to a single space (under-displaying the
+        // hazard). .pad scoped apart from .bad: escape runs must stay
+        // wrappable.
+        assert!(
+            dsp.contains("white-space: pre;"),
+            "the marked space must not collapse or host the line break"
+        );
+        assert!(
+            APP_CSS.contains(".pad {\n    white-space: pre;\n}"),
+            "a padding run must render every one of its spaces"
         );
     }
 

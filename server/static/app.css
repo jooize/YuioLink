@@ -2172,6 +2172,21 @@ html.js .custom-field:not(.open) {
 .dsp {
     text-decoration: underline dotted var(--text-tertiary) 1px;
     text-underline-offset: 2px;
+    /* pre, in a one-space span: the space can neither collapse nor host the
+       soft break. Without it the line breaker PREFERS the space, and a
+       collapsible space at a line end is removed outright -- the hero would
+       show the URL missing a character exactly where it wrapped. The break
+       moves to a neighbouring joint (overflow-wrap: anywhere guarantees one),
+       and a space that ends a line keeps its box and its dots. */
+    white-space: pre;
+}
+
+/* A padding run (the hazard: 2+ spaces, or one at an edge). pre for the same
+   reason as .dsp, and one more: under normal collapsing a three-space run
+   rendered as ONE space -- under-displaying the very thing the tint warns
+   about. Scoped to .pad, not .bad: escape runs in .bad must stay wrappable. */
+.pad {
+    white-space: pre;
 }
 
 /* A marked character preview.js has wired to answer (`.ask` is added by the
