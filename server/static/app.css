@@ -853,6 +853,11 @@ html.js .custom-field:not(.open) {
     padding: 12px 18px;
     min-height: 46px;
     cursor: pointer;
+    /* Continue's label carries the whole domain, and a domain is one
+       unbreakable token: without a last-resort break it overflows the button
+       rather than wrapping. Never truncate it -- the domain on that button IS
+       the trust signal, so every character must be on screen. */
+    overflow-wrap: anywhere;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 1px 2px rgba(0, 0, 0, 0.18);
     transition: filter 0.15s ease, transform 0.06s ease, box-shadow 0.15s ease;
     -webkit-appearance: none;
@@ -2670,6 +2675,10 @@ html.js .pv-fact[data-cast]:hover {
 
 .pv-split .go {
     flex: 1;
+    /* Without this the flex minimum is the label's longest word, and a long
+       domain in "Continue to <domain>" walks out of the padding box instead
+       of wrapping (found live 2026-08-25). */
+    min-width: 0;
     border-radius: var(--radius-control) 0 0 var(--radius-control);
 }
 
