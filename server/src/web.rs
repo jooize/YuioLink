@@ -834,6 +834,7 @@ pub async fn create_plain(
             expires_at: inserted.expires_at,
             words: inserted.words,
             delete_token: None,
+            terms: crate::legal::receipt(),
         })
         .into_response()
     } else {
@@ -1057,6 +1058,12 @@ pub struct CreateResponse {
     /// without a token (the `/create` convenience path).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub delete_token: Option<String>,
+    /// The terms in effect when this link was created — version id and the
+    /// SHA-256 fingerprint of their canonical text (see `/legal`). Kept by the
+    /// client, this is the creator's receipt of what they accepted; the terms
+    /// hash chain alone proves nothing to a fresh visitor, so these stored
+    /// copies are the witnesses.
+    pub terms: crate::legal::TermsReceipt,
 }
 
 #[derive(Serialize)]
@@ -1133,15 +1140,27 @@ pub async fn colophon() -> Response {
 /// `GET /legal` — who provides the service, what it stores, and the terms it is
 /// offered under. Fully static, like the colophon; the contact addresses are
 /// placeholders until publishable ones exist.
-pub async fn legal() -> Response {
-    Html(crate::legal::legal_page().into_string()).into_response()
+pub async fn legal(State(state): State<AppState>) -> Response {
+    Html(crate::legal::legal_page(&state.base_url).into_string()).into_response()
 }
 
-/// `GET /legal/{version}` — one dated version of the terms, current or
-/// archived. The archive ships in the binary (see `legal::VERSIONS`), so past
-/// terms stay readable without depending on anything outside this server.
-pub async fn legal_version(Path(version): Path<String>) -> Response {
-    match crate::legal::legal_version_page(&version) {
+/// `GET /legal/{version}` — one version of the terms, current or archived,
+/// plus `<id>.txt` for a version's canonical plain text (the bytes the hash
+/// chain fingerprints; `curl | sha256sum` verifies it). The archive ships in
+/// the binary (see `legal::VERSIONS`), so past terms stay readable without
+/// depending on anything outside this server.
+pub async fn legal_version(State(state): State<AppState>, Path(version): Path<String>) -> Response {
+    if let Some(id) = version.strip_suffix(".txt") {
+        return match crate::legal::canonical_txt(id) {
+            Some(txt) => (
+                [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+                txt,
+            )
+                .into_response(),
+            None => AppError::NotFound.into_response(),
+        };
+    }
+    match crate::legal::legal_version_page(&state.base_url, &version) {
         Some(page) => Html(page.into_string()).into_response(),
         None => AppError::NotFound.into_response(),
     }
@@ -1236,6 +1255,7 @@ pub async fn api_create_link(
             expires_at: inserted.expires_at,
             words: inserted.words,
             delete_token: Some(delete_token),
+            terms: crate::legal::receipt(),
         }),
     ))
 }
@@ -2092,14 +2112,62 @@ mod tests {
         assert!(home.contains("href=\"/legal\""), "{home}");
 
         // The archive is self-hosted: the current version answers at its own
-        // dated address too, and a date that never was is a plain 404.
-        let (date, _) = *crate::legal::VERSIONS.last().unwrap();
-        assert!(body.contains(&format!("href=\"/legal/{date}\"")), "{body}");
-        let (s, _, dated) = send(&st, get(&format!("/legal/{date}"))).await;
+        // permanent address too, and an id that never was is a plain 404.
+        let (id, _) = *crate::legal::VERSIONS.last().unwrap();
+        assert!(body.contains(&format!("href=\"/legal/{id}\"")), "{body}");
+        let (s, _, dated) = send(&st, get(&format!("/legal/{id}"))).await;
         assert_eq!(s, StatusCode::OK);
-        assert!(dated.contains("current, in effect since this date"), "{dated}");
-        let (s, _, _) = send(&st, get("/legal/1999-01-01")).await;
+        assert!(dated.contains("current, in effect since this moment"), "{dated}");
+        let (s, _, _) = send(&st, get("/legal/1999-01-01T000000Z")).await;
         assert_eq!(s, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn legal_chain_serves_canonical_text_and_stamps_receipts() {
+        let st = test_state().await;
+        let head = crate::legal::head();
+
+        // /legal/<id>.txt is byte-for-byte what the fingerprint hashes, so
+        // `curl | sha256sum` is the whole verification; the HTML page shows
+        // the fingerprint and the command.
+        let (s, h, txt) = send(&st, get(&format!("/legal/{}.txt", head.id))).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(
+            h[header::CONTENT_TYPE].to_str().unwrap().starts_with("text/plain"),
+            "{h:?}"
+        );
+        assert_eq!(txt, head.txt);
+        let (_, _, page) = send(&st, get("/legal")).await;
+        assert!(page.contains(&head.hash), "{page}");
+        assert!(page.contains("sha256sum"), "{page}");
+        let (s, _, _) = send(&st, get("/legal/1999-01-01T000000Z.txt")).await;
+        assert_eq!(s, StatusCode::NOT_FOUND);
+
+        // Every creation response carries the head as the creator's receipt —
+        // the chain's witnesses live in clients, not on this server.
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/v0/links")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"kind":"redirect","content":"https://example.com"}"#,
+            ))
+            .unwrap();
+        let (s, _, body) = send(&st, req).await;
+        assert_eq!(s, StatusCode::CREATED);
+        assert!(
+            body.contains(&format!(
+                "\"terms\":{{\"version\":\"{}\",\"sha256\":\"{}\"}}",
+                head.id, head.hash
+            )),
+            "{body}"
+        );
+
+        // The no-JS path gets the same receipt stamped on the result panel,
+        // where app.js copies it into the local history if it ever runs.
+        let (_, _, home) = send(&st, get("/")).await;
+        assert!(home.contains(&format!("data-terms-version=\"{}\"", head.id)), "{home}");
+        assert!(home.contains(&format!("data-terms-sha256=\"{}\"", head.hash)), "{home}");
     }
 
     #[tokio::test]

@@ -430,8 +430,14 @@ pub fn humanize_duration(secs: i64) -> String {
 /// link name) is the hero; the full URL sits small beneath it; a single meta line
 /// carries kind, expiry, and any use limit.
 fn result_output(url: Option<&str>, meta: Markup, note: Option<&str>) -> Markup {
+    // The terms receipt for the no-JS path: the result page carries the version
+    // and fingerprint of the terms this link was created under, and app.js (if
+    // it later runs) copies them into the local-history entry. The JS create
+    // path takes the same receipt from the API response instead.
+    let terms = crate::legal::receipt();
     html! {
-        output.result #link-panel tabindex="-1" hidden[url.is_none()] {
+        output.result #link-panel tabindex="-1" hidden[url.is_none()]
+            data-terms-version=(terms.version) data-terms-sha256=(terms.sha256) {
             code.result-word #link-word { @if let Some(u) = url { (highlight_name(link_name(u))) } }
             code.result-url #link-element { @if let Some(u) = url { (u) } }
             // Shown when a public link got more than one word because the short
@@ -3253,10 +3259,6 @@ mod tests {
         assert!(!c.contains("pv-cast"), "{c}");
     }
 
-    /// A carried address whose reading kept escapes closed earns an opened
-    /// second line under its row: the inner `=` and `&` are that address's
-    /// own grammar, and the domain it points at gets the bold.
-    #[test]
     /// The hazard notes fold behind their chips: the chip carries the note's
     /// name, the note waits in the deck, and the no-JS stylesheet shows the
     /// deck in full. The wording avoids "this page", which read as the

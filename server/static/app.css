@@ -3876,6 +3876,21 @@ ul.legal-versions {
     line-height: 1.9;
 }
 
+/* /legal fingerprints: 64 hex characters that must wrap, never overflow.
+   Quiet -- a fingerprint is compared, not read. */
+main p.legal-hash {
+    max-width: none;
+    text-align: left;
+    margin-top: 6px;
+    font-size: 12px;
+}
+
+.legal-hash code,
+code.legal-prev {
+    overflow-wrap: anywhere;
+    color: var(--text-secondary);
+}
+
 .help-types {
     margin: 0;
     padding: 0;

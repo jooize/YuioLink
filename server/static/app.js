@@ -1387,7 +1387,9 @@
                 }
                 // Keep the name + delete token so the history row can offer a real
                 // server delete (token is undefined if the backend didn't send one).
-                const entry = { url, name: data.name, kind, uses, expires: data.expires_at, token: data.delete_token, created: Date.now() };
+                // `terms` is the creation receipt: the version + SHA-256 fingerprint
+                // of the terms this link was made under (see /legal#verification).
+                const entry = { url, name: data.name, kind, uses, expires: data.expires_at, token: data.delete_token, terms: data.terms, created: Date.now() };
                 addHistory(entry); // stamps entry.id, which the result's Delete needs
                 renderHistory();
                 setupResultActions(entry);
@@ -1519,6 +1521,12 @@
         const metaText = document.getElementById("link-expiry")?.textContent ?? "";
         const when = metaText.match(/expires (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) UTC/);
         const usesMatch = metaText.match(/max (\d+) uses/);
+        // The terms receipt the server stamped on the result panel: version +
+        // SHA-256 fingerprint of the terms this link was created under.
+        const panel = document.getElementById("link-panel");
+        const terms = panel?.dataset.termsVersion
+            ? { version: panel.dataset.termsVersion, sha256: panel.dataset.termsSha256 }
+            : null;
         const entry = {
             url,
             // The name is the last path segment (minus any #fragment). No token on the
@@ -1528,6 +1536,7 @@
             uses: /one-time/.test(metaText) ? 1 : (usesMatch ? Number.parseInt(usesMatch[1], 10) : null),
             expires: when ? when[1] : null,
             token: null,
+            terms,
             created: Date.now(), // the result page loads at ~creation; grace runs from now
         };
         addHistory(entry);
