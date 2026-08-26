@@ -40,19 +40,25 @@ const GENESIS: &str = "YuioLink terms hash chain genesis\n";
 /// pinned-hash test: once published, ANY edit belongs in a new entry, because
 /// creation receipts in the wild hold this version's fingerprint.
 ///
-/// Every claim in here restates something the code enforces (the seven-day
-/// ceiling, the reaper, the in-memory rate buckets, the aggregate-only stats);
-/// when one of those changes, a new version of this page must change with it.
-/// The contact addresses are placeholders (`span.ph`) until publishable ones
-/// exist.
+/// Every factual claim in here restates something the code enforces (the
+/// seven-day ceiling, the reaper, the in-memory rate buckets, the
+/// aggregate-only stats, the opt-in local history); when one of those changes,
+/// a new version of this page must change with it. The legal citations are the
+/// operator's situation as of writing — Swedish operator, EU hosting: GDPR +
+/// Sweden's Data Protection Act (2018:218), the browser-storage consent rule
+/// in the Electronic Communications Act (2022:482) 9 kap. 28 §, the DSA's
+/// notice-and-action shape without conceding it applies. The contact addresses
+/// are placeholders (`span.ph`) until publishable ones exist.
 fn terms_2026_08_25() -> Markup {
     html! {
         h3.help-h #operator { "Who provides this" }
         p.help-p {
             "YuioLink is a personal, non-commercial project operated by jooize "
             "(\u{201c}the operator\u{201d}). It is offered free of charge, "
-            "without accounts and without advertising. A publishable contact "
-            "address will appear here: "
+            "without accounts and without advertising, and it is operated from "
+            "Sweden; for the little personal data the service touches, the "
+            "operator is the data controller (GDPR, Article 4(7)). A "
+            "publishable contact address will appear here: "
             span.ph { "operator contact — to be published" }
             "."
         }
@@ -77,7 +83,12 @@ fn terms_2026_08_25() -> Markup {
         }
         p.help-p {
             "The history panel on the front page lives in your own browser's "
-            "storage and is never sent to the server. The public "
+            "storage and is never sent to the server — and it is kept beyond "
+            "the visit only after you switch it on. That switch is the consent "
+            "EU rules ask for before a site stores things in your browser (in "
+            "Sweden, the Electronic Communications Act (2022:482), Chapter 9, "
+            "Section 28); there are no cookies and no other stored state. The "
+            "public "
             a href="/stats" { "statistics" }
             " are daily tallies — counts of events per day, with nothing in them "
             "that can be traced to a person or a link."
@@ -99,7 +110,29 @@ fn terms_2026_08_25() -> Markup {
             "memory only, never written to disk. Like essentially every service "
             "on the web, the server also keeps short-lived technical logs of "
             "requests for operations and abuse defence; they are routinely "
-            "discarded and are not used to build profiles of anyone."
+            "discarded and are not used to build profiles of anyone. In legal "
+            "terms, both rest on the operator's legitimate interest in keeping "
+            "the service working and unabused (GDPR, Article 6(1)(f))."
+        }
+
+        h3.help-h #rights { "Your rights" }
+        p.help-p {
+            "European data protection law applies to this service: the GDPR "
+            "(Regulation (EU) 2016/679), supplemented in Sweden by the Data "
+            "Protection Act (2018:218), and this page is the information those "
+            "rules call for, in plain words. Most of the GDPR's rights are "
+            "honored here by not collecting things: a link's record identifies "
+            "no one, and where a service cannot tell which records are whose, "
+            "the rights to access, correct, or export them do not attach "
+            "(Article 11) — there is nothing to look a person up by. What a "
+            "creator can always do is delete their own link, with the deletion "
+            "secret issued at creation."
+        }
+        p.help-p {
+            "If you believe this service mishandles personal data, you can "
+            "complain to a data protection authority (GDPR, Article 77) — the "
+            "operator's is Sweden's Integritetsskyddsmyndigheten (IMY), and "
+            "the authority of the country where you live works too."
         }
 
         h3.help-h #use { "Acceptable use" }
@@ -120,7 +153,10 @@ fn terms_2026_08_25() -> Markup {
             span.ph { "abuse contact — to be published" }
             ". Reports are read by a person. A link that violates these terms "
             "is withdrawn; and because every link expires within seven days, "
-            "even an unreported one is short-lived."
+            "even an unreported one is short-lived. Reports are handled "
+            "notice-and-action style — the shape the EU Digital Services Act "
+            "(Regulation (EU) 2022/2065) gives such procedures — whether or "
+            "not that act strictly binds a personal, non-commercial service."
         }
 
         h3.help-h #warranty { "No warranty" }
@@ -142,6 +178,13 @@ fn terms_2026_08_25() -> Markup {
             "for the content of third-party destinations that links point to. "
             "Nothing in these terms limits liability that cannot lawfully be "
             "limited."
+        }
+
+        h3.help-h #law { "Governing law" }
+        p.help-p {
+            "These terms are governed by Swedish law. Where you use this "
+            "service as a consumer, mandatory protections of the country "
+            "where you live stand regardless of this clause."
         }
 
         h3.help-h #changes { "Changes" }
@@ -400,7 +443,7 @@ mod tests {
     /// fingerprint, and history is append-only.
     const PINNED: &[(&str, &str)] = &[(
         "2026-08-25T132200Z",
-        "18226ed146bac99ef528d5048756049a332445b48113e624df4584569c0bff35",
+        "355d5a19cf76038b5c7b600132a14df3556051183bb873b9cd9c0196be57a30a",
     )];
 
     #[test]
