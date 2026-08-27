@@ -56,7 +56,7 @@ fn terms_2026_08_25() -> Markup {
             "YuioLink is a personal, non-commercial project operated by jooize "
             "(\u{201c}the operator\u{201d}). It is offered free of charge, "
             "without accounts and without advertising, and it is operated from "
-            "Sweden; for the little personal data the service touches, the "
+            "Sweden. For the little personal data the service touches, the "
             "operator is the data controller (GDPR, Article 4(7)). A "
             "publishable contact address will appear here: "
             span.ph { "operator contact — to be published" }
@@ -66,37 +66,43 @@ fn terms_2026_08_25() -> Markup {
         h3.help-h #service { "The service" }
         p.help-p {
             "YuioLink turns a web address or a piece of text into a short link. "
-            "Every link expires: the longest lifetime is seven days, and when a "
-            "link's time is up it stops working for everyone. There are no "
-            "permanent links, by design. Creating a link means accepting these "
-            "terms; if you do not accept them, do not create links here."
+            strong { "Every link expires" }
+            ": the longest lifetime is "
+            strong { "seven days" }
+            ", and when a link's time is up it stops working for everyone. "
+            "There are no permanent links, by design. Creating a link means "
+            "accepting these terms; if you do not accept them, do not create "
+            "links here."
         }
 
         h3.help-h #stored { "What is stored" }
         p.help-p {
-            "A link is one record: its name, what it points to — the destination "
-            "address, or the text — when it was created, when it expires, an "
+            "A link is one record: its name, what it points to (the destination "
+            "address, or the text), when it was created, when it expires, an "
             "optional use limit and a count of uses, a deletion secret, and "
-            "whether its creator has deleted it. That is the whole record. There "
-            "are no accounts, and nothing in the record identifies who created "
-            "or opened a link."
+            "whether its creator has deleted it. That is the whole record. "
+            "There are "
+            strong { "no accounts" }
+            ", and nothing in the record identifies who created or opened a "
+            "link."
         }
         p.help-p {
             "The history panel on the front page lives in your own browser's "
-            "storage and is never sent to the server — and it is kept beyond "
-            "the visit only after you switch it on. That switch is the consent "
-            "EU rules ask for before a site stores things in your browser (in "
-            "Sweden, the Electronic Communications Act (2022:482), Chapter 9, "
-            "Section 28); there are no cookies and no other stored state. The "
-            "public "
+            "storage and is "
+            strong { "never sent to the server" }
+            ". It is kept beyond the visit only after you switch it on; that "
+            "switch is the consent EU rules ask for before a site stores "
+            "things in your browser (in Sweden, the Electronic Communications "
+            "Act (2022:482), Chapter 9, Section 28). There are no cookies and "
+            "no other stored state. The public "
             a href="/stats" { "statistics" }
-            " are daily tallies — counts of events per day, with nothing in them "
-            "that can be traced to a person or a link."
+            " are daily tallies: counts of events per day, with nothing in "
+            "them that can be traced to a person or a link."
         }
 
         h3.help-h #retention { "How long it is kept" }
         p.help-p {
-            "A link's record is deleted shortly after the link expires — at most "
+            "A link's record is deleted shortly after the link expires, at most "
             "seven days after it was created. Deleting a link yourself stops it "
             "resolving immediately; the record then remains only so the name "
             "cannot be claimed by someone else, is no longer readable by "
@@ -106,8 +112,9 @@ fn terms_2026_08_25() -> Markup {
         h3.help-h #network { "Network data" }
         p.help-p {
             "To keep link creation from being abused, the server briefly holds "
-            "the network address a creation request came from — in working "
-            "memory only, never written to disk. Like essentially every service "
+            "the network address a creation request came from, "
+            strong { "in working memory only" }
+            ", never written to disk. Like essentially every service "
             "on the web, the server also keeps short-lived technical logs of "
             "requests for operations and abuse defence; they are routinely "
             "discarded and are not used to build profiles of anyone. In legal "
@@ -119,43 +126,43 @@ fn terms_2026_08_25() -> Markup {
         p.help-p {
             "European data protection law applies to this service: the GDPR "
             "(Regulation (EU) 2016/679), supplemented in Sweden by the Data "
-            "Protection Act (2018:218), and this page is the information those "
+            "Protection Act (2018:218). This page is the information those "
             "rules call for, in plain words. Most of the GDPR's rights are "
             "honored here by not collecting things: a link's record identifies "
             "no one, and where a service cannot tell which records are whose, "
             "the rights to access, correct, or export them do not attach "
-            "(Article 11) — there is nothing to look a person up by. What a "
+            "(Article 11). There is nothing to look a person up by. What a "
             "creator can always do is delete their own link, with the deletion "
             "secret issued at creation."
         }
         p.help-p {
             "If you believe this service mishandles personal data, you can "
-            "complain to a data protection authority (GDPR, Article 77) — the "
+            "complain to a data protection authority (GDPR, Article 77). The "
             "operator's is Sweden's Integritetsskyddsmyndigheten (IMY), and "
             "the authority of the country where you live works too."
         }
 
         h3.help-h #use { "Acceptable use" }
         p.help-p {
-            "Do not use YuioLink to point at, or to carry, anything unlawful — "
-            "including malware, phishing, content that infringes copyright or "
-            "trademark, private information published without consent, or "
-            "material that exploits or harms children — and do not use it for "
-            "spam or harassment. The operator may withdraw any link and refuse "
-            "service at any time, without notice, at the operator's sole "
-            "discretion."
+            "Do not use YuioLink to point at, or to carry, anything unlawful, "
+            "and do not use it for spam or harassment. That covers, among "
+            "other things, malware, phishing, content that infringes copyright "
+            "or trademark, private information published without consent, and "
+            "material that exploits or harms children. The operator may "
+            "withdraw any link and refuse service at any time, without notice, "
+            "at the operator's sole discretion."
         }
 
         h3.help-h #abuse { "Reporting abuse" }
         p.help-p {
-            "To report a link, send its name — the word part of the address — "
+            "To report a link, send its name (the word part of the address) "
             "along with what you found and a way to reach you, to "
             span.ph { "abuse contact — to be published" }
             ". Reports are read by a person. A link that violates these terms "
-            "is withdrawn; and because every link expires within seven days, "
+            "is withdrawn, and because every link expires within seven days, "
             "even an unreported one is short-lived. Reports are handled "
-            "notice-and-action style — the shape the EU Digital Services Act "
-            "(Regulation (EU) 2022/2065) gives such procedures — whether or "
+            "notice-and-action style, the shape the EU Digital Services Act "
+            "(Regulation (EU) 2022/2065) gives such procedures, whether or "
             "not that act strictly binds a personal, non-commercial service."
         }
 
@@ -163,18 +170,19 @@ fn terms_2026_08_25() -> Markup {
         p.help-p {
             "The service is provided \u{201c}as is\u{201d} and \u{201c}as "
             "available\u{201d}, without warranty of any kind, express or "
-            "implied — including the implied warranties of merchantability, "
+            "implied, including the implied warranties of merchantability, "
             "fitness for a particular purpose, and non-infringement. Links "
             "expire, and the service itself may change, pause, or end at any "
-            "time. Do not let a YuioLink be the only copy of anything you care "
-            "about."
+            "time. Do not let a YuioLink be "
+            strong { "the only copy" }
+            " of anything you care about."
         }
 
         h3.help-h #liability { "Liability" }
         p.help-p {
             "To the fullest extent permitted by law, the operator is not liable "
             "for any indirect, incidental, special, or consequential damages "
-            "arising from using — or being unable to use — this service, nor "
+            "arising from using, or being unable to use, this service, nor "
             "for the content of third-party destinations that links point to. "
             "Nothing in these terms limits liability that cannot lawfully be "
             "limited."
@@ -190,8 +198,8 @@ fn terms_2026_08_25() -> Markup {
         h3.help-h #changes { "Changes" }
         p.help-p {
             "These terms may change as the service does. A change takes effect "
-            "when it is published, as a new dated version of this page — and "
-            "every version, this one and each one before it, keeps its own "
+            "when it is published, as a new dated version of this page. Every "
+            "version, this one and each one before it, keeps its own "
             "permanent address on this site, listed at the end of the page. "
             "Because every link expires within seven days, no link ever "
             "outlives the terms it was created under by more than a week."
@@ -402,7 +410,7 @@ fn page(base_url: &str, idx: usize) -> Markup {
         h2.help-title { "Legal" }
         p.help-lead {
             "Who provides this service, what it keeps while a link lives, and "
-            "the terms you use it under — in plain words, with the legal terms "
+            "the terms you use it under, in plain words, with the legal terms "
             "where they matter."
         }
 
@@ -436,19 +444,21 @@ fn page(base_url: &str, idx: usize) -> Markup {
             a href=(format!("/legal/{}.txt", version.id)) {
                 "/legal/" (version.id) ".txt"
             }
-            ". The SHA-256 hash of that file is this version's fingerprint:"
+            ". The SHA-256 hash of that file is this version's "
+            strong { "fingerprint" }
+            ":"
         }
         p.legal-hash { code { (version.hash) } }
         (chain_diagram(version))
         p.help-p {
             "The canonical text names the fingerprint of the version before "
-            "it — this one follows "
+            "it (this one follows "
             code.legal-prev { (version.prev) }
             @if idx == 0 {
                 ", the hash of a fixed genesis line, since nothing came "
                 "before it"
             }
-            " — so the versions form a chain back to the first: rewriting any "
+            "), so the versions form a chain back to the first. Rewriting any "
             "published version would change its fingerprint and break every "
             "version after it. Check this version against its fingerprint "
             "yourself:"
@@ -458,10 +468,11 @@ fn page(base_url: &str, idx: usize) -> Markup {
         }
         p.help-p {
             "Every link-creation response carries the version and fingerprint "
-            "of the terms in effect at that moment — the API returns them, and "
-            "the local history in your browser stores them with each link — so "
-            "creators hold their own receipts of what the terms said, "
-            "independent of this site."
+            "of the terms in effect at that moment; the API returns them, and "
+            "the local history in your browser stores them with each link. "
+            "Creators hold "
+            strong { "their own receipts" }
+            " of what the terms said, independent of this site."
         }
 
         footer { a href="/" { "Back to YuioLink" } }
@@ -494,7 +505,7 @@ mod tests {
     /// fingerprint, and history is append-only.
     const PINNED: &[(&str, &str)] = &[(
         "2026-08-25T132200Z",
-        "1497ce5723061bd952a73b3e3054c907196c328d5abba651cc7c7d6e4aba7c73",
+        "bf61027e6c5efc21ab3b4f2e62ab971f62a206fd70c715d38f8422c15fa79e75",
     )];
 
     #[test]
