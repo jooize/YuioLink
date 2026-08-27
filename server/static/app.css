@@ -3891,6 +3891,61 @@ code.legal-prev {
     color: var(--text-secondary);
 }
 
+/* /legal chain diagram: the hash chain drawn once, in the page's own palette
+   so both themes carry it. Pure markup -- no JS, scales with the column. */
+svg.legal-chain {
+    display: block;
+    width: 100%;
+    max-width: 340px;
+    margin: 16px auto 4px;
+    overflow: visible;
+}
+
+.legal-chain .box {
+    fill: var(--field-bg);
+    stroke: var(--field-border);
+}
+
+.legal-chain .ghost {
+    stroke-dasharray: 4 3;
+}
+
+.legal-chain .wire {
+    stroke: var(--text-tertiary);
+    fill: none;
+    stroke-width: 1.2;
+}
+
+.legal-chain .lbl {
+    fill: var(--text);
+    font-size: 12px;
+}
+
+.legal-chain .sub {
+    fill: var(--text-tertiary);
+    font-size: 11px;
+}
+
+.legal-chain .mono {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    fill: var(--text-secondary);
+}
+
+/* The fingerprint chip is the one emphatic element: it is the value the whole
+   section teaches the reader to check. */
+.legal-chain .fp {
+    fill: color-mix(in srgb, var(--accent) 9%, transparent);
+    stroke: var(--accent-text);
+}
+
+.legal-chain .fp-text {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    fill: var(--accent-text);
+}
+
 .help-types {
     margin: 0;
     padding: 0;

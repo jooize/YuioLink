@@ -229,7 +229,7 @@ pub fn chain() -> &'static [Version] {
             .iter()
             .map(|(id, terms)| {
                 let txt = format!(
-                    "YuioLink Terms\nVersion: {id}\nPrevious: {prev}\n\n{}\n",
+                    "# YuioLink Terms\n\nVersion: {id}\nPrevious: {prev}\n\n{}\n",
                     text_of(&terms().into_string())
                 );
                 let hash = hex(&Sha256::digest(&txt));
@@ -278,8 +278,10 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 /// The text content of one version's rendered markup, in the shape the
-/// canonical form freezes: one line per block (`h3`/`p`), a blank line between
-/// blocks, inline tags stripped, maud's escapes decoded back to characters.
+/// canonical form freezes: one line per block, a blank line between blocks, a
+/// heading (`h3`) prefixed `## ` in the Markdown way, inline tags stripped,
+/// maud's escapes decoded back to characters. The result is plain text that
+/// also happens to be valid Markdown — same bytes, two readable forms.
 ///
 /// This function is part of the canonical definition — its output is what gets
 /// hashed — so it must stay byte-stable for the markup the versions actually
@@ -295,7 +297,8 @@ fn text_of(html_str: &str) -> String {
         let Some(gt) = rest[lt..].find('>') else { break };
         let tag = &rest[lt + 1..lt + gt];
         match tag.split(' ').next().unwrap_or(tag) {
-            "h3" | "p" => block = Some(String::new()),
+            "h3" => block = Some(String::from("## ")),
+            "p" => block = Some(String::new()),
             "/h3" | "/p" => {
                 if let Some(text) = block.take() {
                     blocks.push(text);
@@ -319,6 +322,53 @@ fn text_of(html_str: &str) -> String {
 /// version id, everywhere one is displayed rather than addressed.
 fn human(id: &str) -> String {
     format!("{} {}:{} UTC", &id[..10], &id[11..13], &id[13..15])
+}
+
+/// The chain, drawn once: the genesis line hashes into this version's text,
+/// that text hashes to the fingerprint, and the fingerprint flows two ways —
+/// into every creation receipt and into the next version's `Previous:` line.
+/// Chrome, not part of any canonical text, so it can carry the live values.
+fn chain_diagram(version: &Version) -> Markup {
+    let fp = format!(
+        "{}\u{2026}{}",
+        &version.hash[..8],
+        &version.hash[version.hash.len() - 4..]
+    );
+    let prev = format!("{}\u{2026}", &version.prev[..8]);
+    html! {
+        svg.legal-chain viewBox="0 0 340 292" role="img"
+            aria-label="Diagram of the hash chain: a fixed genesis line is hashed into this version's canonical text; hashing that text gives the version's fingerprint, which is stored in every creation receipt and named inside the next version's text." {
+            defs {
+                marker #chain-arrow markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto" {
+                    path.wire d="M0,0 L6,4 L0,8" {}
+                }
+            }
+            rect.box x="115" y="2" width="110" height="24" rx="12" {}
+            text.sub x="170" y="18" text-anchor="middle" { "genesis line" }
+            line.wire x1="170" y1="26" x2="170" y2="52" marker-end="url(#chain-arrow)" {}
+            text.sub x="178" y="44" { "SHA-256" }
+
+            rect.box x="50" y="56" width="240" height="76" rx="10" {}
+            text.lbl x="170" y="76" text-anchor="middle" { "Version " (human(version.id)) }
+            text.mono x="170" y="96" text-anchor="middle" { "Previous: " (prev) }
+            text.sub x="170" y="118" text-anchor="middle" { "\u{2026}the whole terms text\u{2026}" }
+            line.wire x1="170" y1="132" x2="170" y2="158" marker-end="url(#chain-arrow)" {}
+            text.sub x="178" y="150" { "SHA-256" }
+
+            rect.fp x="95" y="162" width="150" height="26" rx="13" {}
+            text.fp-text x="170" y="179" text-anchor="middle" { (fp) }
+            path.wire d="M170,188 C170,206 95,206 95,222" marker-end="url(#chain-arrow)" {}
+            path.wire.ghost d="M170,188 C170,206 245,206 245,222" marker-end="url(#chain-arrow)" {}
+
+            rect.box x="15" y="226" width="160" height="52" rx="10" {}
+            text.lbl x="95" y="248" text-anchor="middle" { "every creation receipt" }
+            text.sub x="95" y="266" text-anchor="middle" { "kept in creators' browsers" }
+
+            rect.box.ghost x="185" y="226" width="140" height="52" rx="10" {}
+            text.lbl x="255" y="248" text-anchor="middle" { "the next version" }
+            text.mono x="255" y="266" text-anchor="middle" { "Previous: " (&version.hash[..8]) "\u{2026}" }
+        }
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -389,6 +439,7 @@ fn page(base_url: &str, idx: usize) -> Markup {
             ". The SHA-256 hash of that file is this version's fingerprint:"
         }
         p.legal-hash { code { (version.hash) } }
+        (chain_diagram(version))
         p.help-p {
             "The canonical text names the fingerprint of the version before "
             "it — this one follows "
@@ -443,7 +494,7 @@ mod tests {
     /// fingerprint, and history is append-only.
     const PINNED: &[(&str, &str)] = &[(
         "2026-08-25T132200Z",
-        "355d5a19cf76038b5c7b600132a14df3556051183bb873b9cd9c0196be57a30a",
+        "1497ce5723061bd952a73b3e3054c907196c328d5abba651cc7c7d6e4aba7c73",
     )];
 
     #[test]
@@ -488,12 +539,16 @@ mod tests {
             // it does not handle would leave markup in the "plain" text.
             assert!(!v.txt.contains('<') && !v.txt.contains('>'), "{}", v.txt);
             assert!(!v.txt.contains("&amp;") && !v.txt.contains("&#"), "{}", v.txt);
-            assert!(v.txt.starts_with(&format!("YuioLink Terms\nVersion: {}\n", v.id)));
-            // Every heading survives extraction, and typographic characters
-            // arrive as themselves.
+            assert!(v.txt.starts_with(&format!("# YuioLink Terms\n\nVersion: {}\n", v.id)));
+            // Every heading survives extraction as a Markdown `##` line, and
+            // typographic characters arrive as themselves.
             let html = terms().into_string();
             for heading in ["Who provides this", "Acceptable use", "Changes"] {
-                assert_eq!(html.contains(heading), v.txt.contains(heading), "{heading}");
+                assert_eq!(
+                    html.contains(heading),
+                    v.txt.contains(&format!("\n## {heading}\n")),
+                    "{heading}"
+                );
             }
             assert!(v.txt.contains("\u{201c}the operator\u{201d}"), "{}", v.txt);
         }
