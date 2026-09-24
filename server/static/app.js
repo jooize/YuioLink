@@ -119,6 +119,10 @@
             ["rect", { ...round, x: "3", y: "6.2", width: "8", height: "5.8", rx: "1.4", "stroke-width": "1.4" }],
             ["path", { ...round, d: "M4.9 6.2V4.6a2.1 2.1 0 0 1 4.2 0v1.6", "stroke-width": "1.4" }],
         ]);
+    // A right arrow: a redirect row's mark. Drawn rather than typed, since the
+    // arrow glyph differs from font to font (Edge and Chrome pick different ones).
+    const arrowIcon = () =>
+        icon(14, "0 0 14 14", [["path", { ...round, d: "M2 7h9.6M7.6 3l4 4-4 4", "stroke-width": "1.7" }]]);
     // A pair of opening quotes: a Text row's mark, as the arrow is a redirect's.
     const quoteIcon = () =>
         icon(13, "0 0 14 14", [
@@ -609,12 +613,24 @@
     };
 
     // --- what a link holds, as its history row shows it ---
-    // Enough to recognise the link by, never the whole thing: a Text link can be
-    // long, and this sits in localStorage for as long as the row does. Whitespace
-    // folds to single spaces, since the row is one line.
-    const SNIPPET_MAX = 200;
+    // As much as the row shows, which is up to ten lines, and no more: a Text
+    // link can be long, and this sits in localStorage for as long as the row
+    // does. Text keeps its line breaks, and one line past the ten, so the row
+    // can end in an ellipsis when there is more.
+    const SNIPPET_MAX = 1000;
+    const SNIPPET_LINES = 10;
     const snippetOf = (kind, payload) =>
-        (kind === "redirect" ? payload.trim() : payload.replace(/\s+/g, " ").trim()).slice(0, SNIPPET_MAX);
+        (kind === "redirect"
+            ? payload.trim()
+            : payload.trim().split(/\r?\n/).slice(0, SNIPPET_LINES + 1).join("\n")
+        ).slice(0, SNIPPET_MAX);
+    // The lines a row's contents are known to take before it is drawn: its line
+    // breaks, up to the ten shown. Wrapping only adds to it. (PRE_PAINT_JS in
+    // views.rs counts the same, to reserve the height.)
+    const knownExtraLines = (it) =>
+        it.kind === "text" && it.snippet && !it.tombstone && !isExpired(it) && !isCovered(it)
+            ? Math.min(SNIPPET_LINES, it.snippet.split("\n").length) - 1
+            : 0;
     // How much the link holds, counted over the whole payload rather than the
     // snippet, so a covered row can say its size without holding any more of
     // it: numbers only.
@@ -741,8 +757,7 @@
         const mark = () => {
             const m = document.createElement("span");
             m.className = "history-mark";
-            if (it.kind === "redirect") m.textContent = "\u2192";
-            else m.append(quoteIcon());
+            m.append(it.kind === "redirect" ? arrowIcon() : quoteIcon());
             m.setAttribute("aria-hidden", "true");
             return m;
         };
@@ -918,6 +933,7 @@
         const root = document.documentElement;
         root.style.setProperty("--history-rows", String(n));
         root.style.setProperty("--history-live", String(shown.filter((it) => !it.tombstone).length));
+        root.style.setProperty("--history-lines", String(shown.reduce((sum, it) => sum + knownExtraLines(it), 0)));
         root.classList.toggle("has-history", n > 0);
         if (n === 0) return;
         for (const it of shown) {

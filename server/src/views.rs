@@ -69,7 +69,9 @@ fn asset_stamp() -> &'static str {
 /// footer and shoves both down the moment app.js renders it — the footer's whole
 /// CLS. Reading the count here (and the open/closed choice with it) lets the CSS
 /// reserve the rows' height at first paint; app.js fills the space it finds. Live
-/// rows are taller than tombstones, so they are counted apart.
+/// rows are taller than tombstones, so they are counted apart, and so are the
+/// extra lines shown Text is known to take (its line breaks, up to ten a row;
+/// app.js's `knownExtraLines`, whose rules this repeats).
 ///
 /// Last, a window width dragged wider on the front page (saved, like the rest,
 /// only while Local History is on) goes on the root before the window is drawn,
@@ -88,8 +90,11 @@ if(w>480)d.style.setProperty('--window-width-user',Math.min(720,Math.round(w))+'
 var s=JSON.parse(localStorage.getItem('yuiolink:history')||'[]');\
 var n=Array.isArray(s)?s.filter(function(e){return e&&e.tombstone!=='cleared'}).length:0;\
 var c=Array.isArray(s)?s.filter(function(e){return e&&e.tombstone!=='cleared'&&!e.tombstone}).length:0;\
+var l=0;if(Array.isArray(s))s.forEach(function(e){\
+if(e&&!e.tombstone&&e.kind==='text'&&typeof e.snippet==='string'&&!(e.expires&&new Date(e.expires)<=Date.now())\
+&&!(e.cover!=null?e.cover:(e.secret||e.uses===1)))l+=Math.min(10,e.snippet.split('\\n').length)-1});\
 if(n){d.classList.add('has-history');\
-d.style.setProperty('--history-rows',n);d.style.setProperty('--history-live',c);\
+d.style.setProperty('--history-rows',n);d.style.setProperty('--history-live',c);d.style.setProperty('--history-lines',l);\
 if(localStorage.getItem('yuiolink:history:open')==='0')d.classList.add('history-collapsed')}}}catch(e){}";
 
 /// A `<script src>` for one of our own files, carrying this response's CSP nonce.
@@ -919,7 +924,7 @@ pub fn result_page(link: &CreatedLink, redo: Option<&ResultRedo>) -> Markup {
         (a, b) => a.or(b),
     };
     let trimmed = content.trim();
-    let snippet: String = trimmed.chars().take(400).collect();
+    let snippet: String = trimmed.chars().take(1000).collect();
     let snippet = Snippet {
         text: &snippet,
         chars: trimmed.chars().count(),
@@ -929,7 +934,7 @@ pub fn result_page(link: &CreatedLink, redo: Option<&ResultRedo>) -> Markup {
         (home_chip("/", "Create New Link"))
         // What the link holds, for the local-history row app.js records from this
         // page. Cut here rather than there, so a long Text link is not sent back
-        // twice; app.js folds and trims it to the row's own length.
+        // twice; app.js trims it to the row's own ten lines.
         (result_output(Some(url), meta, note.as_deref(), Some(snippet), secret))
         a.btn.btn-block href=(url) { "Open link" }
         // Only offered after a Redirect: a non-URL is already Text, so there is

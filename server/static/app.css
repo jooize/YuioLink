@@ -3209,9 +3209,11 @@ html.history-collapsed .history-body {
        saved count (pre-paint script) and then the rendered count (app.js), and
        `--history-live` the live rows among them. A tombstone is `.history-item`'s
        56px, a live row `.history-item.live`'s 104px plus its 0.5px hairline
-       (48.5px more), plus this panel's own hairline top and bottom. Only ever a
-       floor, so a row that grows (Text running to a second line) still grows. */
-    min-height: calc(var(--history-rows, 0) * 56px + var(--history-live, 0) * 48.5px + 1px);
+       (48.5px more), plus this panel's own hairline top and bottom.
+       `--history-lines` adds the 19px contents lines known before layout (Text's
+       line breaks). Only ever a floor, so a row whose contents wrap still grows. */
+    min-height: calc(var(--history-rows, 0) * 56px + var(--history-live, 0) * 48.5px
+        + var(--history-lines, 0) * 19px + 1px);
     background: var(--field-bg);
     border: 0.5px solid var(--field-border);
     border-radius: 12px;
@@ -3342,7 +3344,8 @@ html.history-collapsed .history-body {
 /* A live row, three lines: what the link holds, the link, then its time and
    actions. Each line has a fixed height, so the row's own is known before it is
    drawn: 10 + 32 + 6 + 17 + 6 + 24 + 9 = 104px, and the hairline under it is
-   the half pixel more `.history-list` reserves. Only Text running to two lines makes a row taller. */
+   the half pixel more `.history-list` reserves. The contents line grows to up to
+   ten 19px lines, which makes the row taller by as much. */
 .history-item.live {
     justify-content: flex-start;
     gap: 6px;
@@ -3354,7 +3357,7 @@ html.history-collapsed .history-body {
    blue, the Text orange) and led by the kind's mark, so the kind needs no word. */
 .history-well {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 7px;
     min-width: 0;
     min-height: 32px;
@@ -3375,7 +3378,7 @@ html.history-collapsed .history-body {
     flex: none;
     display: inline-flex;
     align-items: center;
-    font-weight: 600;
+    height: 19px;
 }
 
 .history-well.redirect .history-mark { color: var(--accent-text); }
@@ -3385,22 +3388,20 @@ html.history-collapsed .history-body {
 .history-well-body {
     flex: 1;
     min-width: 0;
-    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 10;
+    -webkit-box-orient: vertical;
     user-select: text;
 }
 
-/* Text may run to a second line before it trims; a destination stays on one. */
-.history-well.text .history-well-body {
-    white-space: normal;
-    overflow-wrap: anywhere;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-}
+/* The whole contents, to ten lines: Text with its own line breaks, a
+   destination wrapped wherever it has to. */
+.history-well.text .history-well-body { white-space: pre-wrap; }
 
 .history-well.redirect .history-well-body {
+    word-break: break-all;
     font-family: var(--font-mono);
     font-size: 13px;
 }
@@ -3414,14 +3415,15 @@ html.history-collapsed .history-body {
     color: var(--text-tertiary);
 }
 
-/* The eye at the well's end. Its hit box reaches into the well's padding, and
-   the negative margin gives it back, so the well keeps its height. */
+/* The eye at the well's end, level with the first line. Its hit box reaches
+   into the well's padding, and the negative margin gives it back, so the well
+   keeps its height. */
 .history-eye {
     flex: none;
     display: inline-flex;
     align-items: center;
     padding: 6px 7px;
-    margin: -6px 0;
+    margin: -4.5px 0 -7.5px;
     color: var(--text-secondary);
     background: none;
     border: 0;
