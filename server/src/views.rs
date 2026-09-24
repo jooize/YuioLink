@@ -834,6 +834,9 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
         "YuioLink — Wieldy Ephemeral Links",
         html! {
             meta name="description" content="Redirects and text snippets that always expire — never permanent, and every link shows where it leads before you go.";
+            // The schemes a redirect may use, for app.js's kind detection, so
+            // the list lives in one place (core's allowlist).
+            meta name="yuiolink-schemes" content=(yuiolink_core::DEFAULT_ALLOWED_SCHEMES.join(" "));
         },
         body,
         scripts,

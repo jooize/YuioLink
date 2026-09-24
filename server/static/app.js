@@ -20,10 +20,16 @@
         const i = s.indexOf(":");
         return i > 0 && /^[a-zA-Z][a-zA-Z0-9+.-]*$/.test(s.slice(0, i));
     };
-    // A URL holds no whitespace, so "Shopping: oat milk" is prose; a scheme with
-    // `//` after it stays an address despite a stray space. Mirrors
-    // yuiolink_core's looks_like_url.
-    const looksLikeUrl = (s) => hasScheme(s) && (!/\s/.test(s) || s.slice(s.indexOf(":") + 1).startsWith("//"));
+    // A scheme with `//` after it, or one token whose scheme a redirect may use
+    // (the server's list, from the page's meta). Anything else with a word and a
+    // colon in front ("Shopping: oat milk", "Password:hunter2") is Text.
+    // Mirrors yuiolink_core's looks_like_url.
+    const SCHEMES = new Set((document.querySelector('meta[name="yuiolink-schemes"]')?.content ?? "").split(" ").filter(Boolean));
+    const looksLikeUrl = (s) => {
+        if (!hasScheme(s)) return false;
+        const i = s.indexOf(":");
+        return s.startsWith("//", i + 1) || (!/\s/.test(s) && SCHEMES.has(s.slice(0, i).toLowerCase()));
+    };
     const looksLikeDomain = (s) => {
         if (/\s/.test(s)) return false;
         const host = s.split(/[/?#]/)[0].split(":")[0];

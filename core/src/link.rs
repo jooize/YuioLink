@@ -257,16 +257,20 @@ pub fn has_scheme(s: &str) -> bool {
     }
 }
 
-/// True if `s` reads as a URL with a scheme. A URL holds no whitespace, so a
-/// leading word and colon followed by prose ("Shopping: oat milk", "Re: the
-/// plan") is a sentence, not a scheme. The one exception is a scheme with `//`
-/// after it: a pasted address with a stray space in its path is still an
-/// address, and validation says what is wrong with it.
+/// True if `s` reads as a URL with a scheme: a scheme with `//` after it, or a
+/// single token whose scheme is one a redirect may use. Anything else with a
+/// word and a colon in front ("Shopping: oat milk", "Password:hunter2") is
+/// Text. A pasted address with a stray space in its path keeps its `//`, so it
+/// is still an address, and validation says what is wrong with it.
 fn looks_like_url(s: &str) -> bool {
-    has_scheme(s)
-        && (!s.chars().any(char::is_whitespace)
-            || s.split_once(':')
-                .is_some_and(|(_, rest)| rest.starts_with("//")))
+    let Some((scheme, rest)) = s.split_once(':').filter(|_| has_scheme(s)) else {
+        return false;
+    };
+    rest.starts_with("//")
+        || (!s.chars().any(char::is_whitespace)
+            && DEFAULT_ALLOWED_SCHEMES
+                .iter()
+                .any(|known| known.eq_ignore_ascii_case(scheme)))
 }
 
 /// True if `s` is a single token that looks like a bare domain (`example.com`,
@@ -534,9 +538,13 @@ mod tests {
             detect_kind("https://example.com/my file.pdf"),
             Kind::Redirect
         );
-        // One token is still read as a URL, so an unknown scheme is still refused.
-        assert_eq!(detect_kind("javascript:alert(1)"), Kind::Redirect);
+        // Without `//`, only a scheme a redirect may use makes a URL.
+        assert_eq!(detect_kind("Password:hunter2"), Kind::Text);
+        assert_eq!(detect_kind("javascript:alert(1)"), Kind::Text);
         assert_eq!(detect_kind("tel:+46701234567"), Kind::Redirect);
+        assert_eq!(detect_kind("MAILTO:a@b.com"), Kind::Redirect);
+        // With `//`, any scheme is an address, and an unknown one is refused.
+        assert_eq!(detect_kind("gopher://example.com"), Kind::Redirect);
     }
 
     #[test]
