@@ -1,6 +1,10 @@
 # Build the server, then ship just the static binary on a slim runtime.
 # SQLite is bundled into the binary (sqlx), so the runtime image needs no extras.
-FROM rust:1-trixie AS build
+# The build image. A release pins it by digest (see release.yml) and records
+# that digest and its rustc beside the binary, so the build can be repeated
+# with exactly this toolchain; anything else builds with the current Rust 1.x.
+ARG RUST_IMAGE=rust:1-trixie
+FROM ${RUST_IMAGE} AS build
 WORKDIR /src
 # Resolve and download the crate graph against the manifests alone, so a
 # source-only change reuses this layer instead of re-fetching every dependency.

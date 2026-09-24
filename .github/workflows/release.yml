@@ -38,9 +38,20 @@ jobs:
             exit 1
           fi
 
+      # Build with the newest Rust, but never an unrecorded one: resolve the
+      # floating tag to a digest once, build with exactly that image, and
+      # publish the digest and its rustc beside the binary. Rebuilding with
+      # `--build-arg RUST_IMAGE=<that ref>` uses the same toolchain.
+      - name: Pin the Rust image this release builds with
+        run: |
+          digest="$(docker buildx imagetools inspect rust:1-trixie --format '{{json .Manifest}}' | jq -r .digest)"
+          case "$digest" in sha256:*) ;; *) echo "could not resolve rust:1-trixie to a digest" >&2; exit 1 ;; esac
+          echo "RUST_IMAGE=rust:1-trixie@$digest" >> "$GITHUB_ENV"
+
       - name: Build the linux/amd64 binary via the repo Dockerfile
         run: |
-          docker buildx build --platform linux/amd64 -f Dockerfile -o type=local,dest=out .
+          docker buildx build --platform linux/amd64 --build-arg RUST_IMAGE="$RUST_IMAGE" \
+            -f Dockerfile -o type=local,dest=out .
           # A single-platform buildx export has no per-arch subdirectory.
           src="out/usr/local/bin/yuiolink-server"
           [ -f "$src" ] || src="out/linux_amd64/usr/local/bin/yuiolink-server"
@@ -49,11 +60,18 @@ jobs:
       - name: Checksum
         run: sha256sum yuiolink-server-linux-amd64 | tee yuiolink-server-linux-amd64.sha256
 
+      - name: Record the toolchain
+        run: |
+          {
+            echo "image: $RUST_IMAGE"
+            docker run --rm --platform linux/amd64 "$RUST_IMAGE" sh -c 'rustc -V && cargo -V'
+          } | tee build-info.txt
+
       - name: Publish the binary to the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes \
-            yuiolink-server-linux-amd64 yuiolink-server-linux-amd64.sha256 \
+            yuiolink-server-linux-amd64 yuiolink-server-linux-amd64.sha256 build-info.txt \
           || gh release upload "$GITHUB_REF_NAME" \
-            yuiolink-server-linux-amd64 yuiolink-server-linux-amd64.sha256 --clobber
+            yuiolink-server-linux-amd64 yuiolink-server-linux-amd64.sha256 build-info.txt --clobber
