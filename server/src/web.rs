@@ -2026,6 +2026,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn no_js_says_why_an_address_became_text() {
+        let st = test_state().await;
+        let post = |content: &str| {
+            Request::builder()
+                .method("POST")
+                .uri("/")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(format!("content={content}&ttl_stop=7")))
+                .unwrap()
+        };
+        // An address a redirect will not take is a text link, not a refusal,
+        // and the result page says why.
+        let (s, _, body) = send(&st, post("gopher%3A%2F%2Fexample.com")).await;
+        assert_eq!(s, StatusCode::OK, "body: {body}");
+        assert!(body.contains("Text · expires"), "body: {body}");
+        assert!(
+            body.contains("redirect to gopher: addresses"),
+            "body: {body}"
+        );
+        // Prose with a colon is plain Text, with nothing to explain.
+        let (s, _, body) = send(&st, post("Shopping%3A+oat+milk")).await;
+        assert_eq!(s, StatusCode::OK, "body: {body}");
+        assert!(body.contains("Text · expires"), "body: {body}");
+        assert!(!body.contains("so this became a text link"), "body: {body}");
+    }
+
+    #[tokio::test]
     async fn no_js_can_store_a_url_as_text_from_the_result_page() {
         let st = test_state().await;
         // A plain form post detects a Redirect and offers the Text alternative.

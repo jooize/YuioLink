@@ -640,6 +640,8 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                 // Dead without JS, so CSS hides it there (html:not(.js)).
                 button #clear.btn.split-clear type="button" { "Clear" }
             }
+            // Why input that looks like an address will be a text link (app.js).
+            p.form-note #form-note aria-live="polite" hidden {}
             p.form-error #form-error role="alert" hidden {}
 
             fieldset.picker.type-picker {
@@ -896,9 +898,26 @@ pub fn result_page(link: &CreatedLink, redo: Option<&ResultRedo>) -> Markup {
         }
     };
     // A public link is normally one word; more means the short tiers are crowded.
-    let note = (max_uses.is_none() && !secret && words > 1).then(|| {
+    // Input that tried to be an address but could not be one became Text; say
+    // why, as the form does with JavaScript before it is sent.
+    let refusal = (kind_label == "Text")
+        .then(|| yuiolink_core::address_refusal(content))
+        .flatten()
+        .map(|e| match e {
+            yuiolink_core::UriError::SchemeNotAllowed(scheme) => {
+                format!("Links can't redirect to {scheme}: addresses, so this became a text link.")
+            }
+            yuiolink_core::UriError::Invalid => {
+                "This isn't a valid address, so it became a text link.".to_owned()
+            }
+        });
+    let crowded = (max_uses.is_none() && !secret && words > 1).then(|| {
         format!("Short names are in high demand right now, so this link uses {words} words.")
     });
+    let note = match (refusal, crowded) {
+        (Some(a), Some(b)) => Some(format!("{a} {b}")),
+        (a, b) => a.or(b),
+    };
     let trimmed = content.trim();
     let snippet: String = trimmed.chars().take(400).collect();
     let snippet = Snippet {

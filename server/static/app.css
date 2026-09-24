@@ -868,6 +868,17 @@ html.js .custom-field:not(.open) {
     white-space: pre-line;
 }
 
+/* Why an address-like input will be a text link: said quietly, since nothing
+   is wrong, the input just is not an address a redirect will take. */
+.form-note {
+    margin: 12px auto 0;
+    max-width: 36ch;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+}
+
 /* Buttons */
 .btn {
     display: inline-flex;

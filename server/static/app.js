@@ -31,6 +31,16 @@
         const i = s.indexOf(":");
         return !/\s/.test(s) && (s.startsWith("//", i + 1) || SCHEMES.has(s.slice(0, i).toLowerCase()));
     };
+    // Why an input that tries to be an address cannot be a redirect, or "" when
+    // it can. detectKind reads such input as Text, and the form says why under
+    // the button. Mirrors the server's validate_redirect: the scheme must be on
+    // its list, and the whole must parse.
+    const addressProblem = (s) => {
+        const scheme = s.slice(0, s.indexOf(":")).toLowerCase();
+        if (!SCHEMES.has(scheme)) return `Links can't redirect to ${scheme}: addresses, so this will be a text link.`;
+        if (!URL.canParse(s)) return "This isn't a valid address, so it will be a text link.";
+        return "";
+    };
     const looksLikeDomain = (s) => {
         if (/\s/.test(s)) return false;
         const host = s.split(/[/?#]/)[0].split(":")[0];
@@ -46,7 +56,7 @@
         const t = value.trim();
         if (t === "") return "text";
         if (t.includes("\n")) return "text";
-        return looksLikeUrl(t) || looksLikeDomain(t) ? "redirect" : "text";
+        return (looksLikeUrl(t) && !addressProblem(t)) || looksLikeDomain(t) ? "redirect" : "text";
     };
     const kindLabel = (k) => (k === "redirect" ? "Redirect" : "Text");
     // The kind as a colour-coded word (Redirect blue, Text yellow), shared by the
@@ -1557,10 +1567,19 @@
         let altHeld = false;
 
         // The primary button names what it will create (Option flips a URL to Text).
+        const formNote = document.getElementById("form-note");
         const updateSubmitLabel = () => {
             const empty = content.value.trim() === "";
             const kind = altHeld ? "text" : detectKind(content.value);
             submitBtn.textContent = empty ? "Create Link" : `Create ${kindLabel(kind)} Link`;
+            // Input that tries to be an address but cannot be one becomes Text;
+            // say so before it is sent, so a typo is caught rather than shared.
+            const t = content.value.trim();
+            const problem = !altHeld && looksLikeUrl(t) ? addressProblem(t) : "";
+            if (formNote) {
+                formNote.textContent = problem;
+                formNote.hidden = !problem;
+            }
             // Hint the hidden override only when it would change the outcome (a URL that
             // would otherwise redirect), so the tooltip is never misleading.
             submitBtn.title = (!empty && !altHeld && detectKind(content.value) === "redirect")

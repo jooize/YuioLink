@@ -261,8 +261,8 @@ pub fn has_scheme(s: &str) -> bool {
 /// space in an address is written `%20`, as browsers copy it), so anything with
 /// a space is Text: "Shopping: oat milk", or "https://example.com is great".
 /// Then either `//` follows the scheme, or the scheme is one a redirect may use;
-/// "Password:hunter2" is Text. A `//` address with an unknown scheme is still an
-/// address, and validation refuses it.
+/// "Password:hunter2" is Text. This says only that `s` tries to be an address;
+/// `detect_kind` also asks whether a redirect would take it.
 fn looks_like_url(s: &str) -> bool {
     let Some((scheme, rest)) = s.split_once(':').filter(|_| has_scheme(s)) else {
         return false;
@@ -272,6 +272,17 @@ fn looks_like_url(s: &str) -> bool {
             || DEFAULT_ALLOWED_SCHEMES
                 .iter()
                 .any(|known| known.eq_ignore_ascii_case(scheme)))
+}
+
+/// Why input that tries to be an address cannot be a redirect, if it cannot:
+/// `detect_kind` reads such input as Text, and the result says why. `None` for
+/// input a redirect takes, and for input that never tried to be an address.
+pub fn address_refusal(s: &str) -> Option<UriError> {
+    let t = s.trim();
+    if !looks_like_url(t) {
+        return None;
+    }
+    validate_redirect(t, DEFAULT_ALLOWED_SCHEMES).err()
 }
 
 /// True if `s` is a single token that looks like a bare domain (`example.com`,
@@ -316,7 +327,12 @@ pub fn detect_kind(s: &str) -> Kind {
     if trimmed.contains('\n') {
         return Kind::Text;
     }
-    if looks_like_url(trimmed) || looks_like_domain(trimmed) {
+    // Only an address a redirect will take: one that tries to be an address
+    // but cannot be one (an unknown `//` scheme, a broken URL) is Text, and the
+    // form says so before it is sent.
+    if (looks_like_url(trimmed) && validate_redirect(trimmed, DEFAULT_ALLOWED_SCHEMES).is_ok())
+        || looks_like_domain(trimmed)
+    {
         Kind::Redirect
     } else {
         Kind::Text
@@ -546,8 +562,16 @@ mod tests {
         assert_eq!(detect_kind("javascript:alert(1)"), Kind::Text);
         assert_eq!(detect_kind("tel:+46701234567"), Kind::Redirect);
         assert_eq!(detect_kind("MAILTO:a@b.com"), Kind::Redirect);
-        // With `//`, any scheme is an address, and an unknown one is refused.
-        assert_eq!(detect_kind("gopher://example.com"), Kind::Redirect);
+        // An address a redirect would refuse is Text: an unknown scheme, or
+        // one that does not parse.
+        assert_eq!(detect_kind("gopher://example.com"), Kind::Text);
+        assert_eq!(detect_kind("https://exa[mple.com"), Kind::Text);
+        assert_eq!(
+            address_refusal("gopher://example.com"),
+            Some(UriError::SchemeNotAllowed("gopher".into()))
+        );
+        assert_eq!(address_refusal("https://example.com"), None);
+        assert_eq!(address_refusal("Shopping: oat milk"), None);
     }
 
     #[test]
