@@ -1174,12 +1174,13 @@ html.js .custom-field:not(.open) {
     user-select: text;
 }
 
-/* Beneath the link: the buttons, a hairline, then the QR code. The button
-   block centres in whatever the code leaves; the prompt Delete opens spans
-   the whole row under both. */
+/* Beneath the link: the buttons, a hairline, then the QR code, together in
+   the middle of the panel; the prompt Delete opens spans the whole row under
+   both. */
 .result-foot {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto auto;
+    justify-content: center;
     align-items: center;
     margin-top: 16px;
 }
