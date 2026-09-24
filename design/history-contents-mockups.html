@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en" class="js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>History Contents Line</title>
+<link rel="stylesheet" href="../server/static/app.css">
+<style>
+/* The page itself: undo app.css's centered single-card body. */
+body { display: block; padding: 28px 16px 48px; }
+main { max-width: 1080px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.lead { color: var(--text-secondary); font-size: 14px; margin: 0 0 22px; max-width: 72ch; text-align: left; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 500px), 1fr)); gap: 22px; }
+figure { margin: 0; }
+figcaption { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 8px; }
+figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
+.history-list { min-height: 0; }
+
+/* ---------- shared: the line gets a fixed slot for the toggle at its right
+   end, lined up with the trash column below, so Show and Hide never move. */
+.history-snippet { gap: 10px; }
+.history-snippet-body { flex: 1 1 auto; }
+.mk-toggle {
+    flex: none; margin-left: auto; margin-right: -2px;
+    display: inline-flex; align-items: center; gap: 4px;
+    font: inherit; font-size: 12px; font-weight: 500;
+    color: var(--accent-text); background: none; border: 0; padding: 0; cursor: pointer;
+}
+.mk-toggle svg { display: block; }
+.icon-only .mk-toggle { color: var(--text-secondary); }
+.icon-only .mk-toggle:hover { color: var(--accent-text); }
+
+/* ---------- A: veil. A soft frosted capsule of fixed width. */
+.vA .veil {
+    display: block; width: min(15em, 70%); height: 10px; border-radius: 5px;
+    background:
+        linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--text) 5%, transparent) 45%, transparent 70%),
+        color-mix(in srgb, var(--text) 9%, transparent);
+    box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+/* ---------- B: ghost words. Rounded bars of fixed, varied widths. */
+.vB .ghosts { display: flex; gap: 5px; align-items: center; }
+.vB .ghosts i {
+    display: block; height: 8px; border-radius: 4px;
+    background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+/* ---------- C: frosted decoy. A fixed sentence, never the real contents,
+   drawn under a blur so it reads as text behind glass. */
+.vC .frost { filter: blur(3.2px); opacity: 0.7; user-select: none; color: var(--text-secondary); }
+
+/* ---------- D: word. A plain label says what is here. */
+.vD .label { display: inline-flex; align-items: center; gap: 5px; color: var(--text-tertiary); }
+.vD .label svg { flex: none; }
+
+/* ---------- E: leading eye. The toggle opens the line, so it has one
+   place whatever follows it. */
+.vE .history-snippet { gap: 7px; }
+.vE .mk-toggle { order: -1; margin: 0 0 0 -1px; color: var(--text-secondary); }
+.vE .mk-toggle:hover { color: var(--accent-text); }
+.vE .veil {
+    display: block; width: min(13em, 70%); height: 9px; border-radius: 4.5px;
+    background: color-mix(in srgb, var(--text) 9%, transparent);
+}
+
+/* ---------- F: engraved. A hairline rule with a centered lock, the row's
+   own separator language, inset. */
+.vF .rule { display: flex; align-items: center; gap: 8px; color: var(--text-tertiary); }
+.vF .rule::before, .vF .rule::after {
+    content: ""; flex: 1; height: 0; border-top: 1px dashed color-mix(in srgb, var(--text) 16%, transparent);
+}
+</style>
+</head>
+<body>
+<main>
+<h1>History contents line</h1>
+<p class="lead">Six ways to show that a Secret or One-Time row holds something without saying what. In each, the first row is covered, the second is the same row revealed, the third is a public redirect for comparison. Show and Hide now sit in one fixed place at the right end of the line (or its start, in E), so they no longer jump.</p>
+<div class="grid" id="grid"></div>
+</main>
+<script>
+const ns = "http://www.w3.org/2000/svg";
+const svg = (size, vb, parts) => {
+    const s = document.createElementNS(ns, "svg");
+    s.setAttribute("width", size); s.setAttribute("height", size); s.setAttribute("viewBox", vb);
+    s.setAttribute("fill", "none"); s.setAttribute("aria-hidden", "true");
+    for (const [tag, attrs] of parts) {
+        const e = document.createElementNS(ns, tag);
+        for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+        s.append(e);
+    }
+    return s;
+};
+const R = { stroke: "currentColor", "stroke-linecap": "round", "stroke-linejoin": "round" };
+const eye = (off) => svg(15, "0 0 14 14", [
+    ["path", { ...R, "stroke-width": "1.3", d: "M1.3 7C2.8 4.3 4.7 3 7 3s4.2 1.3 5.7 4C11.2 9.7 9.3 11 7 11S2.8 9.7 1.3 7Z" }],
+    ["circle", { ...R, "stroke-width": "1.3", cx: "7", cy: "7", r: "1.9" }],
+    ...(off ? [["path", { ...R, "stroke-width": "1.3", d: "M2.3 1.8 11.7 12.2" }]] : []),
+]);
+const lock = () => svg(12, "0 0 14 14", [
+    ["rect", { ...R, "stroke-width": "1.4", x: "3", y: "6.2", width: "8", height: "5.8", rx: "1.4" }],
+    ["path", { ...R, "stroke-width": "1.4", d: "M4.9 6.2V4.6a2.1 2.1 0 0 1 4.2 0v1.6" }],
+]);
+const copyI = () => svg(16, "0 0 14 14", [
+    ["path", { stroke: "currentColor", "stroke-linecap": "round", d: "M9.6 2.2H3.6c-.77 0-1.4.63-1.4 1.4v6.2", "stroke-width": "1.6" }],
+    ["rect", { stroke: "currentColor", x: "4.9", y: "4.7", width: "7", height: "7.2", rx: "1.3", "stroke-width": "1.6" }],
+]);
+const openI = () => svg(15, "0 0 13 13", [["path", { ...R, d: "M2.5 10.5 10.5 2.5M4 2.5h6.5V9", "stroke-width": "1.8" }]]);
+const trashI = () => svg(16, "0 0 14 14", [["path", { ...R, "stroke-width": "1.4", d: "M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7" }]]);
+const h = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
+
+const SECRET = "The wifi password is hunter2 and the door code is 4711";
+const DECOY = "Something is written here that you cannot read";
+
+// cover(v) -> the covered body for variant v; toggle(v, covered) -> button or null
+const V = {
+    A: { t: "Veil", d: "A soft frosted capsule of fixed width, the eye at the line's end.", icon: true,
+         cover: () => h("span", "veil") },
+    B: { t: "Ghost words", d: "Three rounded bars shaped like words, always the same three.", icon: true,
+         cover: () => { const g = h("span", "ghosts"); for (const w of [44, 70, 30]) { const i = h("i", ""); i.style.width = w + "px"; g.append(i); } return g; } },
+    C: { t: "Frosted glass", d: "Text behind glass. The blurred sentence is a fixed decoy, never the real contents.", icon: false,
+         cover: () => h("span", "frost", DECOY) },
+    D: { t: "A word", d: "No drawing at all: a lock and a quiet label, Show at the end.", icon: false,
+         cover: () => h("span", "label", lock(), "Hidden contents") },
+    E: { t: "Leading eye", d: "The eye opens the line, so it cannot move; a short capsule follows.", icon: true,
+         cover: () => h("span", "veil") },
+    F: { t: "Engraved rule", d: "A dashed hairline with a lock at its center, like a sealed seam.", icon: true,
+         cover: () => h("span", "rule", lock()) },
+};
+
+const url = (name) => {
+    const u = h("div", "history-url");
+    u.append(h("span", "u-scheme", "https://"), h("span", "u-host", "yuio.link"), h("span", "u-sep", "/"));
+    const n = h("span", "u-name"); name.forEach((w, i) => n.append(h("span", "nw-" + (i % 2), w))); u.append(n);
+    return u;
+};
+const foot = (kind, suffix) => {
+    const f = h("div", "history-foot");
+    const m = h("small", "history-meta", h("span", "kind-word " + kind.toLowerCase(), kind), " · ", h("span", "countdown", "7 days left"));
+    if (suffix) m.append(suffix);
+    const a = h("div", "history-actions", h("span", "history-check"), h("a", "history-copy", copyI()), h("a", "history-show", openI()), h("button", "history-remove", trashI()));
+    f.append(m, a); return f;
+};
+const line = (v, kind, text, priv, covered) => {
+    const l = h("div", "history-snippet " + (kind === "Redirect" ? "redirect" : "text"));
+    const b = h("span", "history-snippet-body");
+    if (covered) b.append(V[v].cover()); else b.textContent = text;
+    l.append(b);
+    if (priv) {
+        const t = h("button", "mk-toggle");
+        if (V[v].icon) t.append(eye(!covered)); else t.append(covered ? "Show" : "Hide");
+        l.append(t);
+    }
+    return l;
+};
+const row = (v, name, kind, text, priv, covered, suffix) =>
+    h("li", "history-item", url(name), line(v, kind, text, priv, covered), foot(kind, suffix));
+
+const grid = document.getElementById("grid");
+for (const [k, v] of Object.entries(V)) {
+    const ul = h("ul", "history-list v" + k + (v.icon ? " icon-only" : ""),
+        row(k, ["hazing", "VALLEY", "junior", "GALA"], "Text", SECRET, true, true),
+        row(k, ["hazing", "VALLEY", "junior", "GALA"], "Text", SECRET, true, false),
+        row(k, ["hero"], "Redirect", "example.com/some/long/path/to/a/page?with=query", false, false));
+    const cap = h("figcaption", "", h("b", "", k + " · " + v.t), v.d);
+    grid.append(h("figure", "", cap, ul));
+}
+</script>
+</body>
+</html>

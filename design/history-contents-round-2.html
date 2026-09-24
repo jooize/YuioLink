@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en" class="js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>History Contents Round 2</title>
+<link rel="stylesheet" href="../server/static/app.css">
+<style>
+body { display: block; padding: 28px 16px 48px; }
+main { max-width: 1080px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 17px; margin: 30px 0 4px; }
+.lead { color: var(--text-secondary); font-size: 14px; margin: 0 0 18px; max-width: 72ch; text-align: left; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 500px), 1fr)); gap: 22px; }
+figure { margin: 0; }
+figcaption { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 8px; text-align: left; }
+figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
+.history-list { min-height: 0; }
+.history-snippet-body { flex: 1 1 auto; }
+
+/* frosted decoy: random words per row, never the real contents */
+.frost { filter: blur(2.6px); opacity: 0.9; user-select: none; color: var(--text-secondary); }
+
+.eye {
+    flex: none; display: inline-flex; align-items: center; font: inherit;
+    color: var(--text-secondary); background: none; border: 0; padding: 0; cursor: pointer;
+}
+.eye:hover { color: var(--accent-text); }
+.eye svg { display: block; }
+/* P1: the eye opens line 2 */
+.P1 .history-snippet { gap: 7px; }
+.P1 .eye { margin-left: -1px; }
+/* P2: the eye joins the actions, left of Copy, with the same hit box */
+.P2 .history-actions .eye { padding: 14px 12px; margin: -10px 0; opacity: 0.85; }
+
+/* arrow variants for a redirect's destination */
+.history-snippet.redirect .history-snippet-body::before { content: none; }
+.arr { font-family: var(--font); }
+.R1 .history-snippet.redirect .arr::before { content: "\2192\00a0"; color: var(--text-tertiary); }
+.R2 .history-snippet.redirect .arr::before { content: "\2192"; margin-right: 6px; color: var(--text-secondary); }
+.R3 .history-snippet.redirect .arr::before { content: "\2192"; margin-right: 6px; font-size: 14px; font-weight: 600; color: var(--accent-text); }
+.R4 .history-snippet.redirect { gap: 6px; }
+.R4 .arrsvg { flex: none; color: var(--accent-text); display: block; }
+.R5 .history-snippet.redirect .arr::before { content: "\21B3"; margin-right: 6px; font-size: 13px; color: var(--accent-text); }
+.R6 .history-snippet.redirect { gap: 6px; }
+.R6 .arrsvg { flex: none; color: var(--text-secondary); display: block; }
+</style>
+</head>
+<body>
+<main>
+<h1>History contents line, round 2</h1>
+<p class="lead">Frosted glass with the eye, in two places. The blurred words are picked at random for each row, so no two rows look alike. They are never the real contents. Below that, six treatments of the arrow before a redirect's destination.</p>
+<h2>Eye placement</h2>
+<div class="grid" id="eyes"></div>
+<h2>Redirect arrow</h2>
+<div class="grid" id="arrows"></div>
+</main>
+<script>
+const ns = "http://www.w3.org/2000/svg";
+const svg = (size, vb, parts) => {
+    const s = document.createElementNS(ns, "svg");
+    s.setAttribute("width", size); s.setAttribute("height", size); s.setAttribute("viewBox", vb);
+    s.setAttribute("fill", "none"); s.setAttribute("aria-hidden", "true");
+    for (const [tag, attrs] of parts) {
+        const e = document.createElementNS(ns, tag);
+        for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+        s.append(e);
+    }
+    return s;
+};
+const R = { stroke: "currentColor", "stroke-linecap": "round", "stroke-linejoin": "round" };
+const eye = (off) => svg(15, "0 0 14 14", [
+    ["path", { ...R, "stroke-width": "1.3", d: "M1.3 7C2.8 4.3 4.7 3 7 3s4.2 1.3 5.7 4C11.2 9.7 9.3 11 7 11S2.8 9.7 1.3 7Z" }],
+    ["circle", { ...R, "stroke-width": "1.3", cx: "7", cy: "7", r: "1.9" }],
+    ...(off ? [["path", { ...R, "stroke-width": "1.3", d: "M2.3 1.8 11.7 12.2" }]] : []),
+]);
+const lock = () => svg(12, "0 0 14 14", [
+    ["rect", { ...R, "stroke-width": "1.4", x: "3", y: "6.2", width: "8", height: "5.8", rx: "1.4" }],
+    ["path", { ...R, "stroke-width": "1.4", d: "M4.9 6.2V4.6a2.1 2.1 0 0 1 4.2 0v1.6" }],
+]);
+const copyI = () => svg(16, "0 0 14 14", [
+    ["path", { stroke: "currentColor", "stroke-linecap": "round", d: "M9.6 2.2H3.6c-.77 0-1.4.63-1.4 1.4v6.2", "stroke-width": "1.6" }],
+    ["rect", { stroke: "currentColor", x: "4.9", y: "4.7", width: "7", height: "7.2", rx: "1.3", "stroke-width": "1.6" }],
+]);
+const openI = () => svg(15, "0 0 13 13", [["path", { ...R, d: "M2.5 10.5 10.5 2.5M4 2.5h6.5V9", "stroke-width": "1.8" }]]);
+const trashI = () => svg(16, "0 0 14 14", [["path", { ...R, "stroke-width": "1.4", d: "M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7" }]]);
+const h = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
+
+
+const DECOYS = "river paper lantern quiet orbit meadow copper window signal harbor velvet thunder garden pocket silver marble echo forest candle ribbon planet saddle hollow crystal amber shadow falcon winter island mirror".split(" ");
+let seed = 7;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const decoy = () => { const n = 4 + Math.floor(rnd() * 6); return Array.from({ length: n }, () => DECOYS[Math.floor(rnd() * DECOYS.length)]).join(" "); };
+const SECRETS = ["The wifi password is hunter2 and the door code is 4711", "Meet at the north gate at nine, bring the blue folder", "Invoice 2291 is attached, pay by Friday"];
+const NAMES = [["hazing", "VALLEY", "junior", "GALA"], ["brave", "OTTER", "quiet", "MOSS"], ["amber", "FIELD", "north", "TIDE"]];
+const arrowSvg = () => svg(13, "0 0 14 14", [["path", { ...R, "stroke-width": "1.6", d: "M2 7h9.5M8 3.5 11.5 7 8 10.5" }]]);
+
+const url = (name) => {
+    const u = h("div", "history-url");
+    u.append(h("span", "u-scheme", "https://"), h("span", "u-host", "yuio.link"), h("span", "u-sep", "/"));
+    const n = h("span", "u-name"); name.forEach((w, i) => n.append(h("span", "nw-" + (i % 2), w))); u.append(n);
+    return u;
+};
+const eyeBtn = (covered) => h("button", "eye", eye(!covered));
+const foot = (kind, extra) => {
+    const f = h("div", "history-foot");
+    const m = h("small", "history-meta", h("span", "kind-word " + kind.toLowerCase(), kind), " · ", h("span", "countdown", "7 days left"));
+    const a = h("div", "history-actions", h("span", "history-check"));
+    if (extra) a.append(extra);
+    a.append(h("a", "history-copy", copyI()), h("a", "history-show", openI()), h("button", "history-remove", trashI()));
+    f.append(m, a); return f;
+};
+const textRow = (place, i, covered) => {
+    const l = h("div", "history-snippet text");
+    const b = h("span", "history-snippet-body");
+    if (covered) b.append(h("span", "frost", decoy())); else b.textContent = SECRETS[i];
+    if (place === "P1") l.append(eyeBtn(covered));
+    l.append(b);
+    return h("li", "history-item", url(NAMES[i]), l, foot("Text", place === "P2" ? eyeBtn(covered) : null));
+};
+const redirRow = (r, dest, name) => {
+    const l = h("div", "history-snippet redirect");
+    if (r === "R4") l.append(arrowSvg());
+    if (r === "R6") l.append(arrowSvg());
+    const b = h("span", "history-snippet-body arr", dest);
+    l.append(b);
+    return h("li", "history-item", url(name), l, foot("Redirect"));
+};
+const P = { P1: ["Eye leads line 2", "The eye starts the contents line, the frosted words follow."], P2: ["Eye beside the actions", "The eye joins the icons, left of Copy. Line 2 is only the frosted words."] };
+for (const [k, [t, d]] of Object.entries(P)) {
+    seed = 7;
+    const ul = h("ul", "history-list " + k, textRow(k, 0, true), textRow(k, 0, false), textRow(k, 1, true), textRow(k, 2, true));
+    document.getElementById("eyes").append(h("figure", "", h("figcaption", "", h("b", "", k + " · " + t), d), ul));
+}
+const RS = {
+    R1: ["Today", "Text arrow and one space, faint grey."],
+    R2: ["More room", "Same arrow, 6px of air, one step darker."],
+    R3: ["Blue arrow", "Larger, semibold, in the Redirect blue."],
+    R4: ["Drawn arrow, blue", "An SVG arrow drawn like the row's icons, in Redirect blue."],
+    R5: ["Hook arrow", "A return arrow, as in “this leads to”, in blue."],
+    R6: ["Drawn arrow, grey", "The SVG arrow in the secondary grey."],
+};
+for (const [k, [t, d]] of Object.entries(RS)) {
+    const ul = h("ul", "history-list " + k,
+        redirRow(k, "example.com/some/long/path/to/a/page?with=query", ["hero"]),
+        redirRow(k, "github.com/jooize/yuiolink/issues", ["brave", "OTTER"]));
+    document.getElementById("arrows").append(h("figure", "", h("figcaption", "", h("b", "", k + " · " + t), d), ul));
+}
+</script>
+</body>
+</html>
