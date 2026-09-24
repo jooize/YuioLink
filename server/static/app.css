@@ -3091,9 +3091,10 @@ html.history-collapsed .history-body {
     padding: 0;
     /* The rows' height, held open from the first paint: `--history-rows` is the
        saved count (pre-paint script) and then the rendered count (app.js). One
-       row is `.history-item`'s 56px, plus this panel's own hairline top and
+       row is `.history-item`'s 56px, a row showing its contents 19px more (the
+       snippet line plus the row's gap), plus this panel's own hairline top and
        bottom. Only ever a floor, so a row that grows still grows. */
-    min-height: calc(var(--history-rows, 0) * 56px + 1px);
+    min-height: calc(var(--history-rows, 0) * 56px + var(--history-snippets, 0) * 19px + 1px);
     background: var(--field-bg);
     border: 0.5px solid var(--field-border);
     border-radius: 12px;
@@ -3263,7 +3264,62 @@ html.history-collapsed .history-body {
 .history-url .nw-0,
 .history-url .nw-1 { color: var(--text); }
 
-/* Line 2: kind pill + expiry, in the UI font (mockup A). */
+/* Between the URL and the meta: what the link holds. One fixed-height line, so
+   the reserved list height (see .history-list) can count it. A destination
+   reads in mono like the URL above it; Text reads in the UI font. */
+.history-snippet {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 16px;
+    min-width: 0;
+    font-size: 12.5px;
+    line-height: 16px;
+    color: var(--text-secondary);
+}
+
+.history-snippet-body {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: text;
+}
+
+.history-snippet.redirect .history-snippet-body {
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+/* A redirect's destination opens with an arrow: where the link goes. */
+.history-snippet.redirect .history-snippet-body::before {
+    content: "\2192\00a0";
+    font-family: var(--font);
+    color: var(--text-tertiary);
+}
+
+.history-snippet-body.covered {
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    user-select: none;
+}
+
+.history-snippet-toggle {
+    flex: none;
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--accent-text);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+
+.history-snippet-toggle:hover {
+    text-decoration: underline;
+}
+
+/* Line 3: kind pill + expiry, in the UI font (mockup A). */
 .history-meta {
     display: flex;
     align-items: center;

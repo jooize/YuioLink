@@ -395,12 +395,15 @@ pub async fn form_create(
             });
             Html(
                 views::result_page(
-                    &url,
-                    kind_label,
-                    &inserted.expires_at,
-                    max_uses,
-                    secret,
-                    inserted.words,
+                    &views::CreatedLink {
+                        url: &url,
+                        content: &form.content,
+                        kind_label,
+                        expires_at: &inserted.expires_at,
+                        max_uses,
+                        secret,
+                        words: inserted.words,
+                    },
                     redo.as_ref(),
                 )
                 .into_string(),

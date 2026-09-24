@@ -68,7 +68,9 @@ fn asset_stamp() -> &'static str {
 /// which the server cannot see, so the section sits between the form and the
 /// footer and shoves both down the moment app.js renders it — the footer's whole
 /// CLS. Reading the count here (and the open/closed choice with it) lets the CSS
-/// reserve the rows' height at first paint; app.js fills the space it finds.
+/// reserve the rows' height at first paint; app.js fills the space it finds. Rows
+/// that show their contents are a line taller, so they are counted apart, by
+/// app.js's rule: live, with a snippet, not yet expired.
 ///
 /// The keys and the shape are app.js's (`HISTORY_KEY` and friends); this is the
 /// one other place that knows them, so they move together. A miscount is a
@@ -79,8 +81,10 @@ document.documentElement.classList.add('js');\
 try{if(localStorage.getItem('yuiolink:history:persist')==='1'){\
 var s=JSON.parse(localStorage.getItem('yuiolink:history')||'[]');\
 var n=Array.isArray(s)?s.filter(function(e){return e&&e.tombstone!=='cleared'}).length:0;\
+var c=Array.isArray(s)?s.filter(function(e){return e&&!e.tombstone&&e.snippet&&\
+!(Date.parse(String(e.expires).replace(' ','T')+'Z')<=Date.now())}).length:0;\
 if(n){var d=document.documentElement;d.classList.add('has-history');\
-d.style.setProperty('--history-rows',n);\
+d.style.setProperty('--history-rows',n);d.style.setProperty('--history-snippets',c);\
 if(localStorage.getItem('yuiolink:history:open')==='0')d.classList.add('history-collapsed')}}}catch(e){}";
 
 /// A `<script src>` for one of our own files, carrying this response's CSP nonce.
@@ -429,7 +433,13 @@ pub fn humanize_duration(secs: i64) -> String {
 /// no-JS path, populated in place by `app.js` otherwise). The memorable word (the
 /// link name) is the hero; the full URL sits small beneath it; a single meta line
 /// carries kind, expiry, and any use limit.
-fn result_output(url: Option<&str>, meta: Markup, note: Option<&str>) -> Markup {
+fn result_output(
+    url: Option<&str>,
+    meta: Markup,
+    note: Option<&str>,
+    snippet: Option<&str>,
+    secret: bool,
+) -> Markup {
     // The terms receipt for the no-JS path: the result page carries the version
     // and fingerprint of the terms this link was created under, and app.js (if
     // it later runs) copies them into the local-history entry. The JS create
@@ -440,7 +450,8 @@ fn result_output(url: Option<&str>, meta: Markup, note: Option<&str>) -> Markup 
     let qr = url.map(|u| format!("/{}/qr.svg", link_name(u)));
     html! {
         output.result #link-panel tabindex="-1" hidden[url.is_none()]
-            data-terms-version=(terms.version) data-terms-sha256=(terms.sha256) {
+            data-terms-version=(terms.version) data-terms-sha256=(terms.sha256)
+            data-snippet=[snippet] data-secret=[secret.then_some("1")] {
             // The link and its QR code side by side: a phone held up to the
             // screen is the other way a link leaves this page.
             div.result-top {
@@ -549,7 +560,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
         }
         // The created link (latest), shown above the input. app.js fills it in place;
         // the no-JS path reloads to a result page.
-        (result_output(None, html! {}, None))
+        (result_output(None, html! {}, None, None, false))
 
         form #create-form method="post" action="/" {
             label.visually-hidden for="content" { "Link or text to share" }
@@ -779,15 +790,30 @@ pub struct ResultRedo<'a> {
     pub link_type: &'a str,
 }
 
-pub fn result_page(
-    url: &str,
-    kind_label: &str,
-    expires_at: &str,
-    max_uses: Option<i64>,
-    secret: bool,
-    words: usize,
-    redo: Option<&ResultRedo>,
-) -> Markup {
+/// The link a no-JS create just made, as its result page shows it.
+pub struct CreatedLink<'a> {
+    pub url: &'a str,
+    /// What the form posted; the page passes its opening to app.js for the
+    /// local-history row.
+    pub content: &'a str,
+    pub kind_label: &'a str,
+    pub expires_at: &'a str,
+    pub max_uses: Option<i64>,
+    pub secret: bool,
+    /// Words in the name, to explain a public link longer than one.
+    pub words: usize,
+}
+
+pub fn result_page(link: &CreatedLink, redo: Option<&ResultRedo>) -> Markup {
+    let &CreatedLink {
+        url,
+        content,
+        kind_label,
+        expires_at,
+        max_uses,
+        secret,
+        words,
+    } = link;
     let meta = html! {
         (kind_label) " · expires " (expires_at) " UTC"
         @match max_uses {
@@ -800,9 +826,13 @@ pub fn result_page(
     let note = (max_uses.is_none() && !secret && words > 1).then(|| {
         format!("Short names are in high demand right now, so this link uses {words} words.")
     });
+    let snippet: String = content.trim().chars().take(400).collect();
     let body = html! {
         (home_chip("/", "Create New Link"))
-        (result_output(Some(url), meta, note.as_deref()))
+        // What the link holds, for the local-history row app.js records from this
+        // page. Cut here rather than there, so a long Text link is not sent back
+        // twice; app.js folds and trims it to the row's own length.
+        (result_output(Some(url), meta, note.as_deref(), Some(&snippet), secret))
         a.btn.btn-block href=(url) { "Open link" }
         // Only offered after a Redirect: a non-URL is already Text, so there is
         // no other kind to offer it as.

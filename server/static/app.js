@@ -550,6 +550,29 @@
         const d = parseUtc(it.expires);
         return !!d && !Number.isNaN(d.getTime()) && d.getTime() <= Date.now();
     };
+
+    // --- what a link holds, as its history row shows it ---
+    // Enough to recognise the link by, never the whole thing: a Text link can be
+    // long, and this sits in localStorage for as long as the row does. Whitespace
+    // folds to single spaces, since the row is one line.
+    const SNIPPET_MAX = 200;
+    const snippetOf = (kind, payload) =>
+        (kind === "redirect" ? payload.trim() : payload.replace(/\s+/g, " ").trim()).slice(0, SNIPPET_MAX);
+    // Secret and one-time links hold what their creator did not want on show, so
+    // their rows cover it until asked. Revealing lasts for this page view only.
+    const isPrivate = (it) => !!it.secret || it.uses === 1;
+    const revealed = new Set();
+    // A link that has expired no longer holds anything, so neither does its row:
+    // the contents leave this device when the link leaves the server. Returns
+    // whether anything was dropped. (PRE_PAINT_JS in views.rs counts rows with
+    // contents by the same rule, to reserve their height.)
+    const dropExpiredSnippets = () => {
+        let dropped = false;
+        for (const it of memHistory) {
+            if (it.snippet && isExpired(it)) { delete it.snippet; dropped = true; }
+        }
+        return dropped;
+    };
     const loadPersisted = () => {
         persistEnabled = lsGet(PERSIST_KEY) === "1";
         if (persistEnabled) {
@@ -609,7 +632,46 @@
         requestAnimationFrame(() => { fitQueued = false; fitHistoryUrls(); });
     });
 
+    // Line 2 of a live row, when it knows its contents: a redirect's destination
+    // (the https:// scheme dropped, as the row's own URL does when it runs short)
+    // or the opening of a Text link. A private row shows a fixed run of dots,
+    // which gives away nothing about the length, and a Show button beside it.
+    const snippetLine = (it, rowName) => {
+        const line = document.createElement("div");
+        line.className = `history-snippet ${it.kind === "redirect" ? "redirect" : "text"}`;
+        const body = document.createElement("span");
+        body.className = "history-snippet-body";
+        const covered = isPrivate(it) && !revealed.has(it.id);
+        if (covered) {
+            body.classList.add("covered");
+            body.textContent = "••••••••••••";
+            body.setAttribute("aria-hidden", "true"); // the button says what is hidden
+        } else {
+            body.textContent = it.kind === "redirect" ? it.snippet.replace(/^https:\/\//i, "") : it.snippet;
+            body.title = it.snippet;
+        }
+        line.append(body);
+        if (isPrivate(it)) {
+            const toggle = document.createElement("button");
+            toggle.type = "button";
+            toggle.className = "history-snippet-toggle";
+            toggle.textContent = covered ? "Show" : "Hide";
+            toggle.setAttribute("aria-label", `${covered ? "Show" : "Hide"} Contents of ${rowName}`);
+            toggle.dataset.for = it.id;
+            toggle.addEventListener("click", () => {
+                if (covered) revealed.add(it.id);
+                else revealed.delete(it.id);
+                renderHistory();
+                // The list was rebuilt; hand focus to this row's new button.
+                document.querySelector(`.history-snippet-toggle[data-for="${it.id}"]`)?.focus();
+            });
+            line.append(toggle);
+        }
+        return line;
+    };
+
     const renderHistory = () => {
+        dropExpiredSnippets();
         persistNow();
         // "cleared" certificates are bookkeeping for the cross-tab merge — never shown.
         const shown = memHistory.filter((it) => it.tombstone !== "cleared");
@@ -675,6 +737,7 @@
         // (see PRE_PAINT_JS in views.rs).
         const root = document.documentElement;
         root.style.setProperty("--history-rows", String(n));
+        root.style.setProperty("--history-snippets", String(shown.filter((it) => !it.tombstone && it.snippet).length));
         root.classList.toggle("has-history", n > 0);
         if (n === 0) return;
         for (const it of shown) {
@@ -784,7 +847,9 @@
             actions.append(check, copy, show, remove);
             foot.append(meta, actions);
 
-            li.append(url, foot);
+            li.append(url);
+            if (it.snippet) li.append(snippetLine(it, rowName));
+            li.append(foot);
             listEl.append(li);
         }
         fitHistoryUrls();
@@ -1393,7 +1458,9 @@
                 // server delete (token is undefined if the backend didn't send one).
                 // `terms` is the creation receipt: the version + SHA-256 fingerprint
                 // of the terms this link was made under (see /legal#verification).
-                const entry = { url, name: data.name, kind, uses, expires: data.expires_at, token: data.delete_token, terms: data.terms, created: Date.now() };
+                // `snippet` is what the link holds, cut short, so the row can say
+                // what it was for; `secret` asks the row to keep it covered.
+                const entry = { url, name: data.name, kind, uses, secret: priv, snippet: snippetOf(kind, payload), expires: data.expires_at, token: data.delete_token, terms: data.terms, created: Date.now() };
                 addHistory(entry); // stamps entry.id, which the result's Delete needs
                 renderHistory();
                 setupResultActions(entry);
@@ -1531,13 +1598,19 @@
         const terms = panel?.dataset.termsVersion
             ? { version: panel.dataset.termsVersion, sha256: panel.dataset.termsSha256 }
             : null;
+        const kind = /^Text/.test(metaText) ? "text" : "redirect";
+        // What the form posted, as the server echoed it onto the panel (already
+        // cut short there); a redirect gets the scheme the server stored it with.
+        const raw = panel?.dataset.snippet ?? "";
         const entry = {
             url,
             // The name is the last path segment (minus any #fragment). No token on the
             // no-JS path, so this row can only be forgotten on device, not server-deleted.
             name: url.split("#")[0].split("/").pop(),
-            kind: /^Text/.test(metaText) ? "text" : "redirect",
+            kind,
             uses: /one-time/.test(metaText) ? 1 : (usesMatch ? Number.parseInt(usesMatch[1], 10) : null),
+            secret: panel?.dataset.secret === "1",
+            snippet: raw ? snippetOf(kind, kind === "redirect" ? normalizeTarget(raw) : raw) : undefined,
             expires: when ? when[1] : null,
             token: null,
             terms,
