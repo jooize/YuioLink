@@ -19,7 +19,7 @@
 //! history is only ever added to, never rewritten.
 
 use crate::views::{document_full, home_chip};
-use maud::{html, Markup};
+use maud::{Markup, html};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::sync::OnceLock;
@@ -29,7 +29,10 @@ use std::sync::OnceLock;
 /// is a safe path segment — and its permanent address (`/legal/<id>`). The
 /// LAST entry is the current terms; every entry is frozen by the pinned-hash
 /// test — see the module doc.
-pub const VERSIONS: &[(&str, fn() -> Markup)] = &[("2026-08-25T132200Z", terms_2026_08_25)];
+pub const VERSIONS: &[TermsEntry] = &[("2026-08-25T132200Z", terms_2026_08_25)];
+
+/// One entry of [`VERSIONS`]: the id and the function that renders that text.
+pub type TermsEntry = (&'static str, fn() -> Markup);
 
 /// The line the chain starts from: the first version's `Previous:` fingerprint
 /// is the SHA-256 of this string, so even the head of the chain is anchored to
@@ -302,7 +305,9 @@ fn text_of(html_str: &str) -> String {
         if let Some(text) = block.as_mut() {
             text.push_str(&rest[..lt]);
         }
-        let Some(gt) = rest[lt..].find('>') else { break };
+        let Some(gt) = rest[lt..].find('>') else {
+            break;
+        };
         let tag = &rest[lt + 1..lt + gt];
         match tag.split(' ').next().unwrap_or(tag) {
             "h3" => block = Some(String::from("## ")),
@@ -318,7 +323,13 @@ fn text_of(html_str: &str) -> String {
     }
     let mut out = blocks.join("\n\n");
     // maud's escape set, in an order where `&amp;` cannot double-decode.
-    for (entity, ch) in [("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""), ("&#39;", "'"), ("&amp;", "&")] {
+    for (entity, ch) in [
+        ("&lt;", "<"),
+        ("&gt;", ">"),
+        ("&quot;", "\""),
+        ("&#39;", "'"),
+        ("&amp;", "&"),
+    ] {
         if out.contains(entity) {
             out = out.replace(entity, ch);
         }
@@ -538,7 +549,11 @@ mod tests {
             // The verification promise: sha256sum of the served file IS the
             // fingerprint, and the file names its predecessor.
             assert_eq!(v.hash, hex(&Sha256::digest(&v.txt)));
-            assert!(v.txt.contains(&format!("Previous: {}\n", v.prev)), "{}", v.txt);
+            assert!(
+                v.txt.contains(&format!("Previous: {}\n", v.prev)),
+                "{}",
+                v.txt
+            );
         }
     }
 
@@ -549,8 +564,15 @@ mod tests {
             // construction; what can rot is the extraction — a tag or escape
             // it does not handle would leave markup in the "plain" text.
             assert!(!v.txt.contains('<') && !v.txt.contains('>'), "{}", v.txt);
-            assert!(!v.txt.contains("&amp;") && !v.txt.contains("&#"), "{}", v.txt);
-            assert!(v.txt.starts_with(&format!("# YuioLink Terms\n\nVersion: {}\n", v.id)));
+            assert!(
+                !v.txt.contains("&amp;") && !v.txt.contains("&#"),
+                "{}",
+                v.txt
+            );
+            assert!(
+                v.txt
+                    .starts_with(&format!("# YuioLink Terms\n\nVersion: {}\n", v.id))
+            );
             // Every heading survives extraction as a Markdown `##` line, and
             // typographic characters arrive as themselves.
             let html = terms().into_string();

@@ -1176,11 +1176,9 @@ pub async fn legal(State(state): State<AppState>) -> Response {
 pub async fn legal_version(State(state): State<AppState>, Path(version): Path<String>) -> Response {
     if let Some(id) = version.strip_suffix(".txt") {
         return match crate::legal::canonical_txt(id) {
-            Some(txt) => (
-                [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-                txt,
-            )
-                .into_response(),
+            Some(txt) => {
+                ([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], txt).into_response()
+            }
             None => AppError::NotFound.into_response(),
         };
     }
@@ -2141,7 +2139,10 @@ mod tests {
         assert!(body.contains(&format!("href=\"/legal/{id}\"")), "{body}");
         let (s, _, dated) = send(&st, get(&format!("/legal/{id}"))).await;
         assert_eq!(s, StatusCode::OK);
-        assert!(dated.contains("current, in effect since this moment"), "{dated}");
+        assert!(
+            dated.contains("current, in effect since this moment"),
+            "{dated}"
+        );
         let (s, _, _) = send(&st, get("/legal/1999-01-01T000000Z")).await;
         assert_eq!(s, StatusCode::NOT_FOUND);
     }
@@ -2157,7 +2158,10 @@ mod tests {
         let (s, h, txt) = send(&st, get(&format!("/legal/{}.txt", head.id))).await;
         assert_eq!(s, StatusCode::OK);
         assert!(
-            h[header::CONTENT_TYPE].to_str().unwrap().starts_with("text/plain"),
+            h[header::CONTENT_TYPE]
+                .to_str()
+                .unwrap()
+                .starts_with("text/plain"),
             "{h:?}"
         );
         assert_eq!(txt, head.txt);
@@ -2190,8 +2194,14 @@ mod tests {
         // The no-JS path gets the same receipt stamped on the result panel,
         // where app.js copies it into the local history if it ever runs.
         let (_, _, home) = send(&st, get("/")).await;
-        assert!(home.contains(&format!("data-terms-version=\"{}\"", head.id)), "{home}");
-        assert!(home.contains(&format!("data-terms-sha256=\"{}\"", head.hash)), "{home}");
+        assert!(
+            home.contains(&format!("data-terms-version=\"{}\"", head.id)),
+            "{home}"
+        );
+        assert!(
+            home.contains(&format!("data-terms-sha256=\"{}\"", head.hash)),
+            "{home}"
+        );
     }
 
     #[tokio::test]

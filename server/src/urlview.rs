@@ -987,7 +987,6 @@ fn uri_value_pieces(text: &str) -> Option<Vec<Piece>> {
     Some(out)
 }
 
-
 /// Give a decoded value its structure back, where it turns out to have some.
 /// Only when nothing needed marking: an escape that stayed escaped, or a space
 /// worth pointing at, is the more important thing to say about the value.
@@ -1292,8 +1291,11 @@ pub(crate) fn key_reading(key: &str) -> Vec<Piece> {
     let mut out: Vec<Piece> = Vec::new();
     let mut i = 0;
     while i < key.len() {
-        let escape_at =
-            |j: usize| bytes.get(j) == Some(&b'%') && hex(bytes.get(j + 1)).is_some() && hex(bytes.get(j + 2)).is_some();
+        let escape_at = |j: usize| {
+            bytes.get(j) == Some(&b'%')
+                && hex(bytes.get(j + 1)).is_some()
+                && hex(bytes.get(j + 2)).is_some()
+        };
         if escape_at(i) {
             let start = i;
             while escape_at(i) {
@@ -1363,9 +1365,11 @@ fn detect_hazards(view: &UriView) -> Vec<Hazard> {
     // same way one in a value does, so the chip must fire for both.
     if view.slices.iter().any(|s| {
         s.display.iter().any(|p| matches!(p, Piece::BadEscape(_)))
-            || s.key
-                .as_deref()
-                .is_some_and(|k| key_reading(k).iter().any(|p| matches!(p, Piece::BadEscape(_))))
+            || s.key.as_deref().is_some_and(|k| {
+                key_reading(k)
+                    .iter()
+                    .any(|p| matches!(p, Piece::BadEscape(_)))
+            })
     }) {
         out.push(Hazard::HiddenCharacters);
     }
@@ -1905,10 +1909,7 @@ mod tests {
             ]
         );
         // Ordinary escapes in a key stay verbatim text — keys never decode.
-        assert_eq!(
-            key_reading("a%20b"),
-            vec![Piece::Text("a%20b".to_string())]
-        );
+        assert_eq!(key_reading("a%20b"), vec![Piece::Text("a%20b".to_string())]);
         // A raw invisible cannot arrive via creation (the url crate encodes
         // it), but a legacy or tampered row must still show its escape, red.
         assert_eq!(
@@ -1947,7 +1948,11 @@ mod tests {
         let q = web.param("q").unwrap();
         let read: String = q.display.iter().map(Piece::text).collect();
         assert_eq!(read, "a&b");
-        assert!(q.display.iter().any(|p| matches!(p, Piece::Delim(d) if d == "&")));
+        assert!(
+            q.display
+                .iter()
+                .any(|p| matches!(p, Piece::Delim(d) if d == "&"))
+        );
         assert!(needs_capsule(&q.display));
         // A value with no structure inside earns no capsule.
         let plain = parse_uri("https://example.com/s?q=share");
@@ -1955,7 +1960,11 @@ mod tests {
         // The classic register is untouched.
         let mail = parse_uri("mailto:a@b.example?subject=a%26b");
         let s = mail.param("subject").unwrap();
-        assert!(s.display.iter().any(|p| matches!(p, Piece::Escape(e) if e == "%26")));
+        assert!(
+            s.display
+                .iter()
+                .any(|p| matches!(p, Piece::Escape(e) if e == "%26"))
+        );
     }
 
     /// The percent, refined (the user's RFC 3986 point, round 3): `%25` opens
@@ -1973,7 +1982,10 @@ mod tests {
                 .collect()
         };
         // Nothing hex follows: bare, like the real-world percents.
-        assert_eq!(read("https://example.com/s?discount=100%25", "discount"), "100%");
+        assert_eq!(
+            read("https://example.com/s?discount=100%25", "discount"),
+            "100%"
+        );
         assert_eq!(read("https://example.com/s?t=50%25off", "t"), "50%off");
         // "20" IS hex: a bare % would spell a fake %20, so it stays closed.
         let v = parse_uri("https://example.com/s?f=a%2520b.jpg");
@@ -1982,7 +1994,11 @@ mod tests {
             f.display.iter().map(Piece::text).collect::<String>(),
             "a%2520b.jpg"
         );
-        assert!(f.display.iter().any(|p| matches!(p, Piece::Escape(e) if e == "%25")));
+        assert!(
+            f.display
+                .iter()
+                .any(|p| matches!(p, Piece::Escape(e) if e == "%25"))
+        );
         // The check runs on the reading, not the storage: %25%32%30 decodes
         // to `%`, `2`, `0` — two innocent decodes conspiring — and is caught.
         assert_eq!(read("https://example.com/s?f=%25%32%30", "f"), "%2520");
@@ -1993,7 +2009,11 @@ mod tests {
         // Never legal raw in a path, always a fake fragment if bare.
         let v = parse_uri("https://example.com/a%23b");
         let p = v.first(Role::Path).unwrap();
-        assert!(p.display.iter().any(|p| matches!(p, Piece::Escape(e) if e == "%23")));
+        assert!(
+            p.display
+                .iter()
+                .any(|p| matches!(p, Piece::Escape(e) if e == "%23"))
+        );
         // Inside a value the capsule bounds it, so it reads bare and dim.
         let v = parse_uri("https://example.com/s?q=a%23b");
         let q = v.param("q").unwrap();

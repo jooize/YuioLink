@@ -149,7 +149,12 @@ fn document_shell(
     }
 }
 
-pub(crate) fn document_full(title: &str, head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
+pub(crate) fn document_full(
+    title: &str,
+    head_extra: Markup,
+    body: Markup,
+    scripts: Markup,
+) -> Markup {
     document_shell(title, head_extra, true, false, body, scripts)
 }
 
@@ -3171,7 +3176,10 @@ mod tests {
         // Decoding changed the value, so the record waits behind the Stored
         // Form disclosure, with the drift line beside it.
         let record = c.find("Exactly as Stored").expect("record missing");
-        assert!(record > c.find(r#"<details class="pv-stored">"#).unwrap(), "{c}");
+        assert!(
+            record > c.find(r#"<details class="pv-stored">"#).unwrap(),
+            "{c}"
+        );
         assert!(record < c.find("</details>").unwrap(), "{c}");
         assert!(c.contains("Selecting text copies the readable form"), "{c}");
     }
@@ -3182,7 +3190,10 @@ mod tests {
         // Harmless decodes: the record lives behind the small Stored Form
         // link rather than doubling the page.
         assert!(c.contains(r#"<details class="pv-stored">"#), "{c}");
-        assert!(c.contains(r#"<summary class="pv-stored-lid">Stored Form</summary>"#), "{c}");
+        assert!(
+            c.contains(r#"<summary class="pv-stored-lid">Stored Form</summary>"#),
+            "{c}"
+        );
         let record = c.find("Exactly as Stored").expect("record missing");
         assert!(record > c.find("<details").unwrap(), "{c}");
         assert!(record < c.find("</details>").unwrap(), "{c}");
@@ -3225,7 +3236,10 @@ mod tests {
         // Bare means real: the & simply decodes inside its capsule, so it
         // needs no entry at all any more — only what stayed closed is cast.
         assert!(!c.contains(r#"data-name="u0026""#), "{c}");
-        assert!(c.contains(r#"<span class="qv cv">a<span class="dl">&amp;</span>b</span>"#), "{c}");
+        assert!(
+            c.contains(r#"<span class="qv cv">a<span class="dl">&amp;</span>b</span>"#),
+            "{c}"
+        );
         // The raw tile holds the ACTUAL character — empty on purpose — and
         // the prose says so, so the blank never reads as a rendering bug.
         assert!(
@@ -3264,7 +3278,10 @@ mod tests {
         assert!(!c.contains("entry solo"), "{c}");
         assert!(!c.contains("pv-index"), "{c}");
         let m = card("mailto:a@b.example?subject=Order%204192");
-        assert!(m.contains(r#"<div class="entry solo" data-name="u0020""#), "{m}");
+        assert!(
+            m.contains(r#"<div class="entry solo" data-name="u0020""#),
+            "{m}"
+        );
         const APP_CSS: &str = include_str!("../static/app.css");
         assert!(APP_CSS
             .contains("html.js .pv-cast .entry.shown,\nhtml.js .pv-cast .entry.solo {\n    visibility: visible;\n}"));
@@ -3321,7 +3338,10 @@ mod tests {
             c.contains(r#"<span class="pv-note" data-note-for="user">"#),
             "{c}"
         );
-        assert!(c.contains("The destination is <code>example.com</code>."), "{c}");
+        assert!(
+            c.contains("The destination is <code>example.com</code>."),
+            "{c}"
+        );
         assert!(!c.contains("this page is on"), "{c}");
         const APP_CSS: &str = include_str!("../static/app.css");
         assert!(APP_CSS.contains("html.js .pv-notes:not(:has(.pv-note.shown)) .pv-note {"));
@@ -3796,7 +3816,10 @@ mod tests {
         assert!(mixed.contains(r#"<span class="qv">1</span>"#), "{mixed}");
         // A keyless fragment is a value, not a key — and wears the fragment's
         // own teal (C1).
-        assert!(mixed.contains(r#"<span class="seg fg">f</span>"#), "{mixed}");
+        assert!(
+            mixed.contains(r#"<span class="seg fg">f</span>"#),
+            "{mixed}"
+        );
         // An `=`-shaped fragment unrolls first, so the OAuth case's keys ARE keys.
         let oauth = card("https://example.com/cb#access_token=abc&expires_in=3600");
         assert!(
@@ -3824,8 +3847,7 @@ mod tests {
             "a keyless fragment is a value too"
         );
         assert!(
-            APP_CSS
-                .contains(".pv-url .qk {\n    color: var(--c-key);\n    font-weight: 700;\n}"),
+            APP_CSS.contains(".pv-url .qk {\n    color: var(--c-key);\n    font-weight: 700;\n}"),
             "keys are the signposts: their own hue (C1), bold"
         );
         // Every role hue is defined once per theme. The host never uses
@@ -3834,7 +3856,12 @@ mod tests {
         assert!(APP_CSS.contains(".pv-url .reg {\n    color: var(--c-host);"));
         assert!(APP_CSS.contains(".pv-url .sub {\n    color: var(--c-sub);\n}"));
         for var in [
-            "--c-port:", "--c-host:", "--c-sub:", "--c-path:", "--c-key:", "--c-frag:",
+            "--c-port:",
+            "--c-host:",
+            "--c-sub:",
+            "--c-path:",
+            "--c-key:",
+            "--c-frag:",
         ] {
             assert_eq!(
                 APP_CSS.matches(var).count(),
