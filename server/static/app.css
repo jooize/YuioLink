@@ -220,6 +220,52 @@ body {
     padding: clamp(34px, 6vw, 48px) clamp(22px, 5vw, 34px) clamp(22px, 5vw, 34px);
 }
 
+/* The front page's window at the width its right edge was dragged to (app.js,
+   `setupWindowGrip`; the pre-paint script sets it from storage before the
+   first paint). Only the page with the history has the grip; a phone keeps
+   the full-width sheet. */
+@media (min-width: 521px) {
+    .app-window:has(#history) {
+        width: min(100%, var(--window-width-user, var(--window-width)));
+    }
+}
+
+/* The grip: a strip along the window's right edge, with a pill that stays in
+   view (sticky) however tall the page is. Faint while the pointer is over the
+   window, full on the strip itself or while dragging. */
+.window-grip {
+    position: absolute;
+    top: var(--radius-window);
+    bottom: var(--radius-window);
+    right: -10px;
+    width: 20px;
+    cursor: ew-resize;
+    touch-action: none;
+}
+
+.window-grip-pill {
+    position: sticky;
+    top: calc(50vh - 22px);
+    display: block;
+    width: 5px;
+    height: 44px;
+    margin: 0 auto;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--text) 25%, transparent);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.app-window:hover .window-grip-pill { opacity: 0.5; }
+.window-grip:hover .window-grip-pill,
+.window-grip.dragging .window-grip-pill,
+.window-grip:focus-visible .window-grip-pill { opacity: 1; }
+.window-grip:focus-visible { outline: none; }
+
+@media (max-width: 520px) {
+    .window-grip { display: none; }
+}
+
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
     :root {
         --card-bg: rgba(252, 252, 253, 0.96);
@@ -3163,11 +3209,12 @@ html.history-collapsed .history-body {
     margin: 0;
     padding: 0;
     /* The rows' height, held open from the first paint: `--history-rows` is the
-       saved count (pre-paint script) and then the rendered count (app.js). One
-       row is `.history-item`'s 56px, a row showing its contents 19px more (the
-       snippet line plus the row's gap), plus this panel's own hairline top and
-       bottom. Only ever a floor, so a row that grows still grows. */
-    min-height: calc(var(--history-rows, 0) * 56px + var(--history-snippets, 0) * 19px + 1px);
+       saved count (pre-paint script) and then the rendered count (app.js), and
+       `--history-live` the live rows among them. A tombstone is `.history-item`'s
+       56px, a live row `.history-item.live`'s 104px plus its 0.5px hairline
+       (48.5px more), plus this panel's own hairline top and bottom. Only ever a
+       floor, so a row that grows (Text running to a second line) still grows. */
+    min-height: calc(var(--history-rows, 0) * 56px + var(--history-live, 0) * 48.5px + 1px);
     background: var(--field-bg);
     border: 0.5px solid var(--field-border);
     border-radius: 12px;
@@ -3205,7 +3252,7 @@ html.history-collapsed .history-body {
 /* Expired links stay in the list until cleared via "Clear Expired". Only the dead
    link's text fades — the × and its remove menu stay fully lit so it is easy to clear
    (dimming the whole row would dim the confirm overlay drawn over it too). */
-.history-item.expired .history-url,
+.history-item.expired .history-link,
 .history-item.expired .history-meta {
     opacity: 0.5;
 }
@@ -3252,6 +3299,7 @@ html.history-collapsed .history-body {
 /* Line 2 of a history entry: the meta on the left, the actions (Copy, Remove) on
    the right. Line 1 (the full-width URL) sits above it. */
 .history-foot {
+    min-height: 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -3275,28 +3323,6 @@ html.history-collapsed .history-body {
     gap: var(--row-icon-gap);
 }
 
-/* Line 1: the full-width tri-colour URL — dim scheme, standout host, the name
-   highlighted by word. It owns the whole line (the actions live on line 2) and
-   ellipsizes only what the scheme-drop below couldn't save. */
-.history-url {
-    flex: none;
-    min-width: 0;
-    font-family: var(--font-mono);
-    font-size: 14px;
-    line-height: 1.35;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    user-select: text;
-}
-
-/* When the URL overflows its row, the scheme is the first thing to go — app.js
-   flags the row and the whole "https://" disappears (the name is the point of
-   the row; the scheme never is). Ellipsis only trims what still doesn't fit. */
-.history-url.no-scheme .u-scheme {
-    display: none;
-}
-
 /* Green copy-check on the actions line, just left of the copy sheets (flashes
    with them on copy); opacity-toggled so the row never reflows. */
 .history-check {
@@ -3316,42 +3342,51 @@ html.history-collapsed .history-body {
     opacity: 1;
 }
 
-/* Prominence climbs toward the name: the scheme is faintest, "yuio.link/" sits one
-   step up, and the link name is the loudest part of the row. */
-.history-url .u-scheme,
-.history-url .u-frag {
-    color: var(--text-tertiary);
+/* A live row, three lines: what the link holds, the link, then its time and
+   actions. Each line has a fixed height, so the row's own is known before it is
+   drawn: 10 + 32 + 6 + 17 + 6 + 24 + 9 = 104px, and the hairline under it is
+   the half pixel more `.history-list` reserves. Only Text running to two lines makes a row taller. */
+.history-item.live {
+    justify-content: flex-start;
+    gap: 6px;
+    min-height: 104px;
+    padding: 10px 14px 9px;
 }
 
-.history-url .u-host,
-.history-url .u-sep {
-    /* A strong grey — clearly above the faint scheme, clearly below the black name —
-       so scheme < domain < name reads as three distinct steps. */
-    color: color-mix(in srgb, var(--text) 80%, transparent);
-}
-
-/* The name is the point of the row, so it runs bold at full strength to outshine the
-   host. It stays greyscale (never accent/purple — that's the result hero's job), in
-   one colour: the alternating case plus the global hairline gap separate the words. */
-.history-url .u-name { color: var(--text); font-weight: 600; }
-.history-url .nw-0,
-.history-url .nw-1 { color: var(--text); }
-
-/* Between the URL and the meta: what the link holds. One fixed-height line, so
-   the reserved list height (see .history-list) can count it. A destination
-   reads in mono like the URL above it; Text reads in the UI font. */
-.history-snippet {
+/* Line 1: the contents in a soft well, edged in the kind's colour (the Redirect
+   blue, the Text orange) and led by the kind's mark, so the kind needs no word. */
+.history-well {
     display: flex;
     align-items: center;
-    gap: 8px;
-    height: 16px;
+    gap: 7px;
     min-width: 0;
-    font-size: 12.5px;
-    line-height: 16px;
-    color: var(--text-secondary);
+    min-height: 32px;
+    padding: 6px 4px 6px 10px;
+    font-size: 14px;
+    line-height: 19px;
+    color: var(--text);
+    background: color-mix(in srgb, var(--text) 4.5%, transparent);
+    border-left: 2.5px solid var(--well-edge, var(--separator));
+    border-radius: 3px 8px 8px 3px;
 }
 
-.history-snippet-body {
+.history-well.redirect { --well-edge: color-mix(in srgb, var(--accent) 60%, transparent); }
+.history-well.text { --well-edge: color-mix(in srgb, var(--text-kind) 60%, transparent); }
+.history-well.none { --well-edge: var(--separator); }
+
+.history-mark {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    font-weight: 600;
+}
+
+.history-well.redirect .history-mark { color: var(--accent-text); }
+.history-well.text .history-mark { color: var(--text-kind); }
+.history-mark svg { display: block; }
+
+.history-well-body {
+    flex: 1;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -3359,73 +3394,149 @@ html.history-collapsed .history-body {
     user-select: text;
 }
 
-.history-snippet.redirect .history-snippet-body {
+/* Text may run to a second line before it trims; a destination stays on one. */
+.history-well.text .history-well-body {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.history-well.redirect .history-well-body {
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: 13px;
 }
 
-/* A redirect's destination opens with an arrow: where the link goes. Drawn in
-   the Redirect blue, a size up and with room after it, so it reads as a sign
-   rather than as the first character of the destination (round 2, R3). */
-.history-snippet.redirect .history-snippet-body::before {
-    content: "\2192";
+.history-dest-host { font-weight: 600; }
+.history-dest-path { color: var(--text-secondary); }
+
+.history-well-gone {
+    font-size: 13px;
+    font-style: italic;
+    color: var(--text-tertiary);
+}
+
+/* The eye at the well's end. Its hit box reaches into the well's padding, and
+   the negative margin gives it back, so the well keeps its height. */
+.history-eye {
     flex: none;
-    margin-right: 6px;
-    font-family: var(--font);
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--accent-text);
-}
-
-/* A private row's contents under a 6px blur (round 5, T1): enough to see that
-   text is there and roughly how much, not what it says. The text comes from
-   `data-cover` (app.js pads it to a coarse length), so it is never page text.
-   The blur spills about 12px past the text on every side, and clipping that
-   spill draws hard edges. So the cover clips its own text to the line's width
-   first (its overflow comes before its filter), and nothing around it clips
-   after: the line lets the spill out into the row's padding. */
-.history-snippet-body.covered {
-    display: flex;
-    min-width: 0;
-    overflow: visible;
-    user-select: none;
-    -webkit-user-select: none;
-}
-
-.history-snippet-cover {
-    display: block;
-    min-width: 0;
-    max-width: 100%;
-    height: 16px;
-    overflow: hidden;
-    padding: 0;
-    font: inherit;
-    line-height: 16px;
-    white-space: nowrap;
-    color: inherit;
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 7px;
+    margin: -6px 0;
+    color: var(--text-secondary);
     background: none;
     border: 0;
-    border-radius: 4px;
     cursor: pointer;
-    filter: blur(6px);
+    opacity: 0.85;
 }
 
-.history-snippet-cover::before {
-    content: attr(data-cover);
+.history-eye svg { display: block; }
+.history-eye:hover { opacity: 1; }
+
+/* Covered (round 3, H4): the whole well is one button, striped in the type's
+   colour (Secret green, One-Time purple, grey for a row covered by hand), with
+   a lock, the reason and the size. The contents are not in the page at all. */
+.history-well.covered {
+    --hatch: var(--text);
+    padding: 0;
+    background: repeating-linear-gradient(135deg,
+        color-mix(in srgb, var(--hatch) 4%, transparent) 0 6px,
+        color-mix(in srgb, var(--hatch) 9%, transparent) 6px 12px);
 }
 
-/* The blur would smear a focus ring too, so the ring goes on the line instead. */
-.history-snippet-body.covered:has(.history-snippet-cover:focus-visible) {
+.history-well.covered.secret { --hatch: var(--c-secret); }
+.history-well.covered.once { --hatch: var(--c-once); }
+
+.history-cover {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    min-height: 32px;
+    padding: 6px 4px 6px 10px;
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    color: var(--text-secondary);
+    background: none;
+    border: 0;
+    border-radius: inherit;
+    cursor: pointer;
+}
+
+.history-cover:hover {
+    background: color-mix(in srgb, var(--hatch) 8%, transparent);
+}
+
+.history-cover:focus-visible {
     outline: 2px solid var(--accent);
-    outline-offset: 2px;
-    border-radius: 4px;
+    outline-offset: -2px;
 }
 
-.history-snippet-cover:focus-visible {
-    outline: none;
+.history-cover > svg { flex: none; display: block; }
+
+.history-cover-why {
+    font-weight: 600;
+    color: var(--text);
 }
 
-/* Line 3: kind pill + expiry, in the UI font (mockup A). */
+.history-well.secret .history-cover-why,
+.history-well.secret .history-cover > svg { color: var(--c-secret); }
+.history-well.once .history-cover-why,
+.history-well.once .history-cover > svg { color: var(--c-once); }
+
+.history-cover-size {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-cover .history-eye {
+    margin: -6px 0 -6px auto;
+}
+
+/* Line 2: the link without its scheme, selectable as typed. It never trims:
+   a very long host wraps instead. */
+.history-link {
+    display: block;
+    min-height: 17px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 17px;
+    overflow-wrap: anywhere;
+    user-select: text;
+}
+
+.history-link-host { color: var(--text-tertiary); }
+.history-link-name,
+.history-link-name .nw-0,
+.history-link-name .nw-1 {
+    color: var(--text);
+    font-weight: 600;
+}
+
+/* A single-use link burns after reading: a flame and "Once", in the One-Time
+   purple the type picker and the preview page's badge use for it. */
+.history-once {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-weight: 700;
+    color: var(--c-once);
+}
+
+.history-once svg { display: block; }
+
+.history-uses {
+    font-weight: 600;
+}
+
+/* Line 3, left: the time, led by a single-use flame or a use limit. */
 .history-meta {
     display: flex;
     align-items: center;
@@ -3442,7 +3553,6 @@ html.history-collapsed .history-body {
    glyphs are ~15-16px, so padding grows each hit target to about 30px square
    (larger than the 13px text links they replaced) and supplies the spacing
    between neighbours — .history-actions keeps only a hairline gap. */
-.history-reveal,
 .history-show,
 .history-copy,
 .history-remove {
@@ -3481,7 +3591,6 @@ html.history-collapsed .history-body {
     margin-right: -12px;
 }
 
-.history-reveal svg,
 .history-show svg,
 .history-copy svg,
 .history-remove svg {
@@ -3505,16 +3614,10 @@ html.history-collapsed .history-body {
    down and a later one nudging it up; the later won and put it a whole pixel off
    the line the other two share. */
 
-.history-reveal:hover,
 .history-show:hover,
 .history-copy:hover,
 .history-remove:hover {
     opacity: 1;
-}
-
-/* The eye is grey like the trash: it only changes what this row shows. */
-.history-reveal {
-    color: var(--text-secondary);
 }
 
 .history-show {
@@ -3760,6 +3863,25 @@ html.history-collapsed .history-body {
 
 /* "Clear…" opener: quiet secondary text; the destructive options only appear
    once it is pressed. */
+/* Hide All / Show Public: the eye for every row at once, as quiet as Clear…
+   beside it. With nothing to do it keeps its place but draws nothing. */
+.history-hide {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: inherit;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+
+.history-hide svg { display: block; }
+.history-hide:hover { color: var(--text); }
+.history-hide.idle { visibility: hidden; }
+
 .history-clear-open {
     font-family: inherit;
     font-size: 12.5px;

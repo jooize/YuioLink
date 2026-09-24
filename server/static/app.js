@@ -84,6 +84,22 @@
             ["circle", { ...round, cx: "7", cy: "7", r: "1.9", "stroke-width": "1.3" }],
             ...(struck ? [["path", { ...round, d: "M2.3 1.8 11.7 12.2", "stroke-width": "1.3" }]] : []),
         ]);
+    // A padlock: what a covered history row shows where its contents would be.
+    const lockIcon = () =>
+        icon(13, "0 0 14 14", [
+            ["rect", { ...round, x: "3", y: "6.2", width: "8", height: "5.8", rx: "1.4", "stroke-width": "1.4" }],
+            ["path", { ...round, d: "M4.9 6.2V4.6a2.1 2.1 0 0 1 4.2 0v1.6", "stroke-width": "1.4" }],
+        ]);
+    // A pair of opening quotes: a Text row's mark, as the arrow is a redirect's.
+    const quoteIcon = () =>
+        icon(13, "0 0 14 14", [
+            ["path", { fill: "currentColor", d: "M2 8.6C2 6 3.3 4.2 5.6 3.3l.5.9C4.8 4.9 4.1 5.9 4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H3.4C2.6 11.6 2 11 2 10.2V8.6Zm5.4 0c0-2.6 1.3-4.4 3.6-5.3l.5.9C10.2 4.9 9.5 5.9 9.4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H8.8c-.8 0-1.4-.6-1.4-1.4V8.6Z" }],
+        ]);
+    // A flame: burns after one use.
+    const flameIcon = () =>
+        icon(11, "0 0 14 14", [
+            ["path", { fill: "currentColor", d: "M7.2 1c.5 2.6 3.8 4 3.8 7.6A4 4 0 0 1 3 8.6c0-2 1.2-3.3 2.2-4 0 1.4.5 2.5 1.5 3C6.4 5.4 6.8 3.2 7.2 1Z" }],
+        ]);
     // The arrow out of a box's corner: opens elsewhere.
     const openIcon = () =>
         icon(15, "0 0 13 13", [["path", { ...round, d: "M2.5 10.5 10.5 2.5M4 2.5h6.5V9", "stroke-width": "1.8" }]]);
@@ -203,12 +219,6 @@
         if (uses) return ` · max ${uses.toLocaleString()} uses`;
         return "";
     };
-    // Compact form for the tight history rows.
-    const usesSuffixShort = (uses) => {
-        if (uses === 1) return " · once";
-        if (uses) return ` · ${uses}×`;
-        return "";
-    };
     // SQLite "YYYY-MM-DD HH:MM:SS" is UTC; make it explicit so Date parses correctly.
     const parseUtc = (s) => (s ? new Date(`${s.replace(" ", "T")}Z`) : null);
 
@@ -255,8 +265,11 @@
     };
     // Result spans show the full phrase; history spans set data-compact for "1h"/"4m".
     const updateCountdown = (span) => {
-        const { text, compact, level } = formatCountdown(span.dataset.expires, span.dataset.created);
-        span.textContent = span.dataset.compact ? compact : text;
+        const { text, compact, level, unit } = formatCountdown(span.dataset.expires, span.dataset.created);
+        // A history row opens its line with the time, so it reads as a sentence
+        // there: "Expires in 6 days", then "Expired".
+        const phrase = text === "expired" ? "Expired" : `Expires in ${unit}`;
+        span.textContent = span.dataset.phrase === "expires" ? phrase : span.dataset.compact ? compact : text;
         span.classList.toggle("expiring-soon", level === "soon");
         span.classList.toggle("expiring-now", level === "now");
         // A dead result strikes through its name word and URL (the history list dims
@@ -497,6 +510,12 @@
     const HISTORY_KEY = "yuiolink:history";
     const PERSIST_KEY = "yuiolink:history:persist";
     const OPEN_KEY = "yuiolink:history:open";
+    // The window's width once its edge has been dragged. Saved only while Local
+    // History is on, like the open/closed choice: that switch is the consent to
+    // store anything in this browser. PRE_PAINT_JS in views.rs reads it too.
+    const WIDTH_KEY = "yuiolink:window-width";
+    const WIDTH_MIN = 480;
+    const WIDTH_MAX = 720;
     let memHistory = [];
     let persistEnabled = false;
     // The history panel is open by default each visit; the open/closed choice is only
@@ -538,7 +557,11 @@
         for (const e of [...a, ...b]) {
             if (!e || !e.id) continue;
             const prev = byId.get(e.id);
-            if (!prev || mergeRank(e) > mergeRank(prev)) byId.set(e.id, e);
+            // Between two copies of the same state, the one whose cover was
+            // toggled last wins, so an eye clicked in one tab reaches the others
+            // instead of being written back over by their older copy.
+            if (!prev || mergeRank(e) > mergeRank(prev)
+                || (mergeRank(e) === mergeRank(prev) && (e.coverAt ?? 0) > (prev.coverAt ?? 0))) byId.set(e.id, e);
         }
         const now = Date.now();
         const seenUrl = new Set();
@@ -563,10 +586,19 @@
     const SNIPPET_MAX = 200;
     const snippetOf = (kind, payload) =>
         (kind === "redirect" ? payload.trim() : payload.replace(/\s+/g, " ").trim()).slice(0, SNIPPET_MAX);
+    // How much the link holds, counted over the whole payload rather than the
+    // snippet, so a covered row can say its size without holding any more of
+    // it: numbers only.
+    const sizeOf = (payload) => {
+        const t = payload.trim();
+        return { chars: [...t].length, lines: t.split("\n").length };
+    };
     // Secret and one-time links hold what their creator did not want on show, so
-    // their rows cover it until asked. Revealing lasts for this page view only.
+    // their rows start covered. Any row can be covered or shown by its eye: the
+    // choice is `it.cover`, kept with the entry (and saved with it), and absent
+    // while the row is as it started.
     const isPrivate = (it) => !!it.secret || it.uses === 1;
-    const revealed = new Set();
+    const isCovered = (it) => it.cover ?? isPrivate(it);
     // A link that has expired no longer holds anything, so neither does its row:
     // the contents leave this device when the link leaves the server. Returns
     // whether anything was dropped. (PRE_PAINT_JS in views.rs counts rows with
@@ -578,13 +610,30 @@
         }
         return dropped;
     };
+    // The dragged width, or null at the default. Lives on the root element as
+    // `--window-width-user`, which app.css applies to the front page's window.
+    let windowWidth = null;
+    const clampWidth = (w) => Math.round(Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, w)));
+    const applyWindowWidth = () => {
+        const root = document.documentElement;
+        if (windowWidth) root.style.setProperty("--window-width-user", `${windowWidth}px`);
+        else root.style.removeProperty("--window-width-user");
+    };
+    const persistWidth = () => {
+        if (!persistEnabled) return;
+        if (windowWidth) lsSet(WIDTH_KEY, String(windowWidth));
+        else lsDel(WIDTH_KEY);
+    };
     const loadPersisted = () => {
         persistEnabled = lsGet(PERSIST_KEY) === "1";
         if (persistEnabled) {
             memHistory = mergeHistories(readStored(), []); // normalize + GC stale certificates
             historyOpen = lsGet(OPEN_KEY) !== "0"; // restore the open/closed choice (default open)
+            const w = Number(lsGet(WIDTH_KEY));
+            windowWidth = w > WIDTH_MIN ? clampWidth(w) : null;
         } else {
-            lsDel(OPEN_KEY); // history off: forget any saved openness
+            lsDel(OPEN_KEY); // history off: forget any saved openness and width
+            lsDel(WIDTH_KEY);
         }
     };
     // Write only when the value actually changed — so a tab adopting another tab's update
@@ -602,15 +651,14 @@
         document.documentElement.classList.toggle("history-collapsed", !historyOpen);
         // Rows rendered while the list was collapsed had zero width to measure;
         // refit now that it is (or just became) visible.
-        if (historyOpen) fitHistoryUrls();
     };
     const setHistoryOpen = (open) => { historyOpen = open; applyHistoryOpen(); persistOpen(); };
     const setPersist = (on) => {
         persistEnabled = on;
         // Turning on merges this tab's session links with whatever is already saved (and
         // other tabs') AND saves the current openness; turning off forgets both.
-        if (on) { memHistory = mergeHistories(memHistory, readStored()); lsSet(PERSIST_KEY, "1"); persistNow(); persistOpen(); }
-        else { lsDel(PERSIST_KEY); lsDel(HISTORY_KEY); lsDel(OPEN_KEY); }
+        if (on) { memHistory = mergeHistories(memHistory, readStored()); lsSet(PERSIST_KEY, "1"); persistNow(); persistOpen(); persistWidth(); }
+        else { lsDel(PERSIST_KEY); lsDel(HISTORY_KEY); lsDel(OPEN_KEY); lsDel(WIDTH_KEY); }
     };
     const addHistory = (entry) => {
         entry.id = newId();
@@ -620,83 +668,159 @@
         persistNow();
     };
 
-    // When a history row's URL overflows, the scheme is the first thing to go:
-    // hide "https://" whole (the name is the point of the row; the scheme never
-    // is) and only ellipsize what still doesn't fit. Re-run after every render
-    // and on resize — growing the window brings the scheme back.
-    const fitHistoryUrls = () => {
-        for (const url of document.querySelectorAll(".history-url")) {
-            url.classList.remove("no-scheme");
-            if (url.scrollWidth > url.clientWidth) url.classList.add("no-scheme");
-        }
+    // The eye's choice for one row. Stamped with the time, so the cross-tab merge
+    // takes the latest; set back to the row's default, the override goes.
+    const setCover = (it, covered) => {
+        if (covered === isPrivate(it)) delete it.cover;
+        else it.cover = covered;
+        it.coverAt = Date.now();
     };
-    let fitQueued = false;
-    window.addEventListener("resize", () => {
-        if (fitQueued) return;
-        fitQueued = true;
-        requestAnimationFrame(() => { fitQueued = false; fitHistoryUrls(); });
-    });
-
-    // Line 2 of a live row, when it knows its contents: a redirect's destination
-    // (the https:// scheme dropped, as the row's own URL does when it runs short)
-    // or the opening of a Text link. A private row covers it with the same text
-    // under a heavy blur, which says something is there but not what. The cover
-    // is drawn from a data attribute by CSS rather than put in the page as text,
-    // so find-in-page, copy and screen readers cannot reach what it hides; the
-    // cover is itself a button, and a click reveals.
-    const COVER_STEP = 12;
-    const COVER_FILL = " lorem ipsum dolor sit amet";
-    // The cover's length is the real one rounded up to the next COVER_STEP, made
-    // up with a fixed filler: close to the real width but coarse, the same on
-    // every render, and never a second copy of the text to compare against.
-    const coverText = (text) => {
-        const n = Math.ceil(text.length / COVER_STEP) * COVER_STEP;
-        let out = text;
-        while (out.length < n) out += COVER_FILL;
-        return out.slice(0, n);
-    };
-    const toggleReveal = (it) => {
-        if (revealed.has(it.id)) revealed.delete(it.id);
-        else revealed.add(it.id);
+    const toggleCover = (it) => {
+        setCover(it, !isCovered(it));
         renderHistory();
-        // The list was rebuilt; hand focus to this row's new eye.
-        document.querySelector(`.history-reveal[data-for="${it.id}"]`)?.focus();
+        // The list was rebuilt; hand focus to this row's contents again.
+        document.querySelector(`.history-well[data-for="${it.id}"] button`)?.focus();
     };
-    const snippetLine = (it, rowName) => {
-        const line = document.createElement("div");
-        line.className = `history-snippet ${it.kind === "redirect" ? "redirect" : "text"}`;
-        const body = document.createElement("span");
-        body.className = "history-snippet-body";
-        const text = it.kind === "redirect" ? it.snippet.replace(/^https:\/\//i, "") : it.snippet;
-        if (isPrivate(it) && !revealed.has(it.id)) {
-            body.classList.add("covered");
+    const plainPlural = (n, word) => `${n.toLocaleString("en-US")} ${word}${n === 1 ? "" : "s"}`;
+    // What a covered row says instead of its contents: why it is covered, and how
+    // much it holds. Characters round up to the next ten, so the exact length
+    // never shows; Text says its lines too when there is more than one. Rows saved
+    // before sizes were kept say only why.
+    const coverSize = (it) => {
+        if (!it.chars) return "";
+        const chars = plainPlural(Math.ceil(it.chars / 10) * 10, "character");
+        return it.kind === "redirect" || !(it.lines > 1) ? chars : `${plainPlural(it.lines, "line")}, ${chars}`;
+    };
+    // Line 1 of a live row: what the link holds, in a well edged in its kind's
+    // colour, led by the kind's mark (the arrow, or quotes for Text). The eye in
+    // the well covers it. Covered, the whole well is one button that shows it
+    // again: striped in the type's colour, with a lock, the reason and the size.
+    const contentsWell = (it, rowName) => {
+        const well = document.createElement("div");
+        well.className = `history-well ${it.kind === "redirect" ? "redirect" : "text"}`;
+        well.dataset.for = it.id;
+        if (!it.snippet) {
+            // Expired rows lose their contents with the link; rows saved before
+            // contents were kept never had any.
+            well.classList.add("none");
+            const gone = document.createElement("span");
+            gone.className = "history-well-gone";
+            gone.textContent = isExpired(it) ? "Expired, its contents are gone" : "Contents not saved on this device";
+            well.append(gone);
+            return well;
+        }
+        const mark = () => {
+            const m = document.createElement("span");
+            m.className = "history-mark";
+            if (it.kind === "redirect") m.textContent = "\u2192";
+            else m.append(quoteIcon());
+            m.setAttribute("aria-hidden", "true");
+            return m;
+        };
+        if (isCovered(it)) {
+            const why = it.uses === 1 ? "One-Time" : it.secret ? "Secret" : "Hidden";
+            well.classList.add("covered", it.uses === 1 ? "once" : it.secret ? "secret" : "hidden");
             const cover = document.createElement("button");
             cover.type = "button";
-            cover.className = "history-snippet-cover";
-            cover.dataset.cover = coverText(text);
-            cover.setAttribute("aria-label", `Show Contents of ${rowName}`);
-            cover.addEventListener("click", () => toggleReveal(it));
-            body.append(cover);
-        } else {
-            body.textContent = text;
-            body.title = it.snippet;
+            cover.className = "history-cover";
+            cover.title = "Show the contents";
+            const reason = document.createElement("span");
+            reason.className = "history-cover-why";
+            reason.textContent = why;
+            // The button's name opens with what it does; the words drawn on it
+            // follow, so a screen reader hears the reason and the size too.
+            const act = document.createElement("span");
+            act.className = "visually-hidden";
+            act.textContent = `Show Contents of ${rowName}: `;
+            cover.append(act, mark(), lockIcon(), reason);
+            const size = coverSize(it);
+            if (size) {
+                const sz = document.createElement("span");
+                sz.className = "history-cover-size";
+                sz.textContent = `\u00b7 ${size}`;
+                cover.append(sz);
+            }
+            const eye = document.createElement("span");
+            eye.className = "history-eye";
+            eye.append(eyeIcon(false));
+            cover.append(eye);
+            cover.addEventListener("click", () => toggleCover(it));
+            well.append(cover);
+            return well;
         }
-        line.append(body);
-        return line;
-    };
-    // The eye beside a private row's actions: shows or covers line 2 again.
-    const revealButton = (it, rowName) => {
-        const shown = revealed.has(it.id);
+        const body = document.createElement("span");
+        body.className = "history-well-body";
+        if (it.kind === "redirect") {
+            // The destination with its https:// dropped, the host standing out
+            // from the path: where the link goes, at a glance.
+            const t = it.snippet.replace(/^https:\/\//i, "");
+            const cut = t.indexOf("/");
+            const host = document.createElement("span");
+            host.className = "history-dest-host";
+            host.textContent = cut < 0 ? t : t.slice(0, cut);
+            body.append(host);
+            if (cut >= 0) {
+                const path = document.createElement("span");
+                path.className = "history-dest-path";
+                path.textContent = t.slice(cut);
+                body.append(path);
+            }
+        } else {
+            body.textContent = it.snippet;
+        }
+        body.title = it.snippet;
         const eye = document.createElement("button");
         eye.type = "button";
-        eye.className = "history-reveal";
-        eye.dataset.for = it.id;
-        eye.append(eyeIcon(shown));
-        eye.setAttribute("aria-label", `${shown ? "Hide" : "Show"} Contents of ${rowName}`);
-        eye.setAttribute("aria-pressed", String(shown));
-        eye.title = shown ? "Cover the contents" : "Show the contents";
-        eye.addEventListener("click", () => toggleReveal(it));
-        return eye;
+        eye.className = "history-eye";
+        eye.append(eyeIcon(true));
+        eye.setAttribute("aria-label", `Cover Contents of ${rowName}`);
+        eye.title = "Cover the contents";
+        eye.addEventListener("click", () => toggleCover(it));
+        well.append(mark(), body, eye);
+        return well;
+    };
+    // Line 2: the link without its scheme, as it can be typed or pasted (Copy
+    // still copies it whole). The host comes from the link itself, so a server
+    // with its own domain shows that.
+    const linkLine = (url) => {
+        const line = document.createElement("code");
+        line.className = "history-link";
+        const m = url.match(/^[a-z][a-z0-9+.-]*:\/\/([^/]+)\/([^#]*)/i);
+        if (!m) { line.textContent = url; return line; }
+        const host = document.createElement("span");
+        host.className = "history-link-host";
+        host.textContent = `${m[1]}/`;
+        const name = document.createElement("span");
+        name.className = "history-link-name";
+        name.append(nameSpans(m[2]));
+        line.append(host, name);
+        return line;
+    };
+    // Hide All covers every row that holds something; once nothing shows, it
+    // offers Show Public, which puts every row back as it started. With nothing
+    // to do either way it steps aside (kept in the layout, so the head holds
+    // still).
+    const syncHideAll = (rows) => {
+        const btn = document.getElementById("history-hide");
+        if (!btn) return;
+        const withContents = rows.filter((it) => !it.tombstone && it.snippet);
+        const anyShown = withContents.some((it) => !isCovered(it));
+        const anyChanged = withContents.some((it) => it.cover !== undefined);
+        const label = document.createElement("span");
+        label.textContent = anyShown ? "Hide All" : "Show Public";
+        btn.replaceChildren(label, eyeIcon(anyShown));
+        btn.dataset.action = anyShown ? "hide" : "public";
+        btn.hidden = false;
+        btn.classList.toggle("idle", !anyShown && !anyChanged);
+        btn.disabled = !anyShown && !anyChanged;
+    };
+    const hideAllOrShowPublic = () => {
+        const hide = document.getElementById("history-hide")?.dataset.action === "hide";
+        for (const it of memHistory) {
+            if (it.tombstone || !it.snippet) continue;
+            setCover(it, hide ? true : isPrivate(it));
+        }
+        renderHistory();
     };
 
     const renderHistory = () => {
@@ -766,7 +890,7 @@
         // (see PRE_PAINT_JS in views.rs).
         const root = document.documentElement;
         root.style.setProperty("--history-rows", String(n));
-        root.style.setProperty("--history-snippets", String(shown.filter((it) => !it.tombstone && it.snippet).length));
+        root.style.setProperty("--history-live", String(shown.filter((it) => !it.tombstone).length));
         root.classList.toggle("has-history", n > 0);
         if (n === 0) return;
         for (const it of shown) {
@@ -801,39 +925,42 @@
             }
 
             const li = document.createElement("li");
-            li.className = "history-item";
+            li.className = "history-item live";
             if (isExpired(it)) li.classList.add("expired");
+            const rowName = it.url.split("#")[0].split("/").pop();
 
-            // Line 1: the full-width tri-colour URL (dim scheme, standout host, the
-            // name highlighted by word). fitHistoryUrls() drops the scheme first if
-            // the row overflows; the green copy-check lives on the actions line.
-            const url = document.createElement("code");
-            url.className = "history-url";
-            renderUrlInto(url, it.url);
-
-            // Line 2: kind word + green time on the left, the actions on the right.
+            // Line 3: how long it has, led by a single-use flame or a use limit,
+            // on the left; the actions on the right. The kind needs no word: the
+            // well's mark and edge carry it.
             const foot = document.createElement("div");
             foot.className = "history-foot";
             const meta = document.createElement("small");
             meta.className = "history-meta";
-            meta.append(kindWord(it.kind), " · ");
+            if (it.uses === 1) {
+                const once = document.createElement("span");
+                once.className = "history-once";
+                once.append(flameIcon(), "Once");
+                meta.append(once);
+            } else if (it.uses) {
+                const uses = document.createElement("span");
+                uses.className = "history-uses";
+                uses.textContent = plainPlural(it.uses, "use");
+                meta.append(uses);
+            }
             const span = document.createElement("span");
             span.className = "countdown";
+            span.dataset.phrase = "expires";
             span.dataset.expires = it.expires ?? "";
             if (it.created) span.dataset.created = String(it.created);
             updateCountdown(span);
             meta.append(span);
-            const suffix = usesSuffixShort(it.uses);
-            if (suffix) meta.append(suffix);
 
             const actions = document.createElement("div");
             actions.className = "history-actions";
             // The actions are symbols (styled in app.css), ordered Copy, Preview,
             // Trash: the two link actions first, the destructive one last at the
             // row's edge (a stray tap only opens the confirm). The green check
-            // sits left of the copy sheets and flashes on copy. A private row
-            // with contents puts its eye between the check and Copy: the check
-            // then sits one icon further out, but the icons stay evenly spaced. Copy and the
+            // sits left of the copy sheets and flashes on copy. Copy and the
             // arrow are real links to the URL, so right-click offers Copy Link /
             // Open in New Tab; a left click on the sheets copies instead.
             //
@@ -842,7 +969,6 @@
             // are identical down the list, so "Copy Link" by itself would give four
             // links one name and four destinations — indistinguishable to a screen
             // reader reading the page's links on their own.
-            const rowName = it.url.split("#")[0].split("/").pop();
             const check = document.createElement("span");
             check.className = "history-check";
             check.setAttribute("aria-hidden", "true");
@@ -875,18 +1001,80 @@
             // Opens the confirm prompt over the row — not a toggle; the prompt carries
             // its own Cancel. openConfirm closes any other row's prompt first.
             remove.addEventListener("click", () => openConfirm(li, it));
-            actions.append(check);
-            if (it.snippet && isPrivate(it)) actions.append(revealButton(it, rowName));
-            actions.append(copy, show, remove);
+            actions.append(check, copy, show, remove);
             foot.append(meta, actions);
 
-            li.append(url);
-            if (it.snippet) li.append(snippetLine(it, rowName));
-            li.append(foot);
+            li.append(contentsWell(it, rowName), linkLine(it.url), foot);
             listEl.append(li);
         }
-        fitHistoryUrls();
+        syncHideAll(shown);
         syncClearMenu();
+    };
+
+    // --- the window's right edge: drag it to widen the front page ---
+    // The window is centred, so it grows from the middle: the edge follows the
+    // pointer and the left edge moves out to match. Keys work the same on the
+    // focused grip; a double-click, or Home, puts the default width back. Phones
+    // keep the full-width sheet, and app.css hides the grip there.
+    const setupWindowGrip = () => {
+        const win = document.querySelector(".app-window");
+        if (!win) return;
+        const grip = document.createElement("div");
+        grip.className = "window-grip";
+        grip.tabIndex = 0;
+        grip.setAttribute("role", "separator");
+        grip.setAttribute("aria-orientation", "vertical");
+        grip.setAttribute("aria-label", "Window Width");
+        grip.setAttribute("aria-valuemin", String(WIDTH_MIN));
+        grip.setAttribute("aria-valuemax", String(WIDTH_MAX));
+        grip.title = "Drag to widen the window; double-click to reset";
+        const pill = document.createElement("span");
+        pill.className = "window-grip-pill";
+        grip.append(pill);
+        const sync = () => grip.setAttribute("aria-valuenow", String(windowWidth ?? WIDTH_MIN));
+        const set = (w) => {
+            windowWidth = w && w > WIDTH_MIN ? clampWidth(w) : null;
+            applyWindowWidth();
+            sync();
+        };
+        let startX = 0;
+        let startW = 0;
+        grip.addEventListener("pointerdown", (event) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            startX = event.clientX;
+            startW = win.getBoundingClientRect().width;
+            grip.setPointerCapture(event.pointerId);
+            grip.classList.add("dragging");
+        });
+        grip.addEventListener("pointermove", (event) => {
+            if (!grip.hasPointerCapture(event.pointerId)) return;
+            set(startW + 2 * (event.clientX - startX));
+        });
+        const end = (event) => {
+            if (!grip.hasPointerCapture(event.pointerId)) return;
+            grip.releasePointerCapture(event.pointerId);
+            grip.classList.remove("dragging");
+            persistWidth();
+        };
+        grip.addEventListener("pointerup", end);
+        grip.addEventListener("pointercancel", end);
+        grip.addEventListener("dblclick", () => { set(null); persistWidth(); });
+        grip.addEventListener("keydown", (event) => {
+            const now = windowWidth ?? WIDTH_MIN;
+            const step = event.shiftKey ? 80 : 20;
+            let next;
+            if (event.key === "ArrowRight") next = now + step;
+            else if (event.key === "ArrowLeft") next = now - step;
+            else if (event.key === "Home") next = WIDTH_MIN;
+            else if (event.key === "End") next = WIDTH_MAX;
+            else return;
+            event.preventDefault();
+            set(next);
+            persistWidth();
+        });
+        sync();
+        win.append(grip);
     };
 
     // --- "Clear…" fold: the two destructive actions stay hidden until asked for ---
@@ -1493,8 +1681,9 @@
                 // `terms` is the creation receipt: the version + SHA-256 fingerprint
                 // of the terms this link was made under (see /legal#verification).
                 // `snippet` is what the link holds, cut short, so the row can say
-                // what it was for; `secret` asks the row to keep it covered.
-                const entry = { url, name: data.name, kind, uses, secret: priv, snippet: snippetOf(kind, payload), expires: data.expires_at, token: data.delete_token, terms: data.terms, created: Date.now() };
+                // what it was for; `secret` asks the row to keep it covered, and
+                // `chars` and `lines` let the cover say how much is under it.
+                const entry = { url, name: data.name, kind, uses, secret: priv, snippet: snippetOf(kind, payload), ...sizeOf(payload), expires: data.expires_at, token: data.delete_token, terms: data.terms, created: Date.now() };
                 addHistory(entry); // stamps entry.id, which the result's Delete needs
                 renderHistory();
                 setupResultActions(entry);
@@ -1556,6 +1745,9 @@
         document.getElementById("storage-toggle")?.addEventListener("click", () => flipPersist("pill"));
         document.getElementById("history-persist")?.addEventListener("click", () => flipPersist("history"));
 
+        document.getElementById("history-hide")?.addEventListener("click", hideAllOrShowPublic);
+        setupWindowGrip();
+
         document.getElementById("history-clear-open")?.addEventListener("click", () => {
             setClearMenu(true);
         });
@@ -1616,6 +1808,7 @@
         setupTtl();
         renderHistory();
         applyHistoryOpen(); // open by default on load (or the remembered state)
+        applyWindowWidth(); // the pre-paint script set it already; this keeps them one
         content.focus();
     };
 
@@ -1645,6 +1838,10 @@
             uses: /one-time/.test(metaText) ? 1 : (usesMatch ? Number.parseInt(usesMatch[1], 10) : null),
             secret: panel?.dataset.secret === "1",
             snippet: raw ? snippetOf(kind, kind === "redirect" ? normalizeTarget(raw) : raw) : undefined,
+            // The size of the whole contents, counted by the server, since the
+            // snippet it echoed is cut short.
+            chars: Number(panel?.dataset.chars) || undefined,
+            lines: Number(panel?.dataset.lines) || undefined,
             expires: when ? when[1] : null,
             token: null,
             terms,

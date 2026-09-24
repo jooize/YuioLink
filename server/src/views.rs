@@ -68,9 +68,12 @@ fn asset_stamp() -> &'static str {
 /// which the server cannot see, so the section sits between the form and the
 /// footer and shoves both down the moment app.js renders it — the footer's whole
 /// CLS. Reading the count here (and the open/closed choice with it) lets the CSS
-/// reserve the rows' height at first paint; app.js fills the space it finds. Rows
-/// that show their contents are a line taller, so they are counted apart, by
-/// app.js's rule: live, with a snippet, not yet expired.
+/// reserve the rows' height at first paint; app.js fills the space it finds. Live
+/// rows are taller than tombstones, so they are counted apart.
+///
+/// Last, a window width dragged wider on the front page (saved, like the rest,
+/// only while Local History is on) goes on the root before the window is drawn,
+/// so the page never lays out at the default width first.
 ///
 /// The keys and the shape are app.js's (`HISTORY_KEY` and friends); this is the
 /// one other place that knows them, so they move together. A miscount is a
@@ -79,12 +82,14 @@ fn asset_stamp() -> &'static str {
 const PRE_PAINT_JS: &str = "\
 document.documentElement.classList.add('js');\
 try{if(localStorage.getItem('yuiolink:history:persist')==='1'){\
+var d=document.documentElement;\
+var w=Number(localStorage.getItem('yuiolink:window-width'));\
+if(w>480)d.style.setProperty('--window-width-user',Math.min(720,Math.round(w))+'px');\
 var s=JSON.parse(localStorage.getItem('yuiolink:history')||'[]');\
 var n=Array.isArray(s)?s.filter(function(e){return e&&e.tombstone!=='cleared'}).length:0;\
-var c=Array.isArray(s)?s.filter(function(e){return e&&!e.tombstone&&e.snippet&&\
-!(Date.parse(String(e.expires).replace(' ','T')+'Z')<=Date.now())}).length:0;\
-if(n){var d=document.documentElement;d.classList.add('has-history');\
-d.style.setProperty('--history-rows',n);d.style.setProperty('--history-snippets',c);\
+var c=Array.isArray(s)?s.filter(function(e){return e&&e.tombstone!=='cleared'&&!e.tombstone}).length:0;\
+if(n){d.classList.add('has-history');\
+d.style.setProperty('--history-rows',n);d.style.setProperty('--history-live',c);\
 if(localStorage.getItem('yuiolink:history:open')==='0')d.classList.add('history-collapsed')}}}catch(e){}";
 
 /// A `<script src>` for one of our own files, carrying this response's CSP nonce.
@@ -464,6 +469,16 @@ pub fn humanize_duration(secs: i64) -> String {
 // Landing + created-link result
 // --------------------------------------------------------------------------
 
+/// What a new link holds, for the history row app.js records from the result
+/// page: the opening of it, and the size of the whole, so a covered row can say
+/// how much is under it (numbers only).
+#[derive(Clone, Copy)]
+struct Snippet<'a> {
+    text: &'a str,
+    chars: usize,
+    lines: usize,
+}
+
 /// The result `<output>` shown after a link is created (server-rendered on the
 /// no-JS path, populated in place by `app.js` otherwise). The memorable word (the
 /// link name) is the hero; the full URL sits small beneath it; a single meta line
@@ -472,7 +487,7 @@ fn result_output(
     url: Option<&str>,
     meta: Markup,
     note: Option<&str>,
-    snippet: Option<&str>,
+    snippet: Option<Snippet<'_>>,
     secret: bool,
 ) -> Markup {
     // The terms receipt for the no-JS path: the result page carries the version
@@ -486,7 +501,8 @@ fn result_output(
     html! {
         output.result #link-panel tabindex="-1" hidden[url.is_none()]
             data-terms-version=(terms.version) data-terms-sha256=(terms.sha256)
-            data-snippet=[snippet] data-secret=[secret.then_some("1")] {
+            data-snippet=[snippet.map(|s| s.text)] data-chars=[snippet.map(|s| s.chars)]
+            data-lines=[snippet.map(|s| s.lines)] data-secret=[secret.then_some("1")] {
             div.result-id {
                 @if let Some(u) = url {
                     (hero_name(link_name(u)))
@@ -755,6 +771,9 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                 button.history-persist #history-persist type="button" hidden
                     title="Save history on this device" {}
                 div.history-head-actions {
+                    // Covers every row's contents at once, or puts them back as they
+                    // started; app.js names it for whichever it will do.
+                    button.history-hide #history-hide type="button" hidden {}
                     // "Clear…" folds the two destructive actions away until asked for;
                     // app.js toggles it open to reveal Clear Expired / Clear All.
                     button.history-clear-open #history-clear-open type="button" { "Clear…" }
@@ -877,13 +896,19 @@ pub fn result_page(link: &CreatedLink, redo: Option<&ResultRedo>) -> Markup {
     let note = (max_uses.is_none() && !secret && words > 1).then(|| {
         format!("Short names are in high demand right now, so this link uses {words} words.")
     });
-    let snippet: String = content.trim().chars().take(400).collect();
+    let trimmed = content.trim();
+    let snippet: String = trimmed.chars().take(400).collect();
+    let snippet = Snippet {
+        text: &snippet,
+        chars: trimmed.chars().count(),
+        lines: trimmed.lines().count(),
+    };
     let body = html! {
         (home_chip("/", "Create New Link"))
         // What the link holds, for the local-history row app.js records from this
         // page. Cut here rather than there, so a long Text link is not sent back
         // twice; app.js folds and trims it to the row's own length.
-        (result_output(Some(url), meta, note.as_deref(), Some(&snippet), secret))
+        (result_output(Some(url), meta, note.as_deref(), Some(snippet), secret))
         a.btn.btn-block href=(url) { "Open link" }
         // Only offered after a Redirect: a non-URL is already Text, so there is
         // no other kind to offer it as.
