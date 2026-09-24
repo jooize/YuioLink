@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en" class="js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>History Content First 2</title>
+<link rel="stylesheet" href="../server/static/app.css">
+<style>
+body { display: block; padding: 28px 16px 48px; }
+main { max-width: 1100px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 18px; margin: 34px 0 4px; }
+.lead { color: var(--text-secondary); font-size: 14px; margin: 0 0 18px; max-width: 80ch; text-align: left; }
+.lead li { margin: 2px 0; }
+figure { margin: 0 0 26px; }
+figcaption { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 8px; text-align: left; max-width: 90ch; }
+figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
+.pair { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+.wide { width: 560px; max-width: 100%; }
+.phone { width: 343px; max-width: 100%; }
+.frame-label { font-size: 11.5px; color: var(--text-tertiary); margin: 0 0 4px 8px; }
+.grid4 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 343px), 1fr)); gap: 22px; }
+.history-list { min-height: 0; }
+.history-item { min-height: 0; padding: 10px 14px 7px; gap: 6px; }
+
+/* head with the one eye for all */
+.head { display: flex; align-items: center; gap: 10px; padding: 0 8px; margin-bottom: 10px; }
+.head .history-title { flex: 1; }
+.head .lbl { font-size: 12.5px; color: var(--text-secondary); background: none; border: 0; font: inherit; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 0; }
+.head .lbl svg { display: block; }
+
+/* the well: what the link holds */
+.well { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1;
+    background: color-mix(in srgb, var(--text) 4.5%, transparent); border-radius: 3px 8px 8px 3px;
+    padding: 6px 4px 6px 10px; min-height: 32px; font-size: 14px; line-height: 19px; color: var(--text); }
+.well.text { border-left: 2.5px solid color-mix(in srgb, var(--text-kind) 60%, transparent); }
+.well.redirect { border-left: 2.5px solid color-mix(in srgb, var(--accent) 60%, transparent); }
+.well.none { border-left: 2.5px solid var(--separator); }
+.well .body { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.well.text .body { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.well.redirect .body { font-family: var(--font-mono); font-size: 13px; }
+.arrow { flex: none; color: var(--accent-text); font-weight: 600; font-family: var(--font); }
+.dest-host { color: var(--text); font-weight: 600; }
+.dest-path { color: var(--text-secondary); }
+.gone { color: var(--text-tertiary); font-style: italic; font-size: 13px; }
+
+/* eye buttons */
+.eye { flex: none; display: inline-flex; align-items: center; background: none; border: 0; cursor: pointer;
+    color: var(--text-secondary); opacity: .85; }
+.eye svg { display: block; }
+.well .eye { padding: 6px 7px; margin: -6px 0; }
+.history-actions .eye { padding: 14px 12px; margin: -10px 0; }
+.eye.slot { visibility: hidden; }
+
+/* the link + meta line */
+.foot { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; row-gap: 2px; min-width: 0; }
+.short { font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; }
+.short .h { color: var(--text-tertiary); }
+.short .n, .short .n span { color: var(--text); font-weight: 600; }
+.right { margin-left: auto; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.meta { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-secondary); white-space: nowrap; }
+.countdown { color: var(--result-text); font-weight: 600; }
+.expired .countdown { color: var(--text-secondary); }
+.expired .fade { opacity: .5; }
+
+/* layout C2: actions beside the well */
+.top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.top .history-actions { flex: none; }
+
+/* covered looks */
+.lockrow { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; color: var(--text-secondary); font-size: 13px; cursor: pointer; background: none; border: 0; padding: 0; font-family: inherit; text-align: left; }
+.lockrow svg { flex: none; display: block; }
+.lockrow .why { color: var(--text-secondary); }
+.lockrow .hint { color: var(--text-tertiary); }
+.dots { letter-spacing: 2px; color: var(--text-tertiary); font-size: 12px; overflow: hidden; white-space: nowrap; }
+.well.hatch { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--text) 4%, transparent) 0 6px, color-mix(in srgb, var(--text) 8%, transparent) 6px 12px); }
+.well.K5c { justify-content: center; }
+
+/* single-use badges */
+.b-box { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 3px; border: 1px solid currentColor; border-radius: 4px; font-size: 10.5px; font-weight: 700; color: var(--warn); }
+.b-pill { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.b-text { color: var(--warn); font-weight: 600; }
+.b-icon { display: inline-flex; align-items: center; gap: 3px; color: var(--warn); font-weight: 600; }
+.b-icon svg { display: block; }
+</style>
+</head>
+<body>
+<main>
+<h1>History rows, round 2: the quoted well</h1>
+<div class="lead" style="max-width:80ch">
+<p style="margin:0 0 6px; text-align:left">Layout C with every row carrying an eye, a Hide All in the head, and the eye choices kept across visits. Changes since round 1:</p>
+<ul style="margin:0; padding-left:20px">
+<li>The kind word is gone. The well's edge is blue for a redirect and orange for Text, and a redirect always opens with the arrow, even when covered.</li>
+<li>The time sits at the right. The link never truncates: when the line runs out of room, the time and actions wrap below it instead.</li>
+<li>The host comes from the link itself, so a self-hosted <code>links.example.org/</code> shows its own name.</li>
+<li>Covered contents show a lock and a word instead of a blur.</li>
+</ul>
+</div>
+
+<h2>Where the actions go</h2>
+<div id="layouts"></div>
+
+<h2>What a covered row says</h2>
+<p class="lead">All in layout C2. Click one to reveal.</p>
+<div class="grid4" id="covers"></div>
+
+<h2>Single use</h2>
+<p class="lead">How a one-time link says so, next to its time.</p>
+<div class="grid4" id="badges"></div>
+</main>
+<script>
+const ns = "http://www.w3.org/2000/svg";
+const svg = (size, vb, parts) => {
+    const s = document.createElementNS(ns, "svg");
+    s.setAttribute("width", size); s.setAttribute("height", size); s.setAttribute("viewBox", vb);
+    s.setAttribute("fill", "none"); s.setAttribute("aria-hidden", "true");
+    for (const [tag, attrs] of parts) { const e = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); s.append(e); }
+    return s;
+};
+const R = { stroke: "currentColor", "stroke-linecap": "round", "stroke-linejoin": "round" };
+const eyeI = (off) => svg(15, "0 0 14 14", [
+    ["path", { ...R, "stroke-width": "1.3", d: "M1.3 7C2.8 4.3 4.7 3 7 3s4.2 1.3 5.7 4C11.2 9.7 9.3 11 7 11S2.8 9.7 1.3 7Z" }],
+    ["circle", { ...R, "stroke-width": "1.3", cx: "7", cy: "7", r: "1.9" }],
+    ...(off ? [["path", { ...R, "stroke-width": "1.3", d: "M2.3 1.8 11.7 12.2" }]] : []),
+]);
+const lockI = (n = 13) => svg(n, "0 0 14 14", [
+    ["rect", { ...R, "stroke-width": "1.4", x: "3", y: "6.2", width: "8", height: "5.8", rx: "1.4" }],
+    ["path", { ...R, "stroke-width": "1.4", d: "M4.9 6.2V4.6a2.1 2.1 0 0 1 4.2 0v1.6" }],
+]);
+const flameI = () => svg(12, "0 0 14 14", [["path", { ...R, "stroke-width": "1.4", d: "M7 1.8c.4 2-1.9 3.1-1.9 5.3 0 .9.5 1.5 1 1.8-.1-1 .4-1.7 1.2-2.3.2 1.2 1.9 1.7 1.9 3.3A2.7 2.7 0 0 1 4.3 10C3.3 7.2 6.2 5.6 7 1.8Z" }]]);
+const copyI = () => svg(16, "0 0 14 14", [
+    ["path", { stroke: "currentColor", "stroke-linecap": "round", d: "M9.6 2.2H3.6c-.77 0-1.4.63-1.4 1.4v6.2", "stroke-width": "1.6" }],
+    ["rect", { stroke: "currentColor", x: "4.9", y: "4.7", width: "7", height: "7.2", rx: "1.3", "stroke-width": "1.6" }],
+]);
+const openI = () => svg(15, "0 0 13 13", [["path", { ...R, d: "M2.5 10.5 10.5 2.5M4 2.5h6.5V9", "stroke-width": "1.8" }]]);
+const trashI = () => svg(16, "0 0 14 14", [["path", { ...R, "stroke-width": "1.4", d: "M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7" }]]);
+const h = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
+
+const ROWS = [
+    { kind: "Text", host: "yuio.link", name: ["bacon"], snippet: "blinko blanko" },
+    { kind: "Redirect", host: "yuio.link", name: ["basket", "CEREAL", "deceit", "ENABLE"], snippet: "https://www.example.com/articles/2026/liquid-glass-everywhere" },
+    { kind: "Text", host: "yuio.link", name: ["frying", "IMPURE", "marlin", "PARENT"], snippet: "The wifi password is hunter2 and the door code is 4711", secret: true },
+    { kind: "Text", host: "yuio.link", name: ["drool"], snippet: "Shopping: oat milk, two lemons, the good bread from the corner place, batteries (AA), something for Sunday" },
+    { kind: "Redirect", host: "links.example.org", name: ["hazing", "VALLEY", "junior", "GALA"], snippet: "https://docs.internal.example.org/q3/plan", once: true },
+    { kind: "Redirect", host: "yuio.link", name: ["silver", "COVE"], none: true },
+    { kind: "Text", host: "yuio.link", name: ["early", "BIRD"], none: true, expired: true },
+];
+const isPrivate = (r) => !!r.secret || !!r.once;
+
+const shortUrl = (r) => { const s = h("span", "short fade", h("span", "h", r.host + "/")); const n = h("span", "n"); r.name.forEach((w, i) => n.append(h("span", "nw-" + (i % 2), w))); s.append(n); return s; };
+const badge = (style) => {
+    if (style === "U1") return h("span", "b-text", "1 use");
+    if (style === "U2") return h("span", "b-box", "1");
+    if (style === "U3") return h("span", "b-pill", "1×");
+    if (style === "U4") return h("span", "b-icon", flameI(), "Once");
+    return h("span", "b-pill", "Once");
+};
+const meta = (r, opts) => {
+    const m = h("span", "meta fade");
+    if (r.once) m.append(badge(opts.badge || "U3"));
+    m.append(h("span", "countdown", r.expired ? "Expired" : r.once ? "2 days left" : "7 days left"));
+    return m;
+};
+const coverNode = (r, st, style) => {
+    const why = r.secret ? "Secret" : "One-time";
+    const b = h("button", "lockrow");
+    b.addEventListener("click", () => { st.cov = false; st.draw(); });
+    if (style === "K1") b.append(lockI(), h("span", "why", why));
+    else if (style === "K2") b.append(lockI(), h("span", "why", "Hidden"), h("span", "hint", "· click to show"));
+    else if (style === "K3") b.append(lockI(), h("span", "dots", "•".repeat(Math.min(28, Math.ceil(r.snippet.length / 12) * 6))));
+    else if (style === "K4") b.append(lockI(), h("span", "why", why + " contents"));
+    else if (style === "K5") b.append(lockI(), h("span", "why", `${Math.ceil(r.snippet.length / 10) * 10} characters`));
+    return b;
+};
+const wellNode = (r, st, opts, eyeInside) => {
+    if (r.none) {
+        return h("div", "well none fade", h("span", "body gone", r.expired ? "Expired, its contents are gone" : "Contents not saved on this device"));
+    }
+    const w = h("div", "well " + r.kind.toLowerCase());
+    if (r.kind === "Redirect") w.append(h("span", "arrow", "→"));
+    if (st.cov) {
+        if (opts.cover === "K4") w.classList.add("hatch");
+        w.append(coverNode(r, st, opts.cover));
+    } else if (r.kind === "Redirect") {
+        const t = r.snippet.replace(/^https:\/\//, ""); const i = t.indexOf("/");
+        w.append(h("span", "body", h("span", "dest-host", t.slice(0, i)), h("span", "dest-path", t.slice(i))));
+    } else w.append(h("span", "body", r.snippet));
+    if (eyeInside) w.append(eyeBtn(r, st));
+    return w;
+};
+const eyeBtn = (r, st) => {
+    const e = h("button", "eye", eyeI(!st.cov));
+    e.title = st.cov ? "Show the contents" : "Cover the contents";
+    e.addEventListener("click", () => { st.cov = !st.cov; st.draw(); });
+    return e;
+};
+const acts = (r, st, withEye) => {
+    const a = h("div", "history-actions");
+    if (withEye) a.append(r.none ? h("span", "eye slot", eyeI(false)) : eyeBtn(r, st));
+    a.append(h("a", "history-copy", copyI()), h("a", "history-show", openI()), h("button", "history-remove", trashI()));
+    return a;
+};
+const LAYOUT = {
+    // C1: eye inside the well; link, time and actions share the line below and wrap
+    C1(r, st, o) {
+        return [wellNode(r, st, o, true), h("div", "foot", shortUrl(r), h("div", "right", meta(r, o), acts(r, st, false)))];
+    },
+    // C2: actions beside the well; the link line has only the time to share with
+    C2(r, st, o) {
+        return [h("div", "top", wellNode(r, st, o, true), acts(r, st, false)), h("div", "foot", shortUrl(r), h("div", "right", meta(r, o)))];
+    },
+    // C3: as C1, but the eye stays with the actions
+    C3(r, st, o) {
+        return [wellNode(r, st, o, false), h("div", "foot", shortUrl(r), h("div", "right", meta(r, o), acts(r, st, true)))];
+    },
+};
+const list = (layout, opts, rows = ROWS, head = true) => {
+    const wrap = h("div", "");
+    const ul = h("ul", "history-list");
+    let all = false;
+    const states = rows.map((r) => ({ cov: isPrivate(r) }));
+    const lbl = h("button", "lbl");
+    const draw = () => {
+        ul.replaceChildren(...rows.map((r, i) => {
+            const st = states[i]; st.draw = draw;
+            const li = h("li", "history-item"); if (r.expired) li.classList.add("expired");
+            li.append(...LAYOUT[layout](r, st, opts)); return li;
+        }));
+        lbl.replaceChildren(all ? "Show Public" : "Hide All", eyeI(!all));
+    };
+    lbl.addEventListener("click", () => { all = !all; states.forEach((st, i) => { st.cov = all || isPrivate(rows[i]); }); draw(); });
+    draw();
+    if (head) wrap.append(h("div", "head", h("span", "history-title", "Local History"), lbl));
+    wrap.append(ul);
+    return wrap;
+};
+const L = {
+    C1: ["Eye in the well", "The eye sits inside the well it covers. The link, time and actions share the line below; when they do not fit (the phone, a four-word name), the time and actions wrap to their own line, right-aligned."],
+    C2: ["Actions beside the well", "Copy, open and trash move up beside the well, so the link line only shares with the time. On a phone the longest names (four six-letter words) still push the time to a second line, but nothing else does. The eye stays in the well."],
+    C3: ["Eye with the actions", "As C1, but the eye joins the actions, as it is today. The most familiar, and the first to wrap."],
+};
+for (const [k, [t, d]] of Object.entries(L)) {
+    const pair = h("div", "pair",
+        h("div", "wide", h("div", "frame-label", "Desktop"), list(k, { cover: "K1" })),
+        h("div", "phone", h("div", "frame-label", "Phone"), list(k, { cover: "K1" })));
+    document.getElementById("layouts").append(h("figure", "", h("figcaption", "", h("b", "", k + " · " + t), d), pair));
+}
+const K = {
+    K1: ["Lock and reason", "Says why it is covered: Secret or One-time."],
+    K2: ["Lock, Hidden, hint", "Says what to do about it."],
+    K3: ["Lock and dots", "A coarse run of dots, as long as the text roughly is."],
+    K4: ["Hatched well", "The well itself turns striped, like a sealed envelope."],
+    K5: ["Lock and size", "The length, rounded to tens: says how much, not what."],
+};
+const coverRows = [ROWS[2], ROWS[4], ROWS[0]].map((r, i) => i === 1 ? { ...r, secret: true, once: false } : r);
+for (const [k, [t, d]] of Object.entries(K)) {
+    document.getElementById("covers").append(h("figure", "", h("figcaption", "", h("b", "", k + " · " + t), d), list("C2", { cover: k }, coverRows, false)));
+}
+const B = {
+    U1: ["Words", "\"1 use\" in amber, as today but coloured."],
+    U2: ["A 1 in a box", "The smallest mark."],
+    U3: ["1× capsule", "Reads as \"once\" at a glance."],
+    U4: ["Flame and Once", "Burns after reading."],
+    U5: ["Once capsule", "The word in the capsule."],
+};
+const badgeRows = [{ ...ROWS[4] }, { ...ROWS[0], once: true, name: ["gentle", "ORBIT", "canopy", "MUFFIN"], snippet: "Your code is 318 204" }];
+for (const [k, [t, d]] of Object.entries(B)) {
+    document.getElementById("badges").append(h("figure", "", h("figcaption", "", h("b", "", k + " · " + t), d), list("C2", { cover: "K1", badge: k }, badgeRows, false)));
+}
+</script>
+</body>
+</html>
