@@ -257,18 +257,19 @@ pub fn has_scheme(s: &str) -> bool {
     }
 }
 
-/// True if `s` reads as a URL with a scheme: a scheme with `//` after it, or a
-/// single token whose scheme is one a redirect may use. Anything else with a
-/// word and a colon in front ("Shopping: oat milk", "Password:hunter2") is
-/// Text. A pasted address with a stray space in its path keeps its `//`, so it
-/// is still an address, and validation says what is wrong with it.
+/// True if `s` reads as a URL with a scheme. A URL holds no whitespace (a
+/// space in an address is written `%20`, as browsers copy it), so anything with
+/// a space is Text: "Shopping: oat milk", or "https://example.com is great".
+/// Then either `//` follows the scheme, or the scheme is one a redirect may use;
+/// "Password:hunter2" is Text. A `//` address with an unknown scheme is still an
+/// address, and validation refuses it.
 fn looks_like_url(s: &str) -> bool {
     let Some((scheme, rest)) = s.split_once(':').filter(|_| has_scheme(s)) else {
         return false;
     };
-    rest.starts_with("//")
-        || (!s.chars().any(char::is_whitespace)
-            && DEFAULT_ALLOWED_SCHEMES
+    !s.chars().any(char::is_whitespace)
+        && (rest.starts_with("//")
+            || DEFAULT_ALLOWED_SCHEMES
                 .iter()
                 .any(|known| known.eq_ignore_ascii_case(scheme)))
 }
@@ -533,9 +534,11 @@ mod tests {
         assert_eq!(detect_kind("Shopping: oat milk, two lemons"), Kind::Text);
         assert_eq!(detect_kind("Re: the plan"), Kind::Text);
         assert_eq!(detect_kind("TODO:  call the bank"), Kind::Text);
-        // A scheme with `//` stays an address even with a stray space.
+        // A URL holds no whitespace: a URL and a comment is Text.
+        assert_eq!(detect_kind("https://example.com is great"), Kind::Text);
+        assert_eq!(detect_kind("https://example.com/my file.pdf"), Kind::Text);
         assert_eq!(
-            detect_kind("https://example.com/my file.pdf"),
+            detect_kind("https://example.com/my%20file.pdf"),
             Kind::Redirect
         );
         // Without `//`, only a scheme a redirect may use makes a URL.
