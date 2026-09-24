@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en" class="js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>History Content First 4</title>
+<link rel="stylesheet" href="../server/static/app.css">
+<style>
+body { display: block; padding: 28px 16px 48px; }
+main { max-width: 1300px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 18px; margin: 34px 0 4px; }
+.lead { color: var(--text-secondary); font-size: 14px; margin: 0 0 16px; max-width: 84ch; text-align: left; }
+figure { margin: 0 0 26px; }
+figcaption { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 8px; text-align: left; max-width: 60ch; }
+figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
+.row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+.frame-label { font-size: 11.5px; color: var(--text-tertiary); margin: 0 0 4px 8px; }
+.history-list { min-height: 0; }
+.history-item { min-height: 0; padding: 10px 14px 8px; gap: 6px; }
+.head { display: flex; align-items: center; gap: 10px; padding: 0 8px; margin-bottom: 10px; }
+.head .history-title { flex: 1; }
+.head .lbl { color: var(--text-secondary); background: none; border: 0; font: inherit; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 0; }
+.head .lbl svg { display: block; }
+.well { display: flex; align-items: center; gap: 6px; min-width: 0;
+    background: color-mix(in srgb, var(--text) 4.5%, transparent); border-radius: 3px 8px 8px 3px;
+    padding: 6px 4px 6px 10px; min-height: 32px; font-size: 14px; line-height: 19px; color: var(--text); }
+.well.text { border-left: 2.5px solid color-mix(in srgb, var(--text-kind) 60%, transparent); }
+.well.redirect { border-left: 2.5px solid color-mix(in srgb, var(--accent) 60%, transparent); }
+.well.none { border-left: 2.5px solid var(--separator); }
+.well .body { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.well.text .body { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.well.redirect .body { font-family: var(--font-mono); font-size: 13px; }
+.arrow { flex: none; color: var(--accent-text); font-weight: 600; font-family: var(--font); }
+.dest-host { color: var(--text); font-weight: 600; }
+.dest-path { color: var(--text-secondary); }
+.gone { color: var(--text-tertiary); font-style: italic; font-size: 13px; }
+.eye { flex: none; display: inline-flex; align-items: center; background: none; border: 0; cursor: pointer; color: var(--text-secondary); opacity: .85; padding: 6px 7px; margin: -6px 0; }
+.eye svg { display: block; }
+/* hatched cover */
+.well.hatch { --hc: var(--text); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--hc) 4%, transparent) 0 6px, color-mix(in srgb, var(--hc) 9%, transparent) 6px 12px); }
+.tint .well.hatch.secret { --hc: var(--c-secret); }
+.tint .well.hatch.once { --hc: var(--c-once); }
+.lockrow { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; color: var(--text-secondary); font-size: 13px; cursor: pointer; background: none; border: 0; padding: 0; font-family: inherit; text-align: left; white-space: nowrap; overflow: hidden; }
+.lockrow svg { flex: none; display: block; }
+.lockrow .why { color: var(--text); font-weight: 600; }
+.tint .secret .lockrow .why, .tint .secret .lockrow svg { color: var(--c-secret); }
+.tint .once .lockrow .why, .tint .once .lockrow svg { color: var(--c-once); }
+.lockrow .size { color: var(--text-secondary); }
+/* link line: never truncates; time + actions wrap below with room */
+.foot { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; row-gap: var(--wrap-gap, 8px); min-width: 0; }
+.short { font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; }
+.short .h { color: var(--text-tertiary); }
+.short .n, .short .n span { color: var(--text); font-weight: 600; }
+.right { margin-left: auto; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.meta { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-secondary); white-space: nowrap; }
+.countdown { color: var(--result-text); font-weight: 600; }
+.expired .countdown { color: var(--text-secondary); }
+.expired .fade { opacity: .5; }
+.history-actions .history-copy, .history-actions .history-show, .history-actions .history-remove { }
+/* once marks */
+.o1 { font-size: 10.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; color: var(--c-once); background: color-mix(in srgb, var(--c-once) 12%, transparent); }
+.o2 { font-size: 10.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; color: var(--text-secondary); background: color-mix(in srgb, var(--text) 8%, transparent); }
+.o3 { font-size: 10.5px; font-weight: 700; padding: 0 7px; border-radius: 999px; color: var(--c-once); border: 1px solid color-mix(in srgb, var(--c-once) 45%, transparent); }
+.o4 { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; color: var(--c-once); }
+.o4 svg { display: block; }
+
+.foot { row-gap: 6px; }
+/* the whole cover is the button */
+.well.hatch { cursor: pointer; padding: 0; }
+.well.hatch .lockrow { padding: 6px 4px 6px 10px; min-height: 32px; width: 100%; }
+.well.hatch .lockrow:hover { background: color-mix(in srgb, var(--hc) 7%, transparent); }
+.well.hatch .lockrow .eyeglyph { margin-left: auto; padding: 0 7px; color: var(--text-secondary); display: inline-flex; }
+.well.hatch .lockrow:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 3px 8px 8px 3px; }
+.lockrow { overflow: hidden; }
+.o4 svg { display: block; }
+/* text icons */
+.ti { flex: none; color: var(--text-kind); font-weight: 700; display: inline-flex; align-items: center; }
+.ti svg { display: block; }
+.ti.t4 { font-family: var(--font-mono); font-size: 13px; }
+/* time phrasing */
+.meta .exp { color: var(--result-text); font-weight: 600; }
+.foot.p4 { display: grid; grid-template-columns: 1fr auto; row-gap: 6px; }
+.foot.p4 .short { grid-column: 1 / -1; }
+.foot.p4 .right { margin-left: 0; display: contents; }
+.foot.p4 .meta { justify-self: start; }
+.foot.p3 .right { flex: 1; justify-content: space-between; }
+.foot.p3 .right.wrapped { }
+.uses { font-weight: 600; color: var(--text-secondary); }
+/* resizable window */
+.win { position: relative; margin: 0 auto 0 0; }
+.win .panel { background: var(--card-bg); border: .5px solid var(--card-border); border-radius: 28px; padding: 26px 34px 30px; box-shadow: var(--card-shadow); }
+.grip { position: absolute; top: 0; bottom: 0; right: -9px; width: 18px; cursor: ew-resize; display: grid; place-items: center; touch-action: none; }
+.grip::before { content: ""; width: 5px; height: 44px; border-radius: 3px; background: color-mix(in srgb, var(--text) 22%, transparent); opacity: 0; transition: opacity .15s; }
+.win:hover .grip::before, .grip.show::before, .grip:focus-visible::before { opacity: 1; }
+.grip:focus-visible { outline: none; }
+.wlabel { font-size: 11.5px; color: var(--text-tertiary); margin: 6px 0 0 8px; }
+.stack { display: grid; gap: 26px; }
+</style>
+</head>
+<body>
+<main>
+<h1>History rows, round 4</h1>
+<p class="lead">C1 with your picks: 6px above a wrapped line, the H4 cover (the whole striped area is the button now; hover it), and the O4 flame. Below: a draggable window edge, an icon for Text, and where and how to say the time.</p>
+
+<h2>Drag the window's edge</h2>
+<p class="lead">A grip on the right edge shows on hover; drag it and the window grows from its centre, between 480 and 720. The width is remembered in this browser and applied before the first paint, so the page never jumps. Double-click the grip to reset. Phones keep the full-width sheet. Try it here (this frame only grows to the right).</p>
+<div class="stack" id="resize"></div>
+
+<h2>An icon for Text?</h2>
+<p class="lead">A redirect has its arrow. Should Text have a mark too, in its orange?</p>
+<div class="row" id="icons"></div>
+
+<h2>Saying the time</h2>
+<p class="lead">At today's width. P3 and P4 put the time on the left.</p>
+<div class="row" id="times"></div>
+</main>
+<script>
+const ns = "http://www.w3.org/2000/svg";
+const svg = (size, vb, parts) => {
+    const s = document.createElementNS(ns, "svg");
+    s.setAttribute("width", size); s.setAttribute("height", size); s.setAttribute("viewBox", vb);
+    s.setAttribute("fill", "none"); s.setAttribute("aria-hidden", "true");
+    for (const [tag, attrs] of parts) { const e = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); s.append(e); }
+    return s;
+};
+const R = { stroke: "currentColor", "stroke-linecap": "round", "stroke-linejoin": "round" };
+const eyeI = (off) => svg(15, "0 0 14 14", [
+    ["path", { ...R, "stroke-width": "1.3", d: "M1.3 7C2.8 4.3 4.7 3 7 3s4.2 1.3 5.7 4C11.2 9.7 9.3 11 7 11S2.8 9.7 1.3 7Z" }],
+    ["circle", { ...R, "stroke-width": "1.3", cx: "7", cy: "7", r: "1.9" }],
+    ...(off ? [["path", { ...R, "stroke-width": "1.3", d: "M2.3 1.8 11.7 12.2" }]] : []),
+]);
+const lockI = (n = 13) => svg(n, "0 0 14 14", [
+    ["rect", { ...R, "stroke-width": "1.4", x: "3", y: "6.2", width: "8", height: "5.8", rx: "1.4" }],
+    ["path", { ...R, "stroke-width": "1.4", d: "M4.9 6.2V4.6a2.1 2.1 0 0 1 4.2 0v1.6" }],
+]);
+const flameI = () => svg(12, "0 0 14 14", [["path", { ...R, "stroke-width": "1.4", d: "M7 1.8c.4 2-1.9 3.1-1.9 5.3 0 .9.5 1.5 1 1.8-.1-1 .4-1.7 1.2-2.3.2 1.2 1.9 1.7 1.9 3.3A2.7 2.7 0 0 1 4.3 10C3.3 7.2 6.2 5.6 7 1.8Z" }]]);
+const copyI = () => svg(16, "0 0 14 14", [
+    ["path", { stroke: "currentColor", "stroke-linecap": "round", d: "M9.6 2.2H3.6c-.77 0-1.4.63-1.4 1.4v6.2", "stroke-width": "1.6" }],
+    ["rect", { stroke: "currentColor", x: "4.9", y: "4.7", width: "7", height: "7.2", rx: "1.3", "stroke-width": "1.6" }],
+]);
+const openI = () => svg(15, "0 0 13 13", [["path", { ...R, d: "M2.5 10.5 10.5 2.5M4 2.5h6.5V9", "stroke-width": "1.8" }]]);
+const trashI = () => svg(16, "0 0 14 14", [["path", { ...R, "stroke-width": "1.4", d: "M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7" }]]);
+const h = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
+
+
+const flame2 = () => svg(11, "0 0 14 14", [["path", { fill: "currentColor", d: "M7.2 1c.5 2.6 3.8 4 3.8 7.6A4 4 0 0 1 3 8.6c0-2 1.2-3.3 2.2-4 0 1.4.5 2.5 1.5 3C6.4 5.4 6.8 3.2 7.2 1Z" }]]);
+
+const linesI = () => svg(13, "0 0 14 14", [["path", { ...R, "stroke-width": "1.6", d: "M2.5 3.5h9M2.5 7h9M2.5 10.5h5.5" }]]);
+const quoteI = () => svg(13, "0 0 14 14", [["path", { fill: "currentColor", d: "M2 8.6C2 6 3.3 4.2 5.6 3.3l.5.9C4.8 4.9 4.1 5.9 4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H3.4C2.6 11.6 2 11 2 10.2V8.6Zm5.4 0c0-2.6 1.3-4.4 3.6-5.3l.5.9C10.2 4.9 9.5 5.9 9.4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H8.8c-.8 0-1.4-.6-1.4-1.4V8.6Z" }]]);
+const ROWS = [
+    { kind: "Text", host: "yuio.link", name: ["bacon"], snippet: "blinko blanko", days: 7 },
+    { kind: "Redirect", host: "yuio.link", name: ["basket", "CEREAL", "deceit", "ENABLE"], snippet: "https://www.example.com/articles/2026/liquid-glass-everywhere", days: 7 },
+    { kind: "Text", host: "yuio.link", name: ["frying", "IMPURE", "marlin", "PARENT"], snippet: "Door code 4711 Wifi: hunter2 Alarm: 0000", lines: 3, chars: 41, secret: true, days: 7 },
+    { kind: "Text", host: "yuio.link", name: ["drool"], snippet: "Shopping: oat milk, two lemons, the good bread from the corner place, batteries (AA), something for Sunday", days: 3 },
+    { kind: "Redirect", host: "links.example.org", name: ["hazing", "VALLEY", "junior", "GALA"], snippet: "https://docs.internal.example.org/q3/plan", lines: 1, chars: 41, once: true, days: 2 },
+    { kind: "Text", host: "yuio.link", name: ["gentle", "ORBIT", "canopy", "MUFFIN"], snippet: "Minutes from Thursday", lines: 14, chars: 1312, uses: 5, secret: true, days: 1 },
+    { kind: "Text", host: "yuio.link", name: ["early", "BIRD"], none: true, expired: true },
+];
+const isPrivate = (r) => !!r.secret || !!r.once;
+const round10 = (n) => Math.ceil(n / 10) * 10;
+const plural = (n, w) => `${n.toLocaleString("en-US")} ${w}${n === 1 ? "" : "s"}`;
+const shortUrl = (r) => { const s = h("span", "short fade", h("span", "h", r.host + "/")); const n = h("span", "n"); r.name.forEach((w, i) => n.append(h("span", "nw-" + (i % 2), w))); s.append(n); return s; };
+const sizeText = (r) => { const c = plural(round10(r.chars ?? r.snippet.length), "character"); const l = r.lines ?? 1; return r.kind === "Redirect" || l === 1 ? c : `${plural(l, "line")}, ${c}`; };
+const textIcon = (k) => {
+    if (k === "X1") return h("span", "ti", linesI());
+    if (k === "X2") return h("span", "ti", quoteI());
+    if (k === "X3") return h("span", "ti", "¶");
+    if (k === "X4") return h("span", "ti t4", "T");
+    return null;
+};
+const wellNode = (r, st, o) => {
+    if (r.none) return h("div", "well none fade", h("span", "body gone", "Expired, its contents are gone"));
+    const w = h("div", "well " + r.kind.toLowerCase());
+    const lead = r.kind === "Redirect" ? h("span", "arrow", "→") : textIcon(o.icon);
+    if (st.cov) {
+        w.classList.add("hatch", r.secret ? "secret" : "once");
+        const b = h("button", "lockrow");
+        if (lead) b.append(lead);
+        b.append(lockI(), h("span", "why", r.secret ? "Secret" : "One-Time"), h("span", "size", "· " + sizeText(r)), h("span", "eyeglyph", eyeI(false)));
+        b.title = "Show the contents";
+        b.addEventListener("click", () => { st.cov = false; st.draw(); });
+        w.append(b);
+        return w;
+    }
+    if (lead) w.append(lead);
+    if (r.kind === "Redirect") {
+        const t = r.snippet.replace(/^https:\/\//, ""); const i = t.indexOf("/");
+        w.append(h("span", "body", h("span", "dest-host", t.slice(0, i)), h("span", "dest-path", t.slice(i))));
+    } else w.append(h("span", "body", r.snippet));
+    const e = h("button", "eye", eyeI(true)); e.addEventListener("click", () => { st.cov = true; st.draw(); }); w.append(e);
+    return w;
+};
+const acts = () => h("div", "history-actions", h("a", "history-copy", copyI()), h("a", "history-show", openI()), h("button", "history-remove", trashI()));
+const timeText = (r, p) => r.expired ? "Expired" : (p === "P2" || p === "P4") ? `Expires in ${plural(r.days, "day")}` : `${plural(r.days, "day")} left`;
+const list = (width, o = {}, rows = ROWS, head = true) => {
+    const wrap = h("div", "tint"); if (width) { wrap.style.width = width + "px"; wrap.style.maxWidth = "100%"; }
+    const ul = h("ul", "history-list");
+    let all = false;
+    const states = rows.map((r) => ({ cov: isPrivate(r) }));
+    const lbl = h("button", "lbl");
+    const draw = () => {
+        ul.replaceChildren(...rows.map((r, i) => {
+            const st = states[i]; st.draw = draw;
+            const li = h("li", "history-item"); if (r.expired) li.classList.add("expired");
+            const m = h("span", "meta fade");
+            if (r.once) m.append(h("span", "o4", flame2(), "Once"));
+            if (r.uses) m.append(h("span", "uses", `${r.uses} uses`));
+            m.append(h("span", "countdown", timeText(r, o.time)));
+            const foot = h("div", "foot " + (o.time === "P4" ? "p4" : o.time === "P3" ? "p3" : ""), shortUrl(r), h("div", "right", m, acts()));
+            li.append(wellNode(r, st, o), foot);
+            return li;
+        }));
+        lbl.replaceChildren(all ? "Show Public" : "Hide All", eyeI(!all));
+    };
+    lbl.addEventListener("click", () => { all = !all; states.forEach((st, i) => { st.cov = all || isPrivate(rows[i]); }); draw(); });
+    draw();
+    if (head) wrap.append(h("div", "head", h("span", "history-title", "Local History"), lbl));
+    wrap.append(ul);
+    return wrap;
+};
+const fig = (title, desc, node) => h("figure", "", h("figcaption", "", h("b", "", title), desc), node);
+// resizable window
+const win = (w, grip) => {
+    const box = h("div", "win"); box.style.width = w + "px";
+    const g = h("div", "grip" + (grip ? " show" : "")); g.tabIndex = 0; g.setAttribute("role", "separator"); g.setAttribute("aria-orientation", "vertical"); g.setAttribute("aria-label", "Window width");
+    const lab = h("div", "wlabel", `Window ${w}px`);
+    let startX = 0, startW = 0;
+    g.addEventListener("pointerdown", (e) => { startX = e.clientX; startW = box.offsetWidth; g.setPointerCapture(e.pointerId); });
+    g.addEventListener("pointermove", (e) => { if (!g.hasPointerCapture(e.pointerId)) return; const nw = Math.max(480, Math.min(720, startW + (e.clientX - startX))); box.style.width = nw + "px"; lab.textContent = `Window ${nw}px`; });
+    g.addEventListener("dblclick", () => { box.style.width = "480px"; lab.textContent = "Window 480px"; });
+    box.append(h("div", "panel", list(null, { icon: "X0" }, ROWS.slice(0, 5))), g);
+    return h("div", "", box, lab);
+};
+document.getElementById("resize").append(win(480, true), win(620, false));
+for (const [k, t] of [["X0", "None"], ["X1", "Lines"], ["X2", "Quote"], ["X3", "Pilcrow"], ["X4", "T"]])
+    document.getElementById("icons").append(fig(k + " · " + t, "", list(412, { icon: k }, [ROWS[0], ROWS[1], ROWS[2]], false)));
+for (const [k, t, d] of [["P1", "“2 days left”, right", " As now."], ["P2", "“Expires in 2 days”, right", ""], ["P3", "“2 days left”, left when wrapped", " A wrapped line puts the time under the name and the actions at the right."], ["P4", "“Expires in 2 days”, always its own line", " The link gets a line to itself on every row; time left, actions right. Every row has the same shape."]])
+    document.getElementById("times").append(fig(k + " · " + t, d, list(412, { icon: "X0", time: k }, [ROWS[0], ROWS[4], ROWS[5], ROWS[6]], false)));
+</script>
+</body>
+</html>
