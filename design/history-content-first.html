@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en" class="js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>History Content First</title>
+<link rel="stylesheet" href="../server/static/app.css">
+<style>
+body { display: block; padding: 28px 16px 48px; }
+main { max-width: 1080px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.lead { color: var(--text-secondary); font-size: 14px; margin: 0 0 18px; max-width: 76ch; text-align: left; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 500px), 1fr)); gap: 26px 22px; }
+figure { margin: 0; }
+figcaption { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 8px; text-align: left; }
+figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
+.history-list { min-height: 0; }
+.history-item { min-height: 0; }
+
+/* shared pieces */
+.eye { flex: none; display: inline-flex; align-items: center; background: none; border: 0; cursor: pointer;
+    color: var(--text-secondary); padding: 14px 12px; margin: -10px 0; opacity: .85; }
+.eye svg { display: block; }
+.eye.on { color: var(--accent-text); }
+.body { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cover { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; background: none; border: 0; padding: 0;
+    font: inherit; color: var(--text-secondary); cursor: pointer; filter: blur(6px); user-select: none; text-align: left; }
+.cover::before { content: attr(data-cover); }
+.covered { overflow: visible; }
+.dest-host { color: var(--text); font-weight: 600; }
+.dest-path { color: var(--text-secondary); }
+.arrow { color: var(--accent-text); font-weight: 600; font-family: var(--font); margin-right: 6px; }
+.short { font-family: var(--font-mono); white-space: nowrap; }
+.short .h { color: var(--text-tertiary); }
+.short .n { color: var(--text); font-weight: 600; }
+.short .nw-1 { }
+.meta2 { font-size: 11.5px; color: var(--text-secondary); white-space: nowrap; display: flex; gap: 6px; align-items: center; min-width: 0; }
+.countdown { color: var(--result-text); font-weight: 600; white-space: nowrap; flex: none; }
+.left > .kind-word { flex: none; }
+.left .short, .meta2 .short, .cap { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.eye.slot { visibility: hidden; }
+.expired .countdown { color: var(--text-secondary); }
+.expired .fade { opacity: .5; }
+.nocontent { color: var(--text-tertiary); font-style: italic; }
+
+/* A: content headline, short URL + meta on the line below, actions right */
+.A .history-item { padding: 10px 14px 7px; gap: 2px; }
+.A .l1 { font-size: 14.5px; line-height: 20px; height: 20px; color: var(--text); display: flex; min-width: 0; }
+.A .l1.redirect { font-family: var(--font-mono); font-size: 13.5px; }
+.A .short { font-size: 12.5px; }
+.A .foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.A .left { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 11.5px; color: var(--text-secondary); }
+.A .fallback .l1 { font-family: var(--font-mono); font-size: 14px; }
+
+/* B: kind tile at the left, two lines beside it, actions centred at right */
+.B .history-item { flex-direction: row; align-items: center; gap: 12px; padding: 10px 14px; }
+.B .tile { flex: none; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; font-weight: 700; font-size: 15px; }
+.B .tile.text { color: var(--text-kind); background: color-mix(in srgb, var(--text-kind) 13%, transparent); }
+.B .tile.redirect { color: var(--accent-text); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.B .tile.none { color: var(--text-tertiary); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.B .col { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.B .l1 { font-size: 14.5px; line-height: 20px; height: 20px; color: var(--text); display: flex; min-width: 0; }
+.B .l1.redirect { font-family: var(--font-mono); font-size: 13.5px; }
+.B .short { font-size: 12px; }
+.B .history-actions { flex: none; }
+.B .fallback .l1 { font-family: var(--font-mono); font-size: 14px; }
+
+/* C: contents in an inset well, Text may take two lines */
+.C .history-item { padding: 11px 14px 7px; gap: 6px; }
+.C .well { background: color-mix(in srgb, var(--text) 4.5%, transparent); border-radius: 8px; padding: 7px 10px;
+    font-size: 14px; line-height: 19px; color: var(--text); min-width: 0; }
+.C .well.text .body { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.C .well.redirect { font-family: var(--font-mono); font-size: 13px; display: flex; }
+.C .well.text { border-left: 2.5px solid color-mix(in srgb, var(--text-kind) 55%, transparent); border-radius: 3px 8px 8px 3px; }
+.C .well.redirect { border-left: 2.5px solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 3px 8px 8px 3px; }
+.C .foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.C .left { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 11.5px; color: var(--text-secondary); }
+.C .short { font-size: 12.5px; }
+.C .fallback .headline { font-family: var(--font-mono); font-size: 14px; }
+
+/* D: content first, the name as a capsule at the foot */
+.D .history-item { padding: 10px 14px 7px; gap: 4px; }
+.D .l1 { font-size: 14.5px; line-height: 20px; height: 20px; color: var(--text); display: flex; min-width: 0; }
+.D .l1.redirect { font-family: var(--font-mono); font-size: 13.5px; }
+.D .foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.D .left { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 11.5px; color: var(--text-secondary); }
+.D .cap { font-family: var(--font-mono); font-size: 12px; padding: 1px 8px 2px; border-radius: 999px;
+    background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text-secondary); white-space: nowrap; }
+.D .cap .n { color: var(--text); font-weight: 600; }
+.D .fallback .l1 { font-family: var(--font-mono); font-size: 14px; }
+
+/* E: as A, plus one eye in the head that covers every row at once */
+.E-head { display: flex; align-items: center; gap: 12px; padding: 0 8px; margin-bottom: 10px; }
+.E-head .history-title { flex: 1; }
+.E-head .eye { padding: 6px; margin: -6px 0; }
+.E-head .lbl { font-size: 12.5px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<main>
+<h1>History rows, content first</h1>
+<p class="lead">Every row leads with what the link holds. The link itself shrinks to <code>yuio.link/name</code> (the copy button still copies the full <code>https://</code> link). Every row has the eye: public rows start shown, secret and one-time rows start covered. Click a blur or an eye to toggle. The last two rows in each list have no contents (made before v0.13.0, or expired), so they fall back to the link as the headline.</p>
+<div class="grid" id="grid"></div>
+</main>
+<script>
+const ns = "http://www.w3.org/2000/svg";
+const svg = (size, vb, parts) => {
+    const s = document.createElementNS(ns, "svg");
+    s.setAttribute("width", size); s.setAttribute("height", size); s.setAttribute("viewBox", vb);
+    s.setAttribute("fill", "none"); s.setAttribute("aria-hidden", "true");
+    for (const [tag, attrs] of parts) { const e = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); s.append(e); }
+    return s;
+};
+const R = { stroke: "currentColor", "stroke-linecap": "round", "stroke-linejoin": "round" };
+const eyeI = (off) => svg(15, "0 0 14 14", [
+    ["path", { ...R, "stroke-width": "1.3", d: "M1.3 7C2.8 4.3 4.7 3 7 3s4.2 1.3 5.7 4C11.2 9.7 9.3 11 7 11S2.8 9.7 1.3 7Z" }],
+    ["circle", { ...R, "stroke-width": "1.3", cx: "7", cy: "7", r: "1.9" }],
+    ...(off ? [["path", { ...R, "stroke-width": "1.3", d: "M2.3 1.8 11.7 12.2" }]] : []),
+]);
+const copyI = () => svg(16, "0 0 14 14", [
+    ["path", { stroke: "currentColor", "stroke-linecap": "round", d: "M9.6 2.2H3.6c-.77 0-1.4.63-1.4 1.4v6.2", "stroke-width": "1.6" }],
+    ["rect", { stroke: "currentColor", x: "4.9", y: "4.7", width: "7", height: "7.2", rx: "1.3", "stroke-width": "1.6" }],
+]);
+const openI = () => svg(15, "0 0 13 13", [["path", { ...R, d: "M2.5 10.5 10.5 2.5M4 2.5h6.5V9", "stroke-width": "1.8" }]]);
+const trashI = () => svg(16, "0 0 14 14", [["path", { ...R, "stroke-width": "1.4", d: "M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7" }]]);
+const h = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
+const STEP = 12, FILL = " lorem ipsum dolor sit amet";
+const padded = (s) => { const n = Math.ceil(s.length / STEP) * STEP; let o = s; while (o.length < n) o += FILL; return o.slice(0, n); };
+
+const ROWS = [
+    { kind: "Text", name: ["bacon"], snippet: "blinko blanko" },
+    { kind: "Redirect", name: ["brave", "OTTER", "quiet", "MOSS"], snippet: "https://www.example.com/articles/2026/liquid-glass-everywhere" },
+    { kind: "Text", name: ["amber", "FIELD", "north", "TIDE"], snippet: "The wifi password is hunter2 and the door code is 4711", secret: true },
+    { kind: "Text", name: ["drool"], snippet: "Shopping: oat milk, two lemons, the good bread from the corner place, batteries (AA), something for Sunday" },
+    { kind: "Redirect", name: ["hazing", "VALLEY", "junior", "GALA"], snippet: "https://docs.internal.example.org/q3/plan", secret: true, once: true },
+    { kind: "Redirect", name: ["silver", "COVE"], none: true },
+    { kind: "Text", name: ["early", "BIRD"], none: true, expired: true },
+];
+
+const shortUrl = (name) => { const s = h("span", "short", h("span", "h", "yuio.link/")); const n = h("span", "n"); name.forEach((w) => n.append(w)); s.append(n); return s; };
+const kindW = (k) => h("span", "kind-word " + k.toLowerCase(), k);
+const time = (r) => h("span", "countdown", r.expired ? "Expired" : r.once ? "1 use · 2 days left" : "7 days left");
+const content = (r, st) => {
+    // returns nodes for the contents, covered or shown
+    const text = r.kind === "Redirect" ? r.snippet.replace(/^https:\/\//, "") : r.snippet;
+    if (st.cov) {
+        const c = h("button", "cover"); c.dataset.cover = padded(text); c.addEventListener("click", () => { st.cov = false; st.draw(); });
+        const wrap = h("span", "body covered"); wrap.append(c); return [wrap];
+    }
+    if (r.kind === "Redirect") {
+        const i = text.indexOf("/"); const host = i < 0 ? text : text.slice(0, i); const path = i < 0 ? "" : text.slice(i);
+        return [h("span", "arrow", "→"), h("span", "body", h("span", "dest-host", host), h("span", "dest-path", path))];
+    }
+    return [h("span", "body", text)];
+};
+const actions = (r, st) => {
+    const a = h("div", "history-actions", h("span", "history-check"));
+    if (!r.none) { const e = h("button", "eye" + (st.cov ? "" : ""), eyeI(!st.cov)); e.title = st.cov ? "Show the contents" : "Cover the contents"; e.addEventListener("click", () => { st.cov = !st.cov; st.draw(); }); a.append(e); } else a.append(h("span", "eye slot", eyeI(false)));
+    a.append(h("a", "history-copy", copyI()), h("a", "history-show", openI()), h("button", "history-remove", trashI()));
+    return a;
+};
+
+const build = {
+    A(r, st) {
+        const li = h("li", "history-item"); if (r.none) li.classList.add("fallback"); if (r.expired) li.classList.add("expired");
+        const l1 = h("div", "l1 " + r.kind.toLowerCase());
+        if (r.none) l1.append(h("span", "fade", shortUrl(r.name))); else l1.append(...content(r, st));
+        const left = h("div", "left fade");
+        if (!r.none) left.append(shortUrl(r.name), " · ");
+        left.append(kindW(r.kind), " · ", time(r));
+        li.append(l1, h("div", "foot", left, actions(r, st)));
+        return li;
+    },
+    B(r, st) {
+        const li = h("li", "history-item"); if (r.none) li.classList.add("fallback"); if (r.expired) li.classList.add("expired");
+        const tile = h("div", "tile fade " + (r.kind.toLowerCase()), r.kind === "Text" ? "T" : "→");
+        const l1 = h("div", "l1 " + r.kind.toLowerCase());
+        if (r.none) l1.append(h("span", "fade", shortUrl(r.name))); else l1.append(...content(r, st));
+        const l2 = h("div", "meta2 fade");
+        if (!r.none) l2.append(shortUrl(r.name), " · ");
+        l2.append(time(r));
+        li.append(tile, h("div", "col", l1, l2), actions(r, st));
+        return li;
+    },
+    C(r, st) {
+        const li = h("li", "history-item"); if (r.none) li.classList.add("fallback"); if (r.expired) li.classList.add("expired");
+        if (r.none) li.append(h("div", "headline fade", shortUrl(r.name)));
+        else li.append(h("div", "well " + r.kind.toLowerCase(), ...content(r, st)));
+        const left = h("div", "left fade");
+        if (!r.none) left.append(shortUrl(r.name), " · ");
+        left.append(kindW(r.kind), " · ", time(r));
+        li.append(h("div", "foot", left, actions(r, st)));
+        return li;
+    },
+    D(r, st) {
+        const li = h("li", "history-item"); if (r.none) li.classList.add("fallback"); if (r.expired) li.classList.add("expired");
+        const l1 = h("div", "l1 " + r.kind.toLowerCase());
+        if (r.none) l1.append(h("span", "fade", shortUrl(r.name))); else l1.append(...content(r, st));
+        const left = h("div", "left fade");
+        if (!r.none) { const c = h("span", "cap", "yuio.link/"); const n = h("span", "n"); r.name.forEach((w) => n.append(w)); c.append(n); left.append(c); }
+        left.append(kindW(r.kind), " · ", time(r));
+        li.append(l1, h("div", "foot", left, actions(r, st)));
+        return li;
+    },
+};
+build.E = build.A;
+
+const X = {
+    A: ["Content headline", "The contents on top at full strength. Below them, one quiet line: the short link, kind and time, then the actions. Two lines per row instead of three."],
+    B: ["Kind tile", "A tinted tile says Text or Redirect at a glance, so the kind word goes. Contents over the short link and time, actions centred on the right."],
+    C: ["Quoted well", "The contents sit in a soft inset with a kind-coloured edge, like a quoted message. Text may run to two lines. Taller, but the most legible."],
+    D: ["Name capsule", "As A, with the short link in a grey capsule, so it reads as a tag on the contents rather than a second headline."],
+    E: ["A, with one eye for all", "Layout A, plus an eye in the History head that covers every row at once (screen sharing, someone looking over your shoulder). Row eyes still work one by one."],
+};
+for (const [k, [t, d]] of Object.entries(X)) {
+    const ul = h("ul", "history-list " + (k === "E" ? "A" : k));
+    const states = [];
+    const drawAll = () => { ul.replaceChildren(...states.map((st) => st.el())); };
+    for (const r of ROWS) {
+        const st = { cov: !!r.secret };
+        st.el = () => build[k](r, st);
+        st.draw = drawAll;
+        states.push(st);
+    }
+    drawAll();
+    const fig = h("figure", "", h("figcaption", "", h("b", "", k + " · " + t), d));
+    if (k === "E") {
+        let all = false;
+        const eb = h("button", "eye", eyeI(true));
+        const lbl = h("span", "lbl", "Hide All");
+        eb.addEventListener("click", () => { all = !all; states.forEach((st, i) => { st.cov = all || !!ROWS[i].secret; }); eb.replaceChildren(eyeI(!all)); lbl.textContent = all ? "Show Public" : "Hide All"; drawAll(); });
+        fig.append(h("div", "E-head", h("span", "history-title", "Local History"), lbl, eb));
+    }
+    fig.append(ul);
+    document.getElementById("grid").append(fig);
+}
+</script>
+</body>
+</html>
