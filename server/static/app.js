@@ -1016,6 +1016,8 @@
     };
 
     // --- the window's right edge: drag it to widen the front page ---
+    // Nothing is drawn for it: the edge itself is the handle, found by the
+    // resize cursor it shows.
     // The window is centred, so it grows from the middle: the edge follows the
     // pointer and the left edge moves out to match. Keys work the same on the
     // focused grip; a double-click, or Home, puts the default width back. Phones
@@ -1032,9 +1034,6 @@
         grip.setAttribute("aria-valuemin", String(WIDTH_MIN));
         grip.setAttribute("aria-valuemax", String(WIDTH_MAX));
         grip.title = "Drag to widen the window; double-click to reset";
-        const pill = document.createElement("span");
-        pill.className = "window-grip-pill";
-        grip.append(pill);
         const sync = () => grip.setAttribute("aria-valuenow", String(windowWidth ?? WIDTH_MIN));
         const set = (w) => {
             windowWidth = w && w > WIDTH_MIN ? clampWidth(w) : null;

@@ -230,37 +230,23 @@ body {
     }
 }
 
-/* The grip: a strip along the window's right edge, with a pill that stays in
-   view (sticky) however tall the page is. Faint while the pointer is over the
-   window, full on the strip itself or while dragging. */
+/* The grip: an invisible strip along the window's right edge, found by the
+   resize cursor. Only keyboard focus draws anything: a line on the edge, so
+   the focused control can be seen. */
 .window-grip {
     position: absolute;
     top: var(--radius-window);
     bottom: var(--radius-window);
-    right: -10px;
-    width: 20px;
+    right: -8px;
+    width: 16px;
     cursor: ew-resize;
     touch-action: none;
 }
 
-.window-grip-pill {
-    position: sticky;
-    top: calc(50vh - 22px);
-    display: block;
-    width: 5px;
-    height: 44px;
-    margin: 0 auto;
-    border-radius: 3px;
-    background: color-mix(in srgb, var(--text) 25%, transparent);
-    opacity: 0;
-    transition: opacity 0.15s ease;
+.window-grip:focus-visible {
+    outline: none;
+    background: linear-gradient(var(--accent), var(--accent)) center / 2px 100% no-repeat;
 }
-
-.app-window:hover .window-grip-pill { opacity: 0.5; }
-.window-grip:hover .window-grip-pill,
-.window-grip.dragging .window-grip-pill,
-.window-grip:focus-visible .window-grip-pill { opacity: 1; }
-.window-grip:focus-visible { outline: none; }
 
 @media (max-width: 520px) {
     .window-grip { display: none; }
