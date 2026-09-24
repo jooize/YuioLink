@@ -257,6 +257,18 @@ pub fn has_scheme(s: &str) -> bool {
     }
 }
 
+/// True if `s` reads as a URL with a scheme. A URL holds no whitespace, so a
+/// leading word and colon followed by prose ("Shopping: oat milk", "Re: the
+/// plan") is a sentence, not a scheme. The one exception is a scheme with `//`
+/// after it: a pasted address with a stray space in its path is still an
+/// address, and validation says what is wrong with it.
+fn looks_like_url(s: &str) -> bool {
+    has_scheme(s)
+        && (!s.chars().any(char::is_whitespace)
+            || s.split_once(':')
+                .is_some_and(|(_, rest)| rest.starts_with("//")))
+}
+
 /// True if `s` is a single token that looks like a bare domain (`example.com`,
 /// `sub.example.co.uk/path`) — no whitespace, a dotted host, an alphabetic TLD.
 fn looks_like_domain(s: &str) -> bool {
@@ -299,7 +311,7 @@ pub fn detect_kind(s: &str) -> Kind {
     if trimmed.contains('\n') {
         return Kind::Text;
     }
-    if has_scheme(trimmed) || looks_like_domain(trimmed) {
+    if looks_like_url(trimmed) || looks_like_domain(trimmed) {
         Kind::Redirect
     } else {
         Kind::Text
@@ -509,6 +521,22 @@ mod tests {
         assert_eq!(detect_kind("just some prose here"), Kind::Text); // spaces
         assert_eq!(detect_kind("line one\nline two"), Kind::Text); // multi-line
         assert_eq!(detect_kind(""), Kind::Text);
+    }
+
+    #[test]
+    fn detect_kind_reads_a_word_and_colon_as_prose() {
+        // A label and a colon before prose is a sentence, not a scheme.
+        assert_eq!(detect_kind("Shopping: oat milk, two lemons"), Kind::Text);
+        assert_eq!(detect_kind("Re: the plan"), Kind::Text);
+        assert_eq!(detect_kind("TODO:  call the bank"), Kind::Text);
+        // A scheme with `//` stays an address even with a stray space.
+        assert_eq!(
+            detect_kind("https://example.com/my file.pdf"),
+            Kind::Redirect
+        );
+        // One token is still read as a URL, so an unknown scheme is still refused.
+        assert_eq!(detect_kind("javascript:alert(1)"), Kind::Redirect);
+        assert_eq!(detect_kind("tel:+46701234567"), Kind::Redirect);
     }
 
     #[test]

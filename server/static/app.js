@@ -20,6 +20,10 @@
         const i = s.indexOf(":");
         return i > 0 && /^[a-zA-Z][a-zA-Z0-9+.-]*$/.test(s.slice(0, i));
     };
+    // A URL holds no whitespace, so "Shopping: oat milk" is prose; a scheme with
+    // `//` after it stays an address despite a stray space. Mirrors
+    // yuiolink_core's looks_like_url.
+    const looksLikeUrl = (s) => hasScheme(s) && (!/\s/.test(s) || s.slice(s.indexOf(":") + 1).startsWith("//"));
     const looksLikeDomain = (s) => {
         if (/\s/.test(s)) return false;
         const host = s.split(/[/?#]/)[0].split(":")[0];
@@ -35,7 +39,7 @@
         const t = value.trim();
         if (t === "") return "text";
         if (t.includes("\n")) return "text";
-        return hasScheme(t) || looksLikeDomain(t) ? "redirect" : "text";
+        return looksLikeUrl(t) || looksLikeDomain(t) ? "redirect" : "text";
     };
     const kindLabel = (k) => (k === "redirect" ? "Redirect" : "Text");
     // The kind as a colour-coded word (Redirect blue, Text yellow), shared by the
