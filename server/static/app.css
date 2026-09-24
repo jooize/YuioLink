@@ -3339,7 +3339,7 @@ html.history-collapsed .history-body {
     padding: 10px 14px 9px;
 }
 
-/* Line 1: the contents in a soft well, edged in the kind's colour (the Redirect
+/* Line 1: the contents in a soft well, edged in the kind's color (the Redirect
    blue, the Text orange) and led by the kind's mark, so the kind needs no word. */
 .history-well {
     display: flex;
@@ -3422,7 +3422,7 @@ html.history-collapsed .history-body {
 .history-eye:hover { opacity: 1; }
 
 /* Covered (round 3, H4): the whole well is one button, striped in the type's
-   colour (Secret green, One-Time purple, grey for a row covered by hand), with
+   color (Secret green, One-Time purple, grey for a row covered by hand), with
    a lock, the reason and the size. The contents are not in the page at all. */
 .history-well.covered {
     --hatch: var(--text);

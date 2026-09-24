@@ -703,9 +703,9 @@
         return it.kind === "redirect" || !(it.lines > 1) ? chars : `${plainPlural(it.lines, "line")}, ${chars}`;
     };
     // Line 1 of a live row: what the link holds, in a well edged in its kind's
-    // colour, led by the kind's mark (the arrow, or quotes for Text). The eye in
+    // color, led by the kind's mark (the arrow, or quotes for Text). The eye in
     // the well covers it. Covered, the whole well is one button that shows it
-    // again: striped in the type's colour, with a lock, the reason and the size.
+    // again: striped in the type's color, with a lock, the reason and the size.
     const contentsWell = (it, rowName) => {
         const well = document.createElement("div");
         well.className = `history-well ${it.kind === "redirect" ? "redirect" : "text"}`;
@@ -1023,7 +1023,7 @@
     // --- the window's right edge: drag it to widen the front page ---
     // Nothing is drawn for it: the edge itself is the handle, found by the
     // resize cursor it shows.
-    // The window is centred, so it grows from the middle: the edge follows the
+    // The window is centered, so it grows from the middle: the edge follows the
     // pointer and the left edge moves out to match. Keys work the same on the
     // focused grip; a double-click, or Home, puts the default width back. Phones
     // keep the full-width sheet, and app.css hides the grip there.
