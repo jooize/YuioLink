@@ -2753,6 +2753,13 @@ pub fn help_page(base_url: &str) -> Markup {
             "sees where it leads before they go. When the time runs out the link is gone, "
             "and what it held goes with it."
         }
+        // The capitals exist only to mark word boundaries in a URL, where nothing
+        // else can; someone who only ever sees the URL could take them as required.
+        p.help-p {
+            "Capitals are optional. They only show where one word ends and the next "
+            "begins, so type the name however you like: " code { (host) "/braveotter" }
+            " opens the same link."
+        }
 
         h3.help-h { "Everything expires" }
         p.help-p {
