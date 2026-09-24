@@ -226,6 +226,36 @@ fn highlight_name(name: &str) -> Markup {
     }
 }
 
+/// The result panel's hero: the name's words in lowercase, alternating two
+/// blues, on one line. Mirrors app.js's `heroName`.
+///
+/// Lowercase because the capitals are only there to mark word boundaries in the
+/// URL, where nothing else can; here the colour and the gap do that, and names
+/// are case-insensitive, so the hero reads as words rather than a code. The URL
+/// under it keeps its capitals, since that is the text that gets pasted.
+fn hero_name(name: &str) -> Markup {
+    let words = name_words(name);
+    let chars: usize = words.iter().map(|w| w.len()).sum();
+    // Monospace advance ~0.6em a letter, 0.3em a gap (see `.result-word`).
+    let width = fit_bucket(chars * 6 + (words.len().saturating_sub(1)) * 3 + 2);
+    html! {
+        code.result-word #link-word data-w=(width) {
+            @for (i, word) in words.iter().enumerate() {
+                span class=(format!("nw nw-{}", i % 2)) { (word.to_lowercase()) }
+            }
+        }
+    }
+}
+
+/// The width of a one-line text in half-em steps, from its width in tenths of
+/// an em, rounded up. The stylesheet turns it into a font size that fits the
+/// line (`[data-w]` in app.css): the CSP allows no inline style, so the size
+/// travels as one of a fixed set of values instead. Capped at the largest the
+/// stylesheet knows. Mirrors app.js's `fitBucket`.
+fn fit_bucket(tenths: usize) -> usize {
+    tenths.div_ceil(5).min(60)
+}
+
 /// The `<title>` for a page about one link: `YuioLink Redirect: line`.
 ///
 /// Brand first, like every other page here, then the kind, then the name — so a
@@ -457,53 +487,69 @@ fn result_output(
         output.result #link-panel tabindex="-1" hidden[url.is_none()]
             data-terms-version=(terms.version) data-terms-sha256=(terms.sha256)
             data-snippet=[snippet] data-secret=[secret.then_some("1")] {
-            // The link and its QR code side by side: a phone held up to the
-            // screen is the other way a link leaves this page.
-            div.result-top {
-                div.result-id {
-                    code.result-word #link-word { @if let Some(u) = url { (highlight_name(link_name(u))) } }
-                    code.result-url #link-element { @if let Some(u) = url { (u) } }
-                    // Shown when a public link got more than one word because the short
-                    // tiers are crowded; app.js fills this for the in-place result too.
-                    small.result-note #result-note hidden[note.is_none()] { @if let Some(n) = note { (n) } }
-                    small.result-meta #link-expiry { (meta) }
+            div.result-id {
+                @if let Some(u) = url {
+                    (hero_name(link_name(u)))
+                    // One line too, sized the same way: 0.6em a character, plus room for
+                    // the copy check that trails it.
+                    code.result-url #link-element data-w=(fit_bucket(u.chars().count() * 6 + 15)) { (u) }
+                } @else {
+                    code.result-word #link-word {}
+                    code.result-url #link-element {}
                 }
-                // Empty alt on purpose: the URL it encodes is printed right beside it.
-                img.result-qr #link-qr src=[qr] alt="" width="104" height="104"
-                    hidden[url.is_none()];
+                // Shown when a public link got more than one word because the short
+                // tiers are crowded; app.js fills this for the in-place result too.
+                small.result-note #result-note hidden[note.is_none()] { @if let Some(n) = note { (n) } }
+                small.result-meta #link-expiry { (meta) }
             }
+            // The buttons and the QR code side by side, a hairline between: the
+            // code is the other way a link leaves this page, a phone held up to
+            // the screen.
             div.result-foot {
-                // Copy is the one thing almost everyone came here to do, so it is a
-                // full-width button and stays a word, not a symbol. A real link to
-                // the created URL (right-click gives Copy Link); app.js fills the
-                // href and turns a left click into a copy.
-                a.result-copy #copy-result hidden { "Copy" }
-                // The secondary pair, in the glyphs and colours the history rows
-                // already use. Preview opens this link's own interstitial, so the
-                // creator sees exactly what a recipient will see.
-                div.result-actions {
-                    a.result-preview #preview-result href=[url] target="_blank"
-                        rel="noopener noreferrer" hidden[url.is_none()]
-                        title="Open this link's preview in a new tab" {
-                        svg width="15" height="15" viewBox="0 0 13 13" fill="none" aria-hidden="true" {
-                            path d="M2.5 10.5 10.5 2.5M4 2.5h6.5V9"
-                                stroke="currentColor" stroke-width="1.8"
-                                stroke-linecap="round" stroke-linejoin="round" {}
+                div.result-buttons {
+                    // Copy is the one thing almost everyone came here to do, so it
+                    // leads, larger than the pair beneath it. A real link to the
+                    // created URL (right-click gives Copy Link); app.js fills the
+                    // href and turns a left click into a copy.
+                    a.result-copy #copy-result hidden {
+                        svg width="18" height="18" viewBox="0 0 14 14" fill="none" aria-hidden="true" {
+                            path d="M9.6 2.2H3.6c-.77 0-1.4.63-1.4 1.4v6.2"
+                                stroke="currentColor" stroke-width="1.6" stroke-linecap="round" {}
+                            rect x="4.9" y="4.7" width="7" height="7.2" rx="1.3"
+                                stroke="currentColor" stroke-width="1.6" {}
                         }
-                        span { "Preview" }
+                        span.label { "Copy" }
                     }
-                    // Withdrawing needs the creation token, which only the JavaScript
-                    // path holds — so this ships hidden and app.js reveals it.
-                    button.result-delete #delete-result type="button" hidden
-                        title="Stop this link working" {
-                        svg width="15" height="15" viewBox="0 0 14 14" fill="none" aria-hidden="true" {
-                            path d="M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7"
-                                stroke="currentColor" stroke-width="1.4"
-                                stroke-linecap="round" stroke-linejoin="round" {}
+                    // The secondary pair, in the glyphs and colours the history rows
+                    // already use. Preview opens this link's own interstitial, so the
+                    // creator sees exactly what a recipient will see.
+                    div.result-actions {
+                        a.result-preview #preview-result href=[url] target="_blank"
+                            rel="noopener noreferrer" hidden[url.is_none()]
+                            title="Open this link's preview in a new tab" {
+                            svg width="15" height="15" viewBox="0 0 13 13" fill="none" aria-hidden="true" {
+                                path d="M2.5 10.5 10.5 2.5M4 2.5h6.5V9"
+                                    stroke="currentColor" stroke-width="1.8"
+                                    stroke-linecap="round" stroke-linejoin="round" {}
+                            }
+                            span { "Preview" }
                         }
-                        span { "Delete" }
+                        // Withdrawing needs the creation token, which only the JavaScript
+                        // path holds — so this ships hidden and app.js reveals it.
+                        button.result-delete #delete-result type="button" hidden
+                            title="Stop this link working" {
+                            svg width="15" height="15" viewBox="0 0 14 14" fill="none" aria-hidden="true" {
+                                path d="M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7"
+                                    stroke="currentColor" stroke-width="1.4"
+                                    stroke-linecap="round" stroke-linejoin="round" {}
+                            }
+                            span { "Delete" }
+                        }
                     }
                 }
+                // Empty alt on purpose: the URL it encodes is printed right above it.
+                img.result-qr #link-qr src=[qr] alt="" width="80" height="80"
+                    hidden[url.is_none()];
                 // Filled by app.js when Delete is pressed: a prompt and the two ways
                 // out. Deleting never frees the name — the row becomes a tombstone
                 // and the name stays reserved until the link would have expired — so
@@ -3057,6 +3103,32 @@ pub fn error_page_list(code: u16, messages: &[&str]) -> Markup {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_result_hero_is_lowercase_on_one_line() {
+        let hero = hero_name("zombieWALRUSyodelJIGSAW").into_string();
+        assert!(
+            hero.contains(r#"<span class="nw nw-1">walrus</span>"#),
+            "{hero}"
+        );
+        // 23 letters and 3 gaps: 14.9em, stamped as 30 half-em steps.
+        assert!(hero.contains(r#"data-w="30""#), "{hero}");
+    }
+
+    #[test]
+    fn every_width_the_server_stamps_has_a_rule() {
+        // Anything under 16 fits at full size and needs no rule; `fit_bucket`
+        // caps at 60. Every step between must be in the stylesheet, or that
+        // name or URL silently falls back to the default width and overflows.
+        const APP_CSS: &str = include_str!("../static/app.css");
+        for w in 16..=60 {
+            assert!(
+                APP_CSS.contains(&format!("[data-w=\"{w}\"]")),
+                "no rule for {w}"
+            );
+        }
+        assert_eq!(fit_bucket(10_000), 60);
+    }
 
     /// An `expires_at` string `secs` from now, in SQLite's stored form.
     fn in_secs(secs: i64) -> String {

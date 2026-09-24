@@ -13,6 +13,9 @@
        clears 4.5:1 on the worst-case glass (4.71:1), not the audit's deeper
        #0058bf (5.59:1) -- the extra margin read as dullness. */
     --accent-text: #0062d8;
+    /* The second tone of the result hero's alternating words: a deep navy
+       beside the accent text blue (~12:1 on white). */
+    --name-alt: #0b2f6b;
     --result-text: #0a7854;
     --purple-text: #9546bd;
     /* The toggle track keeps Apple's native green -- deliberate (the user,
@@ -97,6 +100,7 @@
         --accent-hover: #3d9bff;
         --accent-press: #0a6fd6;
         --accent-text: #48a3ff;
+        --name-alt: #a9c8ff;
         --result-text: #34d399;
         --purple-text: #c770f5;
         /* The dark card has headroom; the glyph twin is the native green. */
@@ -956,37 +960,95 @@ html.js .custom-field:not(.open) {
 }
 
 
-/* The link name as the giant hero (direction R4): the memorable word, big and in
-   the accent colour, centred and selectable. Wraps by half, like the link-page
-   hero — a four-word name goes two-and-two, and each row keeps the same
-   blue-then-navy rhythm, so the rows read as rows and not as two colour columns. */
+/* The name and the URL are sized to fit their line: each is one line whatever
+   its length, measured against this block's width. */
+#link-panel .result-id {
+    container-type: inline-size;
+}
+
+/* A one-line text's width in em, from the half-em step views.rs and app.js
+   stamp on it (`fit_bucket` / `fitBucket`). The CSP allows no inline style, so
+   the width arrives as one of these values. Below 16 nothing needs shrinking. */
+[data-w="16"] { --w: 8; }
+[data-w="17"] { --w: 8.5; }
+[data-w="18"] { --w: 9; }
+[data-w="19"] { --w: 9.5; }
+[data-w="20"] { --w: 10; }
+[data-w="21"] { --w: 10.5; }
+[data-w="22"] { --w: 11; }
+[data-w="23"] { --w: 11.5; }
+[data-w="24"] { --w: 12; }
+[data-w="25"] { --w: 12.5; }
+[data-w="26"] { --w: 13; }
+[data-w="27"] { --w: 13.5; }
+[data-w="28"] { --w: 14; }
+[data-w="29"] { --w: 14.5; }
+[data-w="30"] { --w: 15; }
+[data-w="31"] { --w: 15.5; }
+[data-w="32"] { --w: 16; }
+[data-w="33"] { --w: 16.5; }
+[data-w="34"] { --w: 17; }
+[data-w="35"] { --w: 17.5; }
+[data-w="36"] { --w: 18; }
+[data-w="37"] { --w: 18.5; }
+[data-w="38"] { --w: 19; }
+[data-w="39"] { --w: 19.5; }
+[data-w="40"] { --w: 20; }
+[data-w="41"] { --w: 20.5; }
+[data-w="42"] { --w: 21; }
+[data-w="43"] { --w: 21.5; }
+[data-w="44"] { --w: 22; }
+[data-w="45"] { --w: 22.5; }
+[data-w="46"] { --w: 23; }
+[data-w="47"] { --w: 23.5; }
+[data-w="48"] { --w: 24; }
+[data-w="49"] { --w: 24.5; }
+[data-w="50"] { --w: 25; }
+[data-w="51"] { --w: 25.5; }
+[data-w="52"] { --w: 26; }
+[data-w="53"] { --w: 26.5; }
+[data-w="54"] { --w: 27; }
+[data-w="55"] { --w: 27.5; }
+[data-w="56"] { --w: 28; }
+[data-w="57"] { --w: 28.5; }
+[data-w="58"] { --w: 29; }
+[data-w="59"] { --w: 29.5; }
+[data-w="60"] { --w: 30; }
+
+/* The link name as the hero: lowercase words in two alternating blues with a
+   gap between, on one line. 30px unless the name is too wide for that, in
+   which case it shrinks to fit exactly (four six-letter words on a phone land
+   near 20px). */
 .result-word {
     display: flex;
-    flex-wrap: wrap;
     justify-content: center;
+    white-space: nowrap;
     font-family: var(--font-mono);
-    /* The mockup's "arson" is a fixed 30px; clamp only shrinks it on narrow phones. */
-    font-size: clamp(24px, 7vw, 30px);
+    font-size: min(30px, calc(100cqi / var(--w, 8)));
     font-weight: 700;
     line-height: 1.1;
     letter-spacing: -0.01em;
     margin-bottom: 4px;
-    /* Vivid: 24px+ bold is large text (3:1 bar), which --accent clears. */
-    color: var(--accent);
+    color: var(--accent-text);
     user-select: text;
 }
 
+.result-word .nw + .nw { margin-left: 0.3em; }
+.result-word .nw-0 { color: var(--accent-text); }
+.result-word .nw-1 { color: var(--name-alt); }
+
 /* The full URL beneath the hero word: small but legible — dim scheme, standout
-   host — rendered in parts by app.js. Wraps so the whole link stays visible and
-   copyable. Full text colour: this IS the created link, and on the no-JS result
-   page it renders as plain text with no spans, so the base colour must carry it. */
+   host — rendered in parts by app.js. One line, shrinking to fit like the hero,
+   so the whole link stays visible and copyable. Full text colour: this IS the
+   created link, and on the no-JS result page it renders as plain text with no
+   spans, so the base colour must carry it. */
 .result-url {
     display: block;
     margin-top: 0;
     font-family: var(--font-mono);
-    font-size: 15px;
+    font-size: min(15px, calc(100cqi / var(--w, 20)));
     line-height: 1.4;
-    word-break: break-all;
+    white-space: nowrap;
     color: var(--text);
     user-select: text;
 }
@@ -1007,15 +1069,21 @@ html.js .custom-field:not(.open) {
     opacity: 1;
 }
 
-/* A dead result strikes through both the hero name word and the URL — the link no
-   longer resolves, so its whole identity reads as crossed out.
+/* A dead result goes grey: the name, the URL and the QR code lose their colour,
+   and the meta line says "expired". Grey rather than struck through, which
+   crossed out the whole panel and read as an error.
    `.withdrawn` is listed as well as `.expired`: a withdrawn link is dead whatever
-   its clock says, and the strike must not wait for, or depend on, a countdown tick. */
-.result.expired .result-word,
+   its clock says, and the grey must not wait for, or depend on, a countdown tick. */
+.result.expired .result-word .nw,
+.result.withdrawn .result-word .nw {
+    color: var(--text-tertiary);
+}
+
 .result.expired .result-url,
-.result.withdrawn .result-word,
-.result.withdrawn .result-url {
-    text-decoration: line-through;
+.result.expired .result-url *,
+.result.withdrawn .result-url,
+.result.withdrawn .result-url * {
+    color: var(--text-tertiary);
 }
 
 .result-url .u-scheme,
@@ -1063,13 +1131,34 @@ html.js .custom-field:not(.open) {
     user-select: text;
 }
 
-/* The link (name, URL, meta) and its QR code side by side. The text column
-   keeps its centring, so the hero reads the same as before the code joined it. */
-.result-top {
+/* Beneath the link: the buttons, a hairline, then the QR code. The button
+   block centres in whatever the code leaves; the prompt Delete opens spans
+   the whole row under both. */
+.result-foot {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    column-gap: 18px;
+    margin-top: 16px;
+}
+
+.result-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding-right: 16px;
+    border-right: 0.5px solid var(--separator);
+}
+
+/* No code (the landing page's empty panel): no hairline to draw either. */
+.result-foot:has(.result-qr[hidden]) .result-buttons {
+    border-right: 0;
+    padding-right: 0;
+}
+
+.result-foot .result-confirm {
+    grid-column: 1 / -1;
+    margin-top: 12px;
 }
 
 /* The code is blue ink on a white tile whatever the theme: an inverted code is
@@ -1077,28 +1166,21 @@ html.js .custom-field:not(.open) {
    the glass as a card rather than a hole. */
 .result-qr {
     display: block;
-    width: 104px;
-    height: 104px;
-    border-radius: 10px;
+    width: 80px;
+    height: 80px;
+    margin-left: 16px;
+    border-radius: 9px;
     background: #fff;
-    box-shadow: 0 0 0 0.5px var(--card-border);
-    transition: opacity 0.18s ease;
+    box-shadow: 0 0 0 0.5px var(--separator);
+    transition: filter 0.18s ease, opacity 0.18s ease;
 }
 
-/* A dead link's code still scans to a page that says so; faded, it stops
+/* A dead link's code still scans to a page that says so; grey, it stops
    inviting anyone to try. */
 .result.expired .result-qr,
 .result.withdrawn .result-qr {
-    opacity: 0.25;
-}
-
-/* Foot beneath the link: the Copy pill, then Preview and Delete, centred. */
-.result-foot {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    margin-top: 14px;
+    filter: grayscale(1);
+    opacity: 0.45;
 }
 
 .result-meta {
@@ -1232,46 +1314,37 @@ html.js .custom-field:not(.open) {
    context menu offers Copy Link while a left click copies via JS. Full width and
    in words: it is what nearly every visit to this panel is for. */
 .result-copy {
-    display: block;
-    width: 100%;
-    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
     text-decoration: none;
     font-family: inherit;
-    font-size: 15px;
+    font-size: 18px;
     font-weight: 600;
     color: var(--accent-text);
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-    border: 0.5px solid color-mix(in srgb, var(--accent) 22%, transparent);
-    border-radius: var(--radius-control);
-    padding: 12px 22px;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    transition: color 0.15s ease, opacity 0.15s ease;
 }
 
-/* It is an anchor, so the global `a:hover` underline applies unless refused —
-   and an underline inside a pill reads as a second, competing control. */
+.result-copy svg {
+    display: block;
+}
+
+/* An anchor, so the global `a:hover` underline applies unless refused. */
 .result-copy:hover {
     text-decoration: none;
-    background: color-mix(in srgb, var(--accent) 20%, transparent);
-    border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+    color: var(--accent-hover);
 }
 
 .result-copy.copied {
     color: var(--switch-on-text);
-    background: color-mix(in srgb, var(--switch-on) 18%, transparent);
-    border-color: color-mix(in srgb, var(--switch-on) 30%, transparent);
 }
 
-/* Expired link: nothing to copy — the pill goes inert and neutral. */
+/* Expired link: nothing to copy, so the button goes inert and grey. */
 .result-copy.disabled {
     pointer-events: none;
-}
-
-.result-copy:disabled,
-.result-copy.disabled {
     color: var(--text-tertiary);
-    background: color-mix(in srgb, var(--text) 8%, transparent);
-    border-color: var(--separator);
     cursor: not-allowed;
 }
 
@@ -4209,16 +4282,6 @@ code {
 @media (max-width: 520px) {
     body {
         padding: 0;
-    }
-
-    .result-top {
-        column-gap: 14px;
-    }
-
-    .result-qr {
-        width: 88px;
-        height: 88px;
-        border-radius: 8px;
     }
 
     .app-window {

@@ -98,13 +98,14 @@
     const flashCopied = (button) => {
         if (!button) return;
         // Symbol buttons (the history row's copy sheets) keep their glyph and
-        // flash green via .copied alone; only text buttons swap their label.
-        const isText = !button.querySelector("svg");
+        // flash green via .copied alone; a button with a word (the result's
+        // Copy, in its `.label`) says "Copied" for the same moment.
+        const label = button.querySelector(".label");
         button.classList.add("copied");
-        if (isText) button.textContent = "Copied";
+        if (label) label.textContent = "Copied";
         setTimeout(() => {
             button.classList.remove("copied");
-            if (isText) button.textContent = "Copy";
+            if (label) label.textContent = "Copy";
         }, 1500);
     };
     // Add `cls` to `el` for the same 1.5s as the button's "Copied" flash — used for the
@@ -141,28 +142,25 @@
         return frag;
     };
 
-    // The same words, but split down the middle into two `.nwg` halves, for the
-    // hero-sized name on the result panel. The halves are the only line break the
-    // browser is offered, so a four-word name wraps two-and-two rather than mid-word.
-    // Mirrors the server's `highlight_name`; the inline URL below keeps the flat
-    // version, where breaking anywhere is what a long URL should do.
-    const nameHalves = (name) => {
+    // A one-line text's width in half-em steps, from its width in tenths of an
+    // em, rounded up and capped: app.css turns it into a font size that fits
+    // (`[data-w]`). Mirrors the server's `fit_bucket`.
+    const fitBucket = (tenths) => String(Math.min(60, Math.ceil(tenths / 5)));
+
+    // The result hero: the name's words in lowercase, alternating two blues, with
+    // the width bucket that keeps it on one line. Mirrors the server's
+    // `hero_name`. The URL keeps its capitals; only this display drops them.
+    const fillHero = (el, name) => {
         const words = name.match(NAME_WORDS) || [name];
-        const split = Math.ceil(words.length / 2);
-        const frag = document.createDocumentFragment();
-        [words.slice(0, split), words.slice(split)].forEach((group, half) => {
-            if (!group.length) return;
-            const g = document.createElement("span");
-            g.className = "nwg";
-            group.forEach((w, i) => {
-                const s = document.createElement("span");
-                s.className = `nw nw-${(split * half + i) % 2}`;
-                s.textContent = w;
-                g.append(s);
-            });
-            frag.append(g);
+        el.replaceChildren();
+        words.forEach((w, i) => {
+            const s = document.createElement("span");
+            s.className = `nw nw-${i % 2}`;
+            s.textContent = w.toLowerCase();
+            el.append(s);
         });
-        return frag;
+        const chars = words.reduce((n, w) => n + w.length, 0);
+        el.dataset.w = fitBucket(chars * 6 + (words.length - 1) * 3 + 2);
     };
 
     // Render a URL into `el` as styled parts: a dim scheme, a standout host, and the
@@ -1383,8 +1381,9 @@
 
         const showReady = (url, kind, expiresIso, uses) => {
             const name = url.split("#")[0].split("/").pop();
-            if (linkWordEl) linkWordEl.replaceChildren(nameHalves(name));
+            if (linkWordEl) fillHero(linkWordEl, name);
             renderUrlInto(linkEl, url);
+            linkEl.dataset.w = fitBucket([...url].length * 6 + 15); // + the copy check
             // Served by this page's own origin (`/{name}/qr.svg`), whatever API_BASE says.
             const qr = document.getElementById("link-qr");
             if (qr) { qr.src = `/${encodeURIComponent(name)}/qr.svg`; qr.hidden = false; }
