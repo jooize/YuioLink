@@ -3364,32 +3364,59 @@ html.history-collapsed .history-body {
     font-size: 12px;
 }
 
-/* A redirect's destination opens with an arrow: where the link goes. */
+/* A redirect's destination opens with an arrow: where the link goes. Drawn in
+   the Redirect blue, a size up and with room after it, so it reads as a sign
+   rather than as the first character of the destination (round 2, R3). */
 .history-snippet.redirect .history-snippet-body::before {
-    content: "\2192\00a0";
+    content: "\2192";
+    margin-right: 6px;
     font-family: var(--font);
-    color: var(--text-tertiary);
-}
-
-.history-snippet-body.covered {
-    letter-spacing: 0.08em;
-    color: var(--text-tertiary);
-    user-select: none;
-}
-
-.history-snippet-toggle {
-    flex: none;
-    font-family: inherit;
-    font-size: 12px;
+    font-size: 14px;
+    font-weight: 600;
     color: var(--accent-text);
+}
+
+/* A private row's contents under a 6px blur (round 5, T1): enough to see that
+   text is there and roughly how much, not what it says. The text comes from
+   `data-cover` (app.js pads it to a coarse length), so it is never page text.
+   The blur spills past the 16px line, and clipping it would draw a hard grey
+   band: the line lets it out vertically and clips only sideways. */
+.history-snippet-body.covered {
+    overflow-x: clip;
+    overflow-y: visible;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.history-snippet-cover {
+    display: inline-block;
+    vertical-align: top;
+    height: 16px;
+    padding: 0;
+    font: inherit;
+    line-height: 16px;
+    white-space: nowrap;
+    color: inherit;
     background: none;
     border: 0;
-    padding: 0;
+    border-radius: 4px;
     cursor: pointer;
+    filter: blur(6px);
 }
 
-.history-snippet-toggle:hover {
-    text-decoration: underline;
+.history-snippet-cover::before {
+    content: attr(data-cover);
+}
+
+/* The blur would smear a focus ring too, so the ring goes on the line instead. */
+.history-snippet-body.covered:has(.history-snippet-cover:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.history-snippet-cover:focus-visible {
+    outline: none;
 }
 
 /* Line 3: kind pill + expiry, in the UI font (mockup A). */
@@ -3409,6 +3436,7 @@ html.history-collapsed .history-body {
    glyphs are ~15-16px, so padding grows each hit target to about 30px square
    (larger than the 13px text links they replaced) and supplies the spacing
    between neighbours — .history-actions keeps only a hairline gap. */
+.history-reveal,
 .history-show,
 .history-copy,
 .history-remove {
@@ -3447,6 +3475,7 @@ html.history-collapsed .history-body {
     margin-right: -12px;
 }
 
+.history-reveal svg,
 .history-show svg,
 .history-copy svg,
 .history-remove svg {
@@ -3470,10 +3499,16 @@ html.history-collapsed .history-body {
    down and a later one nudging it up; the later won and put it a whole pixel off
    the line the other two share. */
 
+.history-reveal:hover,
 .history-show:hover,
 .history-copy:hover,
 .history-remove:hover {
     opacity: 1;
+}
+
+/* The eye is grey like the trash: it only changes what this row shows. */
+.history-reveal {
+    color: var(--text-secondary);
 }
 
 .history-show {

@@ -77,6 +77,13 @@
             ["path", { stroke: "currentColor", "stroke-linecap": "round", d: "M9.6 2.2H3.6c-.77 0-1.4.63-1.4 1.4v6.2", "stroke-width": "1.6" }],
             ["rect", { stroke: "currentColor", x: "4.9", y: "4.7", width: "7", height: "7.2", rx: "1.3", "stroke-width": "1.6" }],
         ]);
+    // An eye: show what a private row covers; struck through once it shows.
+    const eyeIcon = (struck) =>
+        icon(16, "0 0 14 14", [
+            ["path", { ...round, d: "M1.3 7C2.8 4.3 4.7 3 7 3s4.2 1.3 5.7 4C11.2 9.7 9.3 11 7 11S2.8 9.7 1.3 7Z", "stroke-width": "1.3" }],
+            ["circle", { ...round, cx: "7", cy: "7", r: "1.9", "stroke-width": "1.3" }],
+            ...(struck ? [["path", { ...round, d: "M2.3 1.8 11.7 12.2", "stroke-width": "1.3" }]] : []),
+        ]);
     // The arrow out of a box's corner: opens elsewhere.
     const openIcon = () =>
         icon(15, "0 0 13 13", [["path", { ...round, d: "M2.5 10.5 10.5 2.5M4 2.5h6.5V9", "stroke-width": "1.8" }]]);
@@ -632,40 +639,64 @@
 
     // Line 2 of a live row, when it knows its contents: a redirect's destination
     // (the https:// scheme dropped, as the row's own URL does when it runs short)
-    // or the opening of a Text link. A private row shows a fixed run of dots,
-    // which gives away nothing about the length, and a Show button beside it.
+    // or the opening of a Text link. A private row covers it with the same text
+    // under a heavy blur, which says something is there but not what. The cover
+    // is drawn from a data attribute by CSS rather than put in the page as text,
+    // so find-in-page, copy and screen readers cannot reach what it hides; the
+    // cover is itself a button, and a click reveals.
+    const COVER_STEP = 12;
+    const COVER_FILL = " lorem ipsum dolor sit amet";
+    // The cover's length is the real one rounded up to the next COVER_STEP, made
+    // up with a fixed filler: close to the real width but coarse, the same on
+    // every render, and never a second copy of the text to compare against.
+    const coverText = (text) => {
+        const n = Math.ceil(text.length / COVER_STEP) * COVER_STEP;
+        let out = text;
+        while (out.length < n) out += COVER_FILL;
+        return out.slice(0, n);
+    };
+    const toggleReveal = (it) => {
+        if (revealed.has(it.id)) revealed.delete(it.id);
+        else revealed.add(it.id);
+        renderHistory();
+        // The list was rebuilt; hand focus to this row's new eye.
+        document.querySelector(`.history-reveal[data-for="${it.id}"]`)?.focus();
+    };
     const snippetLine = (it, rowName) => {
         const line = document.createElement("div");
         line.className = `history-snippet ${it.kind === "redirect" ? "redirect" : "text"}`;
         const body = document.createElement("span");
         body.className = "history-snippet-body";
-        const covered = isPrivate(it) && !revealed.has(it.id);
-        if (covered) {
+        const text = it.kind === "redirect" ? it.snippet.replace(/^https:\/\//i, "") : it.snippet;
+        if (isPrivate(it) && !revealed.has(it.id)) {
             body.classList.add("covered");
-            body.textContent = "••••••••••••";
-            body.setAttribute("aria-hidden", "true"); // the button says what is hidden
+            const cover = document.createElement("button");
+            cover.type = "button";
+            cover.className = "history-snippet-cover";
+            cover.dataset.cover = coverText(text);
+            cover.setAttribute("aria-label", `Show Contents of ${rowName}`);
+            cover.addEventListener("click", () => toggleReveal(it));
+            body.append(cover);
         } else {
-            body.textContent = it.kind === "redirect" ? it.snippet.replace(/^https:\/\//i, "") : it.snippet;
+            body.textContent = text;
             body.title = it.snippet;
         }
         line.append(body);
-        if (isPrivate(it)) {
-            const toggle = document.createElement("button");
-            toggle.type = "button";
-            toggle.className = "history-snippet-toggle";
-            toggle.textContent = covered ? "Show" : "Hide";
-            toggle.setAttribute("aria-label", `${covered ? "Show" : "Hide"} Contents of ${rowName}`);
-            toggle.dataset.for = it.id;
-            toggle.addEventListener("click", () => {
-                if (covered) revealed.add(it.id);
-                else revealed.delete(it.id);
-                renderHistory();
-                // The list was rebuilt; hand focus to this row's new button.
-                document.querySelector(`.history-snippet-toggle[data-for="${it.id}"]`)?.focus();
-            });
-            line.append(toggle);
-        }
         return line;
+    };
+    // The eye beside a private row's actions: shows or covers line 2 again.
+    const revealButton = (it, rowName) => {
+        const shown = revealed.has(it.id);
+        const eye = document.createElement("button");
+        eye.type = "button";
+        eye.className = "history-reveal";
+        eye.dataset.for = it.id;
+        eye.append(eyeIcon(shown));
+        eye.setAttribute("aria-label", `${shown ? "Hide" : "Show"} Contents of ${rowName}`);
+        eye.setAttribute("aria-pressed", String(shown));
+        eye.title = shown ? "Cover the contents" : "Show the contents";
+        eye.addEventListener("click", () => toggleReveal(it));
+        return eye;
     };
 
     const renderHistory = () => {
@@ -800,7 +831,9 @@
             // The actions are symbols (styled in app.css), ordered Copy, Preview,
             // Trash: the two link actions first, the destructive one last at the
             // row's edge (a stray tap only opens the confirm). The green check
-            // sits left of the copy sheets and flashes on copy. Copy and the
+            // sits left of the copy sheets and flashes on copy. A private row
+            // with contents puts its eye between the check and Copy: the check
+            // then sits one icon further out, but the icons stay evenly spaced. Copy and the
             // arrow are real links to the URL, so right-click offers Copy Link /
             // Open in New Tab; a left click on the sheets copies instead.
             //
@@ -842,7 +875,9 @@
             // Opens the confirm prompt over the row — not a toggle; the prompt carries
             // its own Cancel. openConfirm closes any other row's prompt first.
             remove.addEventListener("click", () => openConfirm(li, it));
-            actions.append(check, copy, show, remove);
+            actions.append(check);
+            if (it.snippet && isPrivate(it)) actions.append(revealButton(it, rowName));
+            actions.append(copy, show, remove);
             foot.append(meta, actions);
 
             li.append(url);
