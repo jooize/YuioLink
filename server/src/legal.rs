@@ -29,7 +29,7 @@ use std::sync::OnceLock;
 /// is a safe path segment — and its permanent address (`/legal/<id>`). The
 /// LAST entry is the current terms; every entry is frozen by the pinned-hash
 /// test — see the module doc.
-pub const VERSIONS: &[TermsEntry] = &[("2026-08-25T132200Z", terms_2026_08_25)];
+pub const VERSIONS: &[TermsEntry] = &[("2026-09-24T184300Z", terms_2026_09_24)];
 
 /// One entry of [`VERSIONS`]: the id and the function that renders that text.
 pub type TermsEntry = (&'static str, fn() -> Markup);
@@ -39,7 +39,7 @@ pub type TermsEntry = (&'static str, fn() -> Markup);
 /// something published rather than to an empty field.
 const GENESIS: &str = "YuioLink terms hash chain genesis\n";
 
-/// The terms as they took effect 2026-08-25 — the first version. Frozen by the
+/// The terms as they took effect 2026-09-24 — the first version. Frozen by the
 /// pinned-hash test: once published, ANY edit belongs in a new entry, because
 /// creation receipts in the wild hold this version's fingerprint.
 ///
@@ -52,7 +52,7 @@ const GENESIS: &str = "YuioLink terms hash chain genesis\n";
 /// in the Electronic Communications Act (2022:482) 9 kap. 28 §, the DSA's
 /// notice-and-action shape without conceding it applies. The contact addresses
 /// are placeholders (`span.ph`) until publishable ones exist.
-fn terms_2026_08_25() -> Markup {
+fn terms_2026_09_24() -> Markup {
     html! {
         h3.help-h #operator { "Who provides this" }
         p.help-p {
@@ -515,8 +515,8 @@ mod tests {
     /// published on yuio.link — after that, receipts in the wild hold the old
     /// fingerprint, and history is append-only.
     const PINNED: &[(&str, &str)] = &[(
-        "2026-08-25T132200Z",
-        "bf61027e6c5efc21ab3b4f2e62ab971f62a206fd70c715d38f8422c15fa79e75",
+        "2026-09-24T184300Z",
+        "d2ae7bea711e5d61d5acb552e34f81275d20faa3ac00b60143c46814bf284dc0",
     )];
 
     #[test]
