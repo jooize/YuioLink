@@ -47,10 +47,18 @@
         const labels = host.split(".");
         if (labels.length < 2) return false;
         // Unicode-aware so internationalized domains (åäö.se, münchen.de) match,
-        // mirroring yuiolink_core::looks_like_domain.
+        // mirroring yuiolink_core::looks_like_domain. A TLD is letters, or its
+        // punycode form (xn--p1ai for рф).
         const tld = labels.at(-1);
-        if (!/^\p{L}{2,}$/u.test(tld)) return false;
-        return labels.every((l) => /^[\p{L}\p{N}-]+$/u.test(l));
+        if (!/^\p{L}{2,}$/u.test(tld) && !/^xn--./i.test(tld)) return false;
+        if (!labels.every((l) => /^[\p{L}\p{N}-]+$/u.test(l))) return false;
+        // DNS caps a label at 63 bytes, counted as punycode; the URL parser
+        // makes that form, and refuses an xn-- label that does not decode.
+        try {
+            return new URL(`https://${host}`).hostname.split(".").every((l) => l.length <= 63);
+        } catch {
+            return false;
+        }
     };
     const detectKind = (value) => {
         const t = value.trim();

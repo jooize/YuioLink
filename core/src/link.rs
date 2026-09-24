@@ -300,14 +300,26 @@ fn looks_like_domain(s: &str) -> bool {
     }
     // Unicode-aware so internationalized domains (e.g. `åäö.se`, `münchen.de`)
     // are recognized, not just ASCII ones. The browser / `url` crate handle the
-    // IDNA punycode conversion when the link is opened.
-    let tld_ok = labels
-        .last()
-        .is_some_and(|tld| tld.chars().count() >= 2 && tld.chars().all(char::is_alphabetic));
+    // IDNA punycode conversion when the link is opened. A TLD is letters, or
+    // its punycode form (`xn--p1ai` for `рф`).
+    let tld_ok = labels.last().is_some_and(|tld| {
+        (tld.chars().count() >= 2 && tld.chars().all(char::is_alphabetic))
+            || (tld.len() > 4 && tld.get(..4).is_some_and(|p| p.eq_ignore_ascii_case("xn--")))
+    });
     let labels_ok = labels
         .iter()
         .all(|l| !l.is_empty() && l.chars().all(|c| c.is_alphanumeric() || c == '-'));
-    tld_ok && labels_ok
+    tld_ok && labels_ok && labels_fit_dns(host)
+}
+
+/// DNS caps a label at 63 bytes (RFC 1035), counted in the ASCII form the name
+/// is looked up by, so a Unicode label is measured as its punycode. Also false
+/// for a host IDNA refuses (an `xn--` label that does not decode).
+fn labels_fit_dns(host: &str) -> bool {
+    match url::Host::parse(host) {
+        Ok(url::Host::Domain(ascii)) => ascii.split('.').all(|l| l.len() <= 63),
+        _ => false,
+    }
 }
 
 /// Best-effort guess of whether input is a [`Kind::Redirect`] or [`Kind::Text`].
@@ -538,6 +550,17 @@ mod tests {
         assert_eq!(detect_kind("sub.example.co.uk/path"), Kind::Redirect);
         assert_eq!(detect_kind("åäö.se"), Kind::Redirect); // IDN bare domain
         assert_eq!(detect_kind("münchen.de/weg"), Kind::Redirect); // IDN + path
+        assert_eq!(detect_kind("пример.рф"), Kind::Redirect); // Unicode TLD
+        assert_eq!(detect_kind("пример.xn--p1ai"), Kind::Redirect); // punycode TLD
+        assert_eq!(detect_kind("example.XN--P1AI/x"), Kind::Redirect);
+        assert_eq!(detect_kind("example.xn--"), Kind::Text); // nothing encoded
+        assert_eq!(detect_kind("example.xn--zz"), Kind::Text); // not valid punycode
+        let tld63 = format!("example.{}", "a".repeat(63));
+        let tld64 = format!("example.{}", "a".repeat(64));
+        assert_eq!(detect_kind(&tld63), Kind::Redirect); // DNS label limit
+        assert_eq!(detect_kind(&tld64), Kind::Text);
+        // Measured as punycode: 60 Cyrillic letters are 60 chars but more than 63 bytes.
+        assert_eq!(detect_kind(&format!("{}.ru", "п".repeat(60))), Kind::Text);
         assert_eq!(detect_kind("hello"), Kind::Text); // single word
         assert_eq!(detect_kind("just some prose here"), Kind::Text); // spaces
         assert_eq!(detect_kind("line one\nline two"), Kind::Text); // multi-line
