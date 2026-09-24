@@ -727,7 +727,6 @@
             const cover = document.createElement("button");
             cover.type = "button";
             cover.className = "history-cover";
-            cover.title = "Show the contents";
             const reason = document.createElement("span");
             reason.className = "history-cover-why";
             reason.textContent = why;
@@ -772,7 +771,6 @@
         } else {
             body.textContent = it.snippet;
         }
-        body.title = it.snippet;
         const eye = document.createElement("button");
         eye.type = "button";
         eye.className = "history-eye";
