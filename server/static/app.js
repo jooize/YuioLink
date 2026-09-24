@@ -1317,8 +1317,12 @@
         });
 
         const showReady = (url, kind, expiresIso, uses) => {
-            if (linkWordEl) linkWordEl.replaceChildren(nameHalves(url.split("#")[0].split("/").pop()));
+            const name = url.split("#")[0].split("/").pop();
+            if (linkWordEl) linkWordEl.replaceChildren(nameHalves(name));
             renderUrlInto(linkEl, url);
+            // Served by this page's own origin (`/{name}/qr.svg`), whatever API_BASE says.
+            const qr = document.getElementById("link-qr");
+            if (qr) { qr.src = `/${encodeURIComponent(name)}/qr.svg`; qr.hidden = false; }
             // `withdrawn` is sticky by design (see markPanelWithdrawn) and this is a
             // different link, so the hero starts alive again — otherwise the link just
             // created inherited the strike-through of the one deleted before it.

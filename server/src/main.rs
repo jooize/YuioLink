@@ -4,6 +4,7 @@ mod db;
 mod error;
 mod legal;
 mod phone;
+mod qr;
 mod ratelimit;
 mod security;
 mod token;

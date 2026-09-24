@@ -1063,16 +1063,47 @@ html.js .custom-field:not(.open) {
     user-select: text;
 }
 
-/* Foot beneath the hero URL: the meta line, then the Copy pill, centred. */
+/* The link (name, URL, meta) and its QR code side by side. The text column
+   keeps its centring, so the hero reads the same as before the code joined it. */
+.result-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 18px;
+}
+
+/* The code is blue ink on a white tile whatever the theme: an inverted code is
+   the one phone cameras miss. A hairline edge, so in dark mode the tile sits in
+   the glass as a card rather than a hole. */
+.result-qr {
+    display: block;
+    width: 104px;
+    height: 104px;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 0 0 0.5px var(--card-border);
+    transition: opacity 0.18s ease;
+}
+
+/* A dead link's code still scans to a page that says so; faded, it stops
+   inviting anyone to try. */
+.result.expired .result-qr,
+.result.withdrawn .result-qr {
+    opacity: 0.25;
+}
+
+/* Foot beneath the link: the Copy pill, then Preview and Delete, centred. */
 .result-foot {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 12px;
-    margin-top: 13px;
+    margin-top: 14px;
 }
 
 .result-meta {
+    display: block;
+    margin-top: 6px;
     font-size: 12.5px;
     color: var(--text-secondary);
 }
@@ -4122,6 +4153,16 @@ code {
 @media (max-width: 520px) {
     body {
         padding: 0;
+    }
+
+    .result-top {
+        column-gap: 14px;
+    }
+
+    .result-qr {
+        width: 88px;
+        height: 88px;
+        border-radius: 8px;
     }
 
     .app-window {

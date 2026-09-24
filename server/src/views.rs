@@ -435,16 +435,28 @@ fn result_output(url: Option<&str>, meta: Markup, note: Option<&str>) -> Markup 
     // it later runs) copies them into the local-history entry. The JS create
     // path takes the same receipt from the API response instead.
     let terms = crate::legal::receipt();
+    // Same-origin, so the CSP's `img-src 'self'` covers it; app.js points it at
+    // the new name on the in-place path.
+    let qr = url.map(|u| format!("/{}/qr.svg", link_name(u)));
     html! {
         output.result #link-panel tabindex="-1" hidden[url.is_none()]
             data-terms-version=(terms.version) data-terms-sha256=(terms.sha256) {
-            code.result-word #link-word { @if let Some(u) = url { (highlight_name(link_name(u))) } }
-            code.result-url #link-element { @if let Some(u) = url { (u) } }
-            // Shown when a public link got more than one word because the short
-            // tiers are crowded; app.js fills this for the in-place result too.
-            small.result-note #result-note hidden[note.is_none()] { @if let Some(n) = note { (n) } }
+            // The link and its QR code side by side: a phone held up to the
+            // screen is the other way a link leaves this page.
+            div.result-top {
+                div.result-id {
+                    code.result-word #link-word { @if let Some(u) = url { (highlight_name(link_name(u))) } }
+                    code.result-url #link-element { @if let Some(u) = url { (u) } }
+                    // Shown when a public link got more than one word because the short
+                    // tiers are crowded; app.js fills this for the in-place result too.
+                    small.result-note #result-note hidden[note.is_none()] { @if let Some(n) = note { (n) } }
+                    small.result-meta #link-expiry { (meta) }
+                }
+                // Empty alt on purpose: the URL it encodes is printed right beside it.
+                img.result-qr #link-qr src=[qr] alt="" width="104" height="104"
+                    hidden[url.is_none()];
+            }
             div.result-foot {
-                small.result-meta #link-expiry { (meta) }
                 // Copy is the one thing almost everyone came here to do, so it is a
                 // full-width button and stays a word, not a symbol. A real link to
                 // the created URL (right-click gives Copy Link); app.js fills the

@@ -36,6 +36,7 @@ rand.workspace = true
 
 # Share-card image (og:image).
 resvg.workspace = true
+qrcode.workspace = true
 phonenumber.workspace = true
 
 [dev-dependencies]

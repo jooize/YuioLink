@@ -111,6 +111,7 @@ pub fn router(state: AppState) -> Router {
         // `form-action 'self'` blocks at the redirect hop in Chrome and Safari.
         .route("/{name}/reveal", post(reveal))
         .route("/{name}/card.png", get(card_image))
+        .route("/{name}/qr.svg", get(qr_image))
         .fallback(not_found_fallback)
         // Inside the router, not around it: every response the site can produce —
         // pages, assets, API JSON, errors — leaves through here with the same
@@ -707,6 +708,26 @@ pub async fn card_image(State(state): State<AppState>, Path(name): Path<String>)
         )
             .into_response(),
         None => AppError::internal("card render failed").into_response(),
+    }
+}
+
+/// `GET /:name/qr.svg` -- the QR code shown beside a created link. A pure
+/// function of the URL: no lookup, so it says nothing about whether the link
+/// exists (see `qr.rs`). Anything that is not shaped like a link name is a 404.
+pub async fn qr_image(State(state): State<AppState>, Path(name): Path<String>) -> Response {
+    if !crate::qr::is_plausible_name(&name) {
+        return AppError::NotFound.into_response();
+    }
+    match crate::qr::svg(&format!("{}{}", state.base_url, name)) {
+        Some(svg) => (
+            [
+                (header::CONTENT_TYPE, "image/svg+xml"),
+                (header::CACHE_CONTROL, "public, max-age=3600"),
+            ],
+            svg,
+        )
+            .into_response(),
+        None => AppError::NotFound.into_response(),
     }
 }
 

@@ -46,6 +46,10 @@ sha2 = "0.10"
 # loading, since the card is an SVG we generate with bundled fonts.
 resvg = { version = "0.44", default-features = false, features = ["text"] }
 
+# QR code beside the created link. The bare encoder only (no `image` or `svg`
+# features): the server draws the module grid as one SVG path itself.
+qrcode = { version = "0.14", default-features = false }
+
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
