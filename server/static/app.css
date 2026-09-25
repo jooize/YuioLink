@@ -3211,10 +3211,11 @@ html.history-collapsed .history-body {
        `--history-live` the live rows among them. A tombstone is `.history-item`'s
        56px, a live row `.history-item.live`'s 104px plus its 0.5px hairline
        (48.5px more), plus this panel's own hairline top and bottom.
-       `--history-lines` adds the 19px contents lines known before layout (Text's
-       line breaks). Only ever a floor, so a row whose contents wrap still grows. */
+       `--history-extra` adds the pixels a row's contents are known to take before
+       layout (app.js `knownExtraPx`: Text's line breaks, the stacked buttons,
+       a cut row's note). Only ever a floor, so contents that wrap still grow. */
     min-height: calc(var(--history-rows, 0) * 56px + var(--history-live, 0) * 48.5px
-        + var(--history-lines, 0) * 19px + 1px);
+        + var(--history-extra, 0) * 1px + 1px);
     background: var(--field-bg);
     border: 0.5px solid var(--field-border);
     border-radius: 12px;
@@ -3323,22 +3324,19 @@ html.history-collapsed .history-body {
     gap: var(--row-icon-gap);
 }
 
-/* Green copy-check on the actions line, just left of the copy sheets (flashes
-   with them on copy); opacity-toggled so the row never reflows. */
-.history-check {
-    flex: none;
-    font-size: 14px;
+/* Copying the link puts a green check after the link itself, the thing that
+   was copied; opacity-toggled with its space kept, so nothing reflows. */
+.history-link::after {
+    content: "\2713";
+    margin-left: 0.4em;
+    font-family: var(--font);
     font-weight: 700;
     color: var(--switch-on-text);
     opacity: 0;
     transition: opacity 0.18s ease;
 }
 
-.history-check::before {
-    content: "\2713";
-}
-
-.history-check.show {
+.history-link.copied::after {
     opacity: 1;
 }
 
@@ -3386,26 +3384,124 @@ html.history-collapsed .history-body {
 .history-well.text .history-mark { color: var(--text-kind); }
 .history-mark svg { display: block; }
 
-.history-well-body {
+/* The contents, then (on a row cut short) the note under them. */
+.history-well-col {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Up to ten 19px lines. Past that the last line fades out: the row ends
+   mid-text on purpose, and the note below says how much there is. */
+.history-well-body {
+    max-height: 190px;
     overflow: hidden;
     overflow-wrap: anywhere;
-    display: -webkit-box;
-    -webkit-line-clamp: 10;
-    -webkit-box-orient: vertical;
     user-select: text;
 }
 
-/* The whole contents, to ten lines: Text with its own line breaks, a
-   destination wrapped wherever it has to. */
+.history-well-body.cut {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+}
+
+.history-well.open .history-well-body { max-height: none; }
+
 .history-well.text .history-well-body { white-space: pre-wrap; }
 
-.history-well.redirect .history-well-body {
+/* A destination in the preview's own dress (`.pv-url` and its classes), sized
+   for the row: 13px on the row's 19px lines, no hanging indent (the edge and
+   the mark already say where it starts), no copy check. */
+.history-well .history-well-body.pv-url {
+    display: block;
+    width: auto;
+    margin: 0;
+    padding-left: 0;
+    text-indent: 0;
+    font-size: 13px;
+    line-height: 19px;
+}
+
+.history-well .pv-url::after { content: none; }
+.history-well .pv-url .reg { font-size: 1em; padding: 0 3px; }
+
+/* Rows saved before the dress was sent: host and path, plainly. */
+.history-well.redirect .history-well-body:not(.pv-url) {
     word-break: break-all;
     font-family: var(--font-mono);
     font-size: 13px;
 }
+
+/* The note on a cut row: the whole size, and a click opens the rest. The
+   chevron sits in the mark's column (the button reaches back over the mark's
+   14px and the 7px gap), so the words line up with the contents. */
+.history-more {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    align-self: flex-start;
+    margin: 7px 0 0 -21px;
+    padding: 0;
+    font: inherit;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--text-tertiary);
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+
+.history-more svg {
+    flex: none;
+    width: 14px;
+    transition: transform 0.18s ease;
+}
+
+.history-more[aria-expanded="true"] svg { transform: rotate(180deg); }
+.history-more:hover { color: var(--text-secondary); }
+
+/* Copy and the eye for the contents: 16px icons, the first centered on the
+   first line of text, side by side 14px apart on a one-line row and stacked
+   10px apart on a taller one (app.js sets `.stacked`). The eye's right edge
+   lines up with a covered row's eye. Each hit area reaches 6px past its icon
+   without moving anything. */
+.history-well-side {
+    flex: none;
+    display: flex;
+    gap: 14px;
+    padding: 1.5px 7px 0 8px;
+}
+
+.history-well.stacked .history-well-side {
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+.history-well-btn {
+    position: relative;
+    display: inline-flex;
+    padding: 0;
+    color: var(--text-secondary);
+    background: none;
+    border: 0;
+    cursor: pointer;
+    opacity: 0.85;
+}
+
+.history-well-btn::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+}
+
+.history-well.stacked .history-well-btn::after { inset: -5px -6px; }
+.history-well-btn svg { display: block; }
+.history-well-btn:hover { opacity: 1; }
+.history-well-btn.copied { color: var(--switch-on-text); opacity: 1; }
+.history-well-btn.failed { color: var(--danger); opacity: 1; }
 
 .history-dest-host { font-weight: 600; }
 .history-dest-path { color: var(--text-secondary); }
@@ -3416,9 +3512,9 @@ html.history-collapsed .history-body {
     color: var(--text-tertiary);
 }
 
-/* The eye at the well's end, level with the first line. Its hit box reaches
-   into the well's padding, and the negative margin gives it back, so the well
-   keeps its height. */
+/* The eye on a covered row's button. Its hit box reaches into the well's
+   padding, and the negative margin gives it back, so the well keeps its
+   height. */
 .history-eye {
     flex: none;
     display: inline-flex;
@@ -3512,6 +3608,7 @@ html.history-collapsed .history-body {
     user-select: text;
 }
 
+.history-link-dash { margin-right: 0.5em; font-family: var(--font); color: var(--text-tertiary); }
 .history-link-host { color: var(--text-tertiary); }
 .history-link-name,
 .history-link-name .nw-0,

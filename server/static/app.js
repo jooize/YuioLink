@@ -128,6 +128,9 @@
         icon(13, "0 0 14 14", [
             ["path", { fill: "currentColor", d: "M2 8.6C2 6 3.3 4.2 5.6 3.3l.5.9C4.8 4.9 4.1 5.9 4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H3.4C2.6 11.6 2 11 2 10.2V8.6Zm5.4 0c0-2.6 1.3-4.4 3.6-5.3l.5.9C10.2 4.9 9.5 5.9 9.4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H8.8c-.8 0-1.4-.6-1.4-1.4V8.6Z" }],
         ]);
+    // A small down chevron: a cut row's note opens the rest.
+    const chevronIcon = () =>
+        icon(12, "0 0 10 10", [["path", { ...round, d: "M2.5 3.8 5 6.3l2.5-2.5", "stroke-width": "1.5" }]]);
     // A flame: burns after one use.
     const flameIcon = () =>
         icon(11, "0 0 14 14", [
@@ -624,13 +627,18 @@
             ? payload.trim()
             : payload.trim().split(/\r?\n/).slice(0, SNIPPET_LINES + 1).join("\n")
         ).slice(0, SNIPPET_MAX);
-    // The lines a row's contents are known to take before it is drawn: its line
-    // breaks, up to the ten shown. Wrapping only adds to it. (PRE_PAINT_JS in
-    // views.rs counts the same, to reserve the height.)
-    const knownExtraLines = (it) =>
-        it.kind === "text" && it.snippet && !it.tombstone && !isExpired(it) && !isCovered(it)
-            ? Math.min(SNIPPET_LINES, it.snippet.split("\n").length) - 1
-            : 0;
+    // The pixels a row's contents are known to add to its one-line height before
+    // it is drawn: Text's own line breaks, up to the ten shown (19px each), the
+    // stacked Copy and eye a row of two lines or more gets (50px at least), and
+    // the size note under a row cut short (23px). Wrapping only adds to it.
+    // PRE_PAINT_JS in views.rs counts the same, to reserve the height.
+    const knownExtraPx = (it) => {
+        if (it.kind !== "text" || !it.snippet || it.tombstone || isExpired(it) || isCovered(it)) return 0;
+        const lines = it.snippet.split("\n").length;
+        const shown = Math.min(SNIPPET_LINES, lines);
+        const body = shown > 1 ? Math.max(shown * 19, 50) : 19;
+        return body - 19 + (lines > SNIPPET_LINES ? 23 : 0);
+    };
     // How much the link holds, counted over the whole payload rather than the
     // snippet, so a covered row can say its size without holding any more of
     // it: numbers only.
@@ -651,7 +659,7 @@
     const dropExpiredSnippets = () => {
         let dropped = false;
         for (const it of memHistory) {
-            if (it.snippet && isExpired(it)) { delete it.snippet; dropped = true; }
+            if (it.snippet && isExpired(it)) { delete it.snippet; delete it.display; dropped = true; }
         }
         return dropped;
     };
@@ -694,8 +702,6 @@
         // On the root element, not the section: the pre-paint script has to be able
         // to set it before the section exists (see PRE_PAINT_JS in views.rs).
         document.documentElement.classList.toggle("history-collapsed", !historyOpen);
-        // Rows rendered while the list was collapsed had zero width to measure;
-        // refit now that it is (or just became) visible.
     };
     const setHistoryOpen = (open) => { historyOpen = open; applyHistoryOpen(); persistOpen(); };
     const setPersist = (on) => {
@@ -724,7 +730,7 @@
         setCover(it, !isCovered(it));
         renderHistory();
         // The list was rebuilt; hand focus to this row's contents again.
-        document.querySelector(`.history-well[data-for="${it.id}"] button`)?.focus();
+        document.querySelector(`.history-well[data-for="${it.id}"] :is(.history-cover, .history-eye)`)?.focus();
     };
     const plainPlural = (n, word) => `${n.toLocaleString("en-US")} ${word}${n === 1 ? "" : "s"}`;
     // What a covered row says instead of its contents: why it is covered, and how
@@ -791,11 +797,59 @@
             well.append(cover);
             return well;
         }
+        // The contents and, under them when they are cut short, a note saying
+        // how much there is in all; a click opens the rest. The chevron leads the
+        // note from the mark's column, so the text lines up with the contents.
+        const col = document.createElement("div");
+        col.className = "history-well-col";
         const body = document.createElement("span");
         body.className = "history-well-body";
+        fillBody(it, body);
+        const more = document.createElement("button");
+        more.type = "button";
+        more.className = "history-more";
+        more.hidden = true;
+        const open = expanded.has(it.id);
+        const moreText = document.createElement("span");
+        moreText.textContent = open ? "Show Less" : fullSize(it);
+        more.append(chevronIcon(), moreText);
+        more.setAttribute("aria-expanded", String(open));
+        more.addEventListener("click", () => toggleExpand(it));
+        col.append(body, more);
+        if (open) well.classList.add("open");
+        // Copy and the eye, for the contents (the link has its own Copy below).
+        // Side by side on a one-line row, stacked on a taller one (fitWells).
+        const side = document.createElement("span");
+        side.className = "history-well-side";
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.className = "history-well-btn history-well-copy";
+        copy.append(copyIcon());
+        copy.setAttribute("aria-label", `Copy Contents of ${rowName}`);
+        copy.title = "Copy the contents";
+        copy.addEventListener("click", () => copyContents(it, copy));
+        const eye = document.createElement("button");
+        eye.type = "button";
+        eye.className = "history-well-btn history-eye";
+        eye.append(eyeIcon(true));
+        eye.setAttribute("aria-label", `Cover Contents of ${rowName}`);
+        eye.title = "Cover the contents";
+        eye.addEventListener("click", () => toggleCover(it));
+        side.append(copy, eye);
+        well.append(mark(), col, side);
+        return well;
+    };
+    // What a row's contents show: a redirect's destination in the preview's
+    // dress when the server sent it (rows saved before that show the host and
+    // path plainly), or Text as typed, all of it once fetched to open.
+    const fillBody = (it, body) => {
+        const full = expanded.get(it.id);
         if (it.kind === "redirect") {
-            // The destination with its https:// dropped, the host standing out
-            // from the path: where the link goes, at a glance.
+            if (Array.isArray(it.display)) {
+                body.classList.add("pv-url");
+                paintDisplay(it.display, body);
+                return;
+            }
             const t = it.snippet.replace(/^https:\/\//i, "");
             const cut = t.indexOf("/");
             const host = document.createElement("span");
@@ -808,18 +862,123 @@
                 path.textContent = t.slice(cut);
                 body.append(path);
             }
-        } else {
-            body.textContent = it.snippet;
+            return;
         }
-        const eye = document.createElement("button");
-        eye.type = "button";
-        eye.className = "history-eye";
-        eye.append(eyeIcon(true));
-        eye.setAttribute("aria-label", `Cover Contents of ${rowName}`);
-        eye.title = "Cover the contents";
-        eye.addEventListener("click", () => toggleCover(it));
-        well.append(mark(), body, eye);
-        return well;
+        body.textContent = typeof full === "string" ? full : it.snippet;
+    };
+    // The server's destination tree, built as elements: a string is text,
+    // ["wbr"] a line-break opportunity, [class, child...] a span. Only class
+    // names and text come from it, never markup.
+    const paintDisplay = (nodes, parent) => {
+        for (const n of nodes) {
+            if (typeof n === "string") parent.append(n);
+            else if (Array.isArray(n) && n.length === 1 && n[0] === "wbr") parent.append(document.createElement("wbr"));
+            else if (Array.isArray(n) && typeof n[0] === "string") {
+                const span = document.createElement("span");
+                if (n[0]) span.className = n[0];
+                paintDisplay(n.slice(1), span);
+                parent.append(span);
+            }
+        }
+    };
+    const readDisplay = (json) => {
+        if (!json) return undefined;
+        try {
+            const v = JSON.parse(json);
+            return Array.isArray(v) ? v : undefined;
+        } catch {
+            return undefined;
+        }
+    };
+    // The note on a cut row: how much the link holds in all.
+    const fullSize = (it) => {
+        if (!it.chars) return "More";
+        const chars = `${plainPlural(it.chars, "character")} total`;
+        return it.kind === "redirect" || !(it.lines > 1) ? chars : `${plainPlural(it.lines, "line")}, ${chars}`;
+    };
+    // Rows opened to their whole contents, this page view only: the id, and the
+    // contents fetched for it (null until they arrive, or if they cannot).
+    const expanded = new Map();
+    const toggleExpand = async (it) => {
+        const refocus = () => document.querySelector(`.history-well[data-for="${it.id}"] .history-more`)?.focus();
+        if (expanded.has(it.id)) {
+            expanded.delete(it.id);
+            renderHistory();
+            refocus();
+            return;
+        }
+        expanded.set(it.id, null);
+        renderHistory();
+        refocus();
+        if (it.kind !== "text" || snippetComplete(it)) return;
+        const full = await fetchContents(it);
+        if (full != null && expanded.has(it.id)) {
+            expanded.set(it.id, full);
+            renderHistory();
+            refocus();
+        }
+    };
+    // Whether the row holds the whole of what the link holds.
+    const snippetComplete = (it) => !!it.snippet && it.chars != null && [...it.snippet].length >= it.chars;
+    // The whole contents from the server. The creator token goes along when
+    // the row has one: it is what lets a limited link's creator read it back
+    // without spending its use. Null when the server will not or cannot say.
+    const fetchContents = async (it) => {
+        if (!it.name) return null;
+        try {
+            const resp = await fetch(`${API_BASE}/api/v0/links/${encodeURIComponent(it.name)}`, {
+                headers: it.token ? { Authorization: `Bearer ${it.token}` } : {},
+            });
+            if (!resp.ok) return null;
+            const data = await resp.json();
+            return data.content ?? data.target ?? null;
+        } catch {
+            return null;
+        }
+    };
+    // Copy what the link holds: from the row when it has all of it, else from
+    // the server. The clipboard write starts inside the click, with the text
+    // to follow, since Safari refuses a write begun after the fetch returns.
+    const copyContents = async (it, button) => {
+        const full = expanded.get(it.id);
+        if (typeof full === "string") return copyToClipboard(full, button);
+        if (snippetComplete(it)) return copyToClipboard(it.snippet, button);
+        const failed = () => flashClass(button, "failed");
+        if (typeof ClipboardItem === "function") {
+            const blob = fetchContents(it).then((t) => {
+                if (t == null) throw new Error("contents unavailable");
+                return new Blob([t], { type: "text/plain" });
+            });
+            try {
+                await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
+                flashCopied(button);
+            } catch {
+                failed();
+            }
+            return;
+        }
+        const t = await fetchContents(it);
+        if (t == null) failed();
+        else copyToClipboard(t, button);
+    };
+    // After the rows are drawn: stack Copy and the eye beside contents of more
+    // than one line, and mark a row cut short (fade, note) when its contents run
+    // past the ten lines or past what this device kept.
+    const fitWells = () => {
+        for (const well of document.querySelectorAll(".history-well:not(.covered):not(.none)")) {
+            const body = well.querySelector(".history-well-body");
+            const more = well.querySelector(".history-more");
+            if (!body || !more) continue;
+            const it = memHistory.find((e) => e.id === well.dataset.for);
+            well.classList.toggle("stacked", body.getBoundingClientRect().height > 24);
+            const open = well.classList.contains("open");
+            const cut = !open && (body.scrollHeight > body.clientHeight + 1 || (it?.chars ?? 0) > SNIPPET_MAX);
+            body.classList.toggle("cut", cut);
+            more.hidden = !(cut || open);
+            if (open && it && it.kind === "redirect" && (it.chars ?? 0) > SNIPPET_MAX) {
+                more.lastChild.textContent = `Show Less \u00b7 the first ${SNIPPET_MAX.toLocaleString("en-US")} characters`;
+            }
+        }
     };
     // Line 2: the link without its scheme, as it can be typed or pasted (Copy
     // still copies it whole). The host comes from the link itself, so a server
@@ -827,8 +986,14 @@
     const linkLine = (url) => {
         const line = document.createElement("code");
         line.className = "history-link";
+        // An em dash first: the link is the source of the quote above it.
+        const dash = document.createElement("span");
+        dash.className = "history-link-dash";
+        dash.setAttribute("aria-hidden", "true");
+        dash.textContent = "\u2014";
+        line.append(dash);
         const m = url.match(/^[a-z][a-z0-9+.-]*:\/\/([^/]+)\/([^#]*)/i);
-        if (!m) { line.textContent = url; return line; }
+        if (!m) { line.append(url); return line; }
         const host = document.createElement("span");
         host.className = "history-link-host";
         host.textContent = `${m[1]}/`;
@@ -933,7 +1098,7 @@
         const root = document.documentElement;
         root.style.setProperty("--history-rows", String(n));
         root.style.setProperty("--history-live", String(shown.filter((it) => !it.tombstone).length));
-        root.style.setProperty("--history-lines", String(shown.reduce((sum, it) => sum + knownExtraLines(it), 0)));
+        root.style.setProperty("--history-extra", String(shown.reduce((sum, it) => sum + knownExtraPx(it), 0)));
         root.classList.toggle("has-history", n > 0);
         if (n === 0) return;
         for (const it of shown) {
@@ -1002,19 +1167,18 @@
             actions.className = "history-actions";
             // The actions are symbols (styled in app.css), ordered Copy, Preview,
             // Trash: the two link actions first, the destructive one last at the
-            // row's edge (a stray tap only opens the confirm). The green check
-            // sits left of the copy sheets and flashes on copy. Copy and the
-            // arrow are real links to the URL, so right-click offers Copy Link /
-            // Open in New Tab; a left click on the sheets copies instead.
+            // row's edge (a stray tap only opens the confirm). A copy flashes the
+            // sheets green and puts a green check after the link itself, the
+            // thing copied. Copy and the arrow are real links to the URL, so
+            // right-click offers Copy Link / Open in New Tab; a left click on
+            // the sheets copies instead.
             //
             // Every label names the link it acts on, title-cased like the visible
             // labels but leaving the name's own alternating case alone. The symbols
             // are identical down the list, so "Copy Link" by itself would give four
             // links one name and four destinations — indistinguishable to a screen
             // reader reading the page's links on their own.
-            const check = document.createElement("span");
-            check.className = "history-check";
-            check.setAttribute("aria-hidden", "true");
+            const link = linkLine(it.url);
             const copy = document.createElement("a");
             copy.className = "history-copy";
             copy.href = it.url;
@@ -1023,7 +1187,7 @@
             copy.title = "Copy the link";
             copy.addEventListener("click", (event) => {
                 event.preventDefault();
-                copyToClipboard(it.url, copy, () => flashClass(check, "show"));
+                copyToClipboard(it.url, copy, () => flashClass(link, "copied"));
             });
             const show = document.createElement("a");
             show.className = "history-show";
@@ -1044,12 +1208,13 @@
             // Opens the confirm prompt over the row — not a toggle; the prompt carries
             // its own Cancel. openConfirm closes any other row's prompt first.
             remove.addEventListener("click", () => openConfirm(li, it));
-            actions.append(check, copy, show, remove);
+            actions.append(copy, show, remove);
             foot.append(meta, actions);
 
-            li.append(contentsWell(it, rowName), linkLine(it.url), foot);
+            li.append(contentsWell(it, rowName), link, foot);
             listEl.append(li);
         }
+        fitWells();
         syncHideAll(shown);
         syncClearMenu();
     };
@@ -1734,7 +1899,9 @@
                 // `snippet` is what the link holds, cut short, so the row can say
                 // what it was for; `secret` asks the row to keep it covered, and
                 // `chars` and `lines` let the cover say how much is under it.
-                const entry = { url, name: data.name, kind, uses, secret: priv, snippet: snippetOf(kind, payload), ...sizeOf(payload), expires: data.expires_at, token: data.delete_token, terms: data.terms, created: Date.now() };
+                // `display` is a redirect's destination as the preview draws it,
+                // a tree from the server (see paintDisplay).
+                const entry = { url, name: data.name, kind, uses, secret: priv, snippet: snippetOf(kind, payload), display: data.display, ...sizeOf(payload), expires: data.expires_at, token: data.delete_token, terms: data.terms, created: Date.now() };
                 addHistory(entry); // stamps entry.id, which the result's Delete needs
                 renderHistory();
                 setupResultActions(entry);
@@ -1798,6 +1965,17 @@
 
         document.getElementById("history-hide")?.addEventListener("click", hideAllOrShowPublic);
         setupWindowGrip();
+        // Rows are fitted to the list's width (fitWells): again whenever it
+        // changes, as when the window's edge is dragged or a collapsed list opens
+        // (rows drawn while it was collapsed had no width to measure).
+        const list = document.getElementById("history-list");
+        if (list && typeof ResizeObserver === "function") {
+            let width = 0;
+            new ResizeObserver(([entry]) => {
+                const w = Math.round(entry.contentRect.width);
+                if (w !== width) { width = w; fitWells(); }
+            }).observe(list);
+        }
 
         document.getElementById("history-clear-open")?.addEventListener("click", () => {
             setClearMenu(true);
@@ -1893,6 +2071,7 @@
             // snippet it echoed is cut short.
             chars: Number(panel?.dataset.chars) || undefined,
             lines: Number(panel?.dataset.lines) || undefined,
+            display: readDisplay(panel?.dataset.display),
             expires: when ? when[1] : null,
             token: null,
             terms,
