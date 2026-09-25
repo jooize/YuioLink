@@ -39,7 +39,8 @@ figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
    hit area reaches 6px past each icon without moving anything. */
 .side { gap: 14px; padding: 1.5px 7px 0 8px; }
 /* Stacked, the pitch is the text's own 19px, so each icon centers on a line. */
-.stack .side { flex-direction: column; gap: 10px; }
+.stack .side { flex-direction: column; gap: 10px; padding-top: 4px; padding-bottom: 4px; }
+.stack.one .side { padding-top: 1.5px; padding-bottom: 0; }
 .stack:not(.one) .side .well-btn::after { inset: -5px -6px; }
 .stack.one .side { flex-direction: row; }
 .side .well-btn, .stack .side .well-btn, .stack.one .side .well-btn { position: relative; padding: 0; margin: 0; }
