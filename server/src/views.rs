@@ -482,6 +482,8 @@ struct Snippet<'a> {
     text: &'a str,
     chars: usize,
     lines: usize,
+    /// A redirect's destination tree ([`url_display`]) as JSON.
+    display: Option<&'a str>,
 }
 
 /// The result `<output>` shown after a link is created (server-rendered on the
@@ -507,7 +509,8 @@ fn result_output(
         output.result #link-panel tabindex="-1" hidden[url.is_none()]
             data-terms-version=(terms.version) data-terms-sha256=(terms.sha256)
             data-snippet=[snippet.map(|s| s.text)] data-chars=[snippet.map(|s| s.chars)]
-            data-lines=[snippet.map(|s| s.lines)] data-secret=[secret.then_some("1")] {
+            data-lines=[snippet.map(|s| s.lines)] data-display=[snippet.and_then(|s| s.display)]
+            data-secret=[secret.then_some("1")] {
             div.result-id {
                 @if let Some(u) = url {
                     (hero_name(link_name(u)))
@@ -876,6 +879,8 @@ pub struct CreatedLink<'a> {
     /// What the form posted; the page passes its opening to app.js for the
     /// local-history row.
     pub content: &'a str,
+    /// A redirect's destination tree ([`url_display`]), for the same row.
+    pub display: Option<serde_json::Value>,
     pub kind_label: &'a str,
     pub expires_at: &'a str,
     pub max_uses: Option<i64>,
@@ -888,6 +893,7 @@ pub fn result_page(link: &CreatedLink, redo: Option<&ResultRedo>) -> Markup {
     let &CreatedLink {
         url,
         content,
+        ref display,
         kind_label,
         expires_at,
         max_uses,
@@ -925,10 +931,12 @@ pub fn result_page(link: &CreatedLink, redo: Option<&ResultRedo>) -> Markup {
     };
     let trimmed = content.trim();
     let snippet: String = trimmed.chars().take(1000).collect();
+    let display = display.as_ref().map(ToString::to_string);
     let snippet = Snippet {
         text: &snippet,
         chars: trimmed.chars().count(),
         lines: trimmed.lines().count(),
+        display: display.as_deref(),
     };
     let body = html! {
         (home_chip("/", "Create New Link"))
@@ -2384,6 +2392,83 @@ fn pieces(parts: &[Piece], style: PieceStyle) -> Markup {
     }
 }
 
+/// How much of a destination the history row keeps, in characters: as much as
+/// its ten lines show, the same cap app.js puts on a row's contents.
+const DISPLAY_MAX_CHARS: usize = 1000;
+
+/// A destination as the preview's URL line draws it, for the local-history row
+/// to paint: the line's own markup read back into a tree, so the row wears
+/// exactly the hero's dress with no second renderer to drift from it.
+///
+/// A node is a text string, `["wbr"]`, or `[class, child, ...]`. Only classes
+/// cross, never attributes or markup: the row builds elements and sets
+/// `textContent` (the CSP's Trusted Types would refuse `innerHTML` anyway). The
+/// preview's edit wrapper (`hp`) keeps its place but not its class, since in a
+/// row it is not a control. Text stops at [`DISPLAY_MAX_CHARS`].
+pub fn url_display(stored: &str) -> serde_json::Value {
+    let html = url_line_parts(&urlview::parse_uri(stored)).into_string();
+    let mut stack: Vec<Vec<serde_json::Value>> = vec![Vec::new()];
+    let mut budget = DISPLAY_MAX_CHARS;
+    let mut rest = html.as_str();
+    while !rest.is_empty() && budget > 0 {
+        if let Some(r) = rest.strip_prefix("<wbr>") {
+            stack
+                .last_mut()
+                .expect("root")
+                .push(serde_json::json!(["wbr"]));
+            rest = r;
+        } else if let Some(r) = rest.strip_prefix("</span>") {
+            close_node(&mut stack);
+            rest = r;
+        } else if rest.starts_with("<span") {
+            let end = rest.find('>').expect("maud closes its tags");
+            let class = rest[..end]
+                .split_once("class=\"")
+                .and_then(|(_, v)| v.split_once('"'))
+                .map_or("", |(v, _)| v);
+            let class: Vec<&str> = class
+                .split(' ')
+                .filter(|c| !c.is_empty() && *c != "hp")
+                .collect();
+            stack.push(vec![serde_json::json!(class.join(" "))]);
+            rest = &rest[end + 1..];
+        } else {
+            let end = rest.find('<').unwrap_or(rest.len());
+            let text = unescape_html(&rest[..end]);
+            let text: String = text.chars().take(budget).collect();
+            budget -= text.chars().count();
+            stack
+                .last_mut()
+                .expect("root")
+                .push(serde_json::json!(text));
+            rest = &rest[end..];
+        }
+    }
+    while stack.len() > 1 {
+        close_node(&mut stack);
+    }
+    serde_json::Value::Array(stack.pop().expect("root"))
+}
+
+/// Pop the open element into its parent as `[class, children...]`.
+fn close_node(stack: &mut Vec<Vec<serde_json::Value>>) {
+    if stack.len() > 1 {
+        let node = stack.pop().expect("an open element");
+        stack
+            .last_mut()
+            .expect("root")
+            .push(serde_json::Value::Array(node));
+    }
+}
+
+/// Undo maud's text escaping (it escapes exactly these four).
+fn unescape_html(s: &str) -> String {
+    s.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&amp;", "&")
+}
+
 /// The full destination URL, coloured by part. Built from the same slices the
 /// model lists, so userinfo and an explicit port can no longer go missing — the
 /// old renderer had no branch for either, which quietly dropped `alice@` and
@@ -3162,6 +3247,72 @@ pub fn error_page_list(code: u16, messages: &[&str]) -> Markup {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The text of one display node: a string, `["wbr"]` (nothing), or an
+    /// element whose children follow its class.
+    fn node_text(v: &serde_json::Value) -> String {
+        match v {
+            serde_json::Value::String(t) => t.clone(),
+            serde_json::Value::Array(a) if a.len() == 1 && a[0] == "wbr" => String::new(),
+            serde_json::Value::Array(a) => a.iter().skip(1).map(node_text).collect(),
+            _ => String::new(),
+        }
+    }
+
+    fn classes(v: &serde_json::Value, out: &mut Vec<String>) {
+        if let serde_json::Value::Array(a) = v {
+            if let Some(serde_json::Value::String(c)) = a.first()
+                && (a.len() > 1 || c == "wbr")
+            {
+                out.push(c.clone());
+            }
+            for child in a.iter().skip(1) {
+                classes(child, out);
+            }
+        }
+    }
+
+    #[test]
+    fn url_display_is_the_preview_line_as_a_tree() {
+        let tree = url_display("https://www.example.com/a/b?utm_source=x&q=caf%C3%A9#top");
+        let root = tree.as_array().expect("root array");
+        let text: String = root.iter().map(node_text).collect();
+        assert_eq!(
+            text,
+            "https://www.example.com/a/b?utm_source=x&q=caf\u{e9}#top"
+        );
+        let mut seen = Vec::new();
+        for n in root {
+            classes(n, &mut seen);
+        }
+        for want in ["sch", "reg", "ps", "qk", "qv", "wbr"] {
+            assert!(
+                seen.iter().any(|c| c.split(' ').any(|x| x == want)),
+                "missing {want}: {seen:?}"
+            );
+        }
+        assert!(
+            !seen.iter().any(|c| c.split(' ').any(|x| x == "hp")),
+            "the edit wrapper's class stays behind"
+        );
+    }
+
+    #[test]
+    fn url_display_stops_at_the_row_cap() {
+        let long = format!("https://example.com/{}", "a".repeat(5000));
+        let json = url_display(&long).to_string();
+        assert!(
+            json.matches('a').count() < DISPLAY_MAX_CHARS + 50,
+            "{} chars",
+            json.len()
+        );
+    }
+
+    #[test]
+    fn url_display_unescapes_text() {
+        let json = url_display("https://example.com/?a=1&b=%3Cx%3E").to_string();
+        assert!(!json.contains("&amp;"), "{json}");
+    }
 
     #[test]
     fn the_result_hero_is_lowercase_on_one_line() {

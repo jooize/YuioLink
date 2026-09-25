@@ -302,6 +302,15 @@ components:
           description: >-
             One-time secret authorizing `DELETE`. Returned only here; absent
             on the `/create` convenience surface.
+        display:
+          type: array
+          description: >-
+            For a redirect, the destination as the preview page draws it, as a
+            tree for a client to paint: a node is a text string, `["wbr"]` (a
+            line-break opportunity), or `[class, child, ...]` using the
+            preview's class names. Text stops after 1000 characters. Absent
+            for Text links.
+          items: {}
 
     Link:
       type: object

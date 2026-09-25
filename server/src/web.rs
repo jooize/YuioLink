@@ -195,7 +195,7 @@ async fn create_link(
     max_uses: Result<Option<i64>, String>,
     secret: bool,
     delete_token: Option<&str>,
-) -> Result<db::InsertedLink, CreateError> {
+) -> Result<Created, CreateError> {
     let mut errors: Vec<FieldError> = Vec::new();
     let mut fail = |field: &'static str, message: String| {
         errors.push(FieldError {
@@ -299,10 +299,29 @@ async fn create_link(
         &occupancy,
     )
     .await
+    .map(|link| Created {
+        link,
+        kind,
+        content,
+    })
     .map_err(|e| {
         tracing::error!(error = %e, "failed to insert link");
         CreateError::Internal
     })
+}
+
+/// The destination tree for a redirect just stored; nothing for Text.
+fn display_of(created: &Created) -> Option<serde_json::Value> {
+    (created.kind == Kind::Redirect).then(|| views::url_display(&created.content))
+}
+
+/// A link just stored, with what was stored: the kind it got and the content
+/// as kept (a redirect's canonical form), for the parts of a response that
+/// describe it.
+struct Created {
+    link: db::InsertedLink,
+    kind: Kind,
+    content: String,
 }
 
 // --------------------------------------------------------------------------
@@ -379,12 +398,12 @@ pub async fn form_create(
     )
     .await
     {
-        Ok(inserted) => {
+        Ok(created) => {
+            let inserted = &created.link;
             let url = format!("{}{}", state.base_url, inserted.name);
-            let forced_text = form.kind.as_deref() == Some("text");
-            let kind_label = match (forced_text, detect_kind(&form.content)) {
-                (true, _) | (false, Kind::Text) => "Text",
-                (false, Kind::Redirect) => "Redirect",
+            let kind_label = match created.kind {
+                Kind::Text => "Text",
+                Kind::Redirect => "Redirect",
             };
             // The Text offer only makes sense after a Redirect: a link stored as
             // Text has no other kind to become, and neither does plain prose.
@@ -398,6 +417,7 @@ pub async fn form_create(
                     &views::CreatedLink {
                         url: &url,
                         content: &form.content,
+                        display: display_of(&created),
                         kind_label,
                         expires_at: &inserted.expires_at,
                         max_uses,
@@ -820,7 +840,7 @@ pub async fn create_plain(
     };
 
     // Auto-detect kind (None).
-    let inserted = match create_link(
+    let created = match create_link(
         &state,
         None,
         &parsed.content,
@@ -831,7 +851,7 @@ pub async fn create_plain(
     )
     .await
     {
-        Ok(inserted) => inserted,
+        Ok(created) => created,
         Err(CreateError::BadRequest(errors)) => {
             return (
                 StatusCode::BAD_REQUEST,
@@ -844,6 +864,8 @@ pub async fn create_plain(
         }
     };
 
+    let display = display_of(&created);
+    let inserted = created.link;
     let url = format!("{}{}", state.base_url, inserted.name);
 
     let wants_json = headers
@@ -858,6 +880,7 @@ pub async fn create_plain(
             expires_at: inserted.expires_at,
             words: inserted.words,
             delete_token: None,
+            display,
             terms: crate::legal::receipt(),
         })
         .into_response()
@@ -1082,6 +1105,10 @@ pub struct CreateResponse {
     /// without a token (the `/create` convenience path).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub delete_token: Option<String>,
+    /// A redirect's destination as the preview draws it, as a tree the
+    /// local-history row paints (see `views::url_display`). Absent for Text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display: Option<serde_json::Value>,
     /// The terms in effect when this link was created — version id and the
     /// SHA-256 fingerprint of their canonical text (see `/legal`). Kept by the
     /// client, this is the creator's receipt of what they accepted; the terms
@@ -1255,7 +1282,7 @@ pub async fn api_create_link(
 
     let ttl_seconds = req.ttl_seconds.unwrap_or(DEFAULT_TTL_SECS);
     let delete_token = yuiolink_core::generate_token();
-    let inserted = create_link(
+    let created = create_link(
         &state,
         Some(req.kind.as_str()),
         &req.content,
@@ -1266,6 +1293,8 @@ pub async fn api_create_link(
     )
     .await?;
 
+    let display = display_of(&created);
+    let inserted = created.link;
     let url = format!("{}{}", state.base_url, inserted.name);
     let location = format!("{}api/v0/links/{}", state.base_url, inserted.name);
     Ok((
@@ -1277,6 +1306,7 @@ pub async fn api_create_link(
             expires_at: inserted.expires_at,
             words: inserted.words,
             delete_token: Some(delete_token),
+            display,
             terms: crate::legal::receipt(),
         }),
     ))
