@@ -3,6 +3,7 @@
 
 use std::time::Duration;
 
+use sha2::{Digest, Sha256};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
 
 use yuiolink_core::{generate_name, words_for};
@@ -41,9 +42,11 @@ pub struct NewLink<'a> {
     /// Request a secret (long, unguessable) name even for an unlimited link. A
     /// limited link is always given the long name regardless of this flag.
     pub secret: bool,
-    /// Secret that authorizes deleting this link later; `None` means the link
-    /// cannot be deleted via the API (no holder).
-    pub delete_token: Option<&'a str>,
+    /// Secret that proves its holder created this link: it authorizes
+    /// withdrawing it, and reading a limited link without spending its use.
+    /// Only its hash is stored. `None` means no one holds it, so neither can
+    /// happen.
+    pub creator_token: Option<&'a str>,
 }
 
 /// Live name counts per word-tier: `[0]` = live 1-word names, `[1]` = 2-word, and
@@ -76,7 +79,38 @@ pub async fn connect(db_path: &str) -> anyhow::Result<SqlitePool> {
         .connect_with(options)
         .await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
+    hash_plaintext_tokens(&pool).await?;
     Ok(pool)
+}
+
+/// The stored form of a creator token: its SHA-256. The token is 256 random
+/// bits, so a bare hash is enough (see migrations/0007_creator_token_hash.sql).
+fn token_hash(token: &str) -> Vec<u8> {
+    Sha256::digest(token.as_bytes()).to_vec()
+}
+
+/// TRANSITIONAL: hash the creator tokens stored in plain text before migration
+/// 0007 and clear them. Remove this, with a migration that drops `delete_token`,
+/// in a release made at least seven days after 0007 first deployed: by then
+/// every link from before has expired.
+async fn hash_plaintext_tokens(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let rows: Vec<(String, String)> =
+        sqlx::query_as("SELECT name, delete_token FROM links WHERE delete_token IS NOT NULL")
+            .fetch_all(&mut *tx)
+            .await?;
+    for (name, token) in &rows {
+        sqlx::query("UPDATE links SET creator_token_hash = ?, delete_token = NULL WHERE name = ?")
+            .bind(token_hash(token))
+            .bind(name)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    if !rows.is_empty() {
+        tracing::info!(count = rows.len(), "hashed plaintext creator tokens");
+    }
+    Ok(())
 }
 
 /// Read a link without consuming it — for the interstitial preview and the REST
@@ -182,7 +216,7 @@ pub async fn insert_link(
     loop {
         let name = generate_name(words);
         let result: Result<String, sqlx::Error> = sqlx::query_scalar(
-            "INSERT INTO links (name, kind, content, content_type, expires_at, max_uses, delete_token, words) \
+            "INSERT INTO links (name, kind, content, content_type, expires_at, max_uses, creator_token_hash, words) \
              VALUES (?, ?, ?, ?, datetime('now', '+' || ? || ' seconds'), ?, ?, ?) \
              RETURNING expires_at",
         )
@@ -192,7 +226,7 @@ pub async fn insert_link(
         .bind(link.content_type)
         .bind(link.ttl_seconds)
         .bind(link.max_uses)
-        .bind(link.delete_token)
+        .bind(link.creator_token.map(token_hash))
         .bind(words as i64)
         .fetch_one(pool)
         .await;
@@ -251,23 +285,38 @@ pub async fn live_counts_by_words(pool: &SqlitePool) -> Result<Occupancy, sqlx::
     Ok(occ)
 }
 
-/// Withdraw a link by name, but only when `token` matches the secret stored at
-/// creation. This does NOT delete the row: it sets `withdrawn = 1`, which stops
-/// the link resolving (it serves 410 Gone) while keeping the name reserved as a
+/// Withdraw a link by name, but only when `token` is its creator token. This
+/// does NOT delete the row: it sets `withdrawn = 1`, which stops the link
+/// resolving (it serves 410 Gone) while keeping the name reserved as a
 /// tombstone until expiry — so a withdrawn name can never be re-registered and
 /// silently repurposed within its stated life. Returns whether a row matched.
 ///
-/// A NULL stored token never matches (`NULL = ?` is never true), so a tokenless
+/// A NULL stored hash never matches (`NULL = ?` is never true), so a tokenless
 /// link cannot be withdrawn — fail closed. `name` matches case-insensitively
-/// (the column is NOCASE); the token compares with the default binary collation
-/// (exact).
+/// (the column is NOCASE); the hash compares byte for byte. The comparison
+/// need not be constant-time: at most it leaks the stored hash, and a hash
+/// does not help find a token that produces it.
 pub async fn delete_link(pool: &SqlitePool, name: &str, token: &str) -> Result<bool, sqlx::Error> {
-    let result = sqlx::query("UPDATE links SET withdrawn = 1 WHERE name = ? AND delete_token = ?")
-        .bind(name)
-        .bind(token)
-        .execute(pool)
-        .await?;
+    let result =
+        sqlx::query("UPDATE links SET withdrawn = 1 WHERE name = ? AND creator_token_hash = ?")
+            .bind(name)
+            .bind(token_hash(token))
+            .execute(pool)
+            .await?;
     Ok(result.rows_affected() > 0)
+}
+
+/// Whether `token` is the creator token of the link named `name`. Reads
+/// nothing else and spends nothing; the same NULL and comparison notes as
+/// [`delete_link`] apply.
+pub async fn is_creator(pool: &SqlitePool, name: &str, token: &str) -> Result<bool, sqlx::Error> {
+    let found: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM links WHERE name = ? AND creator_token_hash = ?")
+            .bind(name)
+            .bind(token_hash(token))
+            .fetch_optional(pool)
+            .await?;
+    Ok(found.is_some())
 }
 
 /// Delete every expired row, freeing those names for reuse. Returns the count.
@@ -411,7 +460,7 @@ mod tests {
             ttl_seconds: 3600,
             max_uses,
             secret: false,
-            delete_token: Some("tok"),
+            creator_token: Some("tok"),
         }
     }
 
@@ -545,5 +594,53 @@ mod tests {
         let l = insert_link(&pool, nl, &crowded).await.unwrap();
         assert_eq!(l.words, 2, "name was {}", l.name);
         assert!(l.name.chars().any(|c| c.is_ascii_uppercase()), "{}", l.name);
+    }
+
+    #[tokio::test]
+    async fn creator_token_is_stored_only_as_its_hash() {
+        let pool = test_pool().await;
+        let l = insert_link(
+            &pool,
+            redirect("https://example.com", None),
+            &EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+        let (plain, hash): (Option<String>, Vec<u8>) =
+            sqlx::query_as("SELECT delete_token, creator_token_hash FROM links WHERE name = ?")
+                .bind(&l.name)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(plain, None);
+        assert_eq!(hash, token_hash("tok"));
+        assert!(is_creator(&pool, &l.name, "tok").await.unwrap());
+        assert!(!is_creator(&pool, &l.name, "wrong").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn plaintext_tokens_from_before_0007_are_hashed_at_startup() {
+        let pool = test_pool().await;
+        let mut nl = redirect("https://example.com", None);
+        nl.creator_token = None;
+        let l = insert_link(&pool, nl, &EMPTY_OCCUPANCY).await.unwrap();
+        // A row as 0002 left it: the token in plain text, no hash.
+        sqlx::query("UPDATE links SET delete_token = 'old' WHERE name = ?")
+            .bind(&l.name)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(!is_creator(&pool, &l.name, "old").await.unwrap());
+
+        hash_plaintext_tokens(&pool).await.unwrap();
+        let plain: Option<String> =
+            sqlx::query_scalar("SELECT delete_token FROM links WHERE name = ?")
+                .bind(&l.name)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(plain, None);
+        assert!(is_creator(&pool, &l.name, "old").await.unwrap());
+        assert!(delete_link(&pool, &l.name, "old").await.unwrap());
     }
 }

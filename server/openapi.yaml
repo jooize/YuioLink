@@ -50,9 +50,9 @@ paths:
       summary: Create a link
       description: |
         Creates an ephemeral link. Rate-limited per client (burst 10, one
-        create per 6 s sustained). The response carries a one-time
-        `delete_token` — it is never stored server-side in retrievable form,
-        so keep it if you want to withdraw the link later.
+        create per 6 s sustained). The response carries a `creator_token`,
+        returned only once. The server keeps only its SHA-256, so keep the
+        token if you want to withdraw the link or read a one-time link back.
       requestBody:
         required: true
         content:
@@ -90,7 +90,13 @@ paths:
         Safe and idempotent: never spends a use, and there is no per-link view
         counter for it to move. A **one-time** link returns metadata only — no
         `target`/`content` — since spending the use stays exclusive to the
-        site's own reveal flow.
+        site's own reveal flow. Its creator is the exception: with the
+        `creator_token` as `Authorization: Bearer <token>`, the answer includes
+        `target`/`content`, and the use stays unspent. A wrong token is not an
+        error; the answer is the one without it.
+      security:
+        - {}
+        - creatorToken: []
       responses:
         "200":
           description: The link.
@@ -107,14 +113,14 @@ paths:
       operationId: deleteLink
       summary: Withdraw a link
       description: |
-        Authorized by the `delete_token` from creation, sent as
+        Authorized by the `creator_token` from creation, sent as
         `Authorization: Bearer <token>`. Withdrawing tombstones the link (it
         then resolves as `410 Gone`) and its name stays reserved until expiry,
         so it cannot be silently repurposed. A wrong or missing token and an
         unknown name both answer `404` — the endpoint reveals nothing about
         which links exist.
       security:
-        - deleteToken: []
+        - creatorToken: []
       responses:
         "204":
           description: Withdrawn.
@@ -134,7 +140,7 @@ paths:
         `Accept: application/json`). The kind is auto-detected;
         `--data-binary @file` becomes a Text link, verbatim. Only *trailing*
         `ttl=`/`uses=` pairs are treated as options, so a redirect target keeps
-        its own query string. Rate-limited; no `delete_token` is issued.
+        its own query string. Rate-limited; no `creator_token` is issued.
       requestBody:
         required: true
         content:
@@ -191,10 +197,10 @@ components:
         example: braveOTTER
 
   securitySchemes:
-    deleteToken:
+    creatorToken:
       type: http
       scheme: bearer
-      description: The one-time `delete_token` returned at creation.
+      description: The `creator_token` returned once at creation.
 
   responses:
     ValidationError:
@@ -297,11 +303,12 @@ components:
           description: >-
             Word count of the issued name. A public link is normally one word;
             more means the short tiers are crowded right now.
-        delete_token:
+        creator_token:
           type: string
           description: >-
-            One-time secret authorizing `DELETE`. Returned only here; absent
-            on the `/create` convenience surface.
+            Secret proving the caller created the link. It authorizes `DELETE`
+            and reading a one-time link back without spending its use. Returned
+            only here; absent on the `/create` convenience surface.
         display:
           type: array
           description: >-

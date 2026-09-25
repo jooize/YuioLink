@@ -1,0 +1,14 @@
+-- Keep only the SHA-256 of each link's creator token, never the token itself.
+--
+-- The token (0002, then called `delete_token`) lets its holder withdraw a link
+-- and read a limited link back without spending its use. Stored in plain text,
+-- a copy of the database would hand both powers over for every live link. The
+-- token is 256 random bits, so a bare SHA-256 is enough: there is nothing to
+-- guess, so no salt or slow hash buys anything.
+--
+-- SQLite cannot compute SHA-256, so this migration cannot hash the rows already
+-- here. The server does it at startup (`db::hash_plaintext_tokens`) and clears
+-- `delete_token` as it goes. TRANSITIONAL: every link lives at most seven days,
+-- so a later migration drops `delete_token`, and that startup step goes with it,
+-- once this one has been deployed for a week.
+ALTER TABLE links ADD COLUMN creator_token_hash BLOB;

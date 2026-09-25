@@ -50,9 +50,9 @@ full of `%` is not a form.
 
 | Route | Method | Behavior |
 |-------|--------|----------|
-| `/api/v0/links` | POST | Create (JSON: `kind`, `content`, `ttl_seconds?`, `max_uses?` (only `1`), `secret?`). `201 Created` + `Location` + a one-time `delete_token`. Rate-limited. |
-| `/api/v0/links/:name` | GET | Read without spending. For a **one-time** link this returns **metadata only** — no `target`/`content` — because disclosing the payload without spending the use would defeat the burn-after-read tamper evidence. Unlimited links include their `target`/`content`. |
-| `/api/v0/links/:name` | DELETE | Withdraw, authorized by `Authorization: Bearer <delete_token>`. `204`; the name stays reserved as a 410 tombstone until expiry. Wrong/missing token or unknown name are both `404` (reveals nothing). |
+| `/api/v0/links` | POST | Create (JSON: `kind`, `content`, `ttl_seconds?`, `max_uses?` (only `1`), `secret?`). `201 Created` + `Location` + a `creator_token`, returned only here (the server keeps only its SHA-256). Rate-limited. |
+| `/api/v0/links/:name` | GET | Read without spending. For a **one-time** link this returns **metadata only** — no `target`/`content` — because disclosing the payload without spending the use would defeat the burn-after-read tamper evidence. The exception is its creator: with `Authorization: Bearer <creator_token>` the payload is included and the use stays unspent (a wrong token just gets metadata). Unlimited links include their `target`/`content`. |
+| `/api/v0/links/:name` | DELETE | Withdraw, authorized by `Authorization: Bearer <creator_token>`. `204`; the name stays reserved as a 410 tombstone until expiry. Wrong/missing token or unknown name are both `404` (reveals nothing). |
 | `/api/v0/openapi.yaml` | GET | The OpenAPI 3.1 description (embedded from `server/openapi.yaml`, so the served spec matches the binary). |
 
 That description carries its own version in `info.version`, which is

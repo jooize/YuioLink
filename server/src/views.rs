@@ -859,7 +859,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
 /// What the no-JS result page needs to offer "the same content, the other kind".
 ///
 /// The no-JS path has no way to change a link after the fact — it is issued no
-/// delete token, since there is nowhere to keep one — so the offer creates a
+/// creator token, since there is nowhere to keep one — so the offer creates a
 /// second link rather than converting the first. The copy has to say so: the
 /// redirect stays until it expires. This is the whole override on that path,
 /// standing in for the Option key, which does not exist on a phone and does not

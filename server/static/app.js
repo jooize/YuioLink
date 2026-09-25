@@ -1892,7 +1892,7 @@
                     resultNoteEl.textContent = `Short names are in high demand right now, so this link uses ${data.words} words.`;
                     resultNoteEl.hidden = false;
                 }
-                // Keep the name + delete token so the history row can offer a real
+                // Keep the name + creator token so the history row can offer a real
                 // server delete (token is undefined if the backend didn't send one).
                 // `terms` is the creation receipt: the version + SHA-256 fingerprint
                 // of the terms this link was made under (see /legal#verification).
@@ -1901,7 +1901,7 @@
                 // `chars` and `lines` let the cover say how much is under it.
                 // `display` is a redirect's destination as the preview draws it,
                 // a tree from the server (see paintDisplay).
-                const entry = { url, name: data.name, kind, uses, secret: priv, snippet: snippetOf(kind, payload), display: data.display, ...sizeOf(payload), expires: data.expires_at, token: data.delete_token, terms: data.terms, created: Date.now() };
+                const entry = { url, name: data.name, kind, uses, secret: priv, snippet: snippetOf(kind, payload), display: data.display, ...sizeOf(payload), expires: data.expires_at, token: data.creator_token, terms: data.terms, created: Date.now() };
                 addHistory(entry); // stamps entry.id, which the result's Delete needs
                 renderHistory();
                 setupResultActions(entry);

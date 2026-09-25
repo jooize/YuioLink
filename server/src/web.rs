@@ -194,7 +194,7 @@ async fn create_link(
     ttl_seconds: Result<i64, String>,
     max_uses: Result<Option<i64>, String>,
     secret: bool,
-    delete_token: Option<&str>,
+    creator_token: Option<&str>,
 ) -> Result<Created, CreateError> {
     let mut errors: Vec<FieldError> = Vec::new();
     let mut fail = |field: &'static str, message: String| {
@@ -294,7 +294,7 @@ async fn create_link(
             ttl_seconds,
             max_uses,
             secret,
-            delete_token,
+            creator_token,
         },
         &occupancy,
     )
@@ -879,7 +879,7 @@ pub async fn create_plain(
             url,
             expires_at: inserted.expires_at,
             words: inserted.words,
-            delete_token: None,
+            creator_token: None,
             display,
             terms: crate::legal::receipt(),
         })
@@ -1099,12 +1099,13 @@ pub struct CreateResponse {
     /// Word count of the issued name. The page shows a note when a public link got
     /// more than one word because the short tiers are crowded.
     pub words: usize,
-    /// One-time secret that authorizes deleting this link (DELETE with
-    /// `Authorization: Bearer <token>`). Returned only here; never stored
-    /// anywhere the client doesn't put it. Absent when the link was made
+    /// Secret that proves the caller created this link, sent as
+    /// `Authorization: Bearer <token>`: it authorizes withdrawing the link, and
+    /// reading a limited link back without spending its use. Returned only
+    /// here; the server keeps only its hash. Absent when the link was made
     /// without a token (the `/create` convenience path).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub delete_token: Option<String>,
+    pub creator_token: Option<String>,
     /// A redirect's destination as the preview draws it, as a tree the
     /// local-history row paints (see `views::url_display`). Absent for Text.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1123,11 +1124,13 @@ pub struct ApiLink {
     pub kind: String,
     pub url: String,
     /// The destination, for redirect links. Absent for limited (single-use)
-    /// links, whose payload is only disclosed by spending the use.
+    /// links, whose payload is only disclosed by spending the use, unless the
+    /// request carries the link's creator token.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
     /// The body for Text links. Reading it here does not count against
-    /// `max_uses` — which is exactly why it is absent for limited links.
+    /// `max_uses` — which is exactly why it is absent for limited links, unless
+    /// the request carries the link's creator token.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
     /// Uses spent. Only ever 0 or 1: it exists to gate a one-time link, not to
@@ -1281,7 +1284,7 @@ pub async fn api_create_link(
     }
 
     let ttl_seconds = req.ttl_seconds.unwrap_or(DEFAULT_TTL_SECS);
-    let delete_token = yuiolink_core::generate_token();
+    let creator_token = yuiolink_core::generate_token();
     let created = create_link(
         &state,
         Some(req.kind.as_str()),
@@ -1289,7 +1292,7 @@ pub async fn api_create_link(
         Ok(ttl_seconds),
         Ok(req.max_uses),
         req.secret,
-        Some(&delete_token),
+        Some(&creator_token),
     )
     .await?;
 
@@ -1305,7 +1308,7 @@ pub async fn api_create_link(
             url,
             expires_at: inserted.expires_at,
             words: inserted.words,
-            delete_token: Some(delete_token),
+            creator_token: Some(creator_token),
             display,
             terms: crate::legal::receipt(),
         }),
@@ -1353,22 +1356,36 @@ pub async fn api_delete_link(
 /// link repeatedly without spending the use, silently defeating the
 /// burn-after-read tamper evidence the reveal flow exists to provide. Consuming
 /// stays exclusive to `POST /:name/reveal`.
+///
+/// The one exception is the link's creator, proven by the creator token as
+/// `Authorization: Bearer <token>`: they already know what the link holds, so
+/// reading it back tells nobody anything new, and the use stays unspent. A
+/// wrong token is not an error; the answer is the one without it.
 pub async fn api_get_link(
     State(state): State<AppState>,
     Path(name): Path<String>,
+    headers: HeaderMap,
 ) -> Result<Json<ApiLink>, ApiError> {
+    let internal = |e: sqlx::Error| {
+        tracing::error!(error = %e, "failed to read link");
+        ApiError::Internal
+    };
     let d = db::get_link_live(&state.pool, &name)
         .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "failed to read link");
-            ApiError::Internal
-        })?
+        .map_err(internal)?
         .ok_or(ApiError::NotFound)?;
 
-    let (target, content) = match (d.kind.as_str(), d.max_uses.is_some()) {
-        (_, true) => (None, None),
-        ("redirect", false) => (Some(d.content.clone()), None),
-        ("text", false) => (None, Some(d.content.clone())),
+    let disclosed = match (d.max_uses.is_some(), bearer_token(&headers)) {
+        (false, _) => true,
+        (true, Some(token)) => db::is_creator(&state.pool, &d.name, token)
+            .await
+            .map_err(internal)?,
+        (true, None) => false,
+    };
+    let (target, content) = match (d.kind.as_str(), disclosed) {
+        (_, false) => (None, None),
+        ("redirect", true) => (Some(d.content.clone()), None),
+        ("text", true) => (None, Some(d.content.clone())),
         _ => (None, None),
     };
 
@@ -1589,7 +1606,7 @@ mod tests {
             ttl_seconds: 3600,
             max_uses,
             secret: false,
-            delete_token: Some("tok"),
+            creator_token: Some("tok"),
         }
     }
 
@@ -1972,7 +1989,7 @@ mod tests {
                 ttl_seconds: 3600,
                 max_uses: None,
                 secret: false,
-                delete_token: None,
+                creator_token: None,
             },
             &db::EMPTY_OCCUPANCY,
         )
@@ -2447,6 +2464,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn api_read_of_limited_link_discloses_payload_to_its_creator_only() {
+        let st = test_state().await;
+        let l = db::insert_link(
+            &st.pool,
+            redirect("https://secret.example.com/zzz-gated-path", Some(1)),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+        let read = |token: &str| {
+            Request::builder()
+                .uri(format!("/api/v0/links/{}", l.name))
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap()
+        };
+
+        // A wrong token is no error, just the answer without one.
+        let (s, _, body) = send(&st, read("wrong")).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(!body.contains("zzz-gated-path"), "{body}");
+
+        // The creator reads it back, as often as they like, spending nothing.
+        for _ in 0..2 {
+            let (s, _, body) = send(&st, read("tok")).await;
+            assert_eq!(s, StatusCode::OK);
+            assert!(body.contains("zzz-gated-path"), "{body}");
+        }
+        assert_eq!(uses(&st, &l.name).await, 0);
+    }
+
+    #[tokio::test]
     async fn api_reports_every_validation_error_at_once() {
         let st = test_state().await;
         // Three things wrong in one request: an unknown kind, an over-long TTL,
@@ -2585,7 +2634,7 @@ mod tests {
                 ttl_seconds: 3600,
                 max_uses: None,
                 secret: false,
-                delete_token: None,
+                creator_token: None,
             },
             &db::EMPTY_OCCUPANCY,
         )
