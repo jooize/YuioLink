@@ -3960,19 +3960,24 @@ html.history-collapsed .history-body {
 
 /* "Clear…" opener: quiet secondary text; the destructive options only appear
    once it is pressed. */
-/* Hide All / Show Public: the eye for every row at once, as quiet as Clear…
-   beside it. With nothing to do it keeps its place but draws nothing. */
+/* Conceal All / Reveal Public: the eye for every row at once, only the icon,
+   as quiet as Clear… beside it. Its hit area reaches past the icon without
+   moving anything. With nothing to do it keeps its place but draws nothing. */
 .history-hide {
+    position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-family: inherit;
-    font-size: 12.5px;
     color: var(--text-secondary);
     background: none;
     border: 0;
     padding: 0;
     cursor: pointer;
+}
+
+.history-hide::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
 }
 
 .history-hide svg { display: block; }

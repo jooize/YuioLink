@@ -782,8 +782,9 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                 button.history-persist #history-persist type="button" hidden
                     title="Save history on this device" {}
                 div.history-head-actions {
-                    // Covers every row's contents at once, or puts them back as they
-                    // started; app.js names it for whichever it will do.
+                    // An eye that conceals every row's contents at once, or puts
+                    // them back as they started; app.js names it for whichever it
+                    // will do.
                     button.history-hide #history-hide type="button" hidden {}
                     // "Clear…" folds the two destructive actions away until asked for;
                     // app.js toggles it open to reveal Clear Expired / Clear All.

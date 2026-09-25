@@ -768,7 +768,7 @@
             return m;
         };
         if (isCovered(it)) {
-            const why = it.uses === 1 ? "One-Time" : it.secret ? "Secret" : "Hidden";
+            const why = it.uses === 1 ? "One-Time" : it.secret ? "Secret" : "Concealed";
             well.classList.add("covered", it.uses === 1 ? "once" : it.secret ? "secret" : "hidden");
             const cover = document.createElement("button");
             cover.type = "button";
@@ -780,7 +780,7 @@
             // follow, so a screen reader hears the reason and the size too.
             const act = document.createElement("span");
             act.className = "visually-hidden";
-            act.textContent = `Show Contents of ${rowName}: `;
+            act.textContent = `Reveal Contents of ${rowName}: `;
             cover.append(act, mark(), lockIcon(), reason);
             const size = coverSize(it);
             if (size) {
@@ -832,8 +832,8 @@
         eye.type = "button";
         eye.className = "history-well-btn history-eye";
         eye.append(eyeIcon(true));
-        eye.setAttribute("aria-label", `Cover Contents of ${rowName}`);
-        eye.title = "Cover the contents";
+        eye.setAttribute("aria-label", `Conceal Contents of ${rowName}`);
+        eye.title = "Conceal the contents";
         eye.addEventListener("click", () => toggleCover(it));
         side.append(copy, eye);
         well.append(mark(), col, side);
@@ -1003,19 +1003,20 @@
         line.append(host, name);
         return line;
     };
-    // Hide All covers every row that holds something; once nothing shows, it
-    // offers Show Public, which puts every row back as it started. With nothing
-    // to do either way it steps aside (kept in the layout, so the head holds
-    // still).
+    // The header eye conceals every row that holds something; once nothing
+    // shows, it reveals the public ones, which puts every row back as it
+    // started. Only an eye, named by its tooltip, like the rows' own. With
+    // nothing to do either way it steps aside (kept in the layout, so the head
+    // holds still).
     const syncHideAll = (rows) => {
         const btn = document.getElementById("history-hide");
         if (!btn) return;
         const withContents = rows.filter((it) => !it.tombstone && it.snippet);
         const anyShown = withContents.some((it) => !isCovered(it));
         const anyChanged = withContents.some((it) => it.cover !== undefined);
-        const label = document.createElement("span");
-        label.textContent = anyShown ? "Hide All" : "Show Public";
-        btn.replaceChildren(label, eyeIcon(anyShown));
+        btn.replaceChildren(eyeIcon(anyShown));
+        btn.setAttribute("aria-label", anyShown ? "Conceal All Contents" : "Reveal Public Contents");
+        btn.title = anyShown ? "Conceal the contents of every link" : "Reveal the contents of public links";
         btn.dataset.action = anyShown ? "hide" : "public";
         btn.hidden = false;
         btn.classList.toggle("idle", !anyShown && !anyChanged);
