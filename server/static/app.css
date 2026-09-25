@@ -3473,8 +3473,11 @@ html.history-collapsed .history-body {
     padding: 1.5px 7px 0 8px;
 }
 
+/* Centered, so Copy's icon sits over the eye's: the eye's box is wider (its
+   side padding), and a stretched Copy would hold its icon at the left edge. */
 .history-well.stacked .history-well-side {
     flex-direction: column;
+    align-items: center;
     gap: 10px;
     padding-top: 4px;
     padding-bottom: 4px;
