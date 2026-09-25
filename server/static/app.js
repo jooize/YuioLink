@@ -970,6 +970,11 @@
             const more = well.querySelector(".history-more");
             if (!body || !more) continue;
             const it = memHistory.find((e) => e.id === well.dataset.for);
+            // Stacked only when the contents take two lines even beside the
+            // narrower stacked pair. Measured in that layout every time, so a link
+            // that wraps only beside the side-by-side pair stays side by side and
+            // wraps, rather than flipping with whichever layout it was last in.
+            well.classList.add("stacked");
             well.classList.toggle("stacked", body.getBoundingClientRect().height > 24);
             const open = well.classList.contains("open");
             const cut = !open && (body.scrollHeight > body.clientHeight + 1 || (it?.chars ?? 0) > SNIPPET_MAX);
@@ -1206,8 +1211,9 @@
             remove.append(trashIcon());
             remove.setAttribute("aria-label", `Remove Link ${rowName}`);
             remove.title = "Remove this link";
-            // Opens the confirm prompt over the row — not a toggle; the prompt carries
-            // its own Cancel. openConfirm closes any other row's prompt first.
+            // Opens the remove menu in this line, in place of these buttons — not a
+            // toggle; the menu carries its own Cancel. openConfirm closes any other
+            // row's menu first.
             remove.addEventListener("click", () => openConfirm(li, it));
             actions.append(copy, show, remove);
             foot.append(meta, actions);
@@ -1305,10 +1311,13 @@
         syncClearMenu();
     };
 
-    // --- per-item removal: confirm over the row, then break-on-server or forget ---
-    const closeConfirm = (li) => {
+    // --- per-item removal: a menu in the row's last line, then break-on-server or forget ---
+    // `refocus` hands focus back to the trash that opened the menu (its Cancel was
+    // used); a menu closed because another row's opened leaves focus alone.
+    const closeConfirm = (li, refocus = false) => {
         li.classList.remove("confirming");
         li.querySelector(".history-confirm")?.remove();
+        if (refocus) li.querySelector(".history-remove")?.focus();
     };
     // The message under a tombstone, by kind — it also tells the user where the link now
     // stands on the server.
@@ -1392,7 +1401,7 @@
         if (active) forgetGraceTimer = setTimeout(tickForgetGrace, 1000);
     };
 
-    // While the server is contacted, swap the overlay to a spinner; on failure offer
+    // While the server is contacted, swap the menu to a spinner; on failure offer
     // a retry (the entry is left intact so the token survives for another try).
     const showConfirmBusy = (li, msg) => {
         const overlay = li.querySelector(".history-confirm");
@@ -1417,7 +1426,7 @@
         retry.addEventListener("click", () => deleteFromServer(it, li));
         const actions = document.createElement("div");
         actions.className = "history-confirm-actions";
-        actions.append(retry);
+        actions.append(retry, cancelButton(li));
         overlay.replaceChildren(label, actions);
     };
     // Take the hero's Delete away and shut its prompt. Called once a link is withdrawn:
@@ -1501,15 +1510,33 @@
         if (await serverDelete(it.name, it.token)) tombstone(it, "deleted");
         else renderHistory(); // restore the row; Delete reappears if still within grace
     };
+    // " Link" after Forget and Delete, dropped on a narrow row (app.css).
+    const pillTail = () => {
+        const tail = document.createElement("span");
+        tail.className = "history-confirm-tail";
+        tail.textContent = " Link";
+        return tail;
+    };
+    // Cancel (✕) is the only way out, since the trash only opens the menu. It sits
+    // at the right end, where the trash was, so a second tap there cancels.
+    const cancelButton = (li) => {
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "history-confirm-cancel";
+        cancel.textContent = "✕";
+        cancel.title = "Cancel";
+        cancel.setAttribute("aria-label", "Cancel");
+        cancel.addEventListener("click", () => closeConfirm(li, true));
+        return cancel;
+    };
     const openConfirm = (li, it) => {
         for (const el of document.querySelectorAll(".history-item.confirming")) closeConfirm(el);
         li.classList.add("confirming");
 
+        // R2: the time stays and the buttons become the answers, so the pills say
+        // what is asked and no question is written out.
         const overlay = document.createElement("div");
         overlay.className = "history-confirm";
-        const label = document.createElement("span");
-        label.className = "history-confirm-label";
-        label.textContent = "Remove this link?";
         const actions = document.createElement("div");
         actions.className = "history-confirm-actions";
         // An expired link is already gone server-side, which changes both buttons below.
@@ -1519,7 +1546,8 @@
         const forget = document.createElement("button");
         forget.type = "button";
         forget.className = "history-confirm-forget";
-        forget.textContent = "Forget Link";
+        forget.append("Forget", pillTail());
+        forget.setAttribute("aria-label", "Forget Link");
         forget.title = expired
             ? "Removes the record from this device — the link has already expired."
             : "Removes it from this device only — the link keeps working.";
@@ -1530,7 +1558,8 @@
             const server = document.createElement("button");
             server.type = "button";
             server.className = "history-confirm-server";
-            server.textContent = "Delete Link";
+            server.append("Delete", pillTail());
+            server.setAttribute("aria-label", "Delete Link");
             if (expired) {
                 // An expired link is already erased from the server — nothing to delete,
                 // so only forgetting the local record remains.
@@ -1543,19 +1572,11 @@
             actions.append(server);
         }
 
-        // Cancel (×) is the only way out now that Remove… is open-only; it sits at the
-        // right end, after the destructive buttons.
-        const cancel = document.createElement("button");
-        cancel.type = "button";
-        cancel.className = "history-confirm-cancel";
-        cancel.textContent = "✕";
-        cancel.title = "Cancel";
-        cancel.setAttribute("aria-label", "Cancel");
-        cancel.addEventListener("click", () => closeConfirm(li));
-        actions.append(cancel);
+        actions.append(cancelButton(li));
 
-        overlay.append(label, actions);
-        li.append(overlay);
+        overlay.append(actions);
+        li.querySelector(".history-foot").append(overlay);
+        forget.focus();
     };
 
     const initCreate = () => {
