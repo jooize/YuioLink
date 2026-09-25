@@ -3462,14 +3462,14 @@ html.history-collapsed .history-body {
 .history-more:hover { color: var(--text-secondary); }
 
 /* Copy and the eye for the contents: 16px icons, the first centered on the
-   first line of text, side by side 14px apart on a one-line row and stacked
-   10px apart on a taller one (app.js sets `.stacked`). The eye's right edge
-   lines up with a covered row's eye. Each hit area reaches 6px past its icon
-   without moving anything. */
+   first line of text, 10px apart side by side on a one-line row and stacked
+   on a taller one (app.js sets `.stacked`). The eye's right edge lines up
+   with a covered row's eye. Each hit area reaches past its icon without
+   moving anything, 5px toward its neighbor so the two never overlap. */
 .history-well-side {
     flex: none;
     display: flex;
-    gap: 14px;
+    gap: 10px;
     padding: 1.5px 7px 0 8px;
 }
 
@@ -3494,7 +3494,7 @@ html.history-collapsed .history-body {
 .history-well-btn::after {
     content: "";
     position: absolute;
-    inset: -6px;
+    inset: -6px -5px;
 }
 
 .history-well.stacked .history-well-btn::after { inset: -5px -6px; }
