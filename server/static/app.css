@@ -3498,6 +3498,10 @@ html.history-collapsed .history-body {
 }
 
 .history-well.stacked .history-well-btn::after { inset: -5px -6px; }
+/* The contents eye is also a .history-eye, whose uneven margin fits the covered
+   row and would sit this one 1.5px below Copy. Even it out so both icons center
+   on the first line; the horizontal padding stays, as the gap was tuned with it. */
+.history-well-btn.history-eye { margin: -6px 0; }
 .history-well-btn svg { display: block; }
 .history-well-btn:hover { opacity: 1; }
 .history-well-btn.copied { color: var(--switch-on-text); opacity: 1; }
