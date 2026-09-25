@@ -37,10 +37,10 @@ figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
 /* The buttons: 16px icons, the first centered on the first line of text
    (1.5px down in its 19px line), 8px between them, stacked or in a row. The
    hit area reaches 6px past each icon without moving anything. */
-.side { gap: 8px; padding: 1.5px 2px 0 6px; }
+.side { gap: 14px; padding: 1.5px 7px 0 8px; }
 /* Stacked, the pitch is the text's own 19px, so each icon centers on a line. */
-.stack .side { flex-direction: column; gap: 3px; }
-.stack:not(.one) .side .well-btn::after { inset: -1.5px -6px; }
+.stack .side { flex-direction: column; gap: 10px; }
+.stack:not(.one) .side .well-btn::after { inset: -5px -6px; }
 .stack.one .side { flex-direction: row; }
 .side .well-btn, .stack .side .well-btn, .stack.one .side .well-btn { position: relative; padding: 0; margin: 0; }
 .side .well-btn::after { content: ""; position: absolute; inset: -6px; }
@@ -180,7 +180,7 @@ const ROWS = [
 ];
 
 const SECTIONS = [
-    { h: "Round 4: S2, B2, spacing fixed", lead: "Copy and the eye: 16px icons centered on the text's lines, stacked at its 19px pitch on a row of two lines or more, side by side (8px apart) on one line. The link line holds only the link; its buttons sit beside “Expires in” below it.", rows: ROWS4, opts: [
+    { h: "Round 4: S2, B2, spacing fixed", lead: "Copy and the eye: 16px icons centered on the text's lines, 10px apart stacked on a row of two lines or more, 14px apart side by side on one line; the eye's right edge lines up with a covered row's eye. The link line holds only the link; its buttons sit beside “Expires in” below it.", rows: ROWS4, opts: [
         { id: "R4", text: "Destinations without the hanging indent: a wrapped line starts at the same edge as the first.", o: { layout: "B2", chev: "k1", stack: true, oneRow: true, noindent: true } },
         { id: "R4i", text: "The same with the preview's hanging indent, for comparison.", o: { layout: "B2", chev: "k1", stack: true, oneRow: true } },
     ]},
