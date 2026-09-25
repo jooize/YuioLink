@@ -3461,25 +3461,28 @@ html.history-collapsed .history-body {
 .history-more[aria-expanded="true"] svg { transform: rotate(180deg); }
 .history-more:hover { color: var(--text-secondary); }
 
-/* Copy and the eye for the contents: 16px icons, the first centered on the
-   first line of text, 17px apart side by side on a one-line row and stacked
-   on a taller one (app.js sets `.stacked`). The eye's right edge lines up
-   with a covered row's eye. Each hit area reaches past its icon without
-   moving anything, 5px toward its neighbor so the two never overlap. */
+/* Copy and the eye for the contents: 16px icons, 17px apart side by side on
+   a one-line row and stacked on a taller one (app.js sets `.stacked`). The eye
+   holds the well's top-right corner in every state: 8px down and 11px in, the
+   same spot as a covered row's eye, so toggling never moves it. Each hit area
+   reaches past its icon without moving anything, 5px toward its neighbor so
+   the two never overlap. */
 .history-well-side {
     flex: none;
     display: flex;
     gap: 17px;
-    padding: 1.5px 7px 0 8px;
+    padding: 2px 7px 0 8px;
 }
 
-/* Centered, so Copy's icon always sits over the eye's. */
+/* Stacked, the eye goes on top (it keeps the corner) and Copy below it,
+   centered on the same column. Only the order on screen is reversed, so the
+   tab order stays Copy, then the eye, as on a one-line row. The column stays
+   50px tall (2 + 16 + 10 + 16 + 6), the height the pre-paint reserves. */
 .history-well.stacked .history-well-side {
-    flex-direction: column;
+    flex-direction: column-reverse;
     align-items: center;
     gap: 10px;
-    padding-top: 4px;
-    padding-bottom: 4px;
+    padding-bottom: 6px;
 }
 
 .history-well-btn {
