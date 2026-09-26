@@ -3420,7 +3420,14 @@ html.history-collapsed .history-body {
 }
 
 .history-well .pv-url::after { content: none; }
-.history-well .pv-url .reg { font-size: 1em; padding: 0 3px; }
+/* The domain without the preview's blue wash: on the gray well the wash pulled
+   the dark blue under AA (3.82:1). Bold and blue set it apart on their own.
+   Dark mode lifts the blue a step for the gray (4.60:1 at worst). */
+.history-well .pv-url .reg { font-size: 1em; padding: 0; background: none; }
+
+@media (prefers-color-scheme: dark) {
+    .history-well .pv-url .reg { color: #5aaaff; }
+}
 
 /* Rows saved before the dress was sent: host and path, plainly. */
 .history-well.redirect .history-well-body:not(.pv-url) {
