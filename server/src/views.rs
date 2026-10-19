@@ -1720,6 +1720,18 @@ fn char_dress(c: char) -> (String, String) {
         '=' => ("=", "equals sign"),
         '#' => ("#", "number sign"),
         '%' => ("%", "percent sign"),
+        '\u{fe00}'..='\u{fe0f}' => {
+            return (
+                format!("VS{}", c as u32 - 0xfdff),
+                "variation selector".to_string(),
+            );
+        }
+        '\u{e0100}'..='\u{e01ef}' => {
+            return (
+                format!("VS{}", c as u32 - 0xe0100 + 17),
+                "variation selector".to_string(),
+            );
+        }
         _ => return (format!("{:04X}", c as u32), "hidden character".to_string()),
     };
     (sym.to_string(), name.to_string())
@@ -2832,12 +2844,85 @@ pub fn text_view_page(base_host: &str, name: &str, text: &str) -> Markup {
 /// `text.js`, so a visitor without JavaScript gets the whole snippet in flow and
 /// scrolls the page, rather than a box they cannot open.
 fn text_body(text: &str) -> Markup {
+    let crlf = uniform_crlf(text);
+    let hidden = text
+        .char_indices()
+        .any(|(i, c)| text_mark(text, i, c, crlf).is_some());
     html! {
+        @if crlf || hidden {
+            div.pv-facts {
+                @if hidden { span.pv-fact.warn { (alert_icon()) "Hidden Characters" } }
+                @if crlf { span.pv-fact { "CRLF Line Endings" } }
+            }
+        }
         div.text-wrap #text-wrap {
-            pre.text-body #text-body { (text) }
+            pre.text-body #text-body { (marked_text(text, crlf)) }
         }
         button.btn.btn-block #copy-text type="button" hidden { "Copy" }
     }
+}
+
+/// True when every line feed has a carriage return directly before it: the
+/// text's line-ending convention, stated once as a fact beside the snippet
+/// instead of marked on every line. A text with no line feed has no convention.
+fn uniform_crlf(text: &str) -> bool {
+    let b = text.as_bytes();
+    text.contains('\n')
+        && b.iter()
+            .enumerate()
+            .all(|(i, &c)| c != b'\n' || (i > 0 && b[i - 1] == b'\r'))
+}
+
+/// The escape a character in a snippet is marked with, or `None` when it shows
+/// as itself. Line feeds and tabs are layout in a snippet; a carriage return is
+/// layout only as the uniform CRLF convention. Every other invisible or
+/// direction-changing character is marked.
+fn text_mark(text: &str, i: usize, c: char, crlf: bool) -> Option<String> {
+    match c {
+        '\n' | '\t' => None,
+        '\r' if crlf && text.as_bytes().get(i + 1) == Some(&b'\n') => None,
+        c if urlview::is_invisible(c) => Some(format!("\\u{{{:X}}}", c as u32)),
+        _ => None,
+    }
+}
+
+/// The snippet as the reader sees it: every character stays in the text, so a
+/// selection or the Copy button takes exactly what is stored, and a hidden
+/// character gets a mark — a `span.hid` whose escape (`data-esc`) app.css
+/// draws beside it as generated content, never selected or copied.
+///
+/// Two characters cannot travel raw through HTML. The parser turns a carriage
+/// return into a line feed, so it goes out as `&#13;`; it turns a NUL into
+/// U+FFFD even as a reference, so a NUL's mark is empty and carries the code
+/// point in `data-cp`, which text.js puts back when copying.
+fn marked_text(text: &str, crlf: bool) -> Markup {
+    let mut out = String::with_capacity(text.len());
+    // Start of the run of characters that show as themselves.
+    let mut start = 0;
+    for (i, c) in text.char_indices() {
+        let mark = text_mark(text, i, c, crlf);
+        if mark.is_none() && c != '\r' {
+            continue;
+        }
+        out.push_str(&html! { (&text[start..i]) }.into_string());
+        start = i + c.len_utf8();
+        let raw = match c {
+            '\r' => PreEscaped("&#13;".to_string()),
+            '\0' => PreEscaped(String::new()),
+            c => html! { (c) },
+        };
+        match mark {
+            Some(esc) => {
+                let cp = (c == '\0').then_some("0");
+                out.push_str(
+                    &html! { span.hid data-esc=(esc) data-cp=[cp] { (raw) } }.into_string(),
+                );
+            }
+            None => out.push_str(&raw.into_string()),
+        }
+    }
+    out.push_str(&html! { (&text[start..]) }.into_string());
+    PreEscaped(out)
 }
 
 // --------------------------------------------------------------------------
@@ -4249,5 +4334,71 @@ mod tests {
         // Nothing to explain, nothing said.
         assert!(!card("tel:+4782012345").contains("pv-note"));
         assert!(!card("https://example.com/a").contains("pv-note"));
+    }
+
+    fn snippet(text: &str) -> String {
+        text_body(text).into_string()
+    }
+
+    #[test]
+    fn a_snippet_marks_hidden_characters_and_keeps_them_in_the_text() {
+        let s = snippet("pay\u{200b}pal\u{202e}txt");
+        assert!(
+            s.contains("pay<span class=\"hid\" data-esc=\"\\u{200B}\">\u{200b}</span>pal"),
+            "{s}"
+        );
+        assert!(
+            s.contains("data-esc=\"\\u{202E}\">\u{202e}</span>txt"),
+            "{s}"
+        );
+        assert!(s.contains("Hidden Characters"), "{s}");
+        // Markup in the text is still text.
+        assert!(snippet("<b>\u{200b}").contains("&lt;b&gt;<span"));
+    }
+
+    #[test]
+    fn a_snippet_shows_tabs_and_line_feeds_as_themselves() {
+        let s = snippet("fn main() {\n\tgo();\n}\n");
+        assert!(!s.contains("class=\"hid\""), "{s}");
+        assert!(!s.contains("pv-facts"), "{s}");
+        assert!(s.contains("{\n\tgo();"), "{s}");
+    }
+
+    #[test]
+    fn uniform_crlf_is_one_fact_and_every_other_cr_is_marked() {
+        // Every line feed has its carriage return: stated once, nothing marked,
+        // and the carriage returns still travel (as references, since the HTML
+        // parser would turn a raw one into a line feed).
+        let s = snippet("one\r\ntwo\r\n");
+        assert!(s.contains("CRLF Line Endings"), "{s}");
+        assert!(!s.contains("class=\"hid\""), "{s}");
+        assert!(s.contains("one&#13;\ntwo&#13;\n"), "{s}");
+
+        // A mix: no convention, so each carriage return is marked where it is.
+        let s = snippet("one\r\ntwo\nthree");
+        assert!(!s.contains("CRLF Line Endings"), "{s}");
+        assert!(
+            s.contains("one<span class=\"hid\" data-esc=\"\\u{D}\">&#13;</span>\ntwo"),
+            "{s}"
+        );
+        assert!(s.contains("Hidden Characters"), "{s}");
+
+        // A lone carriage return is marked even beside a uniform convention.
+        let s = snippet("a\rb\r\nc\r\n");
+        assert!(s.contains("CRLF Line Endings"), "{s}");
+        assert!(
+            s.contains("a<span class=\"hid\" data-esc=\"\\u{D}\">&#13;</span>b&#13;\n"),
+            "{s}"
+        );
+    }
+
+    #[test]
+    fn a_nul_travels_as_its_code_point() {
+        let s = snippet("a\0b");
+        assert!(
+            s.contains("a<span class=\"hid\" data-esc=\"\\u{0}\" data-cp=\"0\"></span>b"),
+            "{s}"
+        );
+        assert!(!s.contains('\0'), "{s}");
     }
 }

@@ -56,6 +56,22 @@
         });
     };
 
+    // The stored text, read back from the page. A hidden character's mark draws
+    // its escape as generated content, which is never part of the text, so the
+    // page's text is already exact, with one exception: HTML cannot carry a
+    // NUL (the parser turns it into U+FFFD), so its mark is empty and holds the
+    // code point in data-cp instead.
+    const exactText = (root) => {
+        let out = "";
+        for (const node of root.childNodes) {
+            if (node.nodeType === Node.TEXT_NODE) out += node.data;
+            else if (node.nodeType !== Node.ELEMENT_NODE) continue;
+            else if (node.dataset.cp !== undefined) out += String.fromCodePoint(Number(node.dataset.cp));
+            else out += exactText(node);
+        }
+        return out;
+    };
+
     document.addEventListener("DOMContentLoaded", () => {
         const pre = document.getElementById("text-body");
         const wrap = document.getElementById("text-wrap");
@@ -67,7 +83,7 @@
         // clear together.
         const copyAll = async () => {
             try {
-                await navigator.clipboard.writeText(pre.textContent);
+                await navigator.clipboard.writeText(exactText(pre));
             } catch {
                 return; // clipboard unavailable (insecure context) or denied
             }
@@ -82,6 +98,19 @@
 
         copyBtn.hidden = false;
         copyBtn.addEventListener("click", copyAll);
+
+        // A selection the visitor made copies through the browser, which is
+        // exact unless it spans a NUL's empty mark; only then is it rebuilt.
+        document.addEventListener("copy", (event) => {
+            const sel = window.getSelection();
+            if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+            const range = sel.getRangeAt(0);
+            if (!pre.contains(range.commonAncestorContainer)) return;
+            const part = range.cloneContents();
+            if (!part.querySelector("[data-cp]")) return;
+            event.clipboardData.setData("text/plain", exactText(part));
+            event.preventDefault();
+        });
 
         // ⌘C anywhere on the page takes the whole snippet — that is what this page
         // is for. A selection the visitor made themselves wins: copying part of a

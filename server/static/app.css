@@ -30,6 +30,8 @@
     --result: #10b981;
     --warn: #975d00;
     --danger: #d70015;
+    /* Text on a danger fill (a hidden-character mark): 5.4:1. */
+    --on-danger: #fff;
     /* Forget in the remove menu: a tint of the system orange, and text deep
        enough to read on it (4.85:1). Dark mode can use the orange itself. */
     --forget: #ff9500;
@@ -114,6 +116,8 @@
         --warn: #ffd60a;
         /* Lifted a step (audit): #ff453a was under 4.5:1 on the dark glass. */
         --danger: #ff5d54;
+        /* White on the lifted red is 3.0:1; near-black is 6.5:1. */
+        --on-danger: #1c0505;
         --forget: #ff9f0a;
         --forget-text: #ff9f0a;
         --text-kind: #ff9f0a;
@@ -1436,6 +1440,31 @@ html.js .custom-field:not(.open) {
 .text-body.capped {
     max-height: 55vh;
     overflow: hidden;
+}
+
+/* A hidden character in a snippet. The real character stays in the text, so a
+   selection or Copy takes exactly what is stored; its escape is generated
+   content beside it, never selected or copied. The isolate keeps a direction
+   control from reordering anything past its own mark.
+   pointer-events: none is load-bearing: in Safari a label that takes the
+   pointer hides the selection under it and sends a right-to-left drag to the
+   start of the line (user-select: none does not help). */
+.text-body .hid {
+    unicode-bidi: isolate;
+}
+
+.text-body .hid::after {
+    content: attr(data-esc);
+    pointer-events: none;
+    margin: 0 1px;
+    padding: 0 3px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    font-weight: 700;
+    color: var(--on-danger);
+    background: var(--danger);
+    /* Invisible normally; drawn as a box when forced colors drop the fill. */
+    outline: 1px solid transparent;
 }
 
 /* The last rows of a collapsed box fade into the card, so the cut never looks

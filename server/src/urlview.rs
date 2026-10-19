@@ -1058,20 +1058,8 @@ fn decode_chars(value: &str) -> Vec<(char, Option<String>)> {
                 i += 1;
                 continue;
             }
-            let raw = &value[start..i];
-            match std::str::from_utf8(&buf) {
-                Ok(decoded) => {
-                    // One escape per decoded character, so each keeps its own
-                    // provenance and the structure rule applies per character.
-                    let mut consumed = 0;
-                    for c in decoded.chars() {
-                        let n = c.len_utf8() * 3;
-                        chars.push((c, Some(raw[consumed..consumed + n].to_string())));
-                        consumed += n;
-                    }
-                }
-                // Not valid UTF-8: nothing honest to show, so it stays escaped.
-                Err(_) => chars.push((char::REPLACEMENT_CHARACTER, Some(raw.to_string()))),
+            for (c, raw) in run_pairs(&buf, &value[start..i]) {
+                chars.push((c, Some(raw)));
             }
         } else {
             let c = value[i..].chars().next().unwrap_or('\u{fffd}');
@@ -1261,21 +1249,36 @@ pub(crate) fn escape_run_pairs(run: &str) -> Vec<(char, String)> {
             _ => break,
         }
     }
-    match std::str::from_utf8(&buf) {
-        Ok(decoded) => {
-            let mut consumed = 0;
-            decoded
-                .chars()
-                .map(|c| {
-                    let n = c.len_utf8() * 3;
-                    let raw = run[consumed..consumed + n].to_string();
-                    consumed += n;
-                    (c, raw)
-                })
-                .collect()
+    run_pairs(&buf, &run[..i])
+}
+
+/// Pair each character a run of escapes decodes to with the escapes it came
+/// from. `raw` is the run as stored, three characters (`%XX`) per byte of
+/// `bytes`.
+///
+/// One pair per decoded character, so each keeps its own provenance and the
+/// structure rule applies per character. Valid sequences decode even inside a
+/// run that also holds bytes that are not UTF-8; each failing byte becomes its
+/// own replacement-character pair holding its own `%XX`, so `%C3%A9%FF` reads
+/// as `é` then a kept `%FF`, never as three undecodable escapes.
+fn run_pairs(bytes: &[u8], raw: &str) -> Vec<(char, String)> {
+    let mut out = Vec::new();
+    let mut consumed = 0;
+    for chunk in bytes.utf8_chunks() {
+        for c in chunk.valid().chars() {
+            let n = c.len_utf8() * 3;
+            out.push((c, raw[consumed..consumed + n].to_string()));
+            consumed += n;
         }
-        Err(_) => vec![(char::REPLACEMENT_CHARACTER, run.to_string())],
+        for _ in chunk.invalid() {
+            out.push((
+                char::REPLACEMENT_CHARACTER,
+                raw[consumed..consumed + 3].to_string(),
+            ));
+            consumed += 3;
+        }
     }
+    out
 }
 
 /// A parameter key, read for display. Keys are never decoded — what is stored
@@ -1345,10 +1348,12 @@ pub(crate) fn is_invisible(c: char) -> bool {
             | '\u{205f}'..='\u{206f}'
             | '\u{3000}'
             | '\u{3164}'
+            | '\u{fe00}'..='\u{fe0f}'
             | '\u{feff}'
             | '\u{ffa0}'
             | '\u{fff9}'..='\u{fffb}'
-            | '\u{e0000}'..='\u{e007f}')
+            | '\u{e0000}'..='\u{e007f}'
+            | '\u{e0100}'..='\u{e01ef}')
 }
 
 /// Everything the card can say about the stored string that the reader deserves
@@ -1893,6 +1898,55 @@ mod tests {
         assert!(read.contains("%E2%80%AE"), "{read}");
         // Ordinary escapes are not hidden characters.
         assert!(!parse_uri("https://example.com/a%20b%2Fc").has(Hazard::HiddenCharacters));
+    }
+
+    #[test]
+    fn variation_selectors_are_hidden_characters() {
+        // VS16 draws nothing after a non-emoji base, and a run of selectors
+        // can carry data that draws nothing at all.
+        assert_eq!(
+            decode_for_reading("a%EF%B8%8Fb"),
+            vec![
+                Piece::Text("a".to_string()),
+                Piece::BadEscape("%EF%B8%8F".to_string()),
+                Piece::Text("b".to_string()),
+            ]
+        );
+        // The supplementary block (VS17-256) too.
+        assert_eq!(
+            decode_for_reading("%F3%A0%84%80"),
+            vec![Piece::BadEscape("%F3%A0%84%80".to_string())]
+        );
+        assert!(parse_uri("https://example.com/?q=x%EF%B8%8E").has(Hazard::HiddenCharacters));
+    }
+
+    #[test]
+    fn only_the_bytes_that_fail_utf8_stay_escaped() {
+        // A valid character decodes even when the same run holds a stray byte.
+        assert_eq!(
+            decode_for_reading("%C3%A9%FF"),
+            vec![
+                Piece::Text("é".to_string()),
+                Piece::Escape("%FF".to_string())
+            ]
+        );
+        // One pair per failing byte, each holding its own escape.
+        assert_eq!(
+            escape_run_pairs("%C3%A9%FF%FE"),
+            vec![
+                ('é', "%C3%A9".to_string()),
+                (char::REPLACEMENT_CHARACTER, "%FF".to_string()),
+                (char::REPLACEMENT_CHARACTER, "%FE".to_string()),
+            ]
+        );
+        // A truncated sequence before a valid one: only the truncated byte fails.
+        assert_eq!(
+            decode_for_reading("%E2%80a"),
+            vec![
+                Piece::Escape("%E2%80".to_string()),
+                Piece::Text("a".to_string())
+            ]
+        );
     }
 
     #[test]

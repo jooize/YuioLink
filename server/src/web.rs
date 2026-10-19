@@ -387,10 +387,17 @@ pub async fn form_create(
     // offer can reuse the expiry the user actually chose.
     let redo_ttl = ttl_seconds.as_ref().copied().unwrap_or(DEFAULT_TTL_SECS);
 
+    // A browser submits every line break in a textarea as CRLF, whatever the
+    // person typed: the form encoding's own convention, not their text (a
+    // textarea's value never holds a carriage return). Undoing it here gives
+    // back exactly what was typed. Only this path does it: the JSON API and
+    // `curl` carry the sender's bytes, carriage returns included.
+    let content = form.content.replace("\r\n", "\n");
+
     match create_link(
         &state,
         form.kind.as_deref(),
-        &form.content,
+        &content,
         ttl_seconds,
         Ok(max_uses),
         secret,
@@ -408,7 +415,7 @@ pub async fn form_create(
             // The Text offer only makes sense after a Redirect: a link stored as
             // Text has no other kind to become, and neither does plain prose.
             let redo = (kind_label == "Redirect").then(|| views::ResultRedo {
-                content: &form.content,
+                content: &content,
                 ttl_seconds: redo_ttl,
                 link_type: form.link_type.as_deref().unwrap_or("public"),
             });
@@ -416,7 +423,7 @@ pub async fn form_create(
                 views::result_page(
                     &views::CreatedLink {
                         url: &url,
-                        content: &form.content,
+                        content: &content,
                         display: display_of(&created),
                         kind_label,
                         expires_at: &inserted.expires_at,
@@ -1745,6 +1752,44 @@ mod tests {
         assert_eq!(s, StatusCode::GONE);
         assert!(body.contains("410"));
         assert!(!body.contains("zzz-gated-path"));
+    }
+
+    /// The no-JS form undoes the browser's CRLF line breaks; the JSON API keeps
+    /// the sender's bytes, carriage returns included.
+    #[tokio::test]
+    async fn only_the_form_turns_crlf_back_into_lf() {
+        let st = test_state().await;
+        let (s, _, body) = send(
+            &st,
+            post_body("/", "content=one%0D%0Atwo%0D%0A&kind=text&ttl_stop=7"),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "body: {body}");
+        let at = body
+            .find("http://yuio.test/")
+            .expect("result names the link")
+            + 17;
+        let name: String = body[at..]
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric())
+            .collect();
+        let d = db::get_link_live(&st.pool, &name).await.unwrap().unwrap();
+        assert_eq!(d.content, "one\ntwo\n");
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/v0/links")
+            .header("content-type", "application/json")
+            .body(Body::from(r#"{"kind":"text","content":"one\r\ntwo\r\n"}"#))
+            .unwrap();
+        let (s, _, out) = send(&st, req).await;
+        assert_eq!(s, StatusCode::CREATED, "{out}");
+        let name = serde_json::from_str::<serde_json::Value>(&out).unwrap()["name"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let d = db::get_link_live(&st.pool, &name).await.unwrap().unwrap();
+        assert_eq!(d.content, "one\r\ntwo\r\n");
     }
 
     fn post_body(uri: &str, body: &str) -> Request<Body> {
