@@ -1467,6 +1467,21 @@ html.js .custom-field:not(.open) {
     outline: 1px solid transparent;
 }
 
+/* The label is its own left-to-right isolate: it sits inside the mark after
+   the real character, so a right-to-left override there would otherwise
+   reverse the label itself ("{E202}u\" for \u{202E}). An isolate resets the
+   override for everything inside it. */
+.text-body .hid::after {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* The label ignores the pointer, so text.js finds a mark under a click by
+   position, and says so with the cursor. */
+.text-body.over-mark {
+    cursor: pointer;
+}
+
 /* The last rows of a collapsed box fade into the card, so the cut never looks
    like the end of the text. Sits inside the border (0.5px inset all round). */
 .text-wrap.capped::after {

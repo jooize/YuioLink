@@ -1642,6 +1642,9 @@ enum CastKind {
     Kept,
     /// An escape whose bytes are not valid text — nothing honest to name.
     Undecodable,
+    /// A hidden character in a Text snippet: kept in the text, marked by its
+    /// escape, and explained by what it does.
+    Snippet,
 }
 
 /// Where an entry's character sits, for the "in the path" clause.
@@ -1893,7 +1896,7 @@ fn cast_index(entries: &[CastEntry]) -> Markup {
                     CastKind::Padding => format!("{name} U+{:04X}, padding", e.ch as u32),
                     _ => format!("{name} U+{:04X}", e.ch as u32),
                 };
-                @let warn = matches!(e.kind, CastKind::Hidden | CastKind::Padding);
+                @let warn = matches!(e.kind, CastKind::Hidden | CastKind::Padding | CastKind::Snippet);
                 @if e.kind == CastKind::Kept {
                     span.tile.lit data-tell=(e.id) title=(title) { (e.ch) }
                 } @else if e.kind == CastKind::Undecodable {
@@ -1909,7 +1912,10 @@ fn cast_index(entries: &[CastEntry]) -> Markup {
 }
 
 fn cast_entry(e: &CastEntry, solo: bool) -> Markup {
-    let warn = matches!(e.kind, CastKind::Hidden | CastKind::Padding);
+    let warn = matches!(
+        e.kind,
+        CastKind::Hidden | CastKind::Padding | CastKind::Snippet
+    );
     let (sym, name) = char_dress(e.ch);
     let name = if e.kind == CastKind::Undecodable {
         "undecodable bytes".to_string()
@@ -1935,7 +1941,9 @@ fn cast_entry(e: &CastEntry, solo: bool) -> Markup {
                     span.tile.sym { "?" }
                 } @else {
                     span.tile.sym { (sym) }
-                    span.tile.raw { (e.ch) }
+                    // HTML cannot carry a NUL (the parser makes it U+FFFD),
+                    // so its box stays empty rather than show a mark.
+                    span.tile.raw { @if e.ch != '\0' { (e.ch) } }
                 }
             }
             span.what {
@@ -1944,7 +1952,10 @@ fn cast_entry(e: &CastEntry, solo: bool) -> Markup {
                     span.cp { "U+" (format!("{:04X}", e.ch as u32)) } " "
                 }
                 "— " (cast_prose(e)) (cast_tail(e))
-                @if e.kind == CastKind::Hidden { ". The empty box is the character." }
+                @if e.kind == CastKind::Snippet { ". " (char_meaning(e.ch)) }
+                @if matches!(e.kind, CastKind::Hidden | CastKind::Snippet) {
+                    ". The empty box is the character."
+                }
             }
         }
     }
@@ -1956,6 +1967,7 @@ fn cast_prose(e: &CastEntry) -> Markup {
             CastKind::Space => { "stored as " code { "%20" } }
             CastKind::Padding => { "literal, used as padding" }
             CastKind::Hidden => { "stored as " code { (e.stored) } }
+            CastKind::Snippet => { "marked " code { (e.stored) } }
             CastKind::Kept => {
                 "kept escaped as " code { (e.stored) }
                 " so it cannot read as " (structure_reason(e.ch))
@@ -1968,13 +1980,49 @@ fn cast_prose(e: &CastEntry) -> Markup {
     }
 }
 
+/// What a hidden character in a snippet does, in one sentence: the reason it
+/// is marked at all.
+fn char_meaning(c: char) -> &'static str {
+    match c {
+        '\0' => "Many programs stop reading at it, so the text after it can vanish",
+        '\r' => {
+            "In a terminal it returns to the start of the line, so the text after it \
+             can print over the text before it"
+        }
+        '\u{00ad}' => "It shows only where a line happens to break",
+        '\u{00a0}' | '\u{2000}'..='\u{200a}' | '\u{202f}' | '\u{205f}' | '\u{3000}' => {
+            "It looks like a space but is a different character"
+        }
+        '\u{061c}'
+        | '\u{200e}'
+        | '\u{200f}'
+        | '\u{202a}'..='\u{202e}'
+        | '\u{2066}'..='\u{2069}' => {
+            "It changes the direction of the text around it, so the order you see \
+             can differ from the order stored"
+        }
+        '\u{2028}' | '\u{2029}' => "Some programs break the line here and others do not",
+        '\u{fe00}'..='\u{fe0f}' | '\u{e0100}'..='\u{e01ef}' => {
+            "It changes how the character before it is drawn, and a run of them can \
+             carry hidden data"
+        }
+        '\u{e0000}'..='\u{e007f}' => {
+            "It is a tag character: it draws nothing, and a run of them can spell hidden text"
+        }
+        '\u{0000}'..='\u{001f}' | '\u{007f}'..='\u{009f}' => {
+            "It is a control code with no visible form"
+        }
+        _ => "It draws nothing, so two texts that look the same can differ",
+    }
+}
+
 /// The count and place clauses: "…, twice, in the path".
 fn cast_tail(e: &CastEntry) -> Markup {
     html! {
         @if e.count == 2 { ", twice" }
         @else if e.count > 2 { ", " (e.count) " times" }
         @if e.places.len() == 1 { ", in " (place_markup(&e.places[0])) }
-        @else { ", in " (e.places.len()) " places" }
+        @else if e.places.len() > 1 { ", in " (e.places.len()) " places" }
     }
 }
 
@@ -2845,21 +2893,63 @@ pub fn text_view_page(base_host: &str, name: &str, text: &str) -> Markup {
 /// scrolls the page, rather than a box they cannot open.
 fn text_body(text: &str) -> Markup {
     let crlf = uniform_crlf(text);
-    let hidden = text
-        .char_indices()
-        .any(|(i, c)| text_mark(text, i, c, crlf).is_some());
+    let entries = text_cast(text, crlf);
+    let ids = entries
+        .iter()
+        .map(|e| e.id.as_str())
+        .collect::<Vec<_>>()
+        .join(" ");
     html! {
-        @if crlf || hidden {
+        @if crlf || !entries.is_empty() {
             div.pv-facts {
-                @if hidden { span.pv-fact.warn { (alert_icon()) "Hidden Characters" } }
+                @if !entries.is_empty() {
+                    span.pv-fact.warn data-cast=(ids) { (alert_icon()) "Hidden Characters" }
+                }
                 @if crlf { span.pv-fact { "CRLF Line Endings" } }
             }
         }
         div.text-wrap #text-wrap {
             pre.text-body #text-body { (marked_text(text, crlf)) }
         }
+        // Below the box, so the first answer grows the page under the text
+        // rather than pushing the text down under the pointer. Quiet until a
+        // mark or the chip asks (text.js); without the script, the full list.
+        @if !entries.is_empty() {
+            div.pv-cast {
+                @for e in &entries { (cast_entry(e, false)) }
+            }
+        }
         button.btn.btn-block #copy-text type="button" hidden { "Copy" }
     }
+}
+
+/// One cast entry per distinct marked character, in order of first
+/// appearance, each counting how often the snippet holds it.
+fn text_cast(text: &str, crlf: bool) -> Vec<CastEntry> {
+    let mut out: Vec<CastEntry> = Vec::new();
+    for (i, c) in text.char_indices() {
+        let Some(esc) = text_mark(text, i, c, crlf) else {
+            continue;
+        };
+        match out.iter_mut().find(|e| e.ch == c) {
+            Some(e) => e.count += 1,
+            None => out.push(CastEntry {
+                id: mark_id(c),
+                ch: c,
+                stored: esc,
+                kind: CastKind::Snippet,
+                count: 1,
+                places: Vec::new(),
+            }),
+        }
+    }
+    out
+}
+
+/// The `data-tell` id that ties a snippet's marks to the cast entry naming
+/// their character.
+fn mark_id(c: char) -> String {
+    format!("u{:04x}", c as u32)
 }
 
 /// True when every line feed has a carriage return directly before it: the
@@ -2914,8 +3004,10 @@ fn marked_text(text: &str, crlf: bool) -> Markup {
         match mark {
             Some(esc) => {
                 let cp = (c == '\0').then_some("0");
+                let tell = mark_id(c);
                 out.push_str(
-                    &html! { span.hid data-esc=(esc) data-cp=[cp] { (raw) } }.into_string(),
+                    &html! { span.hid data-esc=(esc) data-tell=(tell) data-cp=[cp] { (raw) } }
+                        .into_string(),
                 );
             }
             None => out.push_str(&raw.into_string()),
@@ -4344,11 +4436,11 @@ mod tests {
     fn a_snippet_marks_hidden_characters_and_keeps_them_in_the_text() {
         let s = snippet("pay\u{200b}pal\u{202e}txt");
         assert!(
-            s.contains("pay<span class=\"hid\" data-esc=\"\\u{200B}\">\u{200b}</span>pal"),
+            s.contains("pay<span class=\"hid\" data-esc=\"\\u{200B}\" data-tell=\"u200b\">\u{200b}</span>pal"),
             "{s}"
         );
         assert!(
-            s.contains("data-esc=\"\\u{202E}\">\u{202e}</span>txt"),
+            s.contains("data-esc=\"\\u{202E}\" data-tell=\"u202e\">\u{202e}</span>txt"),
             "{s}"
         );
         assert!(s.contains("Hidden Characters"), "{s}");
@@ -4378,7 +4470,9 @@ mod tests {
         let s = snippet("one\r\ntwo\nthree");
         assert!(!s.contains("CRLF Line Endings"), "{s}");
         assert!(
-            s.contains("one<span class=\"hid\" data-esc=\"\\u{D}\">&#13;</span>\ntwo"),
+            s.contains(
+                "one<span class=\"hid\" data-esc=\"\\u{D}\" data-tell=\"u000d\">&#13;</span>\ntwo"
+            ),
             "{s}"
         );
         assert!(s.contains("Hidden Characters"), "{s}");
@@ -4387,16 +4481,39 @@ mod tests {
         let s = snippet("a\rb\r\nc\r\n");
         assert!(s.contains("CRLF Line Endings"), "{s}");
         assert!(
-            s.contains("a<span class=\"hid\" data-esc=\"\\u{D}\">&#13;</span>b&#13;\n"),
+            s.contains(
+                "a<span class=\"hid\" data-esc=\"\\u{D}\" data-tell=\"u000d\">&#13;</span>b&#13;\n"
+            ),
             "{s}"
         );
+    }
+
+    #[test]
+    fn a_snippet_cast_names_each_marked_character_once() {
+        let s = snippet("a\u{200b}b\u{200b}c\u{202e}d");
+        // The chip steps through the entries, in order of first appearance.
+        assert!(s.contains(r#"data-cast="u200b u202e""#), "{s}");
+        let cast = &s[s.find(r#"<div class="pv-cast">"#).expect("a cast")..];
+        assert!(cast.contains(r#"data-name="u200b""#), "{s}");
+        assert!(cast.contains("zero-width space"), "{s}");
+        assert!(cast.contains(", twice"), "{s}");
+        assert!(cast.contains("It draws nothing"), "{s}");
+        assert!(cast.contains("right-to-left override"), "{s}");
+        assert!(cast.contains("It changes the direction"), "{s}");
+        // The cast sits under the text, so asking never moves the text.
+        assert!(
+            s.find("text-wrap").unwrap() < s.find("pv-cast").unwrap(),
+            "{s}"
+        );
+        // No marks, no cast.
+        assert!(!snippet("plain\ttext\n").contains("pv-cast"));
     }
 
     #[test]
     fn a_nul_travels_as_its_code_point() {
         let s = snippet("a\0b");
         assert!(
-            s.contains("a<span class=\"hid\" data-esc=\"\\u{0}\" data-cp=\"0\"></span>b"),
+            s.contains("a<span class=\"hid\" data-esc=\"\\u{0}\" data-tell=\"u0000\" data-cp=\"0\"></span>b"),
             "{s}"
         );
         assert!(!s.contains('\0'), "{s}");

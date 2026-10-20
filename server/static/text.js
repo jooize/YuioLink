@@ -45,8 +45,9 @@
         chev.append(path);
         btn.append(label, count, chev);
         row.append(btn);
-        // Between the box and the Copy button, straddling the box's bottom edge.
-        copyBtn.before(row);
+        // Right under the box, straddling its bottom edge (the cast, when
+        // there is one, follows it).
+        wrap.after(row);
 
         btn.addEventListener("click", () => {
             const open = pre.classList.toggle("capped") === false;
@@ -72,8 +73,70 @@
         return out;
     };
 
+    // The cast answers when asked, the same deck the preview card uses: one
+    // entry shown at a time, a click on a mark shows the entry naming its
+    // character, and the Hidden Characters chip steps through them all (one
+    // past the last puts the deck away). Without this script the stylesheet
+    // shows the whole list instead.
+    //
+    // A mark's label ignores the pointer, because in Safari a label that
+    // takes it breaks a drag across the text. So a click is matched to a
+    // mark by where it landed, and only a plain click counts: one that ends
+    // a drag-selection leaves the deck alone.
+    const wireCast = (pre) => {
+        const cast = document.querySelector(".pv-cast");
+        const marks = [...pre.querySelectorAll(".hid[data-tell]")];
+        if (!cast || !marks.length) return;
+        const chip = document.querySelector(".pv-fact[data-cast]");
+        const entryFor = (name) => cast.querySelector(`.entry[data-name="${name}"]`);
+        const show = (entry) => {
+            cast.querySelectorAll(".entry.shown").forEach((e) => e.classList.remove("shown"));
+            if (!entry) return;
+            void entry.offsetWidth; // restart the pulse
+            entry.classList.add("shown");
+        };
+        const markAt = (x, y) =>
+            marks.find((m) =>
+                [...m.getClientRects()].some(
+                    (r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom,
+                ),
+            );
+
+        pre.addEventListener("click", (event) => {
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed) return;
+            const mark = markAt(event.clientX, event.clientY);
+            if (!mark) return;
+            show(entryFor(mark.dataset.tell));
+            if (chip) chip.setAttribute("aria-expanded", "false");
+        });
+        pre.addEventListener("mousemove", (event) => {
+            pre.classList.toggle("over-mark", Boolean(markAt(event.clientX, event.clientY)));
+        });
+        pre.addEventListener("mouseleave", () => pre.classList.remove("over-mark"));
+
+        if (!chip) return;
+        const entries = chip.dataset.cast.split(" ").map(entryFor).filter(Boolean);
+        chip.setAttribute("role", "button");
+        chip.setAttribute("tabindex", "0");
+        chip.setAttribute("aria-expanded", "false");
+        const step = () => {
+            const at = entries.findIndex((e) => e.classList.contains("shown"));
+            const next = at + 1;
+            show(entries[next]);
+            chip.setAttribute("aria-expanded", String(next < entries.length));
+        };
+        chip.addEventListener("click", step);
+        chip.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            step();
+        });
+    };
+
     document.addEventListener("DOMContentLoaded", () => {
         const pre = document.getElementById("text-body");
+        if (pre) wireCast(pre);
         const wrap = document.getElementById("text-wrap");
         const copyBtn = document.getElementById("copy-text");
         if (!pre || !wrap || !copyBtn) return;
