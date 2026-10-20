@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en" class="js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text Variant Forms</title>
+<link rel="stylesheet" href="../server/static/app.css">
+<style>
+body { display: block; padding: 28px 16px 48px; }
+.page { max-width: 1240px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.lead { color: var(--text-secondary); font-size: 14px; margin: 0 0 18px; max-width: 84ch; text-align: left; }
+.lead code, figcaption code { font-family: var(--font-mono); font-size: 0.92em; }
+.row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+figure { margin: 0; width: 560px; max-width: 100%; }
+figcaption { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 8px; text-align: left; }
+figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
+.frame .app-window { position: static; margin: 0; width: auto; max-width: none; transform: none; }
+
+/* Option B only: a registered pair wears a dotted underline and opens its
+   entry on click. Real text, not generated content, so a drag is unaffected. */
+.b .text-body .var {
+  text-decoration: underline dotted var(--text-tertiary);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+html.js .pv-fact[data-cast] { cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Variant forms in a Text snippet</h1>
+  <p class="lead">A registered variation sequence draws as the character it asks for: 葛 with
+  <code>U+E0100</code> or <code>U+E0101</code> picks one of two registered glyphs (Adobe-Japan1),
+  and ❤ with VS16 is the emoji. Both mockups keep the red marks for what is still hidden: the
+  zero-width space, and a VS16 after the letter <code>a</code>, which nothing registers. The
+  gray <b>Variant Forms</b> fact steps through entries naming each selector. Click the chips;
+  in B, click an underlined character too.</p>
+
+  <div class="row">
+    <figure class="a">
+      <figcaption><b>A · Quiet fact</b>No inline mark. The fact pill is the only way in.</figcaption>
+      <div class="frame" data-frame></div>
+    </figure>
+    <figure class="b">
+      <figcaption><b>B · Dotted underline</b>The same, plus a dotted underline under each registered pair.</figcaption>
+      <div class="frame" data-frame></div>
+    </figure>
+  </div>
+</div>
+
+<template id="card">
+  <main class="app-window"><div class="sheet-body centered">
+    <div class="pv-head">
+      <h1><span class="kicker">YuioLink <span class="kind kind-text">Text</span></span><span class="pv-name">civic</span></h1>
+      <span class="pv-hostline">yuiolink.test</span>
+    </div>
+    <div class="pv-facts">
+      <span class="pv-fact warn" data-cast="u200b ufe0f"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"></circle><path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path><circle cx="8" cy="11.2" r=".95" fill="currentColor"></circle></svg>Hidden Characters</span>
+      <span class="pv-fact" data-cast="v845b-e0100 v845b-e0101 v2764-fe0f">Variant Forms</span>
+    </div>
+    <div class="text-wrap"><pre class="text-body">let ward = "<span class="var" data-tell="v845b-e0100">&#x845B;&#xE0100;</span>飾区";
+let town = "<span class="var" data-tell="v845b-e0101">&#x845B;&#xE0101;</span>城市";
+let love = "<span class="var" data-tell="v2764-fe0f">&#x2764;&#xFE0F;</span> thanks";
+let pay  = "pay<span class="hid" data-esc="\u{200B}" data-tell="u200b">&#x200B;</span>pal";
+let odd  = "a<span class="hid" data-esc="\u{FE0F}" data-tell="ufe0f">&#xFE0F;</span>b";
+</pre></div>
+    <div class="pv-cast">
+      <div class="entry warn" data-name="u200b"><span class="tiles"><span class="tile sym">ZWSP</span><span class="tile raw">&#x200B;</span></span><span class="what"><b>zero-width space</b> <span class="cp">U+200B</span> — marked <code>\u{200B}</code>. It draws nothing, so two texts that look the same can differ. The empty box is the character.</span></div>
+      <div class="entry warn" data-name="ufe0f"><span class="tiles"><span class="tile sym">VS16</span><span class="tile raw">&#xFE0F;</span></span><span class="what"><b>variation selector-16</b> <span class="cp">U+FE0F</span> — marked <code>\u{FE0F}</code>. Nothing registers it after <code>a</code>, so it draws nothing, and a run of them can carry hidden data. The empty box is the character.</span></div>
+      <div class="entry" data-name="v845b-e0100"><span class="tiles"><span class="tile sym">VS17</span><span class="tile raw">&#x845B;&#xE0100;</span></span><span class="what"><b>variation selector-17</b> <span class="cp">U+E0100</span> — picks a registered glyph of 葛 <span class="cp">U+845B</span> (Adobe-Japan1). The box shows the form it picks.</span></div>
+      <div class="entry" data-name="v845b-e0101"><span class="tiles"><span class="tile sym">VS18</span><span class="tile raw">&#x845B;&#xE0101;</span></span><span class="what"><b>variation selector-18</b> <span class="cp">U+E0101</span> — picks a registered glyph of 葛 <span class="cp">U+845B</span> (Adobe-Japan1). The box shows the form it picks.</span></div>
+      <div class="entry" data-name="v2764-fe0f"><span class="tiles"><span class="tile sym">VS16</span><span class="tile raw">&#x2764;&#xFE0F;</span></span><span class="what"><b>variation selector-16</b> <span class="cp">U+FE0F</span> — picks the emoji style of ❤ <span class="cp">U+2764</span>. The box shows the form it picks.</span></div>
+    </div>
+    <button class="btn btn-block" type="button">Copy</button>
+  </div></main>
+</template>
+
+<script>
+(() => {
+  "use strict";
+  const tpl = document.getElementById("card");
+  for (const slot of document.querySelectorAll("[data-frame]")) {
+    slot.append(tpl.content.cloneNode(true));
+    const root = slot;
+    const pre = root.querySelector(".text-body");
+    const cast = root.querySelector(".pv-cast");
+    const entryFor = (name) => cast.querySelector(`.entry[data-name="${name}"]`);
+    const show = (entry) => {
+      cast.querySelectorAll(".entry.shown").forEach((e) => e.classList.remove("shown"));
+      if (!entry) return;
+      void entry.offsetWidth;
+      entry.classList.add("shown");
+    };
+    // Red marks: matched by position, as on the real page.
+    const marks = [...pre.querySelectorAll(".hid")];
+    const markAt = (x, y) => marks.find((m) => [...m.getClientRects()].some((r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom));
+    const inB = root.closest(".b") !== null;
+    pre.addEventListener("click", (event) => {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed) return;
+      const mark = markAt(event.clientX, event.clientY);
+      if (mark) return show(entryFor(mark.dataset.tell));
+      const pair = inB && event.target.closest(".var");
+      if (pair) show(entryFor(pair.dataset.tell));
+    });
+    pre.addEventListener("mousemove", (event) => pre.classList.toggle("over-mark", Boolean(markAt(event.clientX, event.clientY))));
+    for (const chip of root.querySelectorAll(".pv-fact[data-cast]")) {
+      const entries = chip.dataset.cast.split(" ").map(entryFor);
+      chip.addEventListener("click", () => {
+        const at = entries.findIndex((e) => e.classList.contains("shown"));
+        show(entries[at + 1]);
+      });
+    }
+  }
+})();
+</script>
+</body>
+</html>
