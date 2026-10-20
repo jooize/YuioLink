@@ -79,6 +79,9 @@
     // Forms) steps through its own entries (one past the last puts the deck
     // away). Without this script the stylesheet shows the whole list instead.
     //
+    // A registered variation sequence answers the same way: its pair is
+    // wrapped whole and opens the entry naming the form it picks.
+    //
     // A mark's label ignores the pointer, because in Safari a label that
     // takes it breaks a drag across the text. So a click is matched to a
     // mark by where it landed, and only a plain click counts: one that ends
@@ -106,7 +109,8 @@
         pre.addEventListener("click", (event) => {
             const sel = window.getSelection();
             if (sel && !sel.isCollapsed) return;
-            const mark = markAt(event.clientX, event.clientY);
+            // A registered pair is real text, so it takes the click itself.
+            const mark = markAt(event.clientX, event.clientY) || event.target.closest(".var");
             if (!mark) return;
             show(entryFor(mark.dataset.tell));
             settle();

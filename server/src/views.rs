@@ -1829,9 +1829,6 @@ fn cast_entries(uri: &UriView) -> Vec<CastEntry> {
                 }
             }
         }
-        // The character drawn just before each piece: the base a variant
-        // selector picks a form of.
-        let mut prev: Option<char> = None;
         for piece in &slice.display {
             match piece {
                 Piece::DecodedSpace => {
@@ -1870,13 +1867,20 @@ fn cast_entries(uri: &UriView) -> Vec<CastEntry> {
                     }
                 }
                 Piece::Variant(s) => {
-                    for c in s.chars() {
-                        note(c, prev, String::new(), CastKind::Variant, place.clone(), 1);
+                    let mut pair = s.chars();
+                    if let (Some(b), Some(c)) = (pair.next(), pair.next()) {
+                        note(
+                            c,
+                            Some(b),
+                            String::new(),
+                            CastKind::Variant,
+                            place.clone(),
+                            1,
+                        );
                     }
                 }
                 _ => {}
             }
-            prev = piece.text().chars().next_back().or(prev);
         }
     }
     out
@@ -2477,11 +2481,25 @@ enum PieceStyle {
     Slice,
 }
 
+/// A registered pair, drawn as the one character it is and wrapped so a click
+/// opens the cast entry naming its form.
+fn variant_span(pair: &str) -> Markup {
+    let mut it = pair.chars();
+    let (Some(base), Some(sel)) = (it.next(), it.next()) else {
+        return html! { (pair) };
+    };
+    let (_, name) = char_dress(sel);
+    html! {
+        span.var data-tell=(variant_id(base, sel)) title=(format!("{name} U+{:04X}", sel as u32)) { (pair) }
+    }
+}
+
 fn pieces(parts: &[Piece], style: PieceStyle) -> Markup {
     html! {
         @for p in parts {
             @match p {
-                Piece::Text(s) | Piece::Variant(s) => { (s) }
+                Piece::Text(s) => { (s) }
+                Piece::Variant(s) => { (variant_span(s)) }
                 // A space that was stored as %20 wears a dotted underline: a
                 // receipt saying "this space is an escape in the link".
                 //
@@ -3087,6 +3105,9 @@ fn text_mark(text: &str, i: usize, c: char, crlf: bool) -> Option<String> {
 /// character gets a mark — a `span.hid` whose escape (`data-esc`) app.css
 /// draws beside it as generated content, never selected or copied.
 ///
+/// A registered variation sequence is wrapped whole in a `span.var` with the
+/// `data-tell` of its cast entry: real text, so a drag or a copy is unchanged.
+///
 /// Two characters cannot travel raw through HTML. The parser turns a carriage
 /// return into a line feed, so it goes out as `&#13;`; it turns a NUL into
 /// U+FFFD even as a reference, so a NUL's mark is empty and carries the code
@@ -3095,7 +3116,20 @@ fn marked_text(text: &str, crlf: bool) -> Markup {
     let mut out = String::with_capacity(text.len());
     // Start of the run of characters that show as themselves.
     let mut start = 0;
+    let mut prev: Option<(usize, char)> = None;
     for (i, c) in text.char_indices() {
+        // A registered base is never marked, so it is still in the pending
+        // run; the check only keeps a slice from ever running backward.
+        let base = prev.filter(|&(at, b)| at >= start && variation::completes(Some(b), c));
+        prev = Some((i, c));
+        if let Some((at, _)) = base {
+            out.push_str(&html! { (&text[start..at]) }.into_string());
+            start = i + c.len_utf8();
+            out.push_str(&variant_span(&text[at..start]).into_string());
+            // The pair is drawn; nothing after it may pair with its selector.
+            prev = None;
+            continue;
+        }
         let mark = text_mark(text, i, c, crlf);
         if mark.is_none() && c != '\r' {
             continue;
@@ -4618,9 +4652,15 @@ mod tests {
     #[test]
     fn a_registered_variation_sequence_is_a_variant_form_not_a_mark() {
         let s = snippet("\u{845b}\u{e0100}\u{98fe} \u{2764}\u{fe0f} a\u{fe0f}");
-        // Drawn as the forms they pick: no mark on either registered selector.
+        // Drawn as the forms they pick: no mark on either registered selector,
+        // and each pair wrapped whole so a click opens its entry.
         assert!(
-            s.contains("\u{845b}\u{e0100}\u{98fe} \u{2764}\u{fe0f} a<span"),
+            s.contains(concat!(
+                r#"<span class="var" data-tell="v845b-e0100" title="variation selector-17 U+E0100">"#,
+                "\u{845b}\u{e0100}</span>\u{98fe} ",
+                r#"<span class="var" data-tell="v2764-fe0f" title="variation selector-16 U+FE0F">"#,
+                "\u{2764}\u{fe0f}</span> a<span class=\"hid\"",
+            )),
             "{s}"
         );
         assert!(
@@ -4639,6 +4679,13 @@ mod tests {
     fn a_url_with_a_registered_sequence_lists_it_as_a_variant_form() {
         let c = card("https://example.com/%E2%9D%A4%EF%B8%8F");
         assert!(c.contains("Variant Forms"), "{c}");
+        assert!(
+            c.contains(
+                r#"<span class="var" data-tell="v2764-fe0f" title="variation selector-16 U+FE0F">"#
+            ),
+            "{c}"
+        );
+        assert!(c.contains(r#"data-name="v2764-fe0f""#), "{c}");
         assert!(!c.contains("Hidden Characters"), "{c}");
         assert!(c.contains("picks the emoji style of"), "{c}");
     }

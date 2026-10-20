@@ -173,10 +173,10 @@ pub enum Piece {
     /// The local part of an address. Full colour, regular weight — bold is the
     /// domain's mark site-wide.
     Local(String),
-    /// A variation selector that completes a registered sequence with the
-    /// character before it (❤ + VS16, a kanji + an IVD selector). Decoded and
-    /// drawn as part of that character, never marked; the card lists it as a
-    /// Variant Forms fact.
+    /// A registered variation sequence: a base character and the selector
+    /// that picks its form (❤ + VS16, a kanji + an IVD selector), decoded and
+    /// drawn together. The selector is never marked; the pair answers with
+    /// its cast entry, and the card lists it as a Variant Forms fact.
     Variant(String),
 }
 
@@ -1098,7 +1098,9 @@ pub fn decode_for_reading(value: &str) -> Vec<Piece> {
             // UTF-8 (or really was U+FFFD in storage — same dress either way):
             // nothing honest to show decoded, so the escape stays on screen.
             Some(raw) if *c == char::REPLACEMENT_CHARACTER => Piece::Escape(raw.clone()),
-            _ if completes_at(&chars, idx) => Piece::Variant(c.to_string()),
+            _ if completes_at(&chars, idx) && take_base(&mut out, chars[idx - 1].0) => {
+                Piece::Variant(format!("{}{c}", chars[idx - 1].0))
+            }
             Some(raw) if is_invisible(*c) => Piece::BadEscape(raw.clone()),
             _ if is_invisible(*c) && *c != ' ' => Piece::BadEscape(escaped(*c)),
             _ if padded[idx] => Piece::Padding(c.to_string()),
@@ -1115,6 +1117,24 @@ pub fn decode_for_reading(value: &str) -> Vec<Piece> {
 fn completes_at(chars: &[(char, Option<String>)], idx: usize) -> bool {
     let prev = idx.checked_sub(1).map(|i| chars[i].0);
     variation::completes(prev, chars[idx].0)
+}
+
+/// Take the base of a registered sequence back off the reading, so the pair
+/// becomes one [`Piece::Variant`]. Only a base drawn as plain text qualifies:
+/// one drawn any other way (kept escaped, or a delimiter) is not the character
+/// the selector visibly lands on, so the selector stays hidden instead.
+fn take_base(out: &mut Vec<Piece>, base: char) -> bool {
+    let Some(Piece::Text(s)) = out.last_mut() else {
+        return false;
+    };
+    if !s.ends_with(base) {
+        return false;
+    }
+    s.pop();
+    if s.is_empty() {
+        out.pop();
+    }
+    true
 }
 
 /// Merge a piece into the list where merging keeps the meaning.
@@ -1159,7 +1179,9 @@ fn web_reading(value: &str, in_path: bool) -> Vec<Piece> {
     for (idx, (c, escape)) in chars.iter().enumerate() {
         let piece = match escape {
             Some(raw) if *c == char::REPLACEMENT_CHARACTER => Piece::Escape(raw.clone()),
-            _ if completes_at(&chars, idx) => Piece::Variant(c.to_string()),
+            _ if completes_at(&chars, idx) && take_base(&mut out, chars[idx - 1].0) => {
+                Piece::Variant(format!("{}{c}", chars[idx - 1].0))
+            }
             Some(raw) if is_invisible(*c) => Piece::BadEscape(raw.clone()),
             // A stored `%` that must stay closed shows the encoding of the
             // character; the raw storage may even have been a literal `%`
@@ -1945,17 +1967,30 @@ mod tests {
 
     #[test]
     fn a_registered_variation_sequence_reads_as_its_character() {
-        let heart = || Piece::Text("\u{2764}".to_string());
-        let vs16 = || Piece::Variant("\u{fe0f}".to_string());
+        let heart = || Piece::Variant("\u{2764}\u{fe0f}".to_string());
         assert_eq!(
-            decode_for_reading("%E2%9D%A4%EF%B8%8F"),
-            vec![heart(), vs16()]
+            decode_for_reading("a%E2%9D%A4%EF%B8%8Fb"),
+            vec![
+                Piece::Text("a".to_string()),
+                heart(),
+                Piece::Text("b".to_string()),
+            ]
         );
         // Only the first selector completes the sequence; a second is hidden.
         assert_eq!(
             decode_for_reading("%E2%9D%A4%EF%B8%8F%EF%B8%8F"),
-            vec![heart(), vs16(), Piece::BadEscape("%EF%B8%8F".to_string())]
+            vec![heart(), Piece::BadEscape("%EF%B8%8F".to_string())]
         );
+        // A base that is not drawn as itself leaves its selector hidden: the
+        // classic register keeps `#` escaped, so VS16 would land on the `3`.
+        assert_eq!(
+            decode_for_reading("%23%EF%B8%8F"),
+            vec![
+                Piece::Escape("%23".to_string()),
+                Piece::BadEscape("%EF%B8%8F".to_string()),
+            ]
+        );
+        assert!(parse_uri("https://example.com/?q=%23%EF%B8%8F").has(Hazard::HiddenCharacters));
         assert!(!parse_uri("https://example.com/%E2%9D%A4%EF%B8%8F").has(Hazard::HiddenCharacters));
         // A key never decodes, and a registered pair's selector is not hidden.
         assert_eq!(

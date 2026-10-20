@@ -121,8 +121,13 @@ means listed in Unicode's StandardizedVariants.txt, emoji-variation-sequences.tx
 or the Ideographic Variation Database, all embedded and pinned
 (`server/src/variation.rs`). Clicking the fact steps through cast entries naming
 each selector and the form it picks, so a selector stays discoverable even
-where the font cannot draw its form. Only the first selector after a character
-can complete a sequence; any further one is a hidden character.
+where the font cannot draw its form. The pair itself answers too: clicking it
+opens its entry. In a Text snippet it wears a dotted underline; on a URL card
+it takes the same hover wash as every other character that answers, since a
+dotted underline there already means a space stored as `%20`. Only the first
+selector after a character can complete a sequence, and only when that
+character is drawn as itself (not kept as an escape, not a delimiter); any
+other selector is a hidden character.
 
 **There is no green.** Encryption is the norm; its absence is the signal. A
 padlock on a phishing site is still a padlock, so "Encrypted" would be a verdict

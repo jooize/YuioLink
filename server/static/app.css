@@ -1482,6 +1482,17 @@ html.js .custom-field:not(.open) {
     cursor: pointer;
 }
 
+/* A registered variation sequence in a snippet: the base and its selector,
+   drawn as the one form they pick. A dotted underline says there is more to
+   know; a click opens the entry naming the form. Real text, not generated
+   content, so a drag across it is unaffected. */
+.text-body .var {
+    text-decoration: underline dotted var(--text-tertiary);
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 4px;
+    cursor: pointer;
+}
+
 /* The last rows of a collapsed box fade into the card, so the cut never looks
    like the end of the text. Sits inside the border (0.5px inset all round). */
 .text-wrap.capped::after {
