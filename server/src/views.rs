@@ -10,6 +10,7 @@ use maud::{DOCTYPE, Markup, PreEscaped, html};
 
 use crate::phone;
 use crate::urlview::{self, Hazard, IdnWarning, Piece, Role, Tier, UriView};
+use crate::variation;
 
 /// The crate version, shown in the footer and linked to its release tag.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -1645,6 +1646,10 @@ enum CastKind {
     /// A hidden character in a Text snippet: kept in the text, marked by its
     /// escape, and explained by what it does.
     Snippet,
+    /// A variation selector completing a registered sequence with the
+    /// character before it: drawn as part of that character, never marked,
+    /// listed under the Variant Forms fact.
+    Variant,
 }
 
 /// Where an entry's character sits, for the "in the path" clause.
@@ -1664,6 +1669,8 @@ enum CastPlace {
 struct CastEntry {
     id: String,
     ch: char,
+    /// The character a [`CastKind::Variant`] selector picks a form of.
+    base: Option<char>,
     stored: String,
     kind: CastKind,
     count: usize,
@@ -1723,17 +1730,16 @@ fn char_dress(c: char) -> (String, String) {
         '=' => ("=", "equals sign"),
         '#' => ("#", "number sign"),
         '%' => ("%", "percent sign"),
-        '\u{fe00}'..='\u{fe0f}' => {
-            return (
-                format!("VS{}", c as u32 - 0xfdff),
-                "variation selector".to_string(),
-            );
-        }
-        '\u{e0100}'..='\u{e01ef}' => {
-            return (
-                format!("VS{}", c as u32 - 0xe0100 + 17),
-                "variation selector".to_string(),
-            );
+        '\u{180b}' => ("FVS1", "Mongolian free variation selector one"),
+        '\u{180c}' => ("FVS2", "Mongolian free variation selector two"),
+        '\u{180d}' => ("FVS3", "Mongolian free variation selector three"),
+        '\u{180f}' => ("FVS4", "Mongolian free variation selector four"),
+        '\u{fe00}'..='\u{fe0f}' | '\u{e0100}'..='\u{e01ef}' => {
+            let n = match c as u32 {
+                v @ 0xfe00..=0xfe0f => v - 0xfe00 + 1,
+                v => v - 0xe0100 + 17,
+            };
+            return (format!("VS{n}"), format!("variation selector-{n}"));
         }
         _ => return (format!("{:04X}", c as u32), "hidden character".to_string()),
     };
@@ -1777,11 +1783,16 @@ fn place_of(slice: &urlview::Slice) -> CastPlace {
 /// has the IDN machinery instead), so they contribute nothing.
 fn cast_entries(uri: &UriView) -> Vec<CastEntry> {
     let mut out: Vec<CastEntry> = Vec::new();
-    let mut note = |ch: char, stored: String, kind: CastKind, place: CastPlace, n: usize| {
-        let id = if kind == CastKind::Padding {
-            "pad".to_string()
-        } else {
-            format!("u{:04x}", ch as u32)
+    let mut note = |ch: char,
+                    base: Option<char>,
+                    stored: String,
+                    kind: CastKind,
+                    place: CastPlace,
+                    n: usize| {
+        let id = match (kind, base) {
+            (CastKind::Padding, _) => "pad".to_string(),
+            (CastKind::Variant, Some(b)) => variant_id(b, ch),
+            _ => mark_id(ch),
         };
         match out.iter_mut().find(|e| e.id == id) {
             Some(e) => {
@@ -1793,6 +1804,7 @@ fn cast_entries(uri: &UriView) -> Vec<CastEntry> {
             None => out.push(CastEntry {
                 id,
                 ch,
+                base,
                 stored,
                 kind,
                 count: n,
@@ -1812,19 +1824,30 @@ fn cast_entries(uri: &UriView) -> Vec<CastEntry> {
             for piece in urlview::key_reading(k) {
                 if let Piece::BadEscape(s) = piece {
                     for (c, raw) in urlview::escape_run_pairs(&s) {
-                        note(c, raw, CastKind::Hidden, place.clone(), 1);
+                        note(c, None, raw, CastKind::Hidden, place.clone(), 1);
                     }
                 }
             }
         }
+        // The character drawn just before each piece: the base a variant
+        // selector picks a form of.
+        let mut prev: Option<char> = None;
         for piece in &slice.display {
             match piece {
                 Piece::DecodedSpace => {
-                    note(' ', "%20".to_string(), CastKind::Space, place.clone(), 1);
+                    note(
+                        ' ',
+                        None,
+                        "%20".to_string(),
+                        CastKind::Space,
+                        place.clone(),
+                        1,
+                    );
                 }
                 Piece::Padding(s) => {
                     note(
                         ' ',
+                        None,
                         s.clone(),
                         CastKind::Padding,
                         place.clone(),
@@ -1838,16 +1861,22 @@ fn cast_entries(uri: &UriView) -> Vec<CastEntry> {
                         } else {
                             CastKind::Kept
                         };
-                        note(c, raw, kind, place.clone(), 1);
+                        note(c, None, raw, kind, place.clone(), 1);
                     }
                 }
                 Piece::BadEscape(s) => {
                     for (c, raw) in urlview::escape_run_pairs(s) {
-                        note(c, raw, CastKind::Hidden, place.clone(), 1);
+                        note(c, None, raw, CastKind::Hidden, place.clone(), 1);
+                    }
+                }
+                Piece::Variant(s) => {
+                    for c in s.chars() {
+                        note(c, prev, String::new(), CastKind::Variant, place.clone(), 1);
                     }
                 }
                 _ => {}
             }
+            prev = piece.text().chars().next_back().or(prev);
         }
     }
     out
@@ -1939,6 +1968,10 @@ fn cast_entry(e: &CastEntry, solo: bool) -> Markup {
                     // mark here would claim one does. The dotted square asks
                     // the question instead.
                     span.tile.sym { "?" }
+                } @else if let (CastKind::Variant, Some(base)) = (e.kind, e.base) {
+                    // The pair together: the box shows the form it picks.
+                    span.tile.sym { (sym) }
+                    span.tile.raw { (base) (e.ch) }
                 } @else {
                     span.tile.sym { (sym) }
                     // HTML cannot carry a NUL (the parser makes it U+FFFD),
@@ -1956,6 +1989,7 @@ fn cast_entry(e: &CastEntry, solo: bool) -> Markup {
                 @if matches!(e.kind, CastKind::Hidden | CastKind::Snippet) {
                     ". The empty box is the character."
                 }
+                @if e.kind == CastKind::Variant { ". The box shows the form it picks." }
             }
         }
     }
@@ -1968,6 +2002,7 @@ fn cast_prose(e: &CastEntry) -> Markup {
             CastKind::Padding => { "literal, used as padding" }
             CastKind::Hidden => { "stored as " code { (e.stored) } }
             CastKind::Snippet => { "marked " code { (e.stored) } }
+            CastKind::Variant => { (variant_phrase(e.base, e.ch)) }
             CastKind::Kept => {
                 "kept escaped as " code { (e.stored) }
                 " so it cannot read as " (structure_reason(e.ch))
@@ -2066,12 +2101,32 @@ fn structure_reason(c: char) -> &'static str {
 fn chip_row(uri: &UriView, numbers: &[phone::Number]) -> Markup {
     let pooled = numbers.len() == 1;
     let entries = cast_entries(uri);
+    let variants = variant_ids(&entries);
     let chips = html! {
         @for hazard in &uri.hazards { (warn_chip(*hazard, &entries)) }
+        @if let Some(ids) = &variants { (variant_fact(ids)) }
         @if pooled { (number_chips(&numbers[0])) }
     };
-    let empty = uri.hazards.is_empty() && !pooled;
+    let empty = uri.hazards.is_empty() && variants.is_none() && !pooled;
     html! { @if !empty { div.pv-facts { (chips) } } }
+}
+
+/// The ids of every registered-sequence entry, for the Variant Forms fact to
+/// step through; `None` when there are none.
+fn variant_ids(entries: &[CastEntry]) -> Option<String> {
+    let ids: Vec<&str> = entries
+        .iter()
+        .filter(|e| e.kind == CastKind::Variant)
+        .map(|e| e.id.as_str())
+        .collect();
+    (!ids.is_empty()).then(|| ids.join(" "))
+}
+
+/// A fact, not a warning: the text holds registered variation sequences,
+/// drawn as the forms they pick. Clicking steps through their entries, so a
+/// selector stays discoverable even where the font cannot draw its form.
+fn variant_fact(ids: &str) -> Markup {
+    html! { span.pv-fact data-cast=(ids) { "Variant Forms" } }
 }
 
 /// A number's own chips: where it is, and what kind of line it is. Premium Rate
@@ -2426,7 +2481,7 @@ fn pieces(parts: &[Piece], style: PieceStyle) -> Markup {
     html! {
         @for p in parts {
             @match p {
-                Piece::Text(s) => { (s) }
+                Piece::Text(s) | Piece::Variant(s) => { (s) }
                 // A space that was stored as %20 wears a dotted underline: a
                 // receipt saying "this space is an escape in the link".
                 //
@@ -2894,17 +2949,20 @@ pub fn text_view_page(base_host: &str, name: &str, text: &str) -> Markup {
 fn text_body(text: &str) -> Markup {
     let crlf = uniform_crlf(text);
     let entries = text_cast(text, crlf);
-    let ids = entries
+    let hidden = entries
         .iter()
+        .filter(|e| e.kind == CastKind::Snippet)
         .map(|e| e.id.as_str())
         .collect::<Vec<_>>()
         .join(" ");
+    let variants = variant_ids(&entries);
     html! {
         @if crlf || !entries.is_empty() {
             div.pv-facts {
-                @if !entries.is_empty() {
-                    span.pv-fact.warn data-cast=(ids) { (alert_icon()) "Hidden Characters" }
+                @if !hidden.is_empty() {
+                    span.pv-fact.warn data-cast=(hidden) { (alert_icon()) "Hidden Characters" }
                 }
+                @if let Some(ids) = &variants { (variant_fact(ids)) }
                 @if crlf { span.pv-fact { "CRLF Line Endings" } }
             }
         }
@@ -2913,7 +2971,7 @@ fn text_body(text: &str) -> Markup {
         }
         // Below the box, so the first answer grows the page under the text
         // rather than pushing the text down under the pointer. Quiet until a
-        // mark or the chip asks (text.js); without the script, the full list.
+        // mark or a chip asks (text.js); without the script, the full list.
         @if !entries.is_empty() {
             div.pv-cast {
                 @for e in &entries { (cast_entry(e, false)) }
@@ -2923,21 +2981,32 @@ fn text_body(text: &str) -> Markup {
     }
 }
 
-/// One cast entry per distinct marked character, in order of first
-/// appearance, each counting how often the snippet holds it.
+/// One cast entry per distinct marked character, and one per distinct
+/// registered variation sequence, in order of first appearance, each counting
+/// how often the snippet holds it.
 fn text_cast(text: &str, crlf: bool) -> Vec<CastEntry> {
     let mut out: Vec<CastEntry> = Vec::new();
+    let mut prev: Option<char> = None;
     for (i, c) in text.char_indices() {
-        let Some(esc) = text_mark(text, i, c, crlf) else {
+        let entry = match text_mark(text, i, c, crlf) {
+            Some(esc) => Some((mark_id(c), None, esc, CastKind::Snippet)),
+            None if variation::completes(prev, c) => {
+                prev.map(|b| (variant_id(b, c), Some(b), String::new(), CastKind::Variant))
+            }
+            None => None,
+        };
+        prev = Some(c);
+        let Some((id, base, stored, kind)) = entry else {
             continue;
         };
-        match out.iter_mut().find(|e| e.ch == c) {
+        match out.iter_mut().find(|e| e.id == id) {
             Some(e) => e.count += 1,
             None => out.push(CastEntry {
-                id: mark_id(c),
+                id,
                 ch: c,
-                stored: esc,
-                kind: CastKind::Snippet,
+                base,
+                stored,
+                kind,
                 count: 1,
                 places: Vec::new(),
             }),
@@ -2950,6 +3019,40 @@ fn text_cast(text: &str, crlf: bool) -> Vec<CastEntry> {
 /// their character.
 fn mark_id(c: char) -> String {
     format!("u{:04x}", c as u32)
+}
+
+/// The cast id of a registered sequence: base and selector together, since
+/// the same selector picks different forms of different characters.
+fn variant_id(base: char, selector: char) -> String {
+    format!("v{:04x}-{:04x}", base as u32, selector as u32)
+}
+
+/// What a registered selector does to the character before it, in the words
+/// of the list that registers the pair.
+fn variant_phrase(base: Option<char>, selector: char) -> Markup {
+    let Some((base, v)) = base.and_then(|b| variation::registered(b, selector).map(|v| (b, v)))
+    else {
+        return html! { "picks a form of the character before it" };
+    };
+    let cp = html! { span.cp { "U+" (format!("{:04X}", base as u32)) } };
+    html! {
+        @match v.registry {
+            variation::Registry::Emoji => {
+                "picks the " (v.description) " of " (base) " " (cp)
+            }
+            variation::Registry::Ideographic => {
+                "picks a registered glyph of " (base) " " (cp) " (" (v.description) ")"
+            }
+            variation::Registry::Standardized => {
+                @if let Some(compat) = v.description.strip_prefix("CJK COMPATIBILITY IDEOGRAPH-") {
+                    "picks the form of " (base) " " (cp) " also encoded as "
+                    span.cp { "U+" (compat) }
+                } @else {
+                    "picks a registered form of " (base) " " (cp) " (" (v.description) ")"
+                }
+            }
+        }
+    }
 }
 
 /// True when every line feed has a carriage return directly before it: the
@@ -2971,6 +3074,9 @@ fn text_mark(text: &str, i: usize, c: char, crlf: bool) -> Option<String> {
     match c {
         '\n' | '\t' => None,
         '\r' if crlf && text.as_bytes().get(i + 1) == Some(&b'\n') => None,
+        // A selector completing a registered sequence draws as part of the
+        // character before it: listed as a variant form, never marked.
+        c if variation::completes(text[..i].chars().next_back(), c) => None,
         c if urlview::is_invisible(c) => Some(format!("\\u{{{:X}}}", c as u32)),
         _ => None,
     }
@@ -4507,6 +4613,34 @@ mod tests {
         );
         // No marks, no cast.
         assert!(!snippet("plain\ttext\n").contains("pv-cast"));
+    }
+
+    #[test]
+    fn a_registered_variation_sequence_is_a_variant_form_not_a_mark() {
+        let s = snippet("\u{845b}\u{e0100}\u{98fe} \u{2764}\u{fe0f} a\u{fe0f}");
+        // Drawn as the forms they pick: no mark on either registered selector.
+        assert!(
+            s.contains("\u{845b}\u{e0100}\u{98fe} \u{2764}\u{fe0f} a<span"),
+            "{s}"
+        );
+        assert!(
+            s.contains(r#"data-cast="v845b-e0100 v2764-fe0f">Variant Forms"#),
+            "{s}"
+        );
+        // The selector after a letter is registered for nothing: still hidden.
+        assert!(s.contains(r#"data-cast="ufe0f""#), "{s}");
+        assert!(s.contains("variation selector-17"), "{s}");
+        assert!(s.contains("picks a registered glyph of"), "{s}");
+        assert!(s.contains("Adobe-Japan1"), "{s}");
+        assert!(s.contains("picks the emoji style of"), "{s}");
+    }
+
+    #[test]
+    fn a_url_with_a_registered_sequence_lists_it_as_a_variant_form() {
+        let c = card("https://example.com/%E2%9D%A4%EF%B8%8F");
+        assert!(c.contains("Variant Forms"), "{c}");
+        assert!(!c.contains("Hidden Characters"), "{c}");
+        assert!(c.contains("picks the emoji style of"), "{c}");
     }
 
     #[test]

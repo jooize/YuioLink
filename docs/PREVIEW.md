@@ -104,7 +104,7 @@ Warnings, all provable from the string or a published table:
 |------|----------|
 | Not Encrypted | plain `http`. Not "Not Secure" — this is the transport, not a verdict on the site. |
 | Username in the Address | `alice@` before the host. |
-| Hidden Characters | an escape decoding to something invisible or direction-changing. |
+| Hidden Characters | an escape decoding to something invisible or direction-changing. A variation selector counts unless it completes a registered sequence with the character before it. |
 | Padded With Spaces | a run of two or more spaces, or one at either edge. A single interior space is ordinary English and stays silent. |
 | Carries Another Address | a query value that is itself a complete web address. |
 | Premium Rate | libphonenumber says the number bills at a raised rate. Fires for `sms:` as well as `tel:` — reverse-billed messaging is a real subscription trap. |
@@ -113,6 +113,16 @@ Facts: the region (flag + English name) and the line type (Mobile, Toll Free,
 Fixed Line), both from libphonenumber's tables. On a card with several numbers
 the facts move **beside their own number**, because a pooled row cannot say
 which number a Premium Rate warning is about.
+
+Variant Forms is a fact too: the value holds a registered variation sequence
+(❤ with VS16 for the emoji style, a kanji with an IVD selector for one
+registered glyph), drawn as the form it picks rather than marked. Registered
+means listed in Unicode's StandardizedVariants.txt, emoji-variation-sequences.txt
+or the Ideographic Variation Database, all embedded and pinned
+(`server/src/variation.rs`). Clicking the fact steps through cast entries naming
+each selector and the form it picks, so a selector stays discoverable even
+where the font cannot draw its form. Only the first selector after a character
+can complete a sequence; any further one is a hidden character.
 
 **There is no green.** Encryption is the norm; its absence is the signal. A
 padlock on a phishing site is still a padlock, so "Encrypted" would be a verdict

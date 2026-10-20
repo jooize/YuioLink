@@ -61,3 +61,21 @@ server binary so share-card images render with no system fonts installed.
 
   Full terms: server/assets/fonts/LICENSE.txt
   Source:     https://dejavu-fonts.github.io/
+
+
+Unicode variation sequence data
+-------------------------------
+
+server/assets/unicode/ holds three Unicode data files, embedded verbatim in
+the server binary so a registered variation sequence (an emoji style, a
+registered kanji glyph) is not mistaken for a hidden character. Each is pinned
+by SHA-256 in server/src/variation.rs.
+
+  StandardizedVariants.txt       Unicode 18.0.0 Character Database
+  emoji-variation-sequences.txt  Unicode 18.0.0 Character Database
+  IVD_Sequences.txt              Ideographic Variation Database, 2026-08-03
+
+  Copyright (c) 1991-2026 Unicode, Inc.
+  License:    Unicode License v3, server/assets/unicode/LICENSE.txt
+  Source:     https://www.unicode.org/Public/18.0.0/ucd/
+              https://www.unicode.org/ivd/data/2026-08-03/

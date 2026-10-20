@@ -75,9 +75,9 @@
 
     // The cast answers when asked, the same deck the preview card uses: one
     // entry shown at a time, a click on a mark shows the entry naming its
-    // character, and the Hidden Characters chip steps through them all (one
-    // past the last puts the deck away). Without this script the stylesheet
-    // shows the whole list instead.
+    // character, and each chip with a data-cast (Hidden Characters, Variant
+    // Forms) steps through its own entries (one past the last puts the deck
+    // away). Without this script the stylesheet shows the whole list instead.
     //
     // A mark's label ignores the pointer, because in Safari a label that
     // takes it breaks a drag across the text. So a click is matched to a
@@ -85,9 +85,10 @@
     // a drag-selection leaves the deck alone.
     const wireCast = (pre) => {
         const cast = document.querySelector(".pv-cast");
+        if (!cast) return;
         const marks = [...pre.querySelectorAll(".hid[data-tell]")];
-        if (!cast || !marks.length) return;
-        const chip = document.querySelector(".pv-fact[data-cast]");
+        const chips = [...document.querySelectorAll(".pv-fact[data-cast]")];
+        const settle = () => chips.forEach((c) => c.setAttribute("aria-expanded", "false"));
         const entryFor = (name) => cast.querySelector(`.entry[data-name="${name}"]`);
         const show = (entry) => {
             cast.querySelectorAll(".entry.shown").forEach((e) => e.classList.remove("shown"));
@@ -108,30 +109,33 @@
             const mark = markAt(event.clientX, event.clientY);
             if (!mark) return;
             show(entryFor(mark.dataset.tell));
-            if (chip) chip.setAttribute("aria-expanded", "false");
+            settle();
         });
         pre.addEventListener("mousemove", (event) => {
             pre.classList.toggle("over-mark", Boolean(markAt(event.clientX, event.clientY)));
         });
         pre.addEventListener("mouseleave", () => pre.classList.remove("over-mark"));
 
-        if (!chip) return;
-        const entries = chip.dataset.cast.split(" ").map(entryFor).filter(Boolean);
-        chip.setAttribute("role", "button");
-        chip.setAttribute("tabindex", "0");
-        chip.setAttribute("aria-expanded", "false");
-        const step = () => {
-            const at = entries.findIndex((e) => e.classList.contains("shown"));
-            const next = at + 1;
-            show(entries[next]);
-            chip.setAttribute("aria-expanded", String(next < entries.length));
-        };
-        chip.addEventListener("click", step);
-        chip.addEventListener("keydown", (event) => {
-            if (event.key !== "Enter" && event.key !== " ") return;
-            event.preventDefault();
-            step();
-        });
+        for (const chip of chips) {
+            const entries = chip.dataset.cast.split(" ").map(entryFor).filter(Boolean);
+            chip.setAttribute("role", "button");
+            chip.setAttribute("tabindex", "0");
+            chip.setAttribute("aria-expanded", "false");
+            const step = () => {
+                // An entry another chip or a mark showed restarts this deck.
+                const at = entries.findIndex((e) => e.classList.contains("shown"));
+                const next = at + 1;
+                show(entries[next]);
+                settle();
+                chip.setAttribute("aria-expanded", String(next < entries.length));
+            };
+            chip.addEventListener("click", step);
+            chip.addEventListener("keydown", (event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                step();
+            });
+        }
     };
 
     document.addEventListener("DOMContentLoaded", () => {

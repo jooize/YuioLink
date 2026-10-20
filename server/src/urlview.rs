@@ -23,6 +23,7 @@
 //! catches mixed-script labels, not whole-script confusables (e.g. an all-Cyrillic
 //! string shaped like Latin); those pass, consistent with "all-Cyrillic = legit".
 
+use crate::variation;
 use idna::domain_to_unicode;
 use unicode_security::MixedScript;
 
@@ -172,6 +173,11 @@ pub enum Piece {
     /// The local part of an address. Full colour, regular weight — bold is the
     /// domain's mark site-wide.
     Local(String),
+    /// A variation selector that completes a registered sequence with the
+    /// character before it (❤ + VS16, a kanji + an IVD selector). Decoded and
+    /// drawn as part of that character, never marked; the card lists it as a
+    /// Variant Forms fact.
+    Variant(String),
 }
 
 impl Piece {
@@ -185,7 +191,8 @@ impl Piece {
             | Piece::BadEscape(s)
             | Piece::Delim(s)
             | Piece::Domain(s)
-            | Piece::Local(s) => s,
+            | Piece::Local(s)
+            | Piece::Variant(s) => s,
             Piece::DecodedSpace => " ",
         }
     }
@@ -1091,6 +1098,7 @@ pub fn decode_for_reading(value: &str) -> Vec<Piece> {
             // UTF-8 (or really was U+FFFD in storage — same dress either way):
             // nothing honest to show decoded, so the escape stays on screen.
             Some(raw) if *c == char::REPLACEMENT_CHARACTER => Piece::Escape(raw.clone()),
+            _ if completes_at(&chars, idx) => Piece::Variant(c.to_string()),
             Some(raw) if is_invisible(*c) => Piece::BadEscape(raw.clone()),
             _ if is_invisible(*c) && *c != ' ' => Piece::BadEscape(escaped(*c)),
             _ if padded[idx] => Piece::Padding(c.to_string()),
@@ -1100,6 +1108,13 @@ pub fn decode_for_reading(value: &str) -> Vec<Piece> {
         push_merged(&mut out, piece);
     }
     out
+}
+
+/// True when the character at `idx` is a variation selector completing a
+/// registered sequence with the character decoded just before it.
+fn completes_at(chars: &[(char, Option<String>)], idx: usize) -> bool {
+    let prev = idx.checked_sub(1).map(|i| chars[i].0);
+    variation::completes(prev, chars[idx].0)
 }
 
 /// Merge a piece into the list where merging keeps the meaning.
@@ -1144,6 +1159,7 @@ fn web_reading(value: &str, in_path: bool) -> Vec<Piece> {
     for (idx, (c, escape)) in chars.iter().enumerate() {
         let piece = match escape {
             Some(raw) if *c == char::REPLACEMENT_CHARACTER => Piece::Escape(raw.clone()),
+            _ if completes_at(&chars, idx) => Piece::Variant(c.to_string()),
             Some(raw) if is_invisible(*c) => Piece::BadEscape(raw.clone()),
             // A stored `%` that must stay closed shows the encoding of the
             // character; the raw storage may even have been a literal `%`
@@ -1293,6 +1309,11 @@ pub(crate) fn key_reading(key: &str) -> Vec<Piece> {
     let bytes = key.as_bytes();
     let mut out: Vec<Piece> = Vec::new();
     let mut i = 0;
+    // The character the key spells just before this one, escaped or not: a
+    // selector completing a registered sequence with it is not hidden.
+    let mut prev: Option<char> = None;
+    let hidden_in_key =
+        |prev: Option<char>, c: char| is_invisible(c) && c != ' ' && !variation::completes(prev, c);
     while i < key.len() {
         let escape_at = |j: usize| {
             bytes.get(j) == Some(&b'%')
@@ -1308,21 +1329,23 @@ pub(crate) fn key_reading(key: &str) -> Vec<Piece> {
             // holding the whole run; the replacement character is not
             // invisible, so the run stays verbatim text.
             for (c, raw) in escape_run_pairs(&key[start..i]) {
-                let piece = if is_invisible(c) && c != ' ' {
+                let piece = if hidden_in_key(prev, c) {
                     Piece::BadEscape(raw)
                 } else {
                     Piece::Text(raw)
                 };
+                prev = Some(c);
                 push_merged(&mut out, piece);
             }
         } else {
             let c = key[i..].chars().next().expect("in-bounds index");
             i += c.len_utf8();
-            let piece = if is_invisible(c) && c != ' ' {
+            let piece = if hidden_in_key(prev, c) {
                 Piece::BadEscape(escaped(c))
             } else {
                 Piece::Text(c.to_string())
             };
+            prev = Some(c);
             push_merged(&mut out, piece);
         }
     }
@@ -1342,7 +1365,7 @@ pub(crate) fn is_invisible(c: char) -> bool {
             | '\u{061c}'
             | '\u{115f}'..='\u{1160}'
             | '\u{17b4}'..='\u{17b5}'
-            | '\u{180b}'..='\u{180e}'
+            | '\u{180b}'..='\u{180f}'
             | '\u{2000}'..='\u{200f}'
             | '\u{2028}'..='\u{202f}'
             | '\u{205f}'..='\u{206f}'
@@ -1918,6 +1941,32 @@ mod tests {
             vec![Piece::BadEscape("%F3%A0%84%80".to_string())]
         );
         assert!(parse_uri("https://example.com/?q=x%EF%B8%8E").has(Hazard::HiddenCharacters));
+    }
+
+    #[test]
+    fn a_registered_variation_sequence_reads_as_its_character() {
+        let heart = || Piece::Text("\u{2764}".to_string());
+        let vs16 = || Piece::Variant("\u{fe0f}".to_string());
+        assert_eq!(
+            decode_for_reading("%E2%9D%A4%EF%B8%8F"),
+            vec![heart(), vs16()]
+        );
+        // Only the first selector completes the sequence; a second is hidden.
+        assert_eq!(
+            decode_for_reading("%E2%9D%A4%EF%B8%8F%EF%B8%8F"),
+            vec![heart(), vs16(), Piece::BadEscape("%EF%B8%8F".to_string())]
+        );
+        assert!(!parse_uri("https://example.com/%E2%9D%A4%EF%B8%8F").has(Hazard::HiddenCharacters));
+        // A key never decodes, and a registered pair's selector is not hidden.
+        assert_eq!(
+            key_reading("%E2%9D%A4%EF%B8%8F"),
+            vec![Piece::Text("%E2%9D%A4%EF%B8%8F".to_string())]
+        );
+        // Mongolian FVS4 is a selector too: with nothing before it, hidden.
+        assert_eq!(
+            decode_for_reading("%E1%A0%8F"),
+            vec![Piece::BadEscape("%E1%A0%8F".to_string())]
+        );
     }
 
     #[test]
