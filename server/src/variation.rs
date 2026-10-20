@@ -11,6 +11,7 @@
 //! IVD_Sequences.txt from the Ideographic Variation Database. Licensed under
 //! Unicode License v3, server/assets/unicode/LICENSE.txt.
 
+use std::borrow::Cow;
 use std::sync::OnceLock;
 
 const STANDARDIZED: &str = include_str!("../assets/unicode/StandardizedVariants.txt");
@@ -53,13 +54,14 @@ pub enum Registry {
 }
 
 /// What a registered sequence is, as its list describes it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Variant {
     pub registry: Registry,
     /// The list's own words: "emoji style", "short diagonal stroke form",
-    /// "CJK COMPATIBILITY IDEOGRAPH-FA10", or an IVD collection name such as
-    /// "Adobe-Japan1" (the first one listed, when several share a sequence).
-    pub description: &'static str,
+    /// "CJK COMPATIBILITY IDEOGRAPH-FA10", or the IVD collections that
+    /// register the sequence, in file order: "Adobe-Japan1", or
+    /// "Hanyo-Denshi, Moji_Joho" when several share it.
+    pub description: Cow<'static, str>,
 }
 
 /// True for every variation selector: VS1-16, VS17-256, and the Mongolian
@@ -80,13 +82,13 @@ pub fn completes(prev: Option<char>, c: char) -> bool {
 }
 
 /// The registered sequence `base` + `selector` forms, if any.
-pub fn registered(base: char, selector: char) -> Option<Variant> {
+pub fn registered(base: char, selector: char) -> Option<&'static Variant> {
     let table = table();
     let key = (base as u32, selector as u32);
     table
         .binary_search_by_key(&key, |e| (e.0, e.1))
         .ok()
-        .map(|i| table[i].2)
+        .map(|i| &table[i].2)
 }
 
 /// Every registered sequence, sorted by (base, selector), one entry each.
@@ -106,11 +108,24 @@ fn table() -> &'static [(u32, u32, Variant)] {
                 }
             }
         }
-        // Stable, so the first collection listed for a shared IVD sequence
-        // is the one kept.
+        // Stable, so the collections sharing an IVD sequence stay in file
+        // order and join into one entry.
         out.sort_by_key(|e| (e.0, e.1));
-        out.dedup_by_key(|e| (e.0, e.1));
-        out
+        let mut merged: Vec<(u32, u32, Variant)> = Vec::with_capacity(out.len());
+        for e in out {
+            match merged.last_mut() {
+                Some(last) if (last.0, last.1) == (e.0, e.1) => {
+                    if last.2.registry == Registry::Ideographic
+                        && e.2.registry == Registry::Ideographic
+                    {
+                        let joined = format!("{}, {}", last.2.description, e.2.description);
+                        last.2.description = Cow::Owned(joined);
+                    }
+                }
+                _ => merged.push(e),
+            }
+        }
+        merged
     })
 }
 
@@ -134,7 +149,7 @@ fn parse_line(line: &'static str, registry: Registry) -> Option<(u32, u32, Varia
         selector,
         Variant {
             registry,
-            description,
+            description: Cow::Borrowed(description),
         },
     ))
 }
@@ -161,7 +176,7 @@ mod tests {
         assert_eq!(emoji.registry, Registry::Emoji);
         assert_eq!(emoji.description, "emoji style");
         assert_eq!(
-            registered('\u{2764}', '\u{fe0e}').map(|v| v.description),
+            registered('\u{2764}', '\u{fe0e}').map(|v| &*v.description),
             Some("text style")
         );
 
@@ -169,18 +184,24 @@ mod tests {
         assert_eq!(digit.registry, Registry::Standardized);
         assert_eq!(digit.description, "short diagonal stroke form");
         assert_eq!(
-            registered('\u{585a}', '\u{fe00}').map(|v| v.description),
+            registered('\u{585a}', '\u{fe00}').map(|v| &*v.description),
             Some("CJK COMPATIBILITY IDEOGRAPH-FA10")
         );
         // Mongolian free variation selectors, FVS4 included.
         assert_eq!(
-            registered('\u{1820}', '\u{180b}').map(|v| v.description),
+            registered('\u{1820}', '\u{180b}').map(|v| &*v.description),
             Some("second form")
         );
 
         let kanji = registered('\u{845b}', '\u{e0100}').expect("kuzu + VS17");
         assert_eq!(kanji.registry, Registry::Ideographic);
         assert_eq!(kanji.description, "Adobe-Japan1");
+
+        // A sequence two collections register names both, in file order.
+        assert_eq!(
+            registered('\u{20041}', '\u{e0100}').map(|v| &*v.description),
+            Some("Hanyo-Denshi, Moji_Joho")
+        );
     }
 
     #[test]
