@@ -2338,12 +2338,6 @@ html.js .custom-field:not(.open) {
 }
 
 
-.pv-slice .txt .bad {
-    color: var(--danger);
-    font-weight: 700;
-}
-
-
 /* Userinfo goes danger red in its slice and on the URL line, co-firing with
    its chip. Not amber: amber is the button language for "you leave". */
 .pv-slice.usr .txt {
@@ -2609,12 +2603,6 @@ html:not(.js) .pv-index {
    2026-08-24: a hidden character IN a key is always a warn entry). */
 .pv-cast .entry .what code.k {
     color: var(--c-key);
-    font-weight: 700;
-}
-
-/* The mark inside a place key stays the mark: red, like the hero draws it. */
-.pv-cast .what .bad {
-    color: var(--danger);
     font-weight: 700;
 }
 
@@ -2975,9 +2963,30 @@ html.js .pv-fact[data-cast]:hover {
     color: var(--text-tertiary);
 }
 
-.pv-url .bad {
-    color: var(--danger);
+/* A hidden character wears the reserved mark: reverse red, the same as a
+   Text snippet's (.text-body .hid::after), on the URL line, in its slice and
+   in the cast place that names it. Nothing else on the card wears it. Plain
+   bold red stays the username's and plain http's. Inline, never inline-block,
+   so a long escape run still wraps, and clone gives each wrapped piece its
+   own rounded box. */
+.pv-url .bad,
+.pv-slice .txt .bad,
+.pv-cast .what .bad {
+    padding: 0 3px;
+    border-radius: 3px;
     font-weight: 700;
+    color: var(--on-danger);
+    background: var(--danger);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    /* Invisible normally; drawn as a box when forced colors drop the fill. */
+    outline: 1px solid transparent;
+}
+
+/* The fill is the mark, so the hover answers with a ring, not the wash. */
+.pv-url .bad.ask:hover {
+    background: var(--danger);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 /* An address carried inside a value: its own punctuation recedes to the

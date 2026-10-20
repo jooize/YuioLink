@@ -2506,8 +2506,11 @@ fn pieces(parts: &[Piece], style: PieceStyle) -> Markup {
                 // Every mark also names itself: `data-tell` points at the cast
                 // entry for its character (preview.js wires the click) and the
                 // title is the hover crumb the no-JS page keeps.
+                //
+                // `.bad` is the hidden-character mark and nothing else wears
+                // it: a padding run is plain spaces, so it is only `.pad`.
                 Piece::DecodedSpace => { span.dsp data-tell="u0020" title="space U+0020" { " " } }
-                Piece::Padding(s) => { span.bad.pad data-tell="pad" title="space U+0020, padding" { (s) } }
+                Piece::Padding(s) => { span.pad data-tell="pad" title="space U+0020, padding" { (s) } }
                 Piece::Escape(s) => {
                     @let (tell, title) = mark_meta(s);
                     @if style == PieceStyle::Url { span.pe data-tell=(tell) title=(title) { (s) } }
@@ -3994,6 +3997,39 @@ mod tests {
         // A card with nothing hidden tags no chip with a cast.
         let plain = card("https://example.com/x?ref=1");
         assert!(!plain.contains("data-cast"), "{plain}");
+    }
+
+    /// Promise 3 of the untrusted-text skill: one reserved style means
+    /// hidden. On the URL card that is the snippet's reverse red, worn by a
+    /// hidden character's escape and by nothing else. Found 2026-10-20: the
+    /// mark was plain bold red, the same as the username in
+    /// `https://bank.example@evil.example/`, so the two read alike.
+    #[test]
+    fn only_a_hidden_character_wears_the_reverse_red() {
+        const CSS: &str = include_str!("../static/app.css");
+        let body = |selector: &str| -> &str {
+            let at = CSS.find(selector).unwrap_or_else(|| panic!("{selector}"));
+            let rest = &CSS[at..];
+            &rest[..rest.find('}').unwrap()]
+        };
+        let bad = body(".pv-url .bad,\n.pv-slice .txt .bad,\n.pv-cast .what .bad {");
+        assert!(bad.contains("background: var(--danger);"), "{bad}");
+        assert!(bad.contains("color: var(--on-danger);"), "{bad}");
+        for other in [
+            ".pv-url .usr {",
+            ".pv-slice.usr .txt {",
+            ".pv-url .sch.insecure {",
+        ] {
+            assert!(!body(other).contains("background"), "{other} wears a fill");
+        }
+
+        // A padding run is plain spaces, not a hidden character.
+        let padded = card("https://example.com/x?q=a%20%20%20b");
+        assert!(
+            padded.contains(r#"<span class="pad" data-tell="pad""#),
+            "{padded}"
+        );
+        assert!(!padded.contains(r#"class="bad pad""#), "{padded}");
     }
 
     /// The cast's place words wear the ink of the region they point at,
