@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en" class="js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form Hidden Characters</title>
+<link rel="stylesheet" href="../server/static/app.css">
+<style>
+body { display: block; padding: 28px 16px 48px; }
+.page { max-width: 1240px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.lead { color: var(--text-secondary); font-size: 14px; margin: 0 0 18px; max-width: 84ch; text-align: left; }
+.lead code, figcaption code { font-family: var(--font-mono); font-size: 0.92em; }
+.row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+figure { margin: 0; width: 520px; max-width: 100%; }
+figcaption { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 8px; text-align: left; }
+figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
+.frame .app-window { position: static; margin: 0; width: auto; max-width: none; transform: none; min-height: 0; height: auto; }
+.samples { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+.samples button { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 8px;
+  border: 0.5px solid var(--field-border); background: var(--field-bg); color: var(--text); cursor: pointer; }
+
+/* --- the mocked parts --- */
+
+/* The ringed exclamation the History chip and the Text page's fact wear. */
+.hc-icon { flex: none; display: block; }
+
+/* A: one sentence in the form-note slot under the button, red because the
+   text holds something it does not show. The pills are the marks' style. */
+.hc-note {
+  margin: 12px auto 0; max-width: 44ch; text-align: center;
+  font-size: 13px; line-height: 1.6; color: var(--text-secondary);
+}
+.hc-note .hc-head { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--danger); }
+.hc-pill {
+  display: inline-block; margin: 0 1px; padding: 0 3px; border-radius: 3px;
+  font-family: var(--font-mono); font-size: 0.85em; font-weight: 700; line-height: 1.35;
+  color: var(--on-danger); background: var(--danger); outline: 1px solid transparent;
+}
+
+/* The action every option shares: take them out of the field. */
+.hc-remove {
+  border: 0; padding: 1px 6px; margin: 0 -6px; border-radius: 6px; background: none;
+  font: inherit; font-weight: 600; color: var(--accent-text); cursor: pointer;
+}
+.hc-remove:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+
+/* B and C: the field's text drawn again under it, with its marks, in the
+   field's own font. Same .hid rules as a snippet and a History row. */
+.hc-mirror {
+  margin-top: 8px; padding: 10px 14px;
+  font-family: var(--font); font-size: 15px; line-height: 1.5;
+  max-height: 7.5em; overflow: auto;
+  text-align: left;
+}
+.hc-mirror .hid::after { font-family: var(--font-mono); }
+.hc-foot {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px;
+  margin: 6px 2px 0; font-size: 13px; color: var(--text-secondary); text-align: left;
+}
+.hc-foot .hc-head { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--danger); }
+
+/* C: a chip in the field's corner; the mirror opens on a click. */
+.hc-field { position: relative; }
+.hc-chip {
+  position: absolute; right: 8px; bottom: 8px;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px; border: 0;
+  font: inherit; font-size: 12.5px; font-weight: 600;
+  color: var(--on-danger); background: var(--danger); cursor: pointer;
+}
+.c textarea.form-control { padding-right: 112px; }
+
+.done { color: var(--result-text); font-weight: 600; font-size: 13px; margin: 10px 0 0; text-align: center; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Hidden characters in the form, before the link is made</h1>
+  <p class="lead">Each frame is a live copy of the form: type or paste in its field. The check runs on
+  every edit, in the browser, with the same character list the server marks after creation
+  (zero-width, direction-changing, odd spaces, controls; tabs and line breaks are layout). A
+  variation selector counts only when it follows another one, since the browser cannot tell a
+  registered pair (❤️, a keycap #️⃣) from an odd one; the link's page still marks the rest.
+  <b>Remove Them</b> deletes each character, except that a space-like one becomes a plain space
+  and a line or paragraph separator becomes a line break. Without JavaScript nothing shows here,
+  and the result page marks them as it does today.</p>
+  <div class="samples">
+    <button type="button" data-sample="Ref: INV&#x200B;-2291 invoice&#x202E;fdp.exe">ZWSP + RLO</button>
+    <button type="button" data-sample="Meet at 10&#xA0;am, room&#x3000;4">no-break + ideographic space</button>
+    <button type="button" data-sample="I &#x2764;&#xFE0F; it #&#xFE0F;&#x20E3; fine">registered emoji (no warning)</button>
+    <button type="button" data-sample="p&#xFE0F;&#xFE0F;&#xFE0F;&#xFE0F;ay">stacked selectors</button>
+    <button type="button" data-sample="https://exa&#x200D;mple.com/login">URL with ZWJ</button>
+  </div>
+  <div class="row">
+    <figure class="a">
+      <figcaption><b>A · Sentence under the button</b>The note slot that already explains "this will be a text link" says how many, and which.</figcaption>
+      <div class="frame" data-frame></div>
+    </figure>
+    <figure class="b">
+      <figcaption><b>B · Marked copy under the field</b>The text drawn again with its marks, so you see where each one sits and what order is really stored.</figcaption>
+      <div class="frame" data-frame></div>
+    </figure>
+    <figure class="c">
+      <figcaption><b>C · Chip in the field</b>A red count in the field's corner; clicking it opens B's marked copy.</figcaption>
+      <div class="frame" data-frame></div>
+    </figure>
+  </div>
+</div>
+
+<template id="form">
+  <main class="app-window"><div class="sheet-body centered">
+    <form onsubmit="return false">
+      <div class="hc-field">
+        <textarea class="form-control" rows="1" autocomplete="off" autocapitalize="off" spellcheck="false"
+          placeholder="Link or text to share"></textarea>
+      </div>
+      <div data-slot-b></div>
+      <div class="split-btn">
+        <button class="btn split-primary" type="submit">Create Text Link</button>
+        <button class="btn split-clear" type="button">Clear</button>
+      </div>
+      <div data-slot-a></div>
+    </form>
+  </div></main>
+</template>
+
+<script>
+"use strict";
+// Mirrors the server's is_invisible, minus tab and line feed (layout in a
+// Text). Variation selectors are left to the caller.
+const RANGES = [[0x00, 0x08], [0x0b, 0x1f], [0x7f, 0x9f], [0xa0, 0xa0], [0xad, 0xad], [0x34f, 0x34f],
+  [0x61c, 0x61c], [0x115f, 0x1160], [0x17b4, 0x17b5], [0x180b, 0x180f], [0x2000, 0x200f], [0x2028, 0x202f],
+  [0x205f, 0x206f], [0x3000, 0x3000], [0x3164, 0x3164], [0xfe00, 0xfe0f], [0xfeff, 0xfeff], [0xffa0, 0xffa0],
+  [0xfff9, 0xfffb], [0xe0000, 0xe007f], [0xe0100, 0xe01ef]];
+const inRanges = (cp) => RANGES.some(([a, b]) => cp >= a && cp <= b);
+const isSelector = (cp) => (cp >= 0xfe00 && cp <= 0xfe0f) || (cp >= 0xe0100 && cp <= 0xe01ef) || (cp >= 0x180b && cp <= 0x180d) || cp === 0x180f;
+const SPACES = (cp) => cp === 0xa0 || (cp >= 0x2000 && cp <= 0x200a) || cp === 0x202f || cp === 0x205f || cp === 0x3000;
+const esc = (cp) => `\\u{${cp.toString(16).toUpperCase().padStart(4, "0")}}`;
+
+// One entry per code point: { ch, cp, hidden }.
+const scan = (text) => {
+  const out = [];
+  let prevSel = false;
+  for (const ch of text) {
+    const cp = ch.codePointAt(0);
+    const sel = isSelector(cp);
+    const hidden = sel ? prevSel : inRanges(cp);
+    out.push({ ch, cp, hidden });
+    prevSel = sel;
+  }
+  return out;
+};
+const cleaned = (parts) => parts.map((p) => !p.hidden ? p.ch
+  : SPACES(p.cp) ? " " : (p.cp === 0x2028 || p.cp === 0x2029) ? "\n" : "").join("");
+
+const icon = () => {
+  const s = '<svg class="hc-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>';
+  return document.createRange().createContextualFragment(s);
+};
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const plural = (n) => `${n} Hidden Character${n === 1 ? "" : "s"}`;
+const distinct = (parts) => [...new Set(parts.filter((p) => p.hidden).map((p) => p.cp))];
+
+const mirror = (parts) => {
+  const m = el("div", "text-body hc-mirror");
+  for (const p of parts) {
+    if (!p.hidden) { m.append(p.ch); continue; }
+    const h = el("span", "hid", p.ch);
+    h.dataset.esc = esc(p.cp);
+    m.append(h);
+  }
+  return m;
+};
+const head = (n) => { const h = el("span", "hc-head"); h.append(icon(), plural(n)); return h; };
+
+function setup(frame, option) {
+  frame.append(document.getElementById("form").content.cloneNode(true));
+  const ta = frame.querySelector("textarea");
+  const slotA = frame.querySelector("[data-slot-a]");
+  const slotB = frame.querySelector("[data-slot-b]");
+  const field = frame.querySelector(".hc-field");
+  let open = false;
+  let removedNote = false;
+
+  const autosize = () => { ta.style.height = "auto"; ta.style.height = `${ta.scrollHeight}px`; };
+  const removeBtn = () => {
+    const b = el("button", "hc-remove", "Remove Them");
+    b.type = "button";
+    b.addEventListener("click", () => {
+      ta.focus();
+      ta.select();
+      // insertText keeps the edit on the field's undo stack (Cmd-Z brings them back).
+      if (!document.execCommand("insertText", false, cleaned(scan(ta.value)))) ta.value = cleaned(scan(ta.value));
+      removedNote = true;
+      render();
+    });
+    return b;
+  };
+
+  function render() {
+    autosize();
+    const parts = scan(ta.value);
+    const n = parts.filter((p) => p.hidden).length;
+    slotA.replaceChildren();
+    slotB.replaceChildren();
+    field.querySelector(".hc-chip")?.remove();
+    if (!n) {
+      if (removedNote) slotA.append(el("p", "done", "✓ Hidden characters removed. ⌘Z brings them back."));
+      return;
+    }
+    removedNote = false;
+    if (option === "a") {
+      const p = el("p", "hc-note");
+      p.append(head(n), " in this text: ");
+      for (const cp of distinct(parts)) p.append(el("span", "hc-pill", esc(cp)), " ");
+      p.append(el("br"), removeBtn());
+      slotA.append(p);
+    } else {
+      if (option === "c") {
+        const chip = el("button", "hc-chip");
+        chip.type = "button";
+        chip.append(icon(), `${n} Hidden`);
+        chip.setAttribute("aria-expanded", String(open));
+        chip.addEventListener("click", () => { open = !open; render(); });
+        field.append(chip);
+        if (!open) return;
+      }
+      slotB.append(mirror(parts));
+      const foot = el("div", "hc-foot");
+      foot.append(head(n), removeBtn());
+      slotB.append(foot);
+    }
+  }
+  ta.addEventListener("input", render);
+  frame.querySelector(".split-clear").addEventListener("click", () => { ta.value = ""; render(); });
+  frame.render = (text) => { ta.value = text; render(); };
+}
+
+const frames = [...document.querySelectorAll("[data-frame]")];
+frames.forEach((f) => setup(f, f.closest("figure").className));
+const first = document.querySelector("[data-sample]").dataset.sample;
+frames.forEach((f) => f.render(first));
+for (const b of document.querySelectorAll("[data-sample]"))
+  b.addEventListener("click", () => frames.forEach((f) => f.render(b.dataset.sample)));
+</script>
+</body>
+</html>
