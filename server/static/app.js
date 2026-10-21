@@ -128,6 +128,20 @@
         icon(13, "0 0 14 14", [
             ["path", { fill: "currentColor", d: "M2 8.6C2 6 3.3 4.2 5.6 3.3l.5.9C4.8 4.9 4.1 5.9 4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H3.4C2.6 11.6 2 11 2 10.2V8.6Zm5.4 0c0-2.6 1.3-4.4 3.6-5.3l.5.9C10.2 4.9 9.5 5.9 9.4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H8.8c-.8 0-1.4-.6-1.4-1.4V8.6Z" }],
         ]);
+    // A ringed exclamation: a Text row holds hidden characters (the Text
+    // page's "Hidden Characters" fact wears the same).
+    const alertIcon = () =>
+        icon(12, "0 0 16 16", [
+            ["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
+            ["path", { d: "M8 4.6v4.2", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" }],
+            ["circle", { cx: "8", cy: "11.2", r: ".95", fill: "currentColor" }],
+        ]);
+    // A ringed check: the row's hidden characters are taken out.
+    const checkIcon = () =>
+        icon(12, "0 0 16 16", [
+            ["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
+            ["path", { ...round, d: "M5.2 8.2 7.2 10.1 10.9 6", "stroke-width": "1.6" }],
+        ]);
     // A small down chevron: a cut row's note opens the rest.
     const chevronIcon = () =>
         icon(12, "0 0 10 10", [["path", { ...round, d: "M2.5 3.8 5 6.3l2.5-2.5", "stroke-width": "1.5" }]]);
@@ -596,8 +610,17 @@
             // Between two copies of the same state, the one whose cover was
             // toggled last wins, so an eye clicked in one tab reaches the others
             // instead of being written back over by their older copy.
-            if (!prev || mergeRank(e) > mergeRank(prev)
-                || (mergeRank(e) === mergeRank(prev) && (e.coverAt ?? 0) > (prev.coverAt ?? 0))) byId.set(e.id, e);
+            const win = !prev || mergeRank(e) > mergeRank(prev)
+                || (mergeRank(e) === mergeRank(prev) && (e.coverAt ?? 0) > (prev.coverAt ?? 0)) ? e : prev;
+            // The hidden-character mode travels the same way, on its own stamp,
+            // so a mode picked in one tab and an eye clicked in another both last.
+            const other = win === e ? prev : e;
+            if (other && !win.tombstone && (other.marksAt ?? 0) > (win.marksAt ?? 0)) {
+                const merged = { ...win, marksAt: other.marksAt };
+                if (other.marks) merged.marks = other.marks;
+                else delete merged.marks;
+                byId.set(e.id, merged);
+            } else byId.set(e.id, win);
         }
         const now = Date.now();
         const seenUrl = new Set();
@@ -627,6 +650,10 @@
             ? payload.trim()
             : payload.trim().split(/\r?\n/).slice(0, SNIPPET_LINES + 1).join("\n")
         ).slice(0, SNIPPET_MAX);
+    // Text the server marked comes with a tree of the same opening (cut there
+    // by the same rule), whose text is the snippet.
+    const snippetFor = (kind, payload, display) =>
+        (kind === "text" && Array.isArray(display) ? treeText(display) : snippetOf(kind, payload));
     // The pixels a row's contents are known to add to its one-line height before
     // it is drawn: Text's own line breaks, up to the ten shown (19px each), the
     // stacked Copy and eye a row of two lines or more gets (50px at least), and
@@ -659,7 +686,7 @@
     const dropExpiredSnippets = () => {
         let dropped = false;
         for (const it of memHistory) {
-            if (it.snippet && isExpired(it)) { delete it.snippet; delete it.display; dropped = true; }
+            if (it.snippet && isExpired(it)) { delete it.snippet; delete it.display; delete it.cast; dropped = true; }
         }
         return dropped;
     };
@@ -805,6 +832,7 @@
         const body = document.createElement("span");
         body.className = "history-well-body";
         fillBody(it, body);
+        if (body.querySelector(".hid")) wireMarks(it, body);
         const more = document.createElement("button");
         more.type = "button";
         more.className = "history-more";
@@ -841,9 +869,9 @@
     };
     // What a row's contents show: a redirect's destination in the preview's
     // dress when the server sent it (rows saved before that show the host and
-    // path plainly), or Text as typed, all of it once fetched to open.
+    // path plainly), or Text as typed, all of it once fetched to open. Text
+    // with hidden characters comes as a tree too, drawn in the row's mode.
     const fillBody = (it, body) => {
-        const full = expanded.get(it.id);
         if (it.kind === "redirect") {
             if (Array.isArray(it.display)) {
                 body.classList.add("pv-url");
@@ -864,23 +892,158 @@
             }
             return;
         }
-        body.textContent = typeof full === "string" ? full : it.snippet;
+        const c = rowContents(it);
+        if (!Array.isArray(c.display)) {
+            body.textContent = c.text;
+            return;
+        }
+        const mode = marksMode(it);
+        if (mode === "ticks") body.classList.add("marks-ticks");
+        paintDisplay(c.display, body, mode === "removed");
     };
-    // The server's destination tree, built as elements: a string is text,
-    // ["wbr"] a line-break opportunity, [class, child...] a span. Only class
-    // names and text come from it, never markup.
-    const paintDisplay = (nodes, parent) => {
+    // The server's tree, built as elements: a string is text, ["wbr"] a
+    // line-break opportunity, [class, child...] a span. An object after the
+    // class names another tag and the element's data. Only those tags and
+    // data names, class names and text come from it, never markup. `removed`
+    // leaves out the hidden characters' marks, and so the characters.
+    const TREE_TAGS = new Set(["b", "code", "div"]);
+    const TREE_DATA = new Set(["esc", "tell", "cp", "name"]);
+    const treeExtra = (n) => (n[1] && typeof n[1] === "object" && !Array.isArray(n[1]) ? n[1] : null);
+    const isMarkNode = (n) => Array.isArray(n) && typeof n[0] === "string" && n[0].split(" ").includes("hid");
+    const paintDisplay = (nodes, parent, removed = false) => {
         for (const n of nodes) {
             if (typeof n === "string") parent.append(n);
             else if (Array.isArray(n) && n.length === 1 && n[0] === "wbr") parent.append(document.createElement("wbr"));
             else if (Array.isArray(n) && typeof n[0] === "string") {
-                const span = document.createElement("span");
-                if (n[0]) span.className = n[0];
-                paintDisplay(n.slice(1), span);
-                parent.append(span);
+                if (removed && isMarkNode(n)) continue;
+                const extra = treeExtra(n);
+                const el = document.createElement(TREE_TAGS.has(extra?.tag) ? extra.tag : "span");
+                if (n[0]) el.className = n[0];
+                for (const [k, v] of Object.entries(extra ?? {})) {
+                    if (TREE_DATA.has(k) && typeof v === "string") el.dataset[k] = v;
+                }
+                paintDisplay(n.slice(extra ? 2 : 1), el, removed);
+                parent.append(el);
             }
         }
     };
+    // A code point a mark carries in `data-cp` (a NUL, which HTML cannot hold
+    // in its text), as the character, or nothing if it is not one.
+    const fromCp = (cp) => {
+        const n = Number(cp);
+        return Number.isInteger(n) && n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : "";
+    };
+    // The text a tree holds, exactly as stored; `removed` leaves out the
+    // hidden characters.
+    const treeText = (nodes, removed = false) => {
+        let out = "";
+        for (const n of nodes) {
+            if (typeof n === "string") out += n;
+            else if (!Array.isArray(n) || typeof n[0] !== "string" || (removed && isMarkNode(n))) continue;
+            else if (treeExtra(n)?.cp !== undefined) out += fromCp(treeExtra(n).cp);
+            else out += treeText(n.slice(treeExtra(n) ? 2 : 1), removed);
+        }
+        return out;
+    };
+    const markCount = (nodes) =>
+        nodes.reduce((sum, n) => sum + (isMarkNode(n) ? 1 : Array.isArray(n) ? markCount(n.slice(1)) : 0), 0);
+    // The same, read back from the page: a mark's label is generated content,
+    // never text, so only a NUL's empty mark needs its data-cp put back.
+    const exactText = (root) => {
+        let out = "";
+        for (const node of root.childNodes) {
+            if (node.nodeType === Node.TEXT_NODE) out += node.data;
+            else if (node.nodeType !== Node.ELEMENT_NODE) continue;
+            else if (node.dataset.cp !== undefined) out += fromCp(node.dataset.cp);
+            else out += exactText(node);
+        }
+        return out;
+    };
+
+    // --- hidden characters in a Text row ---
+    // A row draws its hidden characters in one of three modes, cycled by the
+    // chip in its footer: Labels (each mark wears its escape, the default),
+    // Ticks (a thin red tick where each sits) and Removed (left out of the
+    // row, of a selection and of the row's Copy). The mode is the row's own,
+    // `it.marks` (absent for Labels), stamped like the eye for the merge.
+    const MARK_MODES = ["labels", "ticks", "removed"];
+    const marksMode = (it) => (MARK_MODES.includes(it.marks) ? it.marks : "labels");
+    // The entry a mark opens, under the row, this page view only: row id to
+    // the mark's `data-tell`.
+    const castOpen = new Map();
+    const setMarksMode = (it, mode) => {
+        if (mode === "labels") delete it.marks;
+        else it.marks = mode;
+        it.marksAt = Date.now();
+        if (mode === "removed") castOpen.delete(it.id);
+    };
+    const marksChip = (it, n) => {
+        const mode = marksMode(it);
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "history-hidden";
+        chip.dataset.mode = mode;
+        chip.dataset.for = it.id;
+        const what = plainPlural(n, "Hidden Character");
+        if (mode === "removed") chip.append(checkIcon(), `${what} Removed`);
+        else {
+            const state = document.createElement("span");
+            state.className = "history-hidden-mode";
+            state.textContent = `\u00b7 ${mode === "ticks" ? "Ticks" : "Labels"}`;
+            chip.append(alertIcon(), what, state);
+        }
+        chip.title = { labels: "Show them as ticks", ticks: "Take them out of the row", removed: "Show them as labels" }[mode];
+        chip.addEventListener("click", () => {
+            setMarksMode(it, MARK_MODES[(MARK_MODES.indexOf(mode) + 1) % MARK_MODES.length]);
+            renderHistory();
+            document.querySelector(`.history-hidden[data-for="${it.id}"]`)?.focus();
+        });
+        return chip;
+    };
+    // What a mark means, under the row: its cast entry, the Text page's own.
+    const castPanel = (it) => {
+        const tell = castOpen.get(it.id);
+        const cast = rowContents(it).cast;
+        if (!tell || marksMode(it) === "removed" || !Array.isArray(cast)) return null;
+        const entry = cast.find((n) => Array.isArray(n) && treeExtra(n)?.name === tell);
+        if (!entry) return null;
+        const panel = document.createElement("div");
+        panel.className = "history-cast pv-cast";
+        paintDisplay([entry], panel);
+        return panel;
+    };
+    // A mark's label ignores the pointer (in Safari a label that takes it
+    // breaks a drag), so a click is matched to a mark by where it landed, as
+    // on the Text page, and only a plain click counts: one that ends a
+    // drag-selection leaves the entry alone. A click on the open mark puts
+    // its entry away.
+    const markAt = (body, x, y) => {
+        for (const m of body.querySelectorAll(".hid[data-tell]")) {
+            for (const r of m.getClientRects()) {
+                if (r.width > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return m;
+            }
+        }
+        return null;
+    };
+    const wireMarks = (it, body) => {
+        body.addEventListener("click", (event) => {
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed) return;
+            const mark = markAt(body, event.clientX, event.clientY);
+            if (!mark) return;
+            if (castOpen.get(it.id) === mark.dataset.tell) castOpen.delete(it.id);
+            else castOpen.set(it.id, mark.dataset.tell);
+            renderHistory();
+        });
+        body.addEventListener("mousemove", (event) => {
+            body.classList.toggle("over-mark", Boolean(markAt(body, event.clientX, event.clientY)));
+        });
+        body.addEventListener("mouseleave", () => body.classList.remove("over-mark"));
+    };
+    // What a Text row draws: the whole contents once fetched to open, else
+    // the opening it keeps. `display` and `cast` are there only when the
+    // server marked something.
+    const rowContents = (it) => expanded.get(it.id) ?? { text: it.snippet, display: it.display, cast: it.cast };
     const readDisplay = (json) => {
         if (!json) return undefined;
         try {
@@ -897,7 +1060,8 @@
         return it.kind === "redirect" || !(it.lines > 1) ? chars : `${plainPlural(it.lines, "line")}, ${chars}`;
     };
     // Rows opened to their whole contents, this page view only: the id, and the
-    // contents fetched for it (null until they arrive, or if they cannot).
+    // contents fetched for it, as fetchContents gives them (null until they
+    // arrive, or if they cannot).
     const expanded = new Map();
     const toggleExpand = async (it) => {
         const refocus = () => document.querySelector(`.history-well[data-for="${it.id}"] .history-more`)?.focus();
@@ -920,34 +1084,38 @@
     };
     // Whether the row holds the whole of what the link holds.
     const snippetComplete = (it) => !!it.snippet && it.chars != null && [...it.snippet].length >= it.chars;
-    // The whole contents from the server. The creator token goes along when
-    // the row has one: it is what lets a limited link's creator read it back
-    // without spending its use. Null when the server will not or cannot say.
+    // The whole contents from the server, with the tree the row draws them
+    // by: `{ text, display, cast }`. The creator token goes along when the row
+    // has one: it is what lets a limited link's creator read it back without
+    // spending its use. Null when the server will not or cannot say.
     const fetchContents = async (it) => {
         if (!it.name) return null;
         try {
-            const resp = await fetch(`${API_BASE}/api/v0/links/${encodeURIComponent(it.name)}`, {
+            const resp = await fetch(`${API_BASE}/api/v0/links/${encodeURIComponent(it.name)}?display=true`, {
                 headers: it.token ? { Authorization: `Bearer ${it.token}` } : {},
             });
             if (!resp.ok) return null;
             const data = await resp.json();
-            return data.content ?? data.target ?? null;
+            const text = data.content ?? data.target;
+            return typeof text === "string" ? { text, display: data.display, cast: data.cast } : null;
         } catch {
             return null;
         }
     };
     // Copy what the link holds: from the row when it has all of it, else from
-    // the server. The clipboard write starts inside the click, with the text
-    // to follow, since Safari refuses a write begun after the fetch returns.
+    // the server. A row in Removed copies it without its hidden characters.
+    // The clipboard write starts inside the click, with the text to follow,
+    // since Safari refuses a write begun after the fetch returns.
     const copyContents = async (it, button) => {
+        const plain = (c) => (marksMode(it) === "removed" && Array.isArray(c.display) ? treeText(c.display, true) : c.text);
         const full = expanded.get(it.id);
-        if (typeof full === "string") return copyToClipboard(full, button);
-        if (snippetComplete(it)) return copyToClipboard(it.snippet, button);
+        if (full) return copyToClipboard(plain(full), button);
+        if (snippetComplete(it)) return copyToClipboard(plain(rowContents(it)), button);
         const failed = () => flashClass(button, "failed");
         if (typeof ClipboardItem === "function") {
-            const blob = fetchContents(it).then((t) => {
-                if (t == null) throw new Error("contents unavailable");
-                return new Blob([t], { type: "text/plain" });
+            const blob = fetchContents(it).then((c) => {
+                if (c == null) throw new Error("contents unavailable");
+                return new Blob([plain(c)], { type: "text/plain" });
             });
             try {
                 await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
@@ -957,9 +1125,9 @@
             }
             return;
         }
-        const t = await fetchContents(it);
-        if (t == null) failed();
-        else copyToClipboard(t, button);
+        const c = await fetchContents(it);
+        if (c == null) failed();
+        else copyToClipboard(plain(c), button);
     };
     // After the rows are drawn: stack Copy and the eye beside contents of more
     // than one line, and mark a row cut short (fade, note) when its contents run
@@ -1161,6 +1329,11 @@
                 uses.textContent = plainPlural(it.uses, "use");
                 meta.append(uses);
             }
+            // A Text row's hidden characters, counted in what it draws, and
+            // the chip that cycles how they are drawn.
+            const drawn = it.kind === "text" && it.snippet && !isCovered(it) && !isExpired(it) ? rowContents(it).display : null;
+            const marks = Array.isArray(drawn) ? markCount(drawn) : 0;
+            if (marks) meta.append(marksChip(it, marks));
             const span = document.createElement("span");
             span.className = "countdown";
             span.dataset.phrase = "expires";
@@ -1218,7 +1391,8 @@
             actions.append(copy, show, remove);
             foot.append(meta, actions);
 
-            li.append(contentsWell(it, rowName), link, foot);
+            const cast = marks ? castPanel(it) : null;
+            li.append(contentsWell(it, rowName), ...(cast ? [cast] : []), link, foot);
             listEl.append(li);
         }
         fitWells();
@@ -1921,9 +2095,12 @@
                 // `snippet` is what the link holds, cut short, so the row can say
                 // what it was for; `secret` asks the row to keep it covered, and
                 // `chars` and `lines` let the cover say how much is under it.
-                // `display` is a redirect's destination as the preview draws it,
-                // a tree from the server (see paintDisplay).
-                const entry = { url, name: data.name, kind, uses, secret: priv, snippet: snippetOf(kind, payload), display: data.display, ...sizeOf(payload), expires: data.expires_at, token: data.creator_token, terms: data.terms, created: Date.now() };
+                // `display` is the contents as the row draws them, a tree from
+                // the server (see paintDisplay): a redirect's destination in the
+                // preview's dress, or Text with hidden characters marked, whose
+                // `cast` names them. Such Text keeps the tree's own text as its
+                // snippet, so the two never differ.
+                const entry = { url, name: data.name, kind, uses, secret: priv, snippet: snippetFor(kind, payload, data.display), display: data.display, cast: data.cast, ...sizeOf(payload), expires: data.expires_at, token: data.creator_token, terms: data.terms, created: Date.now() };
                 addHistory(entry); // stamps entry.id, which the result's Delete needs
                 renderHistory();
                 setupResultActions(entry);
@@ -2080,6 +2257,7 @@
         // What the form posted, as the server echoed it onto the panel (already
         // cut short there); a redirect gets the scheme the server stored it with.
         const raw = panel?.dataset.snippet ?? "";
+        const display = readDisplay(panel?.dataset.display);
         const entry = {
             url,
             // The name is the last path segment (minus any #fragment). No token on the
@@ -2088,12 +2266,13 @@
             kind,
             uses: /one-time/.test(metaText) ? 1 : (usesMatch ? Number.parseInt(usesMatch[1], 10) : null),
             secret: panel?.dataset.secret === "1",
-            snippet: raw ? snippetOf(kind, kind === "redirect" ? normalizeTarget(raw) : raw) : undefined,
+            snippet: raw ? snippetFor(kind, kind === "redirect" ? normalizeTarget(raw) : raw, display) : undefined,
             // The size of the whole contents, counted by the server, since the
             // snippet it echoed is cut short.
             chars: Number(panel?.dataset.chars) || undefined,
             lines: Number(panel?.dataset.lines) || undefined,
-            display: readDisplay(panel?.dataset.display),
+            display,
+            cast: readDisplay(panel?.dataset.cast),
             expires: when ? when[1] : null,
             token: null,
             terms,
@@ -2102,6 +2281,21 @@
         addHistory(entry);
         return entry;
     };
+
+    // A selection in a row copies through the browser, which is exact unless
+    // it spans a NUL's empty mark; only then is it rebuilt.
+    document.addEventListener("copy", (event) => {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+        const range = sel.getRangeAt(0);
+        const common = range.commonAncestorContainer;
+        const el = common.nodeType === Node.ELEMENT_NODE ? common : common.parentElement;
+        if (!el?.closest(".history-well-body")) return;
+        const part = range.cloneContents();
+        if (!part.querySelector("[data-cp]")) return;
+        event.clipboardData.setData("text/plain", exactText(part));
+        event.preventDefault();
+    });
 
     // Another tab changed the shared store: adopt its history (merge, so neither tab's links
     // are lost) or reflect a persistence on/off flip. The merged render re-persists only if

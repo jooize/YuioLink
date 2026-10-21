@@ -1442,18 +1442,21 @@ html.js .custom-field:not(.open) {
     overflow: hidden;
 }
 
-/* A hidden character in a snippet. The real character stays in the text, so a
-   selection or Copy takes exactly what is stored; its escape is generated
-   content beside it, never selected or copied. The isolate keeps a direction
-   control from reordering anything past its own mark.
+/* A hidden character in a snippet, and in a History row's Text. The real
+   character stays in the text, so a selection or Copy takes exactly what is
+   stored; its escape is generated content beside it, never selected or
+   copied. The isolate keeps a direction control from reordering anything past
+   its own mark.
    pointer-events: none is load-bearing: in Safari a label that takes the
    pointer hides the selection under it and sends a right-to-left drag to the
    start of the line (user-select: none does not help). */
-.text-body .hid {
+.text-body .hid,
+.history-well-body .hid {
     unicode-bidi: isolate;
 }
 
-.text-body .hid::after {
+.text-body .hid::after,
+.history-well-body .hid::after {
     content: attr(data-esc);
     pointer-events: none;
     margin: 0 1px;
@@ -1465,20 +1468,43 @@ html.js .custom-field:not(.open) {
     background: var(--danger);
     /* Invisible normally; drawn as a box when forced colors drop the fill. */
     outline: 1px solid transparent;
+    /* No line box of its own: the fill paints the font's box either way, and
+       a label must not stand its line taller than an unmarked one (it added
+       2px to every marked line). */
+    line-height: 0;
+}
+
+/* A row's text is not monospaced; the label is, as in a snippet. */
+.history-well-body .hid::after {
+    font-family: var(--font-mono);
 }
 
 /* The label is its own left-to-right isolate: it sits inside the mark after
    the real character, so a right-to-left override there would otherwise
    reverse the label itself ("{E202}u\" for \u{202E}). An isolate resets the
    override for everything inside it. */
-.text-body .hid::after {
+.text-body .hid::after,
+.history-well-body .hid::after {
     direction: ltr;
     unicode-bidi: isolate;
 }
 
-/* The label ignores the pointer, so text.js finds a mark under a click by
-   position, and says so with the cursor. */
-.text-body.over-mark {
+/* A row in Ticks: a thin red tick where each character sits, in place of
+   its label. */
+.history-well-body.marks-ticks .hid::after {
+    content: "";
+    display: inline-block;
+    width: 3px;
+    height: 1.05em;
+    padding: 0;
+    border-radius: 2px;
+    vertical-align: -0.18em;
+}
+
+/* The label ignores the pointer, so text.js (and app.js, in a row) finds a
+   mark under a click by position, and says so with the cursor. */
+.text-body.over-mark,
+.history-well-body.over-mark {
     cursor: pointer;
 }
 
@@ -3717,11 +3743,72 @@ html.history-collapsed .history-body {
     font-weight: 600;
 }
 
-/* Line 3, left: the time, led by a single-use flame or a use limit. */
+/* The row's hidden characters: the Text page's "Hidden Characters" fact at
+   row size, a button that cycles how they are drawn. Red while they are drawn,
+   naming the mode; green with a check once they are taken out. The hover is
+   a wash behind the whole chip, never an underline. The negative margins put
+   the words where a plain item's would be; the padding is the wash. */
+.history-hidden {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 -6px;
+    padding: 1px 6px;
+    border: 0;
+    border-radius: 6px;
+    font: inherit;
+    font-weight: 600;
+    color: var(--danger);
+    background: none;
+    cursor: pointer;
+}
+
+.history-hidden:hover {
+    background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.history-hidden[data-mode="removed"] {
+    color: var(--result-text);
+}
+
+.history-hidden svg {
+    flex: none;
+    display: block;
+}
+
+.history-hidden-mode {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+/* What a mark means, under the row: its cast entry, opened by a click on the
+   mark. One entry, always shown, so the deck's grid becomes a block. */
+.history-cast.pv-cast {
+    margin: 2px 0 4px;
+}
+
+html.js .history-cast.pv-cast {
+    display: block;
+}
+
+.history-cast .entry {
+    padding: 5px 4px;
+}
+
+.history-cast .what {
+    font-size: 12.5px;
+}
+
+/* Line 3, left: the time, led by a single-use flame or a use limit, and a
+   Text row's hidden characters. Each item stays whole; when they do not fit
+   beside the actions, the time wraps under them rather than push the actions
+   out of the row. */
 .history-meta {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 7px;
+    gap: 2px 7px;
+    min-width: 0;
     font-size: 11.5px;
     color: var(--text-secondary);
     white-space: nowrap;
