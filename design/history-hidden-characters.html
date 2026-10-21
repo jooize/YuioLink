@@ -46,6 +46,10 @@ figcaption .tag { display: inline-block; margin-left: 6px; padding: 0 6px; borde
   direction: ltr;
   unicode-bidi: isolate;
   outline: 1px solid transparent;
+  /* No line box of its own: the fill paints the font's box either way, and
+     a label must not make its line taller than an unmarked one (it moved the
+     row 2px per line when the modes switched). */
+  line-height: 0;
 }
 .history-well-body.over-mark { cursor: pointer; }
 /* Hidden: the character is still there and isolated (an override cannot
@@ -72,10 +76,10 @@ figcaption .tag { display: inline-block; margin-left: 6px; padding: 0 6px; borde
 }
 button.hc-chip { cursor: pointer; padding: 1px 6px; margin-left: -6px; border-radius: 6px; }
 button.hc-chip:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
-/* The chip's color follows the mode: red while the characters are drawn,
-   amber while they are in the text but not drawn, green once they are out. */
-.hc-chip[data-view="hidden"] { color: var(--warn); }
-.hc-chip[data-view="removed"] { color: var(--result-text); }
+/* The mode word takes a color of its own once the characters are not drawn:
+   amber while they are still in the text, green once they are out. */
+.hc-chip[data-view="hidden"] .state { color: var(--warn); }
+.hc-chip[data-view="removed"] .state { color: var(--result-text); }
 .hc-chip .state { font-weight: 500; color: var(--text-secondary); }
 .hc-chip svg { flex: none; }
 
@@ -111,9 +115,8 @@ html.js .hc-panel.pv-cast, html.js .hc-panel .pv-cast { display: block; }
   it is; click the chips where they are buttons.</p>
 
   <h2>Round 2: four modes</h2>
-  <p class="lead"><b>Ticks</b>, <b>Labels</b>, <b>Hidden</b> and <b>Removed</b>. The chip is red
-  while the characters are drawn, amber while they are hidden, and green with a check once they
-  are removed. Hidden keeps the
+  <p class="lead"><b>Ticks</b>, <b>Labels</b>, <b>Hidden</b> and <b>Removed</b>. The chip stays red; the
+  mode word turns amber for Hidden and green for Removed. Hidden keeps the
   characters (a copy still carries them) and draws nothing. Removed takes them out of the row, so
   a selection copies the text without them. Hidden and Removed look the same; only the chip and
   the copy tell them apart.</p>
@@ -282,7 +285,6 @@ const chip = (row, fig, li) => {
     if (fig === "cycle" || fig === "panel") {
       state.textContent = `· ${MODE_NAME[li.dataset.view]}`;
       c.dataset.view = li.dataset.view;
-      glyph.replaceChildren(li.dataset.view === "removed" ? checkIcon() : alertIcon());
     }
     else if (fig === "compact") state.textContent = li.classList.contains("compact") ? "· Ticks" : "· Labels";
     else state.textContent = li.classList.contains("marks-off") ? "· Show" : "· Shown";
