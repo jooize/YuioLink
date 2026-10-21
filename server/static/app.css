@@ -2983,6 +2983,16 @@ html.js .pv-fact[data-cast]:hover {
     outline: 1px solid transparent;
 }
 
+/* The pill is real text, so it can be selected. The default highlight is
+   translucent, and over the red it turned a muddy purple that hid the
+   selection: an opaque accent reads as selected in both themes. */
+.pv-url .bad::selection,
+.pv-slice .txt .bad::selection,
+.pv-cast .what .bad::selection {
+    color: #fff;
+    background: var(--accent);
+}
+
 /* The fill is the mark, so the hover answers with a ring, not the wash. */
 .pv-url .bad.ask:hover {
     background: var(--danger);
