@@ -97,6 +97,17 @@ paths:
       security:
         - {}
         - creatorToken: []
+      parameters:
+        - name: display
+          in: query
+          required: false
+          description: >-
+            Also send `display` (and `cast`, for Text), drawn from all of the
+            contents rather than a history row's opening. Sent only with the
+            contents themselves.
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
           description: The link.
@@ -104,6 +115,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Link"
+        "400":
+          $ref: "#/components/responses/ValidationError"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -310,14 +323,9 @@ components:
             and reading a one-time link back without spending its use. Returned
             only here; absent on the `/create` convenience surface.
         display:
-          type: array
-          description: >-
-            For a redirect, the destination as the preview page draws it, as a
-            tree for a client to paint: a node is a text string, `["wbr"]` (a
-            line-break opportunity), or `[class, child, ...]` using the
-            preview's class names. Text stops after 1000 characters. Absent
-            for Text links.
-          items: {}
+          $ref: "#/components/schemas/Display"
+        cast:
+          $ref: "#/components/schemas/Cast"
 
     Link:
       type: object
@@ -354,6 +362,35 @@ components:
         expires_at:
           type: string
           description: UTC, `YYYY-MM-DD HH:MM:SS`.
+        display:
+          $ref: "#/components/schemas/Display"
+        cast:
+          $ref: "#/components/schemas/Cast"
+
+    Display:
+      type: array
+      description: >-
+        What a link holds as the site's history row draws it, as a tree for a
+        client to paint: a node is a text string, `["wbr"]` (a line-break
+        opportunity), or `[class, child, ...]` using the site's class names.
+        An element that is not a `span`, or that carries data, has an object
+        after its class: `tag` (`b`, `code` or `div`) and its `data-*`
+        attributes by bare name (`esc`, a hidden character's label; `tell`,
+        the `cast` entry naming it; `cp`, the code point of a NUL, whose mark
+        is empty; `name`, an entry's id). For a redirect, the destination as
+        the preview page draws it, stopping after 1000 characters; for Text,
+        the opening (eleven lines, 1000 characters, or all of it when read
+        with `display=true`) with its hidden characters marked. Absent for
+        Text with nothing to mark.
+      items: {}
+
+    Cast:
+      type: array
+      description: >-
+        For Text with hidden characters, one `Display` node per character,
+        naming it and saying why it is marked; a mark's `tell` is its entry's
+        `name`. Absent otherwise.
+      items: {}
 
     Error:
       type: object
@@ -373,6 +410,7 @@ components:
                 type: string
                 description: >-
                   The offending request field: `content`, `kind`,
-                  `ttl_seconds`, or `max_uses`.
+                  `ttl_seconds`, or `max_uses`; for a read, the `display`
+                  query.
               message:
                 type: string

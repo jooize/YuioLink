@@ -484,8 +484,10 @@ struct Snippet<'a> {
     text: &'a str,
     chars: usize,
     lines: usize,
-    /// A redirect's destination tree ([`url_display`]) as JSON.
+    /// The row's display tree ([`url_display`], [`text_display`]) as JSON.
     display: Option<&'a str>,
+    /// The cast entries a Text row's marks open ([`text_display`]) as JSON.
+    cast: Option<&'a str>,
 }
 
 /// The result `<output>` shown after a link is created (server-rendered on the
@@ -512,6 +514,7 @@ fn result_output(
             data-terms-version=(terms.version) data-terms-sha256=(terms.sha256)
             data-snippet=[snippet.map(|s| s.text)] data-chars=[snippet.map(|s| s.chars)]
             data-lines=[snippet.map(|s| s.lines)] data-display=[snippet.and_then(|s| s.display)]
+            data-cast=[snippet.and_then(|s| s.cast)]
             data-secret=[secret.then_some("1")] {
             div.result-id {
                 @if let Some(u) = url {
@@ -882,8 +885,11 @@ pub struct CreatedLink<'a> {
     /// What the form posted; the page passes its opening to app.js for the
     /// local-history row.
     pub content: &'a str,
-    /// A redirect's destination tree ([`url_display`]), for the same row.
+    /// The row's display tree ([`url_display`], [`text_display`]), for the
+    /// same row.
     pub display: Option<serde_json::Value>,
+    /// The cast entries a Text row's marks open ([`text_display`]).
+    pub cast: Option<serde_json::Value>,
     pub kind_label: &'a str,
     pub expires_at: &'a str,
     pub max_uses: Option<i64>,
@@ -897,6 +903,7 @@ pub fn result_page(link: &CreatedLink, redo: Option<&ResultRedo>) -> Markup {
         url,
         content,
         ref display,
+        ref cast,
         kind_label,
         expires_at,
         max_uses,
@@ -935,11 +942,13 @@ pub fn result_page(link: &CreatedLink, redo: Option<&ResultRedo>) -> Markup {
     let trimmed = content.trim();
     let snippet: String = trimmed.chars().take(1000).collect();
     let display = display.as_ref().map(ToString::to_string);
+    let cast = cast.as_ref().map(ToString::to_string);
     let snippet = Snippet {
         text: &snippet,
         chars: trimmed.chars().count(),
         lines: trimmed.lines().count(),
         display: display.as_deref(),
+        cast: cast.as_deref(),
     };
     let body = html! {
         (home_chip("/", "Create New Link"))
@@ -2538,16 +2547,108 @@ const DISPLAY_MAX_CHARS: usize = 1000;
 /// to paint: the line's own markup read back into a tree, so the row wears
 /// exactly the hero's dress with no second renderer to drift from it.
 ///
-/// A node is a text string, `["wbr"]`, or `[class, child, ...]`. Only classes
-/// cross, never attributes or markup: the row builds elements and sets
-/// `textContent` (the CSP's Trusted Types would refuse `innerHTML` anyway). The
-/// preview's edit wrapper (`hp`) keeps its place but not its class, since in a
-/// row it is not a control. Text stops at [`DISPLAY_MAX_CHARS`].
+/// Only classes cross. The preview's edit wrapper (`hp`) keeps its place but
+/// not its class, since in a row it is not a control. Text stops at
+/// [`DISPLAY_MAX_CHARS`].
 pub fn url_display(stored: &str) -> serde_json::Value {
     let html = url_line_parts(&urlview::parse_uri(stored)).into_string();
+    markup_tree(
+        &html,
+        DISPLAY_MAX_CHARS,
+        &TreeRules {
+            drop_class: &["hp"],
+            unwrap: &[],
+            keep: &[],
+        },
+    )
+}
+
+/// The lines a Text row keeps: the ten it shows and one more, so a longer
+/// text can end in a fade. app.js's `snippetOf` keeps the same.
+const SNIPPET_LINES: usize = 11;
+
+/// The opening of a Text link that its history row holds, cut as app.js's
+/// `snippetOf` cuts it: trimmed, its first lines joined by bare line feeds,
+/// at most [`DISPLAY_MAX_CHARS`] characters.
+fn history_snippet(text: &str) -> String {
+    text.trim()
+        .split('\n')
+        .take(SNIPPET_LINES)
+        .map(|l| l.strip_suffix('\r').unwrap_or(l))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .chars()
+        .take(DISPLAY_MAX_CHARS)
+        .collect()
+}
+
+/// A Text link as a history row draws it: the Text page's marked snippet as a
+/// tree, and the cast entry each of its marks opens, both read back from the
+/// page's own markup. `None` when nothing in it is marked: the row then draws
+/// the text plainly. `whole` keeps all of it (a row opened to its full
+/// contents); otherwise it is cut to the row's opening ([`history_snippet`]).
+///
+/// A mark keeps `data-esc` (its label), `data-tell` (its entry) and, for a
+/// NUL, `data-cp`; an entry keeps its `data-name`. A registered variant form
+/// is plain text in a row, so its wrapper is dropped and only the pair stays.
+pub fn text_display(text: &str, whole: bool) -> Option<(serde_json::Value, serde_json::Value)> {
+    let cut;
+    let text = if whole {
+        text
+    } else {
+        cut = history_snippet(text);
+        &cut
+    };
+    let crlf = uniform_crlf(text);
+    let entries: Vec<CastEntry> = text_cast(text, crlf)
+        .into_iter()
+        .filter(|e| e.kind == CastKind::Snippet)
+        .collect();
+    if entries.is_empty() {
+        return None;
+    }
+    let rules = TreeRules {
+        drop_class: &[],
+        unwrap: &["var"],
+        keep: &["esc", "tell", "cp", "name"],
+    };
+    let tree = markup_tree(&marked_text(text, crlf).into_string(), usize::MAX, &rules);
+    let cast = entries
+        .iter()
+        .flat_map(|e| {
+            let html = cast_entry(e, true).into_string();
+            match markup_tree(&html, usize::MAX, &rules) {
+                serde_json::Value::Array(nodes) => nodes,
+                other => vec![other],
+            }
+        })
+        .collect();
+    Some((tree, serde_json::Value::Array(cast)))
+}
+
+/// What may cross from a page's markup into a display tree.
+struct TreeRules<'a> {
+    /// Classes an element sheds while keeping its place.
+    drop_class: &'a [&'a str],
+    /// Classes whose element is dropped and its children kept in its place.
+    unwrap: &'a [&'a str],
+    /// The `data-*` attributes that cross, named without the prefix.
+    keep: &'a [&'a str],
+}
+
+/// Read maud's own markup back into a tree a client builds as elements.
+///
+/// A node is a text string, `["wbr"]`, or `[class, child, ...]`. An element
+/// that is not a `span`, or that keeps an attribute, has an object after its
+/// class: `tag`, and each kept `data-*` attribute by its bare name. No markup
+/// crosses: the client creates elements and sets text, from a short list of
+/// tags and attributes (the CSP's Trusted Types would refuse `innerHTML`
+/// anyway). Text stops after `budget` characters.
+fn markup_tree(html: &str, mut budget: usize, rules: &TreeRules) -> serde_json::Value {
     let mut stack: Vec<Vec<serde_json::Value>> = vec![Vec::new()];
-    let mut budget = DISPLAY_MAX_CHARS;
-    let mut rest = html.as_str();
+    // Per open element: whether it made a node (an unwrapped one did not).
+    let mut open: Vec<bool> = Vec::new();
+    let mut rest = html;
     while !rest.is_empty() && budget > 0 {
         if let Some(r) = rest.strip_prefix("<wbr>") {
             stack
@@ -2555,21 +2656,46 @@ pub fn url_display(stored: &str) -> serde_json::Value {
                 .expect("root")
                 .push(serde_json::json!(["wbr"]));
             rest = r;
-        } else if let Some(r) = rest.strip_prefix("</span>") {
-            close_node(&mut stack);
-            rest = r;
-        } else if rest.starts_with("<span") {
+        } else if rest.starts_with("</") {
             let end = rest.find('>').expect("maud closes its tags");
-            let class = rest[..end]
-                .split_once("class=\"")
-                .and_then(|(_, v)| v.split_once('"'))
-                .map_or("", |(v, _)| v);
+            if open.pop() == Some(true) {
+                close_node(&mut stack);
+            }
+            rest = &rest[end + 1..];
+        } else if let Some(tag) = rest.strip_prefix('<') {
+            let end = tag.find('>').expect("maud closes its tags");
+            let (name, attrs) = tag[..end].split_once(' ').unwrap_or((&tag[..end], ""));
+            rest = &tag[end + 1..];
+            let attrs = parse_attrs(attrs);
+            let class = attrs
+                .iter()
+                .find(|(k, _)| *k == "class")
+                .map_or("", |(_, v)| v.as_str());
+            if class.split(' ').any(|c| rules.unwrap.contains(&c)) {
+                open.push(false);
+                continue;
+            }
             let class: Vec<&str> = class
                 .split(' ')
-                .filter(|c| !c.is_empty() && *c != "hp")
+                .filter(|c| !c.is_empty() && !rules.drop_class.contains(c))
                 .collect();
-            stack.push(vec![serde_json::json!(class.join(" "))]);
-            rest = &rest[end + 1..];
+            let mut node = vec![serde_json::json!(class.join(" "))];
+            let mut extra = serde_json::Map::new();
+            if name != "span" {
+                extra.insert("tag".into(), serde_json::json!(name));
+            }
+            for (k, v) in &attrs {
+                if let Some(k) = k.strip_prefix("data-")
+                    && rules.keep.contains(&k)
+                {
+                    extra.insert(k.into(), serde_json::json!(v));
+                }
+            }
+            if !extra.is_empty() {
+                node.push(serde_json::Value::Object(extra));
+            }
+            stack.push(node);
+            open.push(true);
         } else {
             let end = rest.find('<').unwrap_or(rest.len());
             let text = unescape_html(&rest[..end]);
@@ -2588,6 +2714,19 @@ pub fn url_display(stored: &str) -> serde_json::Value {
     serde_json::Value::Array(stack.pop().expect("root"))
 }
 
+/// An element's attributes as maud writes them: `name="value"`, each value
+/// escaped, so a quote never appears inside one.
+fn parse_attrs(s: &str) -> Vec<(&str, String)> {
+    let mut out = Vec::new();
+    let mut rest = s;
+    while let Some((name, after)) = rest.split_once("=\"") {
+        let (value, r) = after.split_once('"').unwrap_or((after, ""));
+        out.push((name.trim(), unescape_html(value)));
+        rest = r;
+    }
+    out
+}
+
 /// Pop the open element into its parent as `[class, children...]`.
 fn close_node(stack: &mut Vec<Vec<serde_json::Value>>) {
     if stack.len() > 1 {
@@ -2599,9 +2738,11 @@ fn close_node(stack: &mut Vec<Vec<serde_json::Value>>) {
     }
 }
 
-/// Undo maud's text escaping (it escapes exactly these four).
+/// Undo maud's text escaping (it escapes exactly these four), and the one
+/// reference [`marked_text`] writes itself: a carriage return.
 fn unescape_html(s: &str) -> String {
-    s.replace("&lt;", "<")
+    s.replace("&#13;", "\r")
+        .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
         .replace("&amp;", "&")
@@ -3634,6 +3775,85 @@ mod tests {
     fn url_display_unescapes_text() {
         let json = url_display("https://example.com/?a=1&b=%3Cx%3E").to_string();
         assert!(!json.contains("&amp;"), "{json}");
+    }
+
+    /// The text a row's tree holds, as app.js reads it back: a mark's
+    /// `data-cp` stands in for the NUL HTML cannot carry.
+    fn tree_text(v: &serde_json::Value) -> String {
+        match v {
+            serde_json::Value::String(t) => t.clone(),
+            serde_json::Value::Array(a) => {
+                if let Some(cp) = a.get(1).and_then(|o| o.get("cp")).and_then(|c| c.as_str()) {
+                    let cp: u32 = cp.parse().unwrap();
+                    return char::from_u32(cp).unwrap().to_string();
+                }
+                a.iter().skip(1).map(tree_text).collect()
+            }
+            _ => String::new(),
+        }
+    }
+
+    #[test]
+    fn text_display_is_nothing_for_text_with_nothing_to_mark() {
+        assert!(text_display("Lunch at noon?\r\nThe usual place.", false).is_none());
+        // A registered variant form is drawn as itself, not marked.
+        assert!(text_display("thanks \u{2764}\u{fe0f}", false).is_none());
+    }
+
+    #[test]
+    fn text_display_marks_hidden_characters_and_keeps_them_in_the_text() {
+        let text = "Ref: INV\u{200b}-2291 \u{2764}\u{fe0f}\ninvoice\u{202e}fdp.exe\u{0}x\ry";
+        let (tree, cast) = text_display(text, false).expect("marked");
+        let text_of: String = tree.as_array().unwrap().iter().map(tree_text).collect();
+        assert_eq!(text_of, text);
+        let json = tree.to_string();
+        assert!(
+            json.contains("[\"hid\",{\"esc\":\"\\\\u{200B}\",\"tell\":\"u200b\"},\"\u{200b}\"]"),
+            "{json}"
+        );
+        // The override is marked, and the NUL's mark is empty with its code
+        // point beside it; the lone CR is the character itself.
+        assert!(json.contains(r#""tell":"u202e""#), "{json}");
+        assert!(
+            json.contains(r#"["hid",{"cp":"0","esc":"\\u{0}","tell":"u0000"}]"#),
+            "{json}"
+        );
+        assert!(json.contains(r#""tell":"u000d"},"\r"]"#), "{json}");
+        // The variant form's wrapper is gone; the pair is plain text.
+        assert!(!json.contains("var"), "{json}");
+        assert!(json.contains("\u{2764}\u{fe0f}"), "{json}");
+
+        let entries = cast.as_array().unwrap();
+        let names: Vec<&str> = entries
+            .iter()
+            .map(|e| e[1]["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(names, ["u200b", "u202e", "u0000", "u000d"]);
+        assert_eq!(entries[0][0], "entry warn solo");
+        assert_eq!(entries[0][1]["tag"], "div");
+        let cast = cast.to_string();
+        assert!(
+            cast.contains(r#"{"tag":"b"},"zero-width space"]"#),
+            "{cast}"
+        );
+        assert!(cast.contains(r#"{"tag":"code"},"\\u{200B}"]"#), "{cast}");
+    }
+
+    #[test]
+    fn text_display_cuts_to_the_rows_opening_unless_whole() {
+        let lines: Vec<String> = (1..=14).map(|n| format!("line {n}\u{200b}")).collect();
+        let text = lines.join("\r\n");
+        let (tree, _) = text_display(&text, false).unwrap();
+        let cut: String = tree.as_array().unwrap().iter().map(tree_text).collect();
+        assert_eq!(cut, lines[..11].join("\n"));
+        let (tree, _) = text_display(&text, true).unwrap();
+        let whole: String = tree.as_array().unwrap().iter().map(tree_text).collect();
+        assert_eq!(whole, text);
+
+        let long = format!("\u{200b}{}", "a".repeat(3000));
+        let (tree, _) = text_display(&long, false).unwrap();
+        let cut: String = tree.as_array().unwrap().iter().map(tree_text).collect();
+        assert_eq!(cut.chars().count(), DISPLAY_MAX_CHARS);
     }
 
     #[test]

@@ -17,7 +17,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use axum::extract::{Form, Path, State};
+use axum::extract::{Form, Path, Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
@@ -310,9 +310,36 @@ async fn create_link(
     })
 }
 
-/// The destination tree for a redirect just stored; nothing for Text.
-fn display_of(created: &Created) -> Option<serde_json::Value> {
-    (created.kind == Kind::Redirect).then(|| views::url_display(&created.content))
+/// What a history row draws for a link just stored: the display tree and, for
+/// Text with hidden characters, the cast entries its marks open. Text with
+/// nothing to mark gets neither, and its row draws the text plainly.
+fn display_of(created: &Created) -> RowDisplay {
+    row_display(created.kind, &created.content, false)
+}
+
+/// A link's contents as a history row draws them. `whole` keeps all of a
+/// Text link, for a row opened to its full contents; otherwise it is cut to
+/// the row's opening.
+fn row_display(kind: Kind, content: &str, whole: bool) -> RowDisplay {
+    match kind {
+        Kind::Redirect => RowDisplay {
+            display: Some(views::url_display(content)),
+            cast: None,
+        },
+        Kind::Text => views::text_display(content, whole)
+            .map(|(display, cast)| RowDisplay {
+                display: Some(display),
+                cast: Some(cast),
+            })
+            .unwrap_or_default(),
+    }
+}
+
+/// See [`row_display`].
+#[derive(Default)]
+struct RowDisplay {
+    display: Option<serde_json::Value>,
+    cast: Option<serde_json::Value>,
 }
 
 /// A link just stored, with what was stored: the kind it got and the content
@@ -406,6 +433,7 @@ pub async fn form_create(
     .await
     {
         Ok(created) => {
+            let row = display_of(&created);
             let inserted = &created.link;
             let url = format!("{}{}", state.base_url, inserted.name);
             let kind_label = match created.kind {
@@ -424,7 +452,8 @@ pub async fn form_create(
                     &views::CreatedLink {
                         url: &url,
                         content: &content,
-                        display: display_of(&created),
+                        display: row.display,
+                        cast: row.cast,
                         kind_label,
                         expires_at: &inserted.expires_at,
                         max_uses,
@@ -871,7 +900,7 @@ pub async fn create_plain(
         }
     };
 
-    let display = display_of(&created);
+    let row = display_of(&created);
     let inserted = created.link;
     let url = format!("{}{}", state.base_url, inserted.name);
 
@@ -887,7 +916,8 @@ pub async fn create_plain(
             expires_at: inserted.expires_at,
             words: inserted.words,
             creator_token: None,
-            display,
+            display: row.display,
+            cast: row.cast,
             terms: crate::legal::receipt(),
         })
         .into_response()
@@ -1113,10 +1143,17 @@ pub struct CreateResponse {
     /// without a token (the `/create` convenience path).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub creator_token: Option<String>,
-    /// A redirect's destination as the preview draws it, as a tree the
-    /// local-history row paints (see `views::url_display`). Absent for Text.
+    /// The contents as the local-history row draws them, as a tree it
+    /// paints: a redirect's destination in the preview's dress
+    /// (`views::url_display`), or the opening of a Text link with its hidden
+    /// characters marked (`views::text_display`). Absent for Text with
+    /// nothing to mark.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display: Option<serde_json::Value>,
+    /// For Text with hidden characters, one entry per character naming it,
+    /// which a mark in the row opens. Absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cast: Option<serde_json::Value>,
     /// The terms in effect when this link was created — version id and the
     /// SHA-256 fingerprint of their canonical text (see `/legal`). Kept by the
     /// client, this is the creator's receipt of what they accepted; the terms
@@ -1147,6 +1184,22 @@ pub struct ApiLink {
     pub max_uses: Option<i64>,
     pub created_at: String,
     pub expires_at: String,
+    /// The contents as a history row draws them, sent only when asked
+    /// (`?display=true`) and only with the contents themselves. For Text,
+    /// all of it, not the row's opening. See [`CreateResponse::display`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display: Option<serde_json::Value>,
+    /// See [`CreateResponse::cast`]; sent with `display`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cast: Option<serde_json::Value>,
+}
+
+/// The read API's query: whether to add the row's display tree.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReadQuery {
+    #[serde(default)]
+    display: bool,
 }
 
 pub enum ApiError {
@@ -1303,7 +1356,7 @@ pub async fn api_create_link(
     )
     .await?;
 
-    let display = display_of(&created);
+    let row = display_of(&created);
     let inserted = created.link;
     let url = format!("{}{}", state.base_url, inserted.name);
     let location = format!("{}api/v0/links/{}", state.base_url, inserted.name);
@@ -1316,7 +1369,8 @@ pub async fn api_create_link(
             expires_at: inserted.expires_at,
             words: inserted.words,
             creator_token: Some(creator_token),
-            display,
+            display: row.display,
+            cast: row.cast,
             terms: crate::legal::receipt(),
         }),
     ))
@@ -1371,8 +1425,15 @@ pub async fn api_delete_link(
 pub async fn api_get_link(
     State(state): State<AppState>,
     Path(name): Path<String>,
+    query: Result<Query<ReadQuery>, axum::extract::rejection::QueryRejection>,
     headers: HeaderMap,
 ) -> Result<Json<ApiLink>, ApiError> {
+    let Ok(Query(query)) = query else {
+        return Err(ApiError::BadRequest(vec![FieldError {
+            field: Cow::Borrowed("display"),
+            message: "The only query is `display`, set to `true` or `false`.".to_owned(),
+        }]));
+    };
     let internal = |e: sqlx::Error| {
         tracing::error!(error = %e, "failed to read link");
         ApiError::Internal
@@ -1395,6 +1456,16 @@ pub async fn api_get_link(
         ("text", true) => (None, Some(d.content.clone())),
         _ => (None, None),
     };
+    // Only beside the contents: the tree is the contents, drawn.
+    let kind = match d.kind.as_str() {
+        "redirect" => Some(Kind::Redirect),
+        "text" => Some(Kind::Text),
+        _ => None,
+    };
+    let row = match kind {
+        Some(kind) if query.display && disclosed => row_display(kind, &d.content, true),
+        _ => RowDisplay::default(),
+    };
 
     Ok(Json(ApiLink {
         url: format!("{}{}", state.base_url, d.name),
@@ -1406,6 +1477,8 @@ pub async fn api_get_link(
         max_uses: d.max_uses,
         created_at: d.created_at,
         expires_at: d.expires_at,
+        display: row.display,
+        cast: row.cast,
     }))
 }
 
@@ -2506,6 +2579,65 @@ mod tests {
         let (s, _, body) = send(&st, get(&format!("/api/v0/links/{}", u.name))).await;
         assert_eq!(s, StatusCode::OK);
         assert!(body.contains("https://example.com/open"));
+    }
+
+    #[tokio::test]
+    async fn text_with_hidden_characters_comes_back_with_its_row_tree() {
+        let st = test_state().await;
+        let create = |content: &str| {
+            Request::builder()
+                .method("POST")
+                .uri("/api/v0/links")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({ "kind": "text", "content": content }).to_string(),
+                ))
+                .unwrap()
+        };
+        let (s, _, body) = send(&st, create("plain words")).await;
+        assert_eq!(s, StatusCode::CREATED);
+        assert!(
+            !body.contains("\"display\"") && !body.contains("\"cast\""),
+            "{body}"
+        );
+
+        let (s, _, body) = send(&st, create("pay\u{200b}pal")).await;
+        assert_eq!(s, StatusCode::CREATED);
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["display"][1][1]["tell"], "u200b", "{body}");
+        assert_eq!(v["cast"][0][1]["name"], "u200b", "{body}");
+
+        // The read sends the tree only when asked, and then for all of it.
+        let name = v["name"].as_str().unwrap();
+        let (_, _, body) = send(&st, get(&format!("/api/v0/links/{name}"))).await;
+        assert!(!body.contains("\"display\""), "{body}");
+        let (s, _, body) = send(&st, get(&format!("/api/v0/links/{name}?display=true"))).await;
+        assert_eq!(s, StatusCode::OK);
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["display"][1][1]["tell"], "u200b", "{body}");
+        let (s, _, body) = send(&st, get(&format!("/api/v0/links/{name}?display=yes"))).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}");
+        assert!(body.contains("\"field\":\"display\""), "{body}");
+
+        // A limited link withholds its contents, and so its tree.
+        let l = db::insert_link(
+            &st.pool,
+            NewLink {
+                kind: "text",
+                content: "one\u{200b}time",
+                content_type: None,
+                ttl_seconds: 3600,
+                max_uses: Some(1),
+                secret: false,
+                creator_token: Some("tok"),
+            },
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+        let (_, _, body) = send(&st, get(&format!("/api/v0/links/{}?display=true", l.name))).await;
+        assert!(!body.contains("\"display\""), "{body}");
+        assert_eq!(uses(&st, &l.name).await, 0);
     }
 
     #[tokio::test]
