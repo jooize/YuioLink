@@ -71,7 +71,11 @@ figcaption .tag { display: inline-block; margin-left: 6px; padding: 0 6px; borde
   color: var(--danger); background: none; border: 0; padding: 0; margin: 0 8px 0 0;
 }
 button.hc-chip { cursor: pointer; padding: 1px 6px; margin-left: -6px; border-radius: 6px; }
-button.hc-chip:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+button.hc-chip:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+/* The chip's color follows the mode: red while the characters are drawn,
+   amber while they are in the text but not drawn, green once they are out. */
+.hc-chip[data-view="hidden"] { color: var(--warn); }
+.hc-chip[data-view="removed"] { color: var(--result-text); }
 .hc-chip .state { font-weight: 500; color: var(--text-secondary); }
 .hc-chip svg { flex: none; }
 
@@ -107,7 +111,9 @@ html.js .hc-panel.pv-cast, html.js .hc-panel .pv-cast { display: block; }
   it is; click the chips where they are buttons.</p>
 
   <h2>Round 2: four modes</h2>
-  <p class="lead"><b>Ticks</b>, <b>Labels</b>, <b>Hidden</b> and <b>Removed</b>. Hidden keeps the
+  <p class="lead"><b>Ticks</b>, <b>Labels</b>, <b>Hidden</b> and <b>Removed</b>. The chip is red
+  while the characters are drawn, amber while they are hidden, and green with a check once they
+  are removed. Hidden keeps the
   characters (a copy still carries them) and draws nothing. Removed takes them out of the row, so
   a selection copies the text without them. Hidden and Removed look the same; only the chip and
   the copy tell them apart.</p>
@@ -193,6 +199,10 @@ const alertIcon = () => icon(12, "0 0 16 16", [
   ["path", { d: "M8 4.6v4.2", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" }],
   ["circle", { cx: "8", cy: "11.2", r: ".95", fill: "currentColor" }],
 ]);
+const checkIcon = () => icon(12, "0 0 16 16", [
+  ["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
+  ["path", { ...round, d: "M5.2 8.2 7.2 10.1 10.9 6", "stroke-width": "1.6" }],
+]);
 const el = (tag, cls, ...kids) => {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -265,9 +275,15 @@ const chip = (row, fig, li) => {
   const c = el("button", "hc-chip");
   c.type = "button";
   const state = el("span", "state");
-  c.append(alertIcon(), chipLabel(n), state);
+  const glyph = el("span", "glyph", alertIcon());
+  glyph.style.display = "inline-flex";
+  c.append(glyph, chipLabel(n), state);
   const paint = () => {
-    if (fig === "cycle" || fig === "panel") state.textContent = `· ${MODE_NAME[li.dataset.view]}`;
+    if (fig === "cycle" || fig === "panel") {
+      state.textContent = `· ${MODE_NAME[li.dataset.view]}`;
+      c.dataset.view = li.dataset.view;
+      glyph.replaceChildren(li.dataset.view === "removed" ? checkIcon() : alertIcon());
+    }
     else if (fig === "compact") state.textContent = li.classList.contains("compact") ? "· Ticks" : "· Labels";
     else state.textContent = li.classList.contains("marks-off") ? "· Show" : "· Shown";
   };
