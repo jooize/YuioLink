@@ -9,6 +9,7 @@
 body { display: block; padding: 28px 16px 48px; }
 .page { max-width: 1240px; margin: 0 auto; }
 h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 17px; margin: 34px 0 4px; }
 .lead { color: var(--text-secondary); font-size: 14px; margin: 0 0 18px; max-width: 88ch; text-align: left; }
 .lead code, figcaption code, .readout code { font-family: var(--font-mono); font-size: 0.92em; }
 .row { display: flex; flex-wrap: wrap; gap: 26px 22px; align-items: flex-start; }
@@ -28,7 +29,8 @@ figcaption .tag { display: inline-block; margin-left: 6px; padding: 0 6px; borde
 
 /* --- Mockup-only: the Text page's mark, moved into a History row. The real
    character stays in the text; the label is generated content that ignores
-   the pointer, so a drag selects only what is really there. --- */
+   the pointer, so a drag selects only what is really there. A click is
+   matched to a mark by position, as text.js does. --- */
 .history-well-body .hid { unicode-bidi: isolate; }
 .history-well-body .hid::after {
   content: attr(data-esc);
@@ -45,10 +47,11 @@ figcaption .tag { display: inline-block; margin-left: 6px; padding: 0 6px; borde
   unicode-bidi: isolate;
   outline: 1px solid transparent;
 }
-/* Marks turned off: the character is still isolated (an override cannot
+.history-well-body.over-mark { cursor: pointer; }
+/* Hidden: the character is still there and isolated (an override cannot
    reorder the rest of the row), it just draws nothing. */
 .marks-off .history-well-body .hid::after { display: none; }
-/* Compact: a red tick where each character sits; the chip opens the labels. */
+/* Ticks: a red tick where each character sits. */
 .compact .history-well-body .hid::after {
   content: "";
   display: inline-block;
@@ -60,16 +63,31 @@ figcaption .tag { display: inline-block; margin-left: 6px; padding: 0 6px; borde
   vertical-align: -0.18em;
 }
 
-/* The chip: the Text page's "Hidden Characters" fact, at row size. */
+/* The chip: the Text page's "Hidden Characters" fact, at row size. The hover
+   is a wash behind the whole chip, never an underline (it broke at the dot). */
 .hc-chip {
   display: inline-flex; align-items: center; gap: 4px;
   font: inherit; font-size: 12px; font-weight: 600;
   color: var(--danger); background: none; border: 0; padding: 0; margin: 0 8px 0 0;
 }
-button.hc-chip { cursor: pointer; }
-button.hc-chip:hover { text-decoration: underline; text-underline-offset: 2px; }
+button.hc-chip { cursor: pointer; padding: 1px 6px; margin-left: -6px; border-radius: 6px; }
+button.hc-chip:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .hc-chip .state { font-weight: 500; color: var(--text-secondary); }
 .hc-chip svg { flex: none; }
+
+/* What a mark means, opened under the well by a click on the mark (or, in H,
+   on the chip). The cast entry's own markup and styles. */
+.hc-panel { margin: 2px 0 4px; }
+.hc-panel.pv-cast { margin: 2px 0 4px; }
+.hc-panel .pv-cast { margin: 0; }
+/* A plain list here, not the Text page's one-at-a-time deck: every entry is
+   .solo (always shown) and the deck's grid becomes a block. */
+html.js .hc-panel.pv-cast, html.js .hc-panel .pv-cast { display: block; }
+.hc-panel .entry { padding: 5px 4px; }
+.hc-panel .entry.on { background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.hc-panel .what { font-size: 12.5px; }
+.hc-modes { display: inline-flex; margin: 2px 0 6px; }
+.hc-modes .seg-label { padding: 3px 10px; font-size: 12px; }
 
 /* Option F: one switch in the History header for every row. */
 .hc-head-switch { display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
@@ -82,11 +100,29 @@ button.hc-chip:hover { text-decoration: underline; text-underline-offset: 2px; }
   <h1>Hidden characters in History rows</h1>
   <p class="lead">Today a Text row in History draws its snippet as plain text, so a zero-width
   space disappears and a right-to-left override reorders the line:
-  <code><bdi>invoice&#x202E;fdp.exe</bdi></code> is really an <code>.exe</code>. Each option below uses the real History row and app.css. Drag
-  across a row and the line under it lists what the selection would copy, code point by code
-  point. In every marked option the label is drawn on top of the character, so a selection holds
-  only what the link stores. Click the chips where they are buttons.</p>
+  <code><bdi>invoice&#x202E;fdp.exe</bdi></code> is really an <code>.exe</code>. Each option below
+  uses the real History row and app.css. Drag across a row and the line under it lists what the
+  selection would copy, code point by code point. In every marked option the label is drawn on
+  top of the character, so a selection holds only what the link stores. Click a mark to see what
+  it is; click the chips where they are buttons.</p>
 
+  <h2>Round 2: four modes</h2>
+  <p class="lead"><b>Ticks</b>, <b>Labels</b>, <b>Hidden</b> and <b>Removed</b>. Hidden keeps the
+  characters (a copy still carries them) and draws nothing. Removed takes them out of the row, so
+  a selection copies the text without them. Hidden and Removed look the same; only the chip and
+  the copy tell them apart.</p>
+  <div class="row">
+    <figure data-mode="cycle">
+      <figcaption><b>G · Chip cycles</b><span class="tag">round 2</span><br>Each click moves to the next mode: Ticks, Labels, Hidden, Removed.</figcaption>
+      <div class="frame" data-frame></div><p class="readout" data-readout></p>
+    </figure>
+    <figure data-mode="panel">
+      <figcaption><b>H · Chip opens a panel</b><span class="tag">round 2</span><br>The chip, or a click on a mark, opens the list of characters with the four modes above it.</figcaption>
+      <div class="frame" data-frame></div><p class="readout" data-readout></p>
+    </figure>
+  </div>
+
+  <h2>Round 1</h2>
   <div class="row">
     <figure data-mode="today">
       <figcaption><b>0 · Today</b>Plain text. Nothing marked, and the override reorders the line.</figcaption>
@@ -157,144 +193,173 @@ const alertIcon = () => icon(12, "0 0 16 16", [
   ["path", { d: "M8 4.6v4.2", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" }],
   ["circle", { cx: "8", cy: "11.2", r: ".95", fill: "currentColor" }],
 ]);
+const el = (tag, cls, ...kids) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  e.append(...kids);
+  return e;
+};
 
 // What the server would send: runs of plain text and hidden characters, each
-// hidden one with its label. A registered variant form (the heart + VS16) is
-// plain text, as on the Text page.
+// hidden one with its label and cast id. A registered variant form (the heart
+// + VS16) is plain text, as on the Text page.
 const ROWS = [
   { name: "spell", parts: [
     "Wire the deposit to SE45 5000 0000 0583 9825 7466\nRef: INV",
-    ["​", "\\u{200B}"], "-2291, thanks ❤️\nAttachment: invoice",
-    ["‮", "\\u{202E}"], "fdp.exe",
+    ["​", "\\u{200B}", "u200b"], "-2291, thanks ❤️\nAttachment: invoice",
+    ["‮", "\\u{202E}", "u202e"], "fdp.exe",
   ] },
   { name: "lunch", parts: ["Lunch at noon? The usual place."] },
 ];
 
-const hiddenCount = (row) => row.parts.filter(Array.isArray).length;
-
-const body = (row, marked) => {
-  const b = document.createElement("span");
-  b.className = "history-well-body";
-  for (const p of row.parts) {
-    if (typeof p === "string") { b.append(p); continue; }
-    if (!marked) { b.append(p[0]); continue; }
-    const s = document.createElement("span");
-    s.className = "hid";
-    s.dataset.esc = p[1];
-    s.textContent = p[0];
-    b.append(s);
-  }
-  return b;
+// The cast entries, worded as the Text page words them.
+const CAST = {
+  u200b: { sym: "ZWSP", name: "zero-width space", cp: "U+200B",
+    what: ["marked ", ["code", "\\u{200B}"], ". It draws nothing, so two texts that look the same can differ."] },
+  u202e: { sym: "RLO", name: "right-to-left override", cp: "U+202E",
+    what: ["marked ", ["code", "\\u{202E}"], ". It draws text after it backwards, so ",
+      ["code", "invoice⁨‮fdp.exe⁩"], " reads as a .pdf. Here it is isolated, so it reorders nothing."] },
+};
+const entry = (id, on) => {
+  const c = CAST[id];
+  const what = el("span", "what", el("b", "", c.name), " ", el("span", "cp", c.cp), " — ");
+  for (const w of c.what) what.append(typeof w === "string" ? w : el(w[0], "", w[1]));
+  const e = el("div", `entry warn solo${on ? " on" : ""}`,
+    el("span", "tiles", el("span", "tile sym warn", c.sym)), what);
+  e.dataset.name = id;
+  return e;
 };
 
-const chip = (row, mode, li) => {
-  const n = hiddenCount(row);
-  if (!n || mode === "today" || mode === "marks") return null;
-  const label = n === 1 ? "1 Hidden Character" : `${n} Hidden Characters`;
-  if (mode === "chip" || mode === "header") {
-    const c = document.createElement("span");
-    c.className = "hc-chip";
-    c.append(alertIcon(), label);
-    return c;
+const MODES = ["ticks", "labels", "hidden", "removed"];
+const MODE_NAME = { ticks: "Ticks", labels: "Labels", hidden: "Hidden", removed: "Removed" };
+const hiddenIds = (row) => row.parts.filter(Array.isArray).map((p) => p[2]);
+
+const fillBody = (b, row, marked, removed) => {
+  b.replaceChildren();
+  for (const p of row.parts) {
+    if (typeof p === "string") { b.append(p); continue; }
+    if (removed) continue;
+    if (!marked) { b.append(p[0]); continue; }
+    const s = el("span", "hid", p[0]);
+    s.dataset.esc = p[1];
+    s.dataset.tell = p[2];
+    b.append(s);
   }
-  const c = document.createElement("button");
+};
+
+// The row's display mode, for the four-mode options: the class on the row
+// and whether the characters are in the text at all.
+const applyMode = (li, row, mode) => {
+  li.dataset.view = mode;
+  li.classList.toggle("compact", mode === "ticks");
+  li.classList.toggle("marks-off", mode === "hidden");
+  fillBody(li.querySelector(".history-well-body"), row, true, mode === "removed");
+};
+
+const chipLabel = (n) => (n === 1 ? "1 Hidden Character" : `${n} Hidden Characters`);
+
+const chip = (row, fig, li) => {
+  const n = hiddenIds(row).length;
+  if (!n || fig === "today" || fig === "marks") return null;
+  if (fig === "chip" || fig === "header") return el("span", "hc-chip", alertIcon(), chipLabel(n));
+  const c = el("button", "hc-chip");
   c.type = "button";
-  c.className = "hc-chip";
-  const state = document.createElement("span");
-  state.className = "state";
+  const state = el("span", "state");
+  c.append(alertIcon(), chipLabel(n), state);
   const paint = () => {
-    const on = mode === "compact" ? !li.classList.contains("compact") : !li.classList.contains("marks-off");
-    state.textContent = mode === "compact" ? (on ? "· Labels" : "· Ticks") : (on ? "· Shown" : "· Show");
-    c.setAttribute("aria-pressed", String(on));
+    if (fig === "cycle" || fig === "panel") state.textContent = `· ${MODE_NAME[li.dataset.view]}`;
+    else if (fig === "compact") state.textContent = li.classList.contains("compact") ? "· Ticks" : "· Labels";
+    else state.textContent = li.classList.contains("marks-off") ? "· Show" : "· Shown";
   };
-  c.append(alertIcon(), label, state);
+  li.paintChip = paint;
   c.addEventListener("click", () => {
-    li.classList.toggle(mode === "compact" ? "compact" : "marks-off");
+    if (fig === "cycle") applyMode(li, row, MODES[(MODES.indexOf(li.dataset.view) + 1) % MODES.length]);
+    else if (fig === "panel") togglePanel(li, row, null);
+    else li.classList.toggle(fig === "compact" ? "compact" : "marks-off");
     paint();
   });
-  if (mode === "toggle-off") li.classList.add("marks-off");
-  if (mode === "compact") li.classList.add("compact");
-  paint();
   return c;
 };
 
-const item = (row, mode) => {
-  const li = document.createElement("li");
-  li.className = "history-item live";
-  const well = document.createElement("div");
-  well.className = "history-well text";
-  const mark = document.createElement("span");
-  mark.className = "history-mark";
-  mark.setAttribute("aria-hidden", "true");
-  mark.append(quoteIcon());
-  const col = document.createElement("div");
-  col.className = "history-well-col";
-  // B marks nothing but still isolates each character, so an override
-  // cannot reorder the row; it simply draws nothing.
-  col.append(body(row, mode !== "today"));
-  if (mode === "chip") li.classList.add("marks-off");
-  const side = document.createElement("span");
-  side.className = "history-well-side";
+// H's panel: the four modes, then every character in the row. A click on a
+// mark opens it with that character's entry lit.
+const togglePanel = (li, row, focus) => {
+  const old = li.querySelector(".hc-panel");
+  if (old && (!focus || old.dataset.focus === focus)) { old.remove(); return; }
+  old?.remove();
+  const panel = el("div", "hc-panel");
+  panel.dataset.focus = focus ?? "";
+  const seg = el("div", "segmented hc-modes");
+  const group = `m${Math.random().toString(36).slice(2)}`;
+  for (const m of MODES) {
+    const id = `${group}-${m}`;
+    const r = el("input", "seg-radio");
+    r.type = "radio"; r.name = group; r.id = id; r.checked = li.dataset.view === m;
+    r.addEventListener("change", () => { applyMode(li, row, m); li.paintChip?.(); });
+    const l = el("label", "seg-label", MODE_NAME[m]);
+    l.htmlFor = id;
+    seg.append(r, l);
+  }
+  const cast = el("div", "pv-cast");
+  for (const id of new Set(hiddenIds(row))) cast.append(entry(id, id === focus));
+  panel.append(seg, cast);
+  li.querySelector(".history-well").after(panel);
+};
+
+// Every other marked option: a click on a mark opens its one entry.
+const toggleEntry = (li, id) => {
+  const old = li.querySelector(".hc-panel");
+  old?.remove();
+  if (old?.dataset.focus === id) return;
+  const panel = el("div", "hc-panel pv-cast", entry(id, false));
+  panel.dataset.focus = id;
+  li.querySelector(".history-well").after(panel);
+};
+
+const item = (row, fig) => {
+  const li = el("li", "history-item live");
+  li.row = row;
+  li.fig = fig;
+  const bodyEl = el("span", "history-well-body");
+  fillBody(bodyEl, row, fig !== "today", false);
+  if (fig === "chip" || fig === "toggle-off") li.classList.add("marks-off");
+  if (fig === "compact") li.classList.add("compact");
+  const side = el("span", "history-well-side");
   for (const [cls, ic] of [["history-well-copy", copyIcon()], ["history-eye", eyeIcon(true)]]) {
-    const b = document.createElement("button");
+    const b = el("button", `history-well-btn ${cls}`, ic);
     b.type = "button";
-    b.className = `history-well-btn ${cls}`;
-    b.append(ic);
     side.append(b);
   }
-  well.append(mark, col, side);
+  const mark = el("span", "history-mark", quoteIcon());
+  mark.setAttribute("aria-hidden", "true");
+  const well = el("div", "history-well text", mark, el("div", "history-well-col", bodyEl), side);
 
-  const link = document.createElement("code");
-  link.className = "history-link";
-  const dash = document.createElement("span");
-  dash.className = "history-link-dash";
-  dash.textContent = "—";
-  const host = document.createElement("span");
-  host.className = "history-link-host";
-  host.textContent = "yuiolink.test/";
-  const name = document.createElement("span");
-  name.className = "history-link-name";
-  name.textContent = row.name;
-  link.append(dash, host, name);
+  const link = el("code", "history-link",
+    el("span", "history-link-dash", "—"),
+    el("span", "history-link-host", "yuiolink.test/"),
+    el("span", "history-link-name", row.name));
 
-  const foot = document.createElement("div");
-  foot.className = "history-foot";
-  const meta = document.createElement("small");
-  meta.className = "history-meta";
-  const c = chip(row, mode, li);
-  if (c) meta.append(c);
-  const cd = document.createElement("span");
-  cd.className = "countdown";
-  cd.textContent = "Expires in 7 days";
-  meta.append(cd);
-  const actions = document.createElement("div");
-  actions.className = "history-actions";
+  li.append(well, link);
+  if (fig === "cycle" || fig === "panel") applyMode(li, row, "ticks");
+  const meta = el("small", "history-meta");
+  const c = chip(row, fig, li);
+  if (c) { meta.append(c); li.paintChip?.(); }
+  meta.append(el("span", "countdown", "Expires in 7 days"));
+  const actions = el("div", "history-actions");
   for (const [cls, ic] of [["history-copy", copyIcon()], ["history-show", openIcon()], ["history-remove", trashIcon()]]) {
-    const a = document.createElement(cls === "history-remove" ? "button" : "a");
-    a.className = cls;
+    const a = el(cls === "history-remove" ? "button" : "a", cls, ic);
     if (a.tagName === "A") a.href = "#";
-    a.append(ic);
     actions.append(a);
   }
-  foot.append(meta, actions);
-  li.append(well, link, foot);
+  li.append(el("div", "history-foot", meta, actions));
   return li;
 };
 
 const headSwitch = (list) => {
-  const head = document.createElement("div");
-  head.className = "history-head";
-  const title = document.createElement("span");
-  title.className = "history-title";
-  title.textContent = "Local History";
   // The real History switch's look (.history-persist.on drives the knob).
-  const btn = document.createElement("button");
+  const btn = el("button", "hc-head-switch history-persist", el("span", "storage-switch"), "Mark Hidden Characters");
   btn.type = "button";
-  btn.className = "hc-head-switch history-persist";
   btn.setAttribute("role", "switch");
-  const sw = document.createElement("span");
-  sw.className = "storage-switch";
-  btn.append(sw, "Mark Hidden Characters");
   const paint = () => {
     const on = !list.classList.contains("marks-off");
     btn.setAttribute("aria-checked", String(on));
@@ -302,24 +367,45 @@ const headSwitch = (list) => {
   };
   btn.addEventListener("click", () => { list.classList.toggle("marks-off"); paint(); });
   paint();
-  head.append(title, btn);
-  return head;
+  return el("div", "history-head", el("span", "history-title", "Local History"), btn);
 };
 
 for (const fig of document.querySelectorAll("figure[data-mode]")) {
   const mode = fig.dataset.mode;
-  const section = document.createElement("section");
-  section.className = "history";
-  const list = document.createElement("ul");
-  list.className = "history-list";
+  const list = el("ul", "history-list");
   for (const row of ROWS) list.append(item(row, mode));
+  const section = el("section", "history");
   if (mode === "header") section.append(headSwitch(list));
-  const bodyWrap = document.createElement("div");
-  bodyWrap.className = "history-body";
-  bodyWrap.append(list);
-  section.append(bodyWrap);
+  section.append(el("div", "history-body", list));
   fig.querySelector("[data-frame]").append(section);
 }
+
+// A drawn mark under the pointer, if any. The label ignores the pointer, so
+// the mark is found by position; a mark that draws nothing never answers.
+const markAt = (body, x, y) => {
+  const li = body.closest("li");
+  if (li.classList.contains("marks-off") || li.closest(".history-list.marks-off")) return null;
+  for (const s of body.querySelectorAll(".hid")) {
+    for (const r of s.getClientRects()) {
+      if (r.width > 0 && x >= r.left - 2 && x <= r.right + 2 && y >= r.top && y <= r.bottom) return s;
+    }
+  }
+  return null;
+};
+document.addEventListener("mousemove", (ev) => {
+  for (const b of document.querySelectorAll(".history-well-body.over-mark")) b.classList.remove("over-mark");
+  const body = ev.target.closest?.(".history-well-body");
+  if (body && markAt(body, ev.clientX, ev.clientY)) body.classList.add("over-mark");
+});
+document.addEventListener("click", (ev) => {
+  const body = ev.target.closest?.(".history-well-body");
+  if (!body || !getSelection().isCollapsed) return;
+  const s = markAt(body, ev.clientX, ev.clientY);
+  if (!s) return;
+  const li = body.closest("li");
+  if (li.fig === "panel") togglePanel(li, li.row, s.dataset.tell);
+  else toggleEntry(li, s.dataset.tell);
+});
 
 // The readout: what the current selection would copy, one code point at a
 // time, hidden ones named in red. Generated labels are never part of it.
@@ -331,10 +417,7 @@ const describe = (s) => {
       && !(cp >= 0x2066 && cp <= 0x2069) && cp !== 0xFEFF && !(cp >= 0xFE00 && cp <= 0xFE0F);
     if (ch === "\n") { out.append(" ↵ "); continue; }
     if (visible || ch === " ") { out.append(ch); continue; }
-    const c = document.createElement("span");
-    c.className = "cp";
-    c.textContent = ` U+${cp.toString(16).toUpperCase().padStart(4, "0")} `;
-    out.append(c);
+    out.append(el("span", "cp", ` U+${cp.toString(16).toUpperCase().padStart(4, "0")} `));
   }
   return out;
 };
@@ -344,10 +427,7 @@ document.addEventListener("selectionchange", () => {
   if (!sel.rangeCount || sel.isCollapsed) return;
   const fig = sel.anchorNode?.parentElement?.closest("figure");
   if (!fig) return;
-  const r = fig.querySelector("[data-readout]");
-  const code = document.createElement("code");
-  code.append(describe(sel.toString()));
-  r.append("Copies: ", code);
+  fig.querySelector("[data-readout]").append("Copies: ", el("code", "", describe(sel.toString())));
 });
 </script>
 </body>
