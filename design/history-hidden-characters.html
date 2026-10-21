@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en" class="js has-history">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>History Hidden Characters</title>
+<link rel="stylesheet" href="../server/static/app.css">
+<style>
+body { display: block; padding: 28px 16px 48px; }
+.page { max-width: 1240px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.lead { color: var(--text-secondary); font-size: 14px; margin: 0 0 18px; max-width: 88ch; text-align: left; }
+.lead code, figcaption code, .readout code { font-family: var(--font-mono); font-size: 0.92em; }
+.row { display: flex; flex-wrap: wrap; gap: 26px 22px; align-items: flex-start; }
+figure { margin: 0; width: 520px; max-width: 100%; }
+figcaption { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 8px; text-align: left; }
+figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
+figcaption .tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; color: var(--text-secondary); background: var(--field-bg);
+  border: 0.5px solid var(--card-border); }
+.frame { padding: 14px 18px 10px; border-radius: 18px; background: var(--card-bg);
+  border: 0.5px solid var(--card-border); }
+.frame .history { margin: 0; padding: 0; border: 0; }
+.frame .history-list { min-height: 0; }
+.readout { margin: 8px 2px 0; font-size: 12.5px; color: var(--text-secondary); text-align: left;
+  min-height: 1.6em; overflow-wrap: anywhere; }
+.readout .cp { color: var(--danger); font-weight: 700; }
+
+/* --- Mockup-only: the Text page's mark, moved into a History row. The real
+   character stays in the text; the label is generated content that ignores
+   the pointer, so a drag selects only what is really there. --- */
+.history-well-body .hid { unicode-bidi: isolate; }
+.history-well-body .hid::after {
+  content: attr(data-esc);
+  pointer-events: none;
+  margin: 0 1px;
+  padding: 0 3px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  font-weight: 700;
+  color: var(--on-danger);
+  background: var(--danger);
+  direction: ltr;
+  unicode-bidi: isolate;
+  outline: 1px solid transparent;
+}
+/* Marks turned off: the character is still isolated (an override cannot
+   reorder the rest of the row), it just draws nothing. */
+.marks-off .history-well-body .hid::after { display: none; }
+/* Compact: a red tick where each character sits; the chip opens the labels. */
+.compact .history-well-body .hid::after {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 1.05em;
+  margin: 0 1px;
+  padding: 0;
+  border-radius: 2px;
+  vertical-align: -0.18em;
+}
+
+/* The chip: the Text page's "Hidden Characters" fact, at row size. */
+.hc-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font: inherit; font-size: 12px; font-weight: 600;
+  color: var(--danger); background: none; border: 0; padding: 0; margin: 0 8px 0 0;
+}
+button.hc-chip { cursor: pointer; }
+button.hc-chip:hover { text-decoration: underline; text-underline-offset: 2px; }
+.hc-chip .state { font-weight: 500; color: var(--text-secondary); }
+.hc-chip svg { flex: none; }
+
+/* Option F: one switch in the History header for every row. */
+.hc-head-switch { display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+  color: var(--text-secondary); background: none; border: 0; padding: 0; cursor: pointer; font-weight: 600; }
+.hc-head-switch .storage-switch { transform: scale(0.8); transform-origin: left center; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Hidden characters in History rows</h1>
+  <p class="lead">Today a Text row in History draws its snippet as plain text, so a zero-width
+  space disappears and a right-to-left override reorders the line:
+  <code><bdi>invoice&#x202E;fdp.exe</bdi></code> is really an <code>.exe</code>. Each option below uses the real History row and app.css. Drag
+  across a row and the line under it lists what the selection would copy, code point by code
+  point. In every marked option the label is drawn on top of the character, so a selection holds
+  only what the link stores. Click the chips where they are buttons.</p>
+
+  <div class="row">
+    <figure data-mode="today">
+      <figcaption><b>0 · Today</b>Plain text. Nothing marked, and the override reorders the line.</figcaption>
+      <div class="frame" data-frame></div><p class="readout" data-readout></p>
+    </figure>
+    <figure data-mode="marks">
+      <figcaption><b>A · Marks</b><span class="tag">H1</span><br>The Text page's red labels, inline. No chip: the marks are the signal.</figcaption>
+      <div class="frame" data-frame></div><p class="readout" data-readout></p>
+    </figure>
+    <figure data-mode="chip">
+      <figcaption><b>B · Chip only</b><span class="tag">H3</span><br>A chip in the row's footer says the text holds hidden characters. The text stays unmarked, isolated so it cannot reorder.</figcaption>
+      <div class="frame" data-frame></div><p class="readout" data-readout></p>
+    </figure>
+    <figure data-mode="toggle-on">
+      <figcaption><b>C · Chip toggles marks, on by default</b><span class="tag">H1 + H3</span><br>Marks show; the chip hides them for that row and brings them back.</figcaption>
+      <div class="frame" data-frame></div><p class="readout" data-readout></p>
+    </figure>
+    <figure data-mode="toggle-off">
+      <figcaption><b>D · Chip shows marks on request</b><span class="tag">H3 + H1</span><br>Marks start hidden; the chip shows them. Quiet rows, but the reader has to ask.</figcaption>
+      <div class="frame" data-frame></div><p class="readout" data-readout></p>
+    </figure>
+    <figure data-mode="compact">
+      <figcaption><b>E · Compact ticks</b><span class="tag">H1 + H3</span><br>A thin red tick where each character sits, so the row keeps its length. The chip swaps ticks for full labels.</figcaption>
+      <div class="frame" data-frame></div><p class="readout" data-readout></p>
+    </figure>
+    <figure data-mode="header">
+      <figcaption><b>F · One switch for all rows</b><span class="tag">H1 + toggle</span><br>Marks on by default. A switch in the History header turns them off everywhere; each affected row keeps its chip.</figcaption>
+      <div class="frame" data-frame></div><p class="readout" data-readout></p>
+    </figure>
+  </div>
+</div>
+
+<script>
+"use strict";
+// Icons copied from server/static/app.js so the rows match the live page.
+const SVG_NS = "http://www.w3.org/2000/svg";
+const icon = (size, viewBox, shapes) => {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("width", size); svg.setAttribute("height", size);
+  svg.setAttribute("viewBox", viewBox); svg.setAttribute("fill", "none");
+  svg.setAttribute("aria-hidden", "true");
+  for (const [name, attrs] of shapes) {
+    const shape = document.createElementNS(SVG_NS, name);
+    for (const [k, v] of Object.entries(attrs)) shape.setAttribute(k, v);
+    svg.append(shape);
+  }
+  return svg;
+};
+const round = { stroke: "currentColor", "stroke-linecap": "round", "stroke-linejoin": "round" };
+const copyIcon = () => icon(16, "0 0 14 14", [
+  ["path", { stroke: "currentColor", "stroke-linecap": "round", d: "M9.6 2.2H3.6c-.77 0-1.4.63-1.4 1.4v6.2", "stroke-width": "1.6" }],
+  ["rect", { stroke: "currentColor", x: "4.9", y: "4.7", width: "7", height: "7.2", rx: "1.3", "stroke-width": "1.6" }],
+]);
+const eyeIcon = (struck) => icon(16, "0 0 14 14", [
+  ["path", { ...round, d: "M1.3 7C2.8 4.3 4.7 3 7 3s4.2 1.3 5.7 4C11.2 9.7 9.3 11 7 11S2.8 9.7 1.3 7Z", "stroke-width": "1.3" }],
+  ["circle", { ...round, cx: "7", cy: "7", r: "1.9", "stroke-width": "1.3" }],
+  ...(struck ? [["path", { ...round, d: "M2.3 1.8 11.7 12.2", "stroke-width": "1.3" }]] : []),
+]);
+const quoteIcon = () => icon(13, "0 0 14 14", [
+  ["path", { fill: "currentColor", d: "M2 8.6C2 6 3.3 4.2 5.6 3.3l.5.9C4.8 4.9 4.1 5.9 4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H3.4C2.6 11.6 2 11 2 10.2V8.6Zm5.4 0c0-2.6 1.3-4.4 3.6-5.3l.5.9C10.2 4.9 9.5 5.9 9.4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H8.8c-.8 0-1.4-.6-1.4-1.4V8.6Z" }],
+]);
+const openIcon = () => icon(15, "0 0 13 13", [["path", { ...round, d: "M2.5 10.5 10.5 2.5M4 2.5h6.5V9", "stroke-width": "1.8" }]]);
+const trashIcon = () => icon(16, "0 0 14 14", [["path", { ...round,
+  d: "M2.6 3.9h8.8M5.6 3.9V2.7c0-.4.3-.7.7-.7h1.4c.4 0 .7.3.7.7v1.2M4 3.9l.5 7c0 .5.4.9.9.9h3.2c.5 0 .9-.4.9-.9l.5-7",
+  "stroke-width": "1.4" }]]);
+const alertIcon = () => icon(12, "0 0 16 16", [
+  ["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
+  ["path", { d: "M8 4.6v4.2", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" }],
+  ["circle", { cx: "8", cy: "11.2", r: ".95", fill: "currentColor" }],
+]);
+
+// What the server would send: runs of plain text and hidden characters, each
+// hidden one with its label. A registered variant form (the heart + VS16) is
+// plain text, as on the Text page.
+const ROWS = [
+  { name: "spell", parts: [
+    "Wire the deposit to SE45 5000 0000 0583 9825 7466\nRef: INV",
+    ["​", "\\u{200B}"], "-2291, thanks ❤️\nAttachment: invoice",
+    ["‮", "\\u{202E}"], "fdp.exe",
+  ] },
+  { name: "lunch", parts: ["Lunch at noon? The usual place."] },
+];
+
+const hiddenCount = (row) => row.parts.filter(Array.isArray).length;
+
+const body = (row, marked) => {
+  const b = document.createElement("span");
+  b.className = "history-well-body";
+  for (const p of row.parts) {
+    if (typeof p === "string") { b.append(p); continue; }
+    if (!marked) { b.append(p[0]); continue; }
+    const s = document.createElement("span");
+    s.className = "hid";
+    s.dataset.esc = p[1];
+    s.textContent = p[0];
+    b.append(s);
+  }
+  return b;
+};
+
+const chip = (row, mode, li) => {
+  const n = hiddenCount(row);
+  if (!n || mode === "today" || mode === "marks") return null;
+  const label = n === 1 ? "1 Hidden Character" : `${n} Hidden Characters`;
+  if (mode === "chip" || mode === "header") {
+    const c = document.createElement("span");
+    c.className = "hc-chip";
+    c.append(alertIcon(), label);
+    return c;
+  }
+  const c = document.createElement("button");
+  c.type = "button";
+  c.className = "hc-chip";
+  const state = document.createElement("span");
+  state.className = "state";
+  const paint = () => {
+    const on = mode === "compact" ? !li.classList.contains("compact") : !li.classList.contains("marks-off");
+    state.textContent = mode === "compact" ? (on ? "· Labels" : "· Ticks") : (on ? "· Shown" : "· Show");
+    c.setAttribute("aria-pressed", String(on));
+  };
+  c.append(alertIcon(), label, state);
+  c.addEventListener("click", () => {
+    li.classList.toggle(mode === "compact" ? "compact" : "marks-off");
+    paint();
+  });
+  if (mode === "toggle-off") li.classList.add("marks-off");
+  if (mode === "compact") li.classList.add("compact");
+  paint();
+  return c;
+};
+
+const item = (row, mode) => {
+  const li = document.createElement("li");
+  li.className = "history-item live";
+  const well = document.createElement("div");
+  well.className = "history-well text";
+  const mark = document.createElement("span");
+  mark.className = "history-mark";
+  mark.setAttribute("aria-hidden", "true");
+  mark.append(quoteIcon());
+  const col = document.createElement("div");
+  col.className = "history-well-col";
+  // B marks nothing but still isolates each character, so an override
+  // cannot reorder the row; it simply draws nothing.
+  col.append(body(row, mode !== "today"));
+  if (mode === "chip") li.classList.add("marks-off");
+  const side = document.createElement("span");
+  side.className = "history-well-side";
+  for (const [cls, ic] of [["history-well-copy", copyIcon()], ["history-eye", eyeIcon(true)]]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `history-well-btn ${cls}`;
+    b.append(ic);
+    side.append(b);
+  }
+  well.append(mark, col, side);
+
+  const link = document.createElement("code");
+  link.className = "history-link";
+  const dash = document.createElement("span");
+  dash.className = "history-link-dash";
+  dash.textContent = "—";
+  const host = document.createElement("span");
+  host.className = "history-link-host";
+  host.textContent = "yuiolink.test/";
+  const name = document.createElement("span");
+  name.className = "history-link-name";
+  name.textContent = row.name;
+  link.append(dash, host, name);
+
+  const foot = document.createElement("div");
+  foot.className = "history-foot";
+  const meta = document.createElement("small");
+  meta.className = "history-meta";
+  const c = chip(row, mode, li);
+  if (c) meta.append(c);
+  const cd = document.createElement("span");
+  cd.className = "countdown";
+  cd.textContent = "Expires in 7 days";
+  meta.append(cd);
+  const actions = document.createElement("div");
+  actions.className = "history-actions";
+  for (const [cls, ic] of [["history-copy", copyIcon()], ["history-show", openIcon()], ["history-remove", trashIcon()]]) {
+    const a = document.createElement(cls === "history-remove" ? "button" : "a");
+    a.className = cls;
+    if (a.tagName === "A") a.href = "#";
+    a.append(ic);
+    actions.append(a);
+  }
+  foot.append(meta, actions);
+  li.append(well, link, foot);
+  return li;
+};
+
+const headSwitch = (list) => {
+  const head = document.createElement("div");
+  head.className = "history-head";
+  const title = document.createElement("span");
+  title.className = "history-title";
+  title.textContent = "Local History";
+  // The real History switch's look (.history-persist.on drives the knob).
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "hc-head-switch history-persist";
+  btn.setAttribute("role", "switch");
+  const sw = document.createElement("span");
+  sw.className = "storage-switch";
+  btn.append(sw, "Mark Hidden Characters");
+  const paint = () => {
+    const on = !list.classList.contains("marks-off");
+    btn.setAttribute("aria-checked", String(on));
+    btn.classList.toggle("on", on);
+  };
+  btn.addEventListener("click", () => { list.classList.toggle("marks-off"); paint(); });
+  paint();
+  head.append(title, btn);
+  return head;
+};
+
+for (const fig of document.querySelectorAll("figure[data-mode]")) {
+  const mode = fig.dataset.mode;
+  const section = document.createElement("section");
+  section.className = "history";
+  const list = document.createElement("ul");
+  list.className = "history-list";
+  for (const row of ROWS) list.append(item(row, mode));
+  if (mode === "header") section.append(headSwitch(list));
+  const bodyWrap = document.createElement("div");
+  bodyWrap.className = "history-body";
+  bodyWrap.append(list);
+  section.append(bodyWrap);
+  fig.querySelector("[data-frame]").append(section);
+}
+
+// The readout: what the current selection would copy, one code point at a
+// time, hidden ones named in red. Generated labels are never part of it.
+const describe = (s) => {
+  const out = document.createDocumentFragment();
+  for (const ch of s) {
+    const cp = ch.codePointAt(0);
+    const visible = cp > 0x20 && !(cp >= 0x200B && cp <= 0x200F) && !(cp >= 0x202A && cp <= 0x202E)
+      && !(cp >= 0x2066 && cp <= 0x2069) && cp !== 0xFEFF && !(cp >= 0xFE00 && cp <= 0xFE0F);
+    if (ch === "\n") { out.append(" ↵ "); continue; }
+    if (visible || ch === " ") { out.append(ch); continue; }
+    const c = document.createElement("span");
+    c.className = "cp";
+    c.textContent = ` U+${cp.toString(16).toUpperCase().padStart(4, "0")} `;
+    out.append(c);
+  }
+  return out;
+};
+document.addEventListener("selectionchange", () => {
+  const sel = getSelection();
+  for (const r of document.querySelectorAll("[data-readout]")) r.replaceChildren();
+  if (!sel.rangeCount || sel.isCollapsed) return;
+  const fig = sel.anchorNode?.parentElement?.closest("figure");
+  if (!fig) return;
+  const r = fig.querySelector("[data-readout]");
+  const code = document.createElement("code");
+  code.append(describe(sel.toString()));
+  r.append("Copies: ", code);
+});
+</script>
+</body>
+</html>
