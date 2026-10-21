@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en" class="js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form Hidden Characters 2</title>
+<link rel="stylesheet" href="../server/static/app.css">
+<style>
+body { display: block; padding: 28px 16px 48px; }
+.page { max-width: 1120px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 22px 0 6px; }
+.lead, .page > ul { color: var(--text-secondary); font-size: 14px; margin: 0 0 10px; max-width: 88ch; text-align: left; line-height: 1.5; }
+.page > ul { padding-left: 20px; }
+.lead code, .page code, figcaption code { font-family: var(--font-mono); font-size: 0.92em; }
+.row { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 26px 22px; align-items: start; }
+figure { margin: 0; min-width: 0; }
+figcaption { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 8px; text-align: left; line-height: 1.45; }
+figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
+.frame .app-window { position: static; margin: 0; width: auto; max-width: none; transform: none; min-height: 0; height: auto; }
+.samples { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 22px; position: sticky; top: 0; z-index: 5;
+  padding: 10px 0; background: color-mix(in srgb, var(--card-bg) 85%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+@media (max-width: 700px) { .samples { position: static; } }
+.samples button { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 8px;
+  border: 0.5px solid var(--field-border); background: var(--field-bg); color: var(--text); cursor: pointer; }
+.samples span { font-size: 13px; color: var(--text-secondary); align-self: center; }
+
+/* --- shared by every option --- */
+
+/* The form's own slot for what the field holds, under the field or the button. */
+.hc-slot:empty { display: none; }
+.hc-slot { margin-top: 10px; text-align: left; }
+
+/* A History row's well, standing alone under the field: no Copy, no eye. */
+.hc-slot .history-well { padding-right: 10px; }
+.hc-slot .history-meta { margin: 6px 0 0 2px; font-size: 13px; color: var(--text-secondary); }
+
+/* The Text page's facts row, set left under the field rather than centered
+   on a card. */
+.hc-slot .pv-facts { justify-content: flex-start; margin-top: 0; align-items: center; }
+.hc-slot .pv-cast { margin: 6px 0 0; }
+
+/* The one action the form adds: take them out of the field (undoable). Text
+   button in the accent, with the History chip's wash on hover. */
+.hc-remove {
+  border: 0; padding: 1px 6px; margin: 0 -6px; border-radius: 6px; background: none;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--accent-text); cursor: pointer;
+}
+.hc-remove:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+
+/* C and F: a chip inside the field's corner. Same words and colors as the
+   History chip, on the field's own background. */
+.hc-field { position: relative; }
+.hc-field .history-hidden.in-field {
+  position: absolute; right: 12px; bottom: 11px; margin: 0;
+  font-size: 13px; background: var(--field-bg);
+  box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 35%, transparent);
+}
+.hc-field .history-hidden.in-field:hover { background: color-mix(in srgb, currentColor 10%, var(--field-bg)); }
+.hc-field.has-chip textarea.form-control { padding-right: 112px; }
+
+/* D: ticks drawn over the field, at each character's exact place. A copy of
+   the field's text, laid out by the same metrics, in transparent ink; only
+   the ticks show. It ignores the pointer, so typing and selecting are the
+   field's own. */
+.hc-overlay {
+  position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+  color: transparent; border-color: transparent !important; background: none !important; box-shadow: none !important;
+}
+/* No isolate here, unlike every other mark: the field does not isolate a
+   direction control, so the copy must not either, or its ticks would sit
+   where the stored order puts them rather than where the field draws them. */
+.hc-overlay .hid { position: relative; unicode-bidi: normal; }
+/* A wedge under the line, pointing up at the place: a bar would read as a
+   second caret inside a field that has a real one. */
+.hc-overlay .hid::after {
+  content: ""; position: absolute; left: -4px; top: 1.08em;
+  border: 4px solid transparent; border-top: 0; border-bottom: 5px solid var(--danger);
+}
+
+/* F: the note a paste brings, under the field. */
+.hc-paste {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px;
+  padding: 8px 12px; border-radius: 10px; font-size: 13px; color: var(--text-secondary);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border: 0.5px solid color-mix(in srgb, var(--danger) 30%, transparent);
+}
+.hc-paste .lead-words { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: var(--danger); }
+.hc-paste .lead-words svg { flex: none; }
+
+.hc-pair { display: inline-flex; gap: 14px; }
+.hc-slot .pv-facts .hc-remove { font-size: 12px; }
+
+/* E: the check the first press of Create opens. */
+.hc-check-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.hc-check-actions .btn { flex: 1; min-width: 150px; }
+.hc-quiet { color: var(--text); background: var(--field-bg); border: 0.5px solid var(--field-border); box-shadow: none; }
+.hc-quiet:hover { background: color-mix(in srgb, var(--text) 6%, var(--field-bg)); }
+form.checking .split-btn { display: none; }
+.hc-check-head { display: flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 600; color: var(--danger); margin: 0 0 8px; }
+
+.hc-made { margin: 10px 0 0; text-align: center; font-size: 13px; font-weight: 600; color: var(--result-text); }
+
+/* The live region is read, not seen. */
+.hc-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Hidden characters in the form, round 2</h1>
+  <p class="lead">Six ways to show what the field holds before the link is made. Each frame is a live copy of the
+  form: type or paste in it, or load a sample from the bar, which loads it as a paste. Every option is built
+  from the Text page's and History's own parts and classes, so it behaves the way those already do:</p>
+  <ul>
+    <li><b>Marks</b> are History's: the real character stays, its <code>\u{…}</code> label is drawn beside it, and the label is never selected or copied.</li>
+    <li><b>Clicking a mark</b> opens its entry under it (name, code point, count, what it does). A second click puts it away.</li>
+    <li><b>The chip</b> is History's: <i>2 Hidden Characters · Labels</i>, then Ticks, then <b>Removed</b>, which here takes them out of the field. Green with a check once they are out; one more click puts them back. ⌘Z works too.</li>
+    <li><b>The facts</b> are the Text page's: a red <i>Hidden Characters</i> that steps through the entries, a gray <i>Variant Forms</i> for a registered pair (❤️, a keycap, 葛󠄀), and the tile index when there is more than one character.</li>
+    <li><b>The rules</b> are the server's: the same character list, tabs and line breaks as layout, and a registered variation sequence as a variant form rather than a hidden character. The page would fetch the sequence table (31,821 pairs, about 15 KB compressed) only when the field holds a selector, so nothing typed leaves the browser before Create.</li>
+  </ul>
+  <div class="samples" id="samples">
+    <span>Load:</span>
+    <button type="button" data-sample="Ref: INV&#x200B;-2291 invoice&#x202E;fdp.exe">ZWSP + RLO</button>
+    <button type="button" data-sample="Meet at 10&#xA0;am, room&#x3000;4, bring the&#xAD;badge">odd spaces + soft hyphen</button>
+    <button type="button" data-sample="I &#x2764;&#xFE0F; it, #&#xFE0F;&#x20E3; one, &#x845B;&#xE0100;飾区">registered pairs only</button>
+    <button type="button" data-sample="p&#xFE0F;a&#xFE0F;y&#xE0041;&#xE0042;">odd selectors + tags</button>
+    <button type="button" data-sample="Dear team,&#10;&#10;The new rota is attached.&#x200B;&#x200B;&#x200B;&#10;Thanks,&#10;Kim">long text, three ZWSP</button>
+    <button type="button" data-sample="https://exa&#x200D;mple.com/login">URL with ZWJ</button>
+    <button type="button" data-long>14 lines, two marks</button>
+    <button type="button" data-sample="">empty</button>
+  </div>
+
+  <div class="row">
+    <figure data-option="a">
+      <figcaption><b>A · The Text page's facts, under the button</b>The note slot under the button holds the Text page's facts and cast: the red fact steps through the entries, each tile opens its own, and Remove Them sits beside the fact. No copy of the text.</figcaption>
+      <div class="frame"></div>
+    </figure>
+    <figure data-option="b">
+      <figcaption><b>B · A History row, under the field</b>The field's text drawn again as History draws a row: the well, the marks, the chip cycling Labels, Ticks and Removed, and a click on a mark opening its entry.</figcaption>
+      <div class="frame"></div>
+    </figure>
+    <figure data-option="c">
+      <figcaption><b>C · History's chip, in the field</b>Only the chip, in the field's corner. Clicking it opens B's row under the field; the chip there carries on with Ticks and Removed.</figcaption>
+      <div class="frame"></div>
+    </figure>
+    <figure data-option="d">
+      <figcaption><b>D · Ticks in the field, facts under it</b>A red tick inside the field where each character sits, kept in place as you type. The Text page's facts under the field name them. Labels cannot fit inside a field, so there are only ticks.</figcaption>
+      <div class="frame"></div>
+    </figure>
+    <figure data-option="e">
+      <figcaption><b>E · A check when you press Create</b>Nothing while you type. The first press of Create opens B's row with two choices: Remove Them, or Create Anyway. Editing the text closes it.</figcaption>
+      <div class="frame"></div>
+    </figure>
+    <figure data-option="f">
+      <figcaption><b>F · A note when a paste brings them</b>Most hidden characters arrive by paste, so the paste is when it speaks: Remove Them or Keep. Keep folds the note into C's chip, which also covers typed ones.</figcaption>
+      <div class="frame"></div>
+    </figure>
+  </div>
+</div>
+
+<template id="form">
+  <main class="app-window"><div class="sheet-body centered">
+    <form novalidate>
+      <div class="hc-field">
+        <textarea class="form-control" rows="1" autocomplete="off" autocapitalize="off" spellcheck="false"
+          placeholder="Link or text to share" aria-label="Link or text to share"></textarea>
+      </div>
+      <div class="hc-slot" data-under-field></div>
+      <div class="split-btn">
+        <button class="btn split-primary" type="submit">Create Link</button>
+        <button class="btn split-clear" type="button">Clear</button>
+      </div>
+      <div class="hc-slot" data-under-button></div>
+      <p class="hc-live" aria-live="polite"></p>
+    </form>
+  </div></main>
+</template>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------------------
+// The server's rules, mirrored. In the product these come from the server
+// (the character list in the page, the sequence table fetched on demand);
+// here they are copied so the mockup stands alone.
+// ---------------------------------------------------------------------------
+
+// urlview::is_invisible
+const INVISIBLE = [[0x00, 0x1f], [0x7f, 0x9f], [0xa0, 0xa0], [0xad, 0xad], [0x34f, 0x34f], [0x61c, 0x61c],
+  [0x115f, 0x1160], [0x17b4, 0x17b5], [0x180b, 0x180f], [0x2000, 0x200f], [0x2028, 0x202f], [0x205f, 0x206f],
+  [0x3000, 0x3000], [0x3164, 0x3164], [0xfe00, 0xfe0f], [0xfeff, 0xfeff], [0xffa0, 0xffa0], [0xfff9, 0xfffb],
+  [0xe0000, 0xe007f], [0xe0100, 0xe01ef]];
+const isInvisible = (cp) => INVISIBLE.some(([a, b]) => cp >= a && cp <= b);
+
+// A sample of variation::registered, with variant_phrase's words.
+const REGISTERED = new Map([
+  ["2764-fe0f", "picks the emoji style of ❤ <span class=\"cp\">U+2764</span>"],
+  ["23-fe0f", "picks the emoji style of # <span class=\"cp\">U+0023</span>"],
+  ["845b-e0100", "picks a registered glyph of 葛 <span class=\"cp\">U+845B</span> (Adobe-Japan1)"],
+]);
+const registered = (base, sel) => base != null && REGISTERED.has(`${base.toString(16)}-${sel.toString(16)}`);
+
+// char_dress
+const DRESS = { 0x1b: ["ESC", "escape character"], 0x7f: ["DEL", "delete"], 0xa0: ["NBSP", "no-break space"],
+  0xad: ["SHY", "soft hyphen"], 0x34f: ["CGJ", "combining grapheme joiner"], 0x61c: ["ALM", "Arabic letter mark"],
+  0x180e: ["MVS", "Mongolian vowel separator"], 0x2000: ["NQSP", "en quad"], 0x2001: ["MQSP", "em quad"],
+  0x2002: ["ENSP", "en space"], 0x2003: ["EMSP", "em space"], 0x2004: ["3/MSP", "three-per-em space"],
+  0x2005: ["4/MSP", "four-per-em space"], 0x2006: ["6/MSP", "six-per-em space"], 0x2007: ["FSP", "figure space"],
+  0x2008: ["PSP", "punctuation space"], 0x2009: ["THSP", "thin space"], 0x200a: ["HSP", "hair space"],
+  0x200b: ["ZWSP", "zero-width space"], 0x200c: ["ZWNJ", "zero-width non-joiner"], 0x200d: ["ZWJ", "zero-width joiner"],
+  0x200e: ["LRM", "left-to-right mark"], 0x200f: ["RLM", "right-to-left mark"], 0x2028: ["LS", "line separator"],
+  0x2029: ["PS", "paragraph separator"], 0x202a: ["LRE", "left-to-right embedding"], 0x202b: ["RLE", "right-to-left embedding"],
+  0x202c: ["PDF", "pop directional formatting"], 0x202d: ["LRO", "left-to-right override"], 0x202e: ["RLO", "right-to-left override"],
+  0x202f: ["NNBSP", "narrow no-break space"], 0x205f: ["MMSP", "medium mathematical space"], 0x2060: ["WJ", "word joiner"],
+  0x2066: ["LRI", "left-to-right isolate"], 0x2067: ["RLI", "right-to-left isolate"], 0x2068: ["FSI", "first strong isolate"],
+  0x2069: ["PDI", "pop directional isolate"], 0x3000: ["IDSP", "ideographic space"], 0x3164: ["HF", "hangul filler"],
+  0xfeff: ["BOM", "byte order mark"], 0x0d: ["CR", "carriage return"], 0x00: ["NUL", "null"] };
+const hex4 = (cp) => cp.toString(16).toUpperCase().padStart(4, "0");
+const dress = (cp) => {
+  if (DRESS[cp]) return DRESS[cp];
+  const vs = cp >= 0xfe00 && cp <= 0xfe0f ? cp - 0xfe00 + 1 : cp >= 0xe0100 && cp <= 0xe01ef ? cp - 0xe0100 + 17 : 0;
+  if (vs) return [`VS${vs}`, `variation selector-${vs}`];
+  return [hex4(cp), "hidden character"];
+};
+
+// char_meaning
+const meaning = (cp) => {
+  if (cp === 0) return "Many programs stop reading at it, so the text after it can vanish";
+  if (cp === 0x0d) return "In a terminal it returns to the start of the line, so the text after it can print over the text before it";
+  if (cp === 0xad) return "It shows only where a line happens to break";
+  if (cp === 0xa0 || (cp >= 0x2000 && cp <= 0x200a) || cp === 0x202f || cp === 0x205f || cp === 0x3000) return "It looks like a space but is a different character";
+  if (cp === 0x61c || cp === 0x200e || cp === 0x200f || (cp >= 0x202a && cp <= 0x202e) || (cp >= 0x2066 && cp <= 0x2069))
+    return "It changes the direction of the text around it, so the order you see can differ from the order stored";
+  if (cp === 0x2028 || cp === 0x2029) return "Some programs break the line here and others do not";
+  if ((cp >= 0xfe00 && cp <= 0xfe0f) || (cp >= 0xe0100 && cp <= 0xe01ef)) return "It changes how the character before it is drawn, and a run of them can carry hidden data";
+  if (cp >= 0xe0000 && cp <= 0xe007f) return "It is a tag character: it draws nothing, and a run of them can spell hidden text";
+  if (cp <= 0x1f || (cp >= 0x7f && cp <= 0x9f)) return "It is a control code with no visible form";
+  return "It draws nothing, so two texts that look the same can differ";
+};
+
+// text_mark / text_cast: the parts in order, and one entry per distinct
+// character (or registered pair), in order of first appearance.
+const scan = (text) => {
+  const parts = [];
+  const entries = [];
+  const chars = [...text];
+  const count = (id, make) => {
+    const e = entries.find((x) => x.id === id);
+    if (e) e.count++; else entries.push({ ...make(), id, count: 1 });
+  };
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    const cp = ch.codePointAt(0);
+    const next = chars[i + 1]?.codePointAt(0);
+    if (next != null && registered(cp, next)) {
+      const id = `v${cp.toString(16).padStart(4, "0")}-${next.toString(16)}`;
+      parts.push({ kind: "var", text: ch + chars[i + 1], id });
+      count(id, () => ({ kind: "var", cp: next, base: ch }));
+      i++;
+      continue;
+    }
+    if (cp !== 0x0a && cp !== 0x09 && isInvisible(cp)) {
+      const id = `u${cp.toString(16).padStart(4, "0")}`;
+      parts.push({ kind: "hid", text: ch, cp, id });
+      count(id, () => ({ kind: "hid", cp }));
+      continue;
+    }
+    const last = parts.at(-1);
+    if (last?.kind === "text") last.text += ch; else parts.push({ kind: "text", text: ch });
+  }
+  const hidden = parts.filter((p) => p.kind === "hid").length;
+  return { parts, entries, hidden };
+};
+
+// The field with its hidden characters taken out. A space-like one becomes
+// a plain space and a line or paragraph separator a line break, so words
+// and lines stay apart; every other one is deleted.
+const SPACE_LIKE = (cp) => cp === 0xa0 || (cp >= 0x2000 && cp <= 0x200a) || cp === 0x202f || cp === 0x205f || cp === 0x3000;
+const withoutHidden = (text) => scan(text).parts.map((p) => p.kind !== "hid" ? p.text
+  : SPACE_LIKE(p.cp) ? " " : (p.cp === 0x2028 || p.cp === 0x2029) ? "\n" : "").join("");
+
+// ---------------------------------------------------------------------------
+// Parts, built as app.js builds them (elements and text, no markup strings
+// from the field).
+// ---------------------------------------------------------------------------
+const SVG_NS = "http://www.w3.org/2000/svg";
+const icon = (size, viewBox, shapes) => {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  for (const [k, v] of Object.entries({ width: size, height: size, viewBox, fill: "none", "aria-hidden": "true" })) svg.setAttribute(k, v);
+  for (const [name, attrs] of shapes) {
+    const s = document.createElementNS(SVG_NS, name);
+    for (const [k, v] of Object.entries(attrs)) s.setAttribute(k, v);
+    svg.append(s);
+  }
+  return svg;
+};
+const round = { stroke: "currentColor", "stroke-linecap": "round", "stroke-linejoin": "round" };
+const alertIcon = () => icon(12, "0 0 16 16", [
+  ["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
+  ["path", { d: "M8 4.6v4.2", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" }],
+  ["circle", { cx: "8", cy: "11.2", r: ".95", fill: "currentColor" }]]);
+const checkIcon = () => icon(12, "0 0 16 16", [
+  ["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
+  ["path", { ...round, d: "M5.2 8.2 7.2 10.1 10.9 6", "stroke-width": "1.6" }]]);
+const quoteIcon = () => icon(13, "0 0 14 14", [["path", { fill: "currentColor", d: "M2 8.6C2 6 3.3 4.2 5.6 3.3l.5.9C4.8 4.9 4.1 5.9 4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H3.4C2.6 11.6 2 11 2 10.2V8.6Zm5.4 0c0-2.6 1.3-4.4 3.6-5.3l.5.9C10.2 4.9 9.5 5.9 9.4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H8.8c-.8 0-1.4-.6-1.4-1.4V8.6Z" }]]);
+const arrowIcon = () => icon(14, "0 0 14 14", [["path", { ...round, d: "M2 7h9.6M7.6 3l4 4-4 4", "stroke-width": "1.7" }]]);
+const el = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const esc = (cp) => `\\u{${cp.toString(16).toUpperCase()}}`;
+
+// The marked text: History's `.hid` marks (label as generated content).
+const markedInto = (body, parts, mode) => {
+  for (const p of parts) {
+    if (p.kind !== "hid") { body.append(p.text); continue; }
+    if (mode === "removed") continue;
+    const m = el("span", "hid", p.text);
+    m.dataset.esc = esc(p.cp);
+    m.dataset.tell = p.id;
+    body.append(m);
+  }
+};
+
+// cast_entry: tiles, then the sentence.
+const entryEl = (e) => {
+  const d = el("div", e.kind === "hid" ? "entry warn" : "entry");
+  d.dataset.name = e.id;
+  const [sym, name] = dress(e.cp);
+  const raw = el("span", "tile raw", e.kind === "var" ? e.base + String.fromCodePoint(e.cp) : e.cp === 0 ? "" : String.fromCodePoint(e.cp));
+  d.append(el("span", "tiles", el("span", "tile sym", sym), raw));
+  const what = el("span", "what", el("b", "", name), " ");
+  if (e.kind === "var") {
+    const phrase = document.createElement("span");
+    phrase.innerHTML = REGISTERED.get(e.id.slice(1).replace(/^0+/, "")); // static table above, never the field
+    what.append(el("span", "cp", `U+${hex4(e.cp)}`), " — ", ...phrase.childNodes, ". The box shows the form it picks.");
+  } else {
+    const tail = e.count === 2 ? ", twice" : e.count > 2 ? `, ${e.count} times` : "";
+    what.append(el("span", "cp", `U+${hex4(e.cp)}`), " — marked ", el("code", "", esc(e.cp)), `${tail}. ${meaning(e.cp)}. The empty box is the character.`);
+  }
+  d.append(what);
+  return d;
+};
+
+// A click lands on a mark by position: labels ignore the pointer (Safari).
+const markAt = (body, x, y) => {
+  for (const m of body.querySelectorAll(".hid[data-tell]"))
+    for (const r of m.getClientRects())
+      if (r.width > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return m;
+  return null;
+};
+
+// ---------------------------------------------------------------------------
+// One form.
+// ---------------------------------------------------------------------------
+function setup(frame, option) {
+  frame.append(document.getElementById("form").content.cloneNode(true));
+  const form = frame.querySelector("form");
+  const ta = frame.querySelector("textarea");
+  const field = frame.querySelector(".hc-field");
+  const underField = frame.querySelector("[data-under-field]");
+  const underButton = frame.querySelector("[data-under-button]");
+  const submit = frame.querySelector(".split-primary");
+  const live = frame.querySelector(".hc-live");
+
+  // Per form: the History mode while the characters are in, the text they
+  // were taken out of (Removed, until the field is edited), the entry a mark
+  // or fact opened, and the option's own switches.
+  const st = { mode: "labels", before: null, after: null, open: null, rowOpen: false,
+    checking: false, made: false, pasteNote: false, kept: false, announced: 0 };
+  const scanNow = () => scan(ta.value);
+
+  const autosize = () => { ta.style.height = "auto"; ta.style.height = `${ta.scrollHeight}px`; };
+  // Replace the whole field through the editing machinery, so ⌘Z undoes it.
+  const replaceField = (text) => {
+    ta.focus();
+    ta.select();
+    if (!document.execCommand("insertText", false, text)) { ta.value = text; ta.dispatchEvent(new Event("input")); }
+  };
+  const removeThem = () => {
+    const before = ta.value;
+    const after = withoutHidden(before);
+    st.ignoreInput = true;
+    replaceField(after);
+    st.ignoreInput = false;
+    Object.assign(st, { before, after, mode: "removed", open: null, pasteNote: false, checking: false });
+    live.textContent = "Hidden characters removed.";
+    render();
+  };
+  const putBack = () => {
+    const before = st.before;
+    st.ignoreInput = true;
+    replaceField(before);
+    st.ignoreInput = false;
+    Object.assign(st, { before: null, after: null, mode: "labels" });
+    render();
+  };
+  const removedNow = () => st.before != null && ta.value === st.after;
+
+  // History's chip: Labels -> Ticks -> Removed -> (put back) Labels.
+  const chip = (n, inField = false) => {
+    const removed = removedNow();
+    const mode = removed ? "removed" : st.mode;
+    const c = el("button", inField ? "history-hidden in-field" : "history-hidden");
+    c.type = "button";
+    c.dataset.mode = mode;
+    if (removed) c.append(checkIcon(), `${plural(n, "Hidden Character")} Removed`);
+    else if (inField) c.append(alertIcon(), `${n} Hidden`);
+    else c.append(alertIcon(), plural(n, "Hidden Character"), el("span", "history-hidden-mode", `· ${mode === "ticks" ? "Ticks" : "Labels"}`));
+    c.title = inField ? "Show where they are" : { labels: "Show them as ticks", ticks: "Take them out of the text", removed: "Put them back" }[mode];
+    if (inField) c.setAttribute("aria-expanded", String(st.rowOpen));
+    c.addEventListener("click", () => {
+      if (inField) { st.rowOpen = !st.rowOpen; render(); return; }
+      if (removed) putBack();
+      else if (mode === "labels") { st.mode = "ticks"; render(); }
+      else removeThem();
+      frame.querySelector(inField ? ".history-hidden.in-field" : ".hc-slot .history-hidden")?.focus();
+    });
+    return c;
+  };
+
+  // B: History's row for the field's text.
+  const historyRow = (s, extra = []) => {
+    const wrap = el("div", "");
+    const kind = /^\S+:\/\/\S+$/.test(ta.value.trim()) ? "redirect" : "text";
+    const well = el("div", `history-well ${kind}`);
+    const mark = el("span", "history-mark", kind === "redirect" ? arrowIcon() : quoteIcon());
+    mark.setAttribute("aria-hidden", "true");
+    const body = el("span", `history-well-body${st.mode === "ticks" ? " marks-ticks" : ""}`);
+    if (kind === "redirect") body.style.whiteSpace = "pre-wrap";
+    markedInto(body, s.parts, st.mode);
+    body.addEventListener("click", (ev) => {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed) return;
+      const m = markAt(body, ev.clientX, ev.clientY);
+      if (!m) return;
+      st.open = st.open === m.dataset.tell ? null : m.dataset.tell;
+      render();
+    });
+    body.addEventListener("mousemove", (ev) => body.classList.toggle("over-mark", Boolean(markAt(body, ev.clientX, ev.clientY))));
+    const col = el("div", "history-well-col", body);
+    if (st.whole) well.classList.add("open");
+    well.append(mark, col);
+    // History's cut, measured once the row is in the page: ten lines and a
+    // fade, then the note that opens the rest.
+    requestAnimationFrame(() => {
+      // Past the ten-line cap only: a label overhangs its line by a pixel,
+      // so scrollHeight against clientHeight would cut a one-line row.
+      const cap = Number.parseFloat(getComputedStyle(body).maxHeight);
+      if (!st.whole && !(body.scrollHeight > cap + 1)) return;
+      if (!st.whole) body.classList.add("cut");
+      const lines = ta.value.split("\n").length;
+      const more = el("button", "history-more", icon(12, "0 0 10 10", [["path", { ...round, d: "M2.5 3.8 5 6.3l2.5-2.5", "stroke-width": "1.5" }]]),
+        el("span", "", st.whole ? "Show Less" : `${plural(lines, "line")}, ${plural([...ta.value].length, "character")} total`));
+      more.type = "button";
+      more.setAttribute("aria-expanded", String(Boolean(st.whole)));
+      more.addEventListener("click", () => { st.whole = !st.whole; render(); });
+      col.append(more);
+    });
+    wrap.append(well);
+    const open = st.open && s.entries.find((e) => e.id === st.open && e.kind === "hid");
+    if (open) {
+      // History's entry is solo: shown outright, no deck to step.
+      const d = entryEl(open);
+      d.classList.add("solo");
+      wrap.append(el("div", "history-cast pv-cast", d));
+    }
+    wrap.append(el("div", "history-meta", chip(s.hidden), ...extra));
+    return wrap;
+  };
+
+  // A and D: the Text page's facts and cast deck.
+  const facts = (s, { remove = true } = {}) => {
+    const wrap = el("div", "");
+    const hid = s.entries.filter((e) => e.kind === "hid");
+    const vars = s.entries.filter((e) => e.kind === "var");
+    const row = el("div", "pv-facts");
+    const stepper = (cls, label, list, withIcon) => {
+      const f = el("span", cls, ...(withIcon ? [alertIcon()] : []), label);
+      f.dataset.cast = list.map((e) => e.id).join(" ");
+      f.setAttribute("role", "button");
+      f.tabIndex = 0;
+      const at = list.findIndex((e) => e.id === st.open);
+      f.setAttribute("aria-expanded", String(at >= 0));
+      const step = () => { const i = list.findIndex((e) => e.id === st.open); st.open = list[i + 1]?.id ?? null; render(); };
+      f.addEventListener("click", step);
+      f.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); step(); } });
+      return f;
+    };
+    if (removedNow()) {
+      row.append(chip(s.hidden || scan(st.before).hidden));
+    } else {
+      if (hid.length) row.append(stepper("pv-fact warn", plural(s.hidden, "Hidden Character"), hid, true));
+      if (vars.length) row.append(stepper("pv-fact", "Variant Forms", vars, false));
+      if (hid.length && remove) { const b = el("button", "hc-remove", "Remove Them"); b.type = "button"; b.addEventListener("click", removeThem); row.append(b); }
+    }
+    wrap.append(row);
+    if (removedNow() || !s.entries.length) return wrap;
+    const cast = el("div", "pv-cast");
+    if (s.entries.length > 1) {
+      const idx = el("div", "pv-index");
+      for (const e of s.entries) {
+        const [sym, name] = dress(e.cp);
+        const t = el("span", e.kind === "hid" ? "tile sym warn" : "tile sym", sym);
+        t.title = `${name} U+${hex4(e.cp)}`;
+        t.addEventListener("click", () => { st.open = st.open === e.id ? null : e.id; render(); });
+        idx.append(t);
+      }
+      cast.append(idx);
+    }
+    for (const e of s.entries) {
+      const d = entryEl(e);
+      if (s.entries.length === 1) d.classList.add("solo");
+      if (e.id === st.open) d.classList.add("shown");
+      cast.append(d);
+    }
+    wrap.append(cast);
+    return wrap;
+  };
+
+  // D: the overlay that carries the ticks, laid out by the field's metrics.
+  let overlay = null;
+  const syncOverlay = (s) => {
+    if (!overlay) {
+      overlay = el("div", "hc-overlay");
+      overlay.setAttribute("aria-hidden", "true");
+      field.append(overlay);
+      ta.addEventListener("scroll", () => { overlay.scrollTop = ta.scrollTop; });
+    }
+    const cs = getComputedStyle(ta);
+    for (const p of ["fontFamily", "fontSize", "fontWeight", "fontStyle", "fontStretch", "letterSpacing", "wordSpacing", "lineHeight", "padding", "borderWidth", "borderStyle",
+      "boxSizing", "whiteSpace", "overflowWrap", "wordBreak", "textAlign", "textIndent", "direction", "tabSize", "alignContent"])
+      overlay.style[p] = cs[p];
+    overlay.style.borderRadius = cs.borderRadius;
+    overlay.replaceChildren();
+    // A trailing line feed needs a following character to take its line.
+    markedInto(overlay, s.parts, "ticks");
+    overlay.append("​");
+    overlay.style.height = `${ta.offsetHeight}px`;
+    overlay.scrollTop = ta.scrollTop;
+  };
+
+  function render() {
+    autosize();
+    const s = scanNow();
+    const n = s.hidden;
+    underField.replaceChildren();
+    underButton.replaceChildren();
+    field.querySelector(".history-hidden.in-field")?.remove();
+    field.classList.remove("has-chip");
+    if (st.before != null && !removedNow()) Object.assign(st, { before: null, after: null, mode: "labels" });
+    if (!n) { st.open = s.entries.some((e) => e.id === st.open) ? st.open : null; st.rowOpen = st.rowOpen && removedNow(); }
+    const kind = /^\S+:\/\/\S+$/.test(ta.value.trim()) && !/\s/.test(ta.value.trim()) ? "Redirect" : "Text";
+    submit.textContent = ta.value.trim() ? `Create ${kind} Link` : "Create Link";
+    // Say it once when they first appear, for a screen reader.
+    if (n && !st.announced) live.textContent = `${plural(n, "hidden character")} in the text.`;
+    st.announced = n;
+    const removed = removedNow();
+    const showAny = n > 0 || removed || s.entries.length > 0;
+
+    if (option === "a") {
+      if (showAny) underButton.append(facts(s));
+    } else if (option === "b") {
+      if (removed) underField.append(el("div", "history-meta", chip(scan(st.before).hidden)));
+      else if (n) underField.append(historyRow(s));
+    } else if (option === "c") {
+      if (n || removed) {
+        if (!removed) { field.append(chip(n, true)); field.classList.add("has-chip"); }
+        if (removed) underField.append(el("div", "history-meta", chip(scan(st.before).hidden)));
+        else if (st.rowOpen) underField.append(historyRow(s));
+      }
+    } else if (option === "d") {
+      syncOverlay(s);
+      if (showAny) underField.append(facts(s));
+    } else if (option === "e") {
+      if (removed) underButton.append(el("div", "history-meta", chip(scan(st.before).hidden)));
+      else if (st.checking && n) {
+        const box = el("div", "");
+        box.append(el("p", "hc-check-head", alertIcon(), `This text holds ${plural(n, "hidden character")}.`), historyRow(s));
+        const acts = el("div", "hc-check-actions");
+        const rm = el("button", "btn", "Remove Them"); rm.type = "button"; rm.addEventListener("click", removeThem);
+        const go = el("button", "btn hc-quiet", "Create Anyway"); go.type = "button";
+        go.addEventListener("click", () => { st.checking = false; st.made = true; render(); });
+        acts.append(rm, go);
+        box.append(acts);
+        underButton.append(box);
+      }
+    } else if (option === "f") {
+      if (removed) underField.append(el("div", "history-meta", chip(scan(st.before).hidden)));
+      else if (n && st.pasteNote) {
+        const note = el("div", "hc-paste", el("span", "lead-words", alertIcon(), `The text you pasted holds ${plural(n, "hidden character")}.`));
+        const rm = el("button", "hc-remove", "Remove Them"); rm.type = "button"; rm.addEventListener("click", removeThem);
+        const keep = el("button", "hc-remove", "Keep"); keep.type = "button";
+        keep.addEventListener("click", () => { st.pasteNote = false; render(); frame.querySelector(".history-hidden.in-field")?.focus(); });
+        note.append(el("span", "hc-pair", rm, keep));
+        underField.append(note);
+      } else if (n) {
+        field.append(chip(n, true)); field.classList.add("has-chip");
+        if (st.rowOpen) underField.append(historyRow(s));
+      }
+    }
+    form.classList.toggle("checking", option === "e" && st.checking && n > 0 && !removed);
+    if (st.made) underButton.append(el("p", "hc-made", "✓ The link would be created now (mockup)."));
+    if (option === "d") syncOverlay(s);
+  }
+
+  ta.addEventListener("input", () => {
+    if (!st.ignoreInput) { st.checking = false; st.made = false; }
+    render();
+  });
+  ta.addEventListener("paste", (ev) => {
+    const text = ev.clipboardData?.getData("text/plain") ?? "";
+    if (scan(text).hidden) st.pasteNote = true;
+  });
+  new ResizeObserver(() => { if (option === "d") syncOverlay(scanNow()); }).observe(ta);
+  form.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    if (option === "e" && scanNow().hidden && !st.checking) { st.checking = true; render(); return; }
+    st.made = Boolean(ta.value.trim());
+    render();
+  });
+  frame.querySelector(".split-clear").addEventListener("click", () => { ta.value = ""; Object.assign(st, { before: null, after: null, mode: "labels", open: null, rowOpen: false, pasteNote: false, checking: false, made: false }); render(); });
+  // Load as a paste: the same path a real one takes.
+  frame.load = (text) => {
+    Object.assign(st, { before: null, after: null, mode: "labels", open: null, rowOpen: false, checking: false, made: false, announced: 0, whole: false });
+    st.pasteNote = scan(text).hidden > 0;
+    ta.value = text;
+    render();
+  };
+}
+
+const frames = [...document.querySelectorAll("figure[data-option]")].map((f) => {
+  const frame = f.querySelector(".frame");
+  setup(frame, f.dataset.option);
+  return frame;
+});
+const first = document.querySelector("[data-sample]").dataset.sample;
+frames.forEach((f) => f.load(first));
+document.querySelector("[data-long]").addEventListener("click", () => {
+  const lines = Array.from({ length: 14 }, (_, i) => `Line ${i + 1} of the minutes, as agreed.`);
+  lines[2] = "Budget\u00a0approved for Q3.";
+  lines[12] = "Sign\u200bed, the board.";
+  frames.forEach((f) => f.load(lines.join("\n")));
+});
+for (const b of document.querySelectorAll("[data-sample]"))
+  b.addEventListener("click", () => frames.forEach((f) => f.load(b.dataset.sample)));
+</script>
+</body>
+</html>
