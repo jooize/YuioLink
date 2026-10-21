@@ -76,10 +76,9 @@ figcaption .tag { display: inline-block; margin-left: 6px; padding: 0 6px; borde
 }
 button.hc-chip { cursor: pointer; padding: 1px 6px; margin-left: -6px; border-radius: 6px; }
 button.hc-chip:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
-/* The mode word takes a color of its own once the characters are not drawn:
-   amber while they are still in the text, green once they are out. */
-.hc-chip[data-view="hidden"] .state { color: var(--warn); }
-.hc-chip[data-view="removed"] .state { color: var(--result-text); }
+/* Once the characters are out of the row, the chip says so in green, with a
+   check in place of the alert. */
+.hc-chip[data-view="removed"] { color: var(--result-text); }
 .hc-chip .state { font-weight: 500; color: var(--text-secondary); }
 .hc-chip svg { flex: none; }
 
@@ -114,19 +113,17 @@ html.js .hc-panel.pv-cast, html.js .hc-panel .pv-cast { display: block; }
   top of the character, so a selection holds only what the link stores. Click a mark to see what
   it is; click the chips where they are buttons.</p>
 
-  <h2>Round 2: four modes</h2>
-  <p class="lead"><b>Ticks</b>, <b>Labels</b>, <b>Hidden</b> and <b>Removed</b>. The chip stays red; the
-  mode word turns amber for Hidden and green for Removed. Hidden keeps the
-  characters (a copy still carries them) and draws nothing. Removed takes them out of the row, so
-  a selection copies the text without them. Hidden and Removed look the same; only the chip and
-  the copy tell them apart.</p>
+  <h2>Round 2: three modes</h2>
+  <p class="lead"><b>Labels</b> (the default), <b>Ticks</b> and <b>Removed</b>. While the characters
+  are drawn the chip is red and names the mode. Removed takes them out of the row, so a selection
+  copies the text without them, and the chip turns green: <b>2 Hidden Characters Removed</b>.</p>
   <div class="row">
     <figure data-mode="cycle">
-      <figcaption><b>G · Chip cycles</b><span class="tag">round 2</span><br>Each click moves to the next mode: Ticks, Labels, Hidden, Removed.</figcaption>
+      <figcaption><b>G · Chip cycles</b><span class="tag">round 2</span><br>Each click moves to the next mode: Labels, Ticks, Removed.</figcaption>
       <div class="frame" data-frame></div><p class="readout" data-readout></p>
     </figure>
     <figure data-mode="panel">
-      <figcaption><b>H · Chip opens a panel</b><span class="tag">round 2</span><br>The chip, or a click on a mark, opens the list of characters with the four modes above it.</figcaption>
+      <figcaption><b>H · Chip opens a panel</b><span class="tag">round 2</span><br>The chip, or a click on a mark, opens the list of characters with the three modes above it.</figcaption>
       <div class="frame" data-frame></div><p class="readout" data-readout></p>
     </figure>
   </div>
@@ -243,8 +240,8 @@ const entry = (id, on) => {
   return e;
 };
 
-const MODES = ["ticks", "labels", "hidden", "removed"];
-const MODE_NAME = { ticks: "Ticks", labels: "Labels", hidden: "Hidden", removed: "Removed" };
+const MODES = ["labels", "ticks", "removed"];
+const MODE_NAME = { labels: "Labels", ticks: "Ticks", removed: "Removed" };
 const hiddenIds = (row) => row.parts.filter(Array.isArray).map((p) => p[2]);
 
 const fillBody = (b, row, marked, removed) => {
@@ -260,12 +257,11 @@ const fillBody = (b, row, marked, removed) => {
   }
 };
 
-// The row's display mode, for the four-mode options: the class on the row
+// The row's display mode, for the three-mode options: the class on the row
 // and whether the characters are in the text at all.
 const applyMode = (li, row, mode) => {
   li.dataset.view = mode;
   li.classList.toggle("compact", mode === "ticks");
-  li.classList.toggle("marks-off", mode === "hidden");
   fillBody(li.querySelector(".history-well-body"), row, true, mode === "removed");
 };
 
@@ -280,11 +276,15 @@ const chip = (row, fig, li) => {
   const state = el("span", "state");
   const glyph = el("span", "glyph", alertIcon());
   glyph.style.display = "inline-flex";
-  c.append(glyph, chipLabel(n), state);
+  const label = el("span", "", chipLabel(n));
+  c.append(glyph, label, state);
   const paint = () => {
     if (fig === "cycle" || fig === "panel") {
-      state.textContent = `· ${MODE_NAME[li.dataset.view]}`;
+      const removed = li.dataset.view === "removed";
       c.dataset.view = li.dataset.view;
+      glyph.replaceChildren(removed ? checkIcon() : alertIcon());
+      label.textContent = removed ? `${chipLabel(n)} Removed` : chipLabel(n);
+      state.textContent = removed ? "" : `· ${MODE_NAME[li.dataset.view]}`;
     }
     else if (fig === "compact") state.textContent = li.classList.contains("compact") ? "· Ticks" : "· Labels";
     else state.textContent = li.classList.contains("marks-off") ? "· Show" : "· Shown";
@@ -299,7 +299,7 @@ const chip = (row, fig, li) => {
   return c;
 };
 
-// H's panel: the four modes, then every character in the row. A click on a
+// H's panel: the three modes, then every character in the row. A click on a
 // mark opens it with that character's entry lit.
 const togglePanel = (li, row, focus) => {
   const old = li.querySelector(".hc-panel");
@@ -358,7 +358,7 @@ const item = (row, fig) => {
     el("span", "history-link-name", row.name));
 
   li.append(well, link);
-  if (fig === "cycle" || fig === "panel") applyMode(li, row, "ticks");
+  if (fig === "cycle" || fig === "panel") applyMode(li, row, "labels");
   const meta = el("small", "history-meta");
   const c = chip(row, fig, li);
   if (c) { meta.append(c); li.paintChip?.(); }
