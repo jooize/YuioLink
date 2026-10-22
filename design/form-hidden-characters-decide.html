@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en" class="js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hidden Character Decisions</title>
+<link rel="stylesheet" href="../server/static/app.css">
+<style>
+body { display: block; padding: 28px 16px 64px; }
+.page { max-width: 1180px; margin: 0 auto; text-align: left; }
+h1 { font-size: 22px; margin: 0 0 6px; }
+.lead { color: var(--text-secondary); font-size: 14px; margin: 0 0 10px; max-width: 88ch; line-height: 1.5; }
+.page code { font-family: var(--font-mono); font-size: 0.92em; }
+.frame .app-window { position: static; margin: 0; width: auto; max-width: none; transform: none; min-height: 0; height: auto; }
+
+/* --- The decision page. */
+.index { border-collapse: collapse; font-size: 13.5px; margin: 14px 0 6px; }
+.index td, .index th { text-align: left; padding: 4px 14px 4px 0; border-bottom: 0.5px solid var(--separator); vertical-align: top; }
+.index th { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+.index a { color: inherit; text-decoration: none; }
+.index a:hover { text-decoration: underline; }
+.index .chosen { color: var(--accent-text); font-weight: 600; }
+.card { margin: 26px 0; padding: 18px; border-radius: 18px; background: var(--card-bg); border: 0.5px solid var(--card-border); }
+.card h2 { font-size: 17px; margin: 0 0 4px; }
+.card h2 .n { color: var(--text-tertiary); margin-right: 6px; }
+.card > p { color: var(--text-secondary); font-size: 13.5px; line-height: 1.5; margin: 0 0 6px; max-width: 92ch; }
+.card .try { font-size: 13px; color: var(--accent-text); }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 14px; margin-top: 12px; align-items: start; }
+.opt { min-width: 0; padding: 10px; border-radius: 14px; border: 1.5px solid transparent;
+  background: color-mix(in srgb, var(--text) 3%, transparent); }
+.opt:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.opt > label { display: flex; gap: 8px; align-items: baseline; font-weight: 600; font-size: 14.5px; cursor: pointer; }
+.opt > label input { accent-color: var(--accent); }
+.opt .why { font-size: 12.5px; color: var(--text-secondary); line-height: 1.45; margin: 3px 0 8px 22px; }
+.tag { font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.tag.pick { color: var(--accent-text); border: 1px solid currentColor; }
+.tag.liked { color: var(--switch-on-text); border: 1px solid currentColor; }
+.opt .app-window .sheet-body { padding-top: 18px; padding-bottom: 18px; }
+.notes { margin-top: 12px; }
+.notes textarea { display: block; width: 100%; min-height: 2.6em; box-sizing: border-box; resize: vertical; font: inherit; font-size: 13px;
+  padding: 7px 9px; border-radius: 8px; border: 0.5px solid var(--field-border); background: var(--field-bg); color: var(--text); }
+.decided { font-size: 14px; font-weight: 600; color: var(--switch-on-text); margin: 8px 0 0; }
+.dock { position: sticky; bottom: 14px; display: flex; justify-content: flex-end; pointer-events: none; z-index: 5; }
+.dock .btn { pointer-events: auto; width: auto; padding: 0 18px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); }
+.out pre { white-space: pre-wrap; margin: 10px 0 0; font: 12.5px/1.5 var(--font-mono); background: var(--field-bg);
+  border: 0.5px solid var(--field-border); border-radius: 10px; padding: 12px; max-height: 40vh; overflow: auto; }
+.out .btn { width: auto; padding: 0 22px; }
+.out .copied-note { font-size: 13px; color: var(--switch-on-text); font-weight: 600; margin-left: 10px; }
+.out-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+
+/* --- The form and its ticks (round 7). */
+.hc-slot:empty { display: none; }
+.hc-slot { margin-top: 10px; text-align: left; }
+.hc-slot .history-well { padding-right: 10px; }
+.hc-slot .history-meta { margin: 6px 0 0 2px; font-size: 13px; color: var(--text-secondary); }
+.hc-slot > .history-meta:first-child { margin-top: 0; }
+.hc-field { position: relative; }
+.hc-overlay {
+  position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+  color: transparent; border-color: transparent !important; background: none !important; box-shadow: none !important;
+}
+.hc-overlay .hid { position: relative; unicode-bidi: normal; }
+
+/* The tick: a thin bar with a wedge on top, drawn over the text at the
+   character's place, taking no width. --tick is its ink, blue while open. */
+.ticked { --w: 0.46em; --fan: 0.55em; --t: 1.5px; --cap: 0.24em; --gap: 0.3em; }
+.ticked .hid { position: relative; --tick: var(--danger); }
+.ticked .hid.open { --tick: var(--accent); }
+.ticked .hid::after {
+  content: ""; position: absolute; margin: 0; padding: 0; border: 0; border-radius: 0; outline: 0;
+  font-size: 1em; line-height: normal; background: var(--tick);
+  top: 0.02em; height: 1.12em; width: var(--w);
+  left: calc(50% - var(--w) / 2);
+  clip-path: polygon(0 0, 100% 0, calc(50% + var(--t) / 2) var(--cap), calc(50% + var(--t) / 2) 100%,
+    calc(50% - var(--t) / 2) 100%, calc(50% - var(--t) / 2) var(--cap));
+  transition: transform 0.12s ease, height 0.15s ease;
+}
+.ticked .hid.hot::after { transform: scale(1.3); }
+
+/* A run of hidden characters side by side. Fan: one tick each. */
+.ticked.run-fan .hid::after { left: calc(50% - var(--w) / 2 + var(--i, 0) * var(--fan)); }
+/* Count: one tick for the run, its length beside the wedge. */
+.ticked.run-count .hid:not(.first):not(.lab)::after,
+.ticked.run-comb .hid:not(.first):not(.lab)::after { display: none; }
+.ticked.run-count .hid.first:not([data-n="1"]):not(.lab)::before {
+  content: attr(data-n); position: absolute; top: -0.42em; left: calc(50% + var(--w) / 2 - 0.05em);
+  font: 700 0.62em/1 var(--font); color: var(--tick);
+}
+/* Comb: one bar across the run, a tooth per character. */
+.ticked.run-comb .hid.first:not([data-n="1"]):not(.lab)::after {
+  width: calc((var(--n) - 1) * var(--gap) + var(--t)); left: calc(50% - var(--t) / 2); clip-path: none;
+  background: linear-gradient(var(--tick), var(--tick)) top left / 100% 0.14em no-repeat,
+    repeating-linear-gradient(to right, var(--tick) 0 var(--t), transparent var(--t) var(--gap));
+}
+
+/* With the caret beside it, the run's bar pulls up into its wedge, so the
+   caret is never hidden; the wedge points down at the caret. */
+.hc-overlay.caret-lift .hid.flagged::after { height: calc(var(--cap) + 0.02em); }
+.hc-overlay.caret-lift.run-comb .hid.flagged.first::after { height: 0.14em; }
+
+/* An opened run in History takes its label in place of its ticks. */
+.ticked .hid.lab::after {
+  content: attr(data-esc); position: static; width: auto; height: auto; clip-path: none; display: inline;
+  margin: 0 1px; padding: 0 3px; border-radius: 3px; font-size: 0.85em; font-weight: 700; line-height: 0;
+  color: var(--on-danger); background: var(--danger); transform: none;
+}
+.ticked .hid.lab.open::after { background: var(--danger); box-shadow: 0 0 0 2px var(--accent); }
+
+/* The flag over an opened run in the field; the peek is the same flag,
+   faint, under the pointer. */
+.hc-flag {
+  position: absolute; z-index: 2; pointer-events: none; transform: translate(-50%, -100%);
+  padding: 1px 5px; border-radius: 4px; white-space: nowrap;
+  font: 700 11.5px/1.25 var(--font-mono); color: var(--on-danger); background: var(--danger);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.hc-flag.peek { color: var(--danger); background: var(--field-bg); box-shadow: inset 0 0 0 1px var(--danger); opacity: 0.95; }
+
+/* History at the field's size. */
+.hist-field .history-well { font-size: 16px; line-height: 23px; }
+.hist-field .history-mark { height: 23px; }
+.hist-field .history-well-body { max-height: 230px; }
+.hist-field .history-well .history-well-body.pv-url { font-size: 15px; line-height: 23px; }
+
+.hc-slot .history-well-body.pv-url .bad { cursor: pointer; }
+.pv-url .bad.open { box-shadow: 0 0 0 2px var(--accent); }
+.hc-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.hc-note { display: flex; gap: 5px; align-items: center; margin: 6px 0 0 2px; font-size: 13px; color: var(--danger); }
+.hc-note code { color: var(--text); font-weight: 600; }
+
+/* The entry's forms: each over a caption saying where it is written. A
+   click copies it. */
+.pv-cast .entry.warn .what code.bad { color: var(--on-danger); font-size: 11.5px; }
+.pv-cast .entry.warn .what code:not(.bad) { color: var(--text); }
+.pv-cast .what .after { display: block; margin-top: 2px; }
+.pv-cast .entry .tiles { align-self: flex-start; }
+.what .forms { display: flex; flex-wrap: wrap; gap: 2px 8px; margin: 3px 0 0 -5px; }
+.what .form { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  font: inherit; text-align: left; padding: 2px 5px; border: 0; border-radius: 6px; background: none; cursor: copy; }
+.what .form:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.what .form small { font-size: 10.5px; line-height: 1.2; color: var(--text-tertiary); }
+.what .form.copied small { color: var(--switch-on-text); font-weight: 600; }
+.made { margin: 10px 0 0; text-align: center; font-size: 13px; font-weight: 600; color: var(--result-text); }
+
+/* No-JS mockups. */
+.nojs-head { display: flex; align-items: center; gap: 5px; margin: 0 0 8px; font-size: 13.5px; font-weight: 600; color: var(--danger); }
+.nojs-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.nojs-actions .btn { flex: 1; min-width: 150px; }
+.hc-quiet { color: var(--text); background: var(--field-bg); border: 0.5px solid var(--field-border); box-shadow: none; }
+.mock-result { text-align: center; }
+.mock-result .word { font-size: 26px; font-weight: 700; color: var(--accent-text); margin: 4px 0; }
+.mock-result .url { font-family: var(--font-mono); font-size: 13px; color: var(--text-secondary); }
+.mock-result .qr { width: 96px; height: 96px; margin: 12px auto; border-radius: 8px;
+  background: repeating-conic-gradient(var(--text) 0 25%, transparent 0 50%) 0 0 / 16px 16px; opacity: 0.8; }
+.mock-result .warn { display: flex; gap: 5px; justify-content: center; align-items: center; font-size: 13px; color: var(--danger); font-weight: 600; }
+.mock-plain { font-size: 13px; color: var(--text-secondary); text-align: center; margin: 6px 0 0; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Hidden characters: your decisions</h1>
+  <p class="lead">One card per open question, each with a mockup of every option. Most mockups are live: type,
+  click a tick, or use the arrow keys. Pick one option per card and add a note if you like. Your picks show in
+  the box at the bottom. Press <b>Copy Answers</b> and paste them into Claude. This browser remembers your picks
+  until you send them.</p>
+  <table class="index"><thead><tr><th>#</th><th>Decision</th><th>Your pick</th></tr></thead><tbody id="index"></tbody></table>
+  <div id="cards"></div>
+  <div class="dock"><button class="btn" type="button" id="dock-copy">Copy Answers</button></div>
+  <div class="card out" id="out">
+    <div class="out-bar"><button class="btn" type="button" id="copy">Copy Answers</button><span class="copied-note" id="copied"></span></div>
+    <pre id="answers"></pre>
+  </div>
+</div>
+
+<template id="form">
+  <main class="app-window"><div class="sheet-body centered">
+    <form novalidate>
+      <div class="hc-field">
+        <textarea class="form-control" rows="1" autocomplete="off" autocapitalize="off" spellcheck="false"
+          placeholder="Link or text to share" aria-label="Link or text to share"></textarea>
+      </div>
+      <div class="hc-slot" data-under-field></div>
+      <div class="split-btn">
+        <button class="btn split-primary" type="submit">Create Link</button>
+        <button class="btn split-clear" type="button">Clear</button>
+      </div>
+      <div class="hc-slot" data-under-button></div>
+      <p class="hc-live" aria-live="polite"></p>
+    </form>
+  </div></main>
+</template>
+
+<script>
+"use strict";
+// --- The server's rules, mirrored (in the product they come from the server).
+const INVISIBLE = [[0x00, 0x1f], [0x7f, 0x9f], [0xa0, 0xa0], [0xad, 0xad], [0x34f, 0x34f], [0x61c, 0x61c],
+  [0x115f, 0x1160], [0x17b4, 0x17b5], [0x180b, 0x180f], [0x2000, 0x200f], [0x2028, 0x202f], [0x205f, 0x206f],
+  [0x3000, 0x3000], [0x3164, 0x3164], [0xfe00, 0xfe0f], [0xfeff, 0xfeff], [0xffa0, 0xffa0], [0xfff9, 0xfffb],
+  [0xe0000, 0xe007f], [0xe0100, 0xe01ef]];
+const isInvisible = (cp) => INVISIBLE.some(([a, b]) => cp >= a && cp <= b);
+const REGISTERED = new Set(["2764-fe0f", "23-fe0f", "845b-e0100"]);
+const registered = (b, s) => b != null && REGISTERED.has(`${b.toString(16)}-${s.toString(16)}`);
+const DRESS = { 0xa0: ["NBSP", "no-break space"], 0xad: ["SHY", "soft hyphen"], 0x200b: ["ZWSP", "zero-width space"],
+  0x200c: ["ZWNJ", "zero-width non-joiner"], 0x200d: ["ZWJ", "zero-width joiner"], 0x200e: ["LRM", "left-to-right mark"],
+  0x200f: ["RLM", "right-to-left mark"], 0x202e: ["RLO", "right-to-left override"], 0x202d: ["LRO", "left-to-right override"],
+  0x202f: ["NNBSP", "narrow no-break space"], 0x2060: ["WJ", "word joiner"], 0x3000: ["IDSP", "ideographic space"],
+  0xfeff: ["BOM", "byte order mark"] };
+const hex4 = (cp) => cp.toString(16).toUpperCase().padStart(4, "0");
+const dress = (cp) => {
+  if (DRESS[cp]) return DRESS[cp];
+  const vs = cp >= 0xfe00 && cp <= 0xfe0f ? cp - 0xfe00 + 1 : cp >= 0xe0100 && cp <= 0xe01ef ? cp - 0xe0100 + 17 : 0;
+  return vs ? [`VS${vs}`, `variation selector-${vs}`] : [hex4(cp), "hidden character"];
+};
+const meaning = (cp) => {
+  if (cp === 0xad) return "It shows only where a line happens to break";
+  if (cp === 0xa0 || (cp >= 0x2000 && cp <= 0x200a) || cp === 0x202f || cp === 0x205f || cp === 0x3000) return "It looks like a space but is a different character";
+  if (cp === 0x61c || cp === 0x200e || cp === 0x200f || (cp >= 0x202a && cp <= 0x202e) || (cp >= 0x2066 && cp <= 0x2069))
+    return "It changes the direction of the text around it, so the order you see can differ from the order stored";
+  if ((cp >= 0xfe00 && cp <= 0xfe0f) || (cp >= 0xe0100 && cp <= 0xe01ef)) return "It changes how the character before it is drawn, and a run of them can carry hidden data";
+  if (cp <= 0x1f || (cp >= 0x7f && cp <= 0x9f)) return "It is a control code with no visible form";
+  return "It draws nothing, so two texts that look the same can differ";
+};
+const esc = (cp) => `\\u{${cp.toString(16).toUpperCase()}}`;
+
+// Each hidden part keeps `at`, its place in the text in UTF-16 units (the
+// field's selection counts in those), so the caret can be matched to it.
+const scan = (text) => {
+  const parts = [], entries = [];
+  const chars = [...text];
+  const count = (id, make) => { const e = entries.find((x) => x.id === id); if (e) e.count++; else entries.push({ ...make(), id, count: 1 }); };
+  let run = 0, at = 0;
+  const addText = (t) => { const last = parts.at(-1); if (last?.kind === "text") last.text += t; else parts.push({ kind: "text", text: t }); at += t.length; };
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i], cp = ch.codePointAt(0), next = chars[i + 1]?.codePointAt(0);
+    if (next != null && registered(cp, next)) { run = 0; addText(ch + chars[i + 1]); i++; continue; }
+    if (cp !== 0x0a && cp !== 0x09 && isInvisible(cp)) {
+      const id = `u${cp.toString(16).padStart(4, "0")}`;
+      parts.push({ kind: "hid", text: ch, cp, id, i: run++, at });
+      at += ch.length;
+      count(id, () => ({ kind: "hid", cp }));
+      continue;
+    }
+    run = 0;
+    addText(ch);
+  }
+  return { parts, entries, hidden: parts.filter((p) => p.kind === "hid").length };
+};
+// The entries the caret stands beside (the one after it first), or every
+// entry a selection holds.
+const idsAtCaret = (text, a, b) => {
+  const hid = scan(text).parts.filter((p) => p.kind === "hid");
+  const near = a === b
+    ? [...hid.filter((p) => p.at === a), ...hid.filter((p) => p.at + p.text.length === a)]
+    : hid.filter((p) => p.at >= a && p.at + p.text.length <= b);
+  return [...new Set(near.map((p) => p.id))];
+};
+const SPACE_LIKE = (cp) => cp === 0xa0 || (cp >= 0x2000 && cp <= 0x200a) || cp === 0x202f || cp === 0x205f || cp === 0x3000;
+const withoutHidden = (text) => scan(text).parts.map((p) => p.kind !== "hid" ? p.text
+  : SPACE_LIKE(p.cp) ? " " : (p.cp === 0x2028 || p.cp === 0x2029) ? "\n" : "").join("");
+
+// A redirect as it will be stored: the browser's own serializer (WHATWG, the
+// same standard the server's parser follows), or null when it is not one.
+const storedUrl = (value) => {
+  const t = value.trim();
+  if (!/^https?:\/\/\S+$/i.test(t.replace(/[​-‏‪-‮⁠﻿]/g, ""))) return null;
+  try { return new URL(t).href; } catch { return null; }
+};
+const urlPieces = (href) => {
+  const out = [];
+  let last = 0;
+  for (const m of href.matchAll(/(?:%[0-9A-Fa-f]{2})+/g)) {
+    out.push({ text: href.slice(last, m.index) });
+    const bytes = m[0].match(/%../g);
+    let k = 0;
+    while (k < bytes.length) {
+      const lead = parseInt(bytes[k].slice(1), 16);
+      const len = lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : lead >= 0xc0 ? 2 : 1;
+      const seq = bytes.slice(k, k + len).join("");
+      let ch = null;
+      try { ch = decodeURIComponent(seq); } catch { /* not valid UTF-8: kept as text */ }
+      const cp = ch && [...ch].length === 1 ? ch.codePointAt(0) : null;
+      out.push(cp != null && isInvisible(cp) ? { text: seq, bad: `u${cp.toString(16).padStart(4, "0")}` } : { text: seq });
+      k += len;
+    }
+    last = m.index + m[0].length;
+  }
+  out.push({ text: href.slice(last) });
+  return out;
+};
+
+// --- Parts, built as app.js builds them.
+const SVG_NS = "http://www.w3.org/2000/svg";
+const icon = (size, viewBox, shapes) => {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  for (const [k, v] of Object.entries({ width: size, height: size, viewBox, fill: "none", "aria-hidden": "true" })) svg.setAttribute(k, v);
+  for (const [name, attrs] of shapes) { const s = document.createElementNS(SVG_NS, name); for (const [k, v] of Object.entries(attrs)) s.setAttribute(k, v); svg.append(s); }
+  return svg;
+};
+const round = { stroke: "currentColor", "stroke-linecap": "round", "stroke-linejoin": "round" };
+const alertIcon = () => icon(12, "0 0 16 16", [["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
+  ["path", { d: "M8 4.6v4.2", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" }], ["circle", { cx: "8", cy: "11.2", r: ".95", fill: "currentColor" }]]);
+const checkIcon = () => icon(12, "0 0 16 16", [["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
+  ["path", { ...round, d: "M5.2 8.2 7.2 10.1 10.9 6", "stroke-width": "1.6" }]]);
+const quoteIcon = () => icon(13, "0 0 14 14", [["path", { fill: "currentColor", d: "M2 8.6C2 6 3.3 4.2 5.6 3.3l.5.9C4.8 4.9 4.1 5.9 4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H3.4C2.6 11.6 2 11 2 10.2V8.6Zm5.4 0c0-2.6 1.3-4.4 3.6-5.3l.5.9C10.2 4.9 9.5 5.9 9.4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H8.8c-.8 0-1.4-.6-1.4-1.4V8.6Z" }]]);
+const arrowIcon = () => icon(14, "0 0 14 14", [["path", { ...round, d: "M2 7h9.6M7.6 3l4 4-4 4", "stroke-width": "1.7" }]]);
+const chevronIcon = () => icon(12, "0 0 10 10", [["path", { ...round, d: "M2.5 3.8 5 6.3l2.5-2.5", "stroke-width": "1.5" }]]);
+const el = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+
+// Hidden characters in runs, in text order: a run is what one tick group
+// marks, and what one click opens.
+const runsOf = (parts) => {
+  const runs = [];
+  for (const p of parts) {
+    if (p.kind !== "hid") continue;
+    const last = runs.at(-1);
+    if (p.i > 0 && last) { last.parts.push(p); last.end = p.at + p.text.length; }
+    else runs.push({ at: p.at, end: p.at + p.text.length, parts: [p] });
+  }
+  return runs;
+};
+const pct = (cp) => encodeURIComponent(String.fromCodePoint(cp)).toUpperCase();
+// What an opened run says: the form its context stores, once per kind, with
+// a count for a run of one kind ("3 × \u{200B}").
+const runLabel = (run, ctx) => {
+  const form = (cp) => (ctx === "url" ? pct(cp) : esc(cp));
+  const cps = run.parts.map((p) => p.cp);
+  if (cps.every((c) => c === cps[0])) return `${cps.length > 1 ? `${cps.length} × ` : ""}${form(cps[0])}`;
+  return cps.map(form).join(" ");
+};
+const runIds = (run) => [...new Set(run.parts.map((p) => p.id))];
+
+// `open` is the run opened into its label (by its `at`), or null.
+const markedInto = (body, parts, { labels = false, open = null, ctx = "text" } = {}) => {
+  const runs = runsOf(parts);
+  for (const p of parts) {
+    if (p.kind !== "hid") { body.append(p.text); continue; }
+    const run = runs.find((r) => p.at >= r.at && p.at < r.end);
+    const m = el("span", "hid", p.text);
+    m.dataset.tell = p.id;
+    m.dataset.run = run.at;
+    m.style.setProperty("--i", p.i);
+    m.style.setProperty("--n", run.parts.length);
+    if (p.i === 0) { m.classList.add("first"); m.dataset.n = run.parts.length; }
+    if (run.at === open) m.classList.add("flagged");
+    if (labels || run.at === open) { m.dataset.esc = esc(p.cp); m.classList.add("lab"); }
+    if (run.at === open && p.i === 0) m.dataset.flag = runLabel(run, ctx);
+    body.append(m);
+  }
+};
+
+// Every way to write the character, in a fixed order; the one its mark
+// shows wears the mark's reverse red. A click copies one.
+const copyText = async (text) => {
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* file:// or no permission: the old way */ }
+  const t = el("textarea", "", text);
+  t.style.position = "fixed"; t.style.opacity = "0";
+  document.body.append(t); t.select();
+  const ok = document.execCommand("copy");
+  t.remove();
+  return ok;
+};
+const formButton = ([where, text, ctxOf], ctx) => {
+  const code = el("code", ctxOf === ctx ? "bad" : "", text);
+  const cap = el("small", "", where);
+  const b = el("button", "form", code, cap);
+  b.type = "button";
+  b.title = `Copy ${text}`;
+  b.addEventListener("click", async () => {
+    const ok = await copyText(text);
+    cap.textContent = ok ? "Copied" : "Copy failed";
+    b.classList.toggle("copied", ok);
+    setTimeout(() => { cap.textContent = where; b.classList.remove("copied"); }, 1300);
+  });
+  return b;
+};
+// layout "three": all three forms in the row. "beside": U+XXXX beside the
+// name, as today's entry has it, and the two forms you paste in the row.
+const entryEl = (e, ctx = "text", layout = "three") => {
+  const d = el("div", "entry warn solo");
+  d.dataset.name = e.id;
+  const [sym, name] = dress(e.cp);
+  d.append(el("span", "tiles", el("span", "tile sym", sym), el("span", "tile raw", String.fromCodePoint(e.cp))));
+  const forms = [["in code", esc(e.cp), "text"], ["in a URL", pct(e.cp), "url"]];
+  if (layout === "three") forms.push(["in Unicode", `U+${hex4(e.cp)}`, null]);
+  const times = e.count > 1 ? ` It appears ${e.count === 2 ? "twice" : `${e.count} times`}.` : "";
+  const what = el("span", "what", el("b", "", name));
+  if (layout === "beside") what.append(" ", el("span", "cp", `U+${hex4(e.cp)}`));
+  what.append(el("span", "forms", ...forms.map((f) => formButton(f, ctx))),
+    el("span", "after", `${meaning(e.cp)}.${times} The empty box is the character.`));
+  d.append(what);
+  return d;
+};
+const castEl = (entries, ids, ctx, layout) => {
+  const shown = ids.map((id) => entries.find((e) => e.id === id)).filter(Boolean);
+  return shown.length ? el("div", "history-cast pv-cast", ...shown.map((e) => entryEl(e, ctx, layout))) : null;
+};
+const paintOpen = (root, ids) => { for (const m of root.querySelectorAll(".hid, .bad[data-tell]")) m.classList.toggle("open", ids.includes(m.dataset.tell)); };
+
+// A mark near a point: within 6px of where its tick is drawn across, and on
+// its line. Matching only, never the cursor.
+const markNear = (root, x, y, sel = ".hid[data-tell], .bad[data-tell]") => {
+  const cs = getComputedStyle(root);
+  const fs = Number.parseFloat(cs.fontSize);
+  const fan = root.classList.contains("run-fan") ? 0.55 * fs : 0;
+  const comb = root.classList.contains("run-comb") ? 0.3 * fs : 0;
+  for (const m of root.querySelectorAll(sel)) {
+    if (m.classList.contains("lab") || !m.classList.contains("hid")) {
+      for (const r of m.getClientRects()) if (x >= r.left - 3 && x <= r.right + 3 && y >= r.top && y <= r.bottom) return m;
+      continue;
+    }
+    const i = Number(m.style.getPropertyValue("--i")) || 0, n = Number(m.style.getPropertyValue("--n")) || 1;
+    for (const r of m.getClientRects()) {
+      const left = r.left + i * fan, right = r.right + i * fan + (m.classList.contains("first") ? (n - 1) * comb : 0);
+      if (x >= left - 6 && x <= right + 6 && y >= r.top && y <= r.bottom) return m;
+    }
+  }
+  return null;
+};
+// Where a run's flag stands: over the middle of its ticks.
+const runCenter = (root, m) => {
+  const r = m.getClientRects()[0];
+  if (!r) return null;
+  const fs = Number.parseFloat(getComputedStyle(root).fontSize);
+  const n = Number(m.style.getPropertyValue("--n")) || 1;
+  const spread = root.classList.contains("run-fan") ? 0.55 * fs : root.classList.contains("run-comb") ? 0.3 * fs : 0;
+  return { x: r.left + r.width / 2 + ((n - 1) * spread) / 2, top: r.top + 0.06 * fs, bottom: r.bottom };
+};
+const hoverGrow = (target, root) => {
+  target.addEventListener("mousemove", (ev) => {
+    const w = markNear(root, ev.clientX, ev.clientY, ".hid:not(.lab)");
+    root.querySelectorAll(".hid.hot").forEach((m) => m !== w && m.classList.remove("hot"));
+    w?.classList.add("hot");
+  });
+  target.addEventListener("mouseleave", () => root.querySelectorAll(".hid.hot").forEach((m) => m.classList.remove("hot")));
+};
+
+// History's row. In Ticks, a click on a run opens it into its label in
+// place; in Labels every run is open.
+const historyWell = (text, { labels = false, open = null, stored = null, run = "count", onMark = null, whole = false, onMore = null } = {}) => {
+  const s = scan(text);
+  const redirect = stored != null;
+  const well = el("div", `history-well ${redirect ? "redirect" : "text"}`);
+  const mark = el("span", "history-mark", redirect ? arrowIcon() : quoteIcon());
+  mark.setAttribute("aria-hidden", "true");
+  const body = el("span", `history-well-body ticked run-${run}${redirect ? " pv-url" : ""}`);
+  if (redirect) {
+    for (const p of urlPieces(stored)) {
+      if (!p.bad) { body.append(p.text); continue; }
+      const b = el("span", "bad", p.text);
+      b.dataset.tell = p.bad;
+      body.append(b);
+    }
+  } else markedInto(body, s.parts, { labels, open });
+  if (onMark) {
+    // A plain click only (detail 1, nothing selected): a drag or a
+    // double-click selects and leaves the marks alone.
+    body.addEventListener("click", (ev) => {
+      const sel = window.getSelection();
+      if (ev.detail > 1 || (sel && !sel.isCollapsed)) return;
+      const m = markNear(body, ev.clientX, ev.clientY);
+      if (m) onMark(m);
+    });
+    hoverGrow(body, body);
+  }
+  const col = el("div", "history-well-col", body);
+  if (whole) well.classList.add("open");
+  well.append(mark, col);
+  if (!onMore) { well.classList.add("open"); return well; }
+  requestAnimationFrame(() => {
+    const cap = Number.parseFloat(getComputedStyle(body).maxHeight);
+    if (!whole && !(body.scrollHeight > cap + 1)) return;
+    if (!whole) body.classList.add("cut");
+    const more = el("button", "history-more", chevronIcon(),
+      el("span", "", whole ? "Show Less" : `${plural(text.split("\n").length, "line")}, ${plural([...text].length, "character")} total`));
+    more.type = "button";
+    more.setAttribute("aria-expanded", String(whole));
+    more.addEventListener("click", onMore);
+    col.append(more);
+  });
+  return well;
+};
+
+// --- The form. cfg: caret "lift" | "stay"; hover "peek" | "grow"; run
+// "count" | "comb" | "fan"; layout (the entry's); labelsCopy (round 3's
+// labeled copy under the field); domainNote.
+const DEFAULTS = { caret: "lift", hover: "peek", run: "count", layout: "three", labelsCopy: false, domainNote: true };
+function setupForm(frame, cfgIn = {}) {
+  const cfg = { ...DEFAULTS, ...cfgIn };
+  frame.append(document.getElementById("form").content.cloneNode(true));
+  const form = frame.querySelector("form");
+  const ta = frame.querySelector("textarea");
+  const field = frame.querySelector(".hc-field");
+  const underField = frame.querySelector("[data-under-field]");
+  const underButton = frame.querySelector("[data-under-button]");
+  const submit = frame.querySelector(".split-primary");
+  const live = frame.querySelector(".hc-live");
+  const st = { before: null, after: null, open: [], flag: null, announced: 0, made: false, down: false };
+
+  const overlay = el("div", `hc-overlay ticked run-${cfg.run} caret-${cfg.caret}`);
+  overlay.setAttribute("aria-hidden", "true");
+  const flag = el("span", "hc-flag"), peek = el("span", "hc-flag peek");
+  flag.hidden = peek.hidden = true;
+  field.append(overlay, flag, peek);
+  const ctxNow = () => (storedUrl(ta.value) ? "url" : "text");
+  // A flag sits on the top of a run's wedge, centered on the run, and
+  // hides while that line is scrolled out of the field.
+  const place = (badge, m, text) => {
+    const c = m && runCenter(overlay, m);
+    const box = ta.getBoundingClientRect(), fr = field.getBoundingClientRect();
+    badge.hidden = !c || c.top < box.top || c.bottom > box.bottom;
+    if (badge.hidden) return;
+    badge.textContent = text;
+    badge.style.left = `${c.x - fr.left}px`;
+    badge.style.top = `${c.top - fr.top}px`;
+  };
+  const placeFlag = () => { const m = overlay.querySelector("[data-flag]"); place(flag, m, m?.dataset.flag); };
+
+  const autosize = () => { ta.style.height = "auto"; ta.style.height = `${ta.scrollHeight}px`; };
+  const replaceField = (text) => {
+    ta.focus(); ta.select();
+    st.ours = true;
+    if (!document.execCommand("insertText", false, text)) ta.value = text;
+    st.ours = false;
+  };
+  const removedNow = () => st.before != null && ta.value === st.after;
+  const removeThem = () => {
+    const before = ta.value, after = withoutHidden(before);
+    replaceField(after);
+    Object.assign(st, { before, after, open: [], flag: null });
+    live.textContent = "Hidden characters removed.";
+    render();
+  };
+  const putBack = () => { const b = st.before; replaceField(b); Object.assign(st, { before: null, after: null }); render(); };
+  const chip = (n) => {
+    const removed = removedNow();
+    const c = el("button", "history-hidden");
+    c.type = "button";
+    c.dataset.mode = removed ? "removed" : "ticks";
+    if (removed) c.append(checkIcon(), `${plural(n, "Hidden Character")} Removed`, el("span", "history-hidden-mode", "· Put Back"));
+    else c.append(alertIcon(), plural(n, "Hidden Character"), el("span", "history-hidden-mode", "· Remove"));
+    c.addEventListener("click", () => {
+      if (removed) putBack(); else removeThem();
+      frame.querySelector(".hc-slot .history-hidden")?.focus();
+    });
+    return c;
+  };
+
+  const syncOverlay = (s) => {
+    const cs = getComputedStyle(ta);
+    for (const p of ["fontFamily", "fontSize", "fontWeight", "fontStyle", "fontStretch", "letterSpacing", "wordSpacing", "lineHeight",
+      "padding", "borderWidth", "borderStyle", "boxSizing", "whiteSpace", "overflowWrap", "wordBreak", "textAlign", "textIndent",
+      "direction", "tabSize", "alignContent", "borderRadius"]) overlay.style[p] = cs[p];
+    overlay.replaceChildren();
+    markedInto(overlay, s.parts, { open: cfg.labelsCopy ? null : st.flag, ctx: ctxNow() });
+    // The field cannot make room: its run keeps the ticks, and the flag
+    // above them opens instead.
+    for (const m of overlay.querySelectorAll(".lab")) m.classList.remove("lab");
+    overlay.append("​");
+    paintOpen(overlay, st.open);
+    overlay.style.height = `${ta.offsetHeight}px`;
+    overlay.scrollTop = ta.scrollTop;
+    placeFlag();
+  };
+
+  // The marks follow the caret, never the pointer: after a click or a drag
+  // ends, after a key that moves the caret, but not after typing.
+  const follow = () => {
+    const a = ta.selectionStart, b = ta.selectionEnd;
+    const runs = runsOf(scan(ta.value).parts);
+    let flagAt = null, ids;
+    if (a === b) {
+      const run = runs.find((r) => a >= r.at && a <= r.end);
+      flagAt = run ? run.at : null;
+      ids = run ? runIds(run) : [];
+    } else ids = idsAtCaret(ta.value, a, b);
+    if (flagAt === st.flag && ids.join() === st.open.join()) return;
+    Object.assign(st, { flag: flagAt, open: ids });
+    if (ids.length) live.textContent = ids.map((id) => dress(Number.parseInt(id.slice(1), 16))[1]).join(", ");
+    render();
+  };
+  ta.addEventListener("pointerdown", () => { st.down = true; });
+  document.addEventListener("pointerup", () => { if (st.down) { st.down = false; follow(); } });
+  ta.addEventListener("keyup", (ev) => {
+    if (ev.key.startsWith("Arrow") || ["Home", "End", "PageUp", "PageDown"].includes(ev.key) || (ev.key === "a" && (ev.metaKey || ev.ctrlKey))) follow();
+  });
+  if (cfg.hover === "grow") hoverGrow(ta, overlay);
+  else {
+    // The peek: a faint flag over the run under the pointer, unless that
+    // run is already open.
+    ta.addEventListener("mousemove", (ev) => {
+      const m = markNear(overlay, ev.clientX, ev.clientY, ".hid");
+      const first = m && overlay.querySelector(`.hid.first[data-run="${m.dataset.run}"]`);
+      if (!first || (!cfg.labelsCopy && Number(first.dataset.run) === st.flag)) { peek.hidden = true; return; }
+      const run = runsOf(scan(ta.value).parts).find((r) => String(r.at) === first.dataset.run);
+      place(peek, first, runLabel(run, ctxNow()));
+    });
+    ta.addEventListener("mouseleave", () => { peek.hidden = true; });
+  }
+  ta.addEventListener("scroll", () => { overlay.scrollTop = ta.scrollTop; placeFlag(); peek.hidden = true; });
+
+  function render() {
+    autosize();
+    const s = scan(ta.value);
+    const n = s.hidden;
+    const removed = removedNow();
+    if (st.before != null && !removed) Object.assign(st, { before: null, after: null });
+    st.open = st.open.filter((id) => s.entries.some((e) => e.id === id));
+    if (!runsOf(s.parts).some((r) => r.at === st.flag)) st.flag = null;
+    underField.replaceChildren();
+    underButton.replaceChildren();
+    peek.hidden = true;
+    const stored = storedUrl(ta.value);
+    submit.textContent = ta.value.trim() ? `Create ${stored ? "Redirect" : "Text"} Link` : "Create Link";
+    if (n && !st.announced) live.textContent = `${plural(n, "hidden character")} in the text.`;
+    st.announced = n;
+    if (removed) underField.append(el("div", "history-meta", chip(scan(st.before).hidden)));
+    else if (n) {
+      if (cfg.labelsCopy) {
+        const well = historyWell(ta.value, { labels: true, stored, run: cfg.run,
+          onMark: (m) => { st.open = st.open.join() === m.dataset.tell ? [] : [m.dataset.tell]; render(); } });
+        paintOpen(well, st.open);
+        underField.append(well);
+      }
+      const cast = castEl(s.entries, st.open, stored ? "url" : "text", cfg.layout);
+      if (cast) underField.append(cast);
+      underField.append(el("div", "history-meta", chip(n)));
+    }
+    // A hidden character in the domain: the browser stores a different name.
+    if (cfg.domainNote && stored) {
+      const raw = ta.value.trim().split("/")[2] ?? "";
+      const host = new URL(stored).host;
+      if (raw && raw.toLowerCase() !== host) underField.append(el("p", "hc-note", alertIcon(), "The domain becomes ", el("code", "", host), "."));
+    }
+    if (st.made) underButton.append(el("p", "made", "✓ The link would be created now (mockup)."));
+    syncOverlay(s);
+  }
+  ta.addEventListener("input", () => { if (!st.ours) st.made = false; render(); });
+  new ResizeObserver(() => syncOverlay(scan(ta.value))).observe(ta);
+  form.addEventListener("submit", (ev) => { ev.preventDefault(); st.made = Boolean(ta.value.trim()); render(); });
+  frame.querySelector(".split-clear").addEventListener("click", () => { ta.value = ""; Object.assign(st, { before: null, after: null, open: [], flag: null, made: false }); render(); });
+  frame.load = (text) => { Object.assign(st, { before: null, after: null, open: [], flag: null, announced: 0, made: false }); ta.value = text; render(); };
+  // Open a run as if the caret stood beside it (the mockup's start).
+  frame.openRun = (k) => {
+    const run = runsOf(scan(ta.value).parts)[k];
+    if (!run) return;
+    Object.assign(st, { flag: run.at, open: runIds(run) });
+    render();
+  };
+}
+
+// --- History, the same text as a saved row. cfg: labels (start in
+// Labels), size "today" | "field", run.
+function setupHist(frame, cfg = {}) {
+  const st = { text: "", open: [], flag: null, labels: Boolean(cfg.labels), whole: false };
+  const render = () => {
+    const s = scan(st.text);
+    const stored = storedUrl(st.text);
+    const box = el("div", `hc-slot${cfg.size === "field" ? " hist-field" : ""}`);
+    box.style.margin = "0";
+    const well = historyWell(st.text, {
+      labels: st.labels, open: st.flag, stored, run: cfg.run ?? "count", whole: st.whole,
+      onMark: (m) => {
+        const run = m.dataset.run;
+        const same = run != null ? String(st.flag) === run : st.open.join() === m.dataset.tell;
+        if (same) Object.assign(st, { flag: null, open: [] });
+        else if (run != null) {
+          const r = runsOf(s.parts).find((x) => String(x.at) === run);
+          Object.assign(st, { flag: r.at, open: runIds(r) });
+        } else Object.assign(st, { flag: null, open: [m.dataset.tell] });
+        render();
+      },
+      onMore: () => { st.whole = !st.whole; render(); },
+    });
+    paintOpen(well, st.open);
+    box.append(well);
+    const cast = castEl(s.entries, st.open, stored ? "url" : "text", cfg.layout ?? "three");
+    if (cast) box.append(cast);
+    if (s.hidden) {
+      const c = el("button", "history-hidden", alertIcon(), plural(s.hidden, "Hidden Character"));
+      c.type = "button";
+      if (!stored) {
+        c.append(el("span", "history-hidden-mode", `· ${st.labels ? "Labels" : "Ticks"}`));
+        c.addEventListener("click", () => { st.labels = !st.labels; render(); });
+      }
+      box.append(el("div", "history-meta", c));
+    }
+    frame.replaceChildren(el("main", "app-window", el("div", "sheet-body centered", box)));
+  };
+  frame.load = (text) => { Object.assign(st, { text, open: [], flag: null, whole: false }); render(); };
+  frame.openRun = (k) => {
+    const run = runsOf(scan(st.text).parts)[k];
+    if (run) Object.assign(st, { flag: run.at, open: runIds(run) });
+    render();
+  };
+}
+
+// --- No JavaScript: what the server sends back after the first Create.
+function noJsStep(frame, text) {
+  const s = scan(text);
+  const ta = el("textarea", "form-control");
+  ta.value = text;
+  ta.rows = Math.min(6, text.split("\n").length);
+  const head = el("p", "nojs-head", alertIcon(), `This text holds ${plural(s.hidden, "hidden character")}. Nothing is created yet.`);
+  const well = historyWell(text, { labels: true });
+  const cast = el("div", "history-cast pv-cast", ...s.entries.map((e) => entryEl(e, "text")));
+  const actions = el("div", "nojs-actions", el("button", "btn", "Remove Them and Create"), el("button", "btn hc-quiet", "Create With Them"));
+  frame.replaceChildren(el("main", "app-window", el("div", "sheet-body centered", ta, el("div", "hc-slot", head, well, cast), actions)));
+}
+function noJsResult(frame, text, warn) {
+  const s = scan(text);
+  const body = el("div", "sheet-body centered mock-result",
+    el("div", "word", "MapleOtter"), el("div", "url", "https://yuio.link/MapleOtter"), el("div", "qr"));
+  if (warn) body.append(el("p", "warn", alertIcon(), `This text held ${plural(s.hidden, "hidden character")}. They are in the link as you wrote them.`));
+  else body.append(el("p", "mock-plain", "The result page today: name, address and QR code, never the contents."));
+  frame.replaceChildren(el("main", "app-window", body));
+}
+
+// --- The decisions.
+const MULTI = "Dear team,\n\nThe new rota is attached.​​​\nRoom 4 at 10 am, bring the­badge.\nThanks,\nKim";
+const RUNS = "The new rota is attached.​​​\nRoom 4 at 10 am.\nsigned​‌‍⁠​​ by the board.";
+const URL_PATH = "https://example.com/lo‍gin?next=%2Fhome&f=invoice‮fdp.exe";
+const URL_HOST = "https://exa‍mple.com/login";
+const LONG = Array.from({ length: 12 }, (_, i) => (i === 2 ? "Budget approved for Q3.​​" : i === 7 ? "Sign​ed, the board." : `Line ${i + 1} of the minutes, as agreed.`)).join("\n");
+
+const frameOf = (box) => { const f = el("div", "frame"); box.append(f); return f; };
+const formMock = (cfg, sample, openRun = null) => (box) => {
+  const f = frameOf(box);
+  setupForm(f, cfg);
+  f.load(sample);
+  if (openRun != null) requestAnimationFrame(() => f.openRun(openRun));
+};
+const histMock = (cfg, sample, openRun = null) => (box) => {
+  const f = frameOf(box);
+  setupHist(f, cfg);
+  f.load(sample);
+  if (openRun != null) f.openRun(openRun);
+};
+const entryMock = (layout) => (box) => {
+  const zwj = { cp: 0x200d, id: "u200d", count: 1 };
+  box.append(el("main", "app-window", el("div", "sheet-body",
+    el("div", "history-cast pv-cast", entryEl(zwj, "url", layout)),
+    el("div", "history-cast pv-cast", entryEl({ ...zwj, count: 2 }, "text", layout)))));
+};
+const both = (...mocks) => (box) => mocks.forEach((m) => m(box));
+
+const DECISIONS = [
+  { key: "open", title: "A tick opens into its label",
+    context: "With the caret beside a run of hidden characters, where does its label show?",
+    try: "Click right after “attached.” or after “Room”.",
+    options: [
+      { value: "in-place", title: "In place: a flag in the field, the label in History's row", liked: true, pick: true,
+        why: "The text is never drawn twice. You called round 7 glorious.",
+        mock: both(formMock({}, MULTI, 0), histMock({}, MULTI, 1)) },
+      { value: "copy", title: "A labeled copy under the field (round 3)",
+        why: "Every label at once, at the cost of drawing the text twice.",
+        mock: formMock({ labelsCopy: true }, MULTI) },
+    ] },
+  { key: "chip", title: "The form's chip: Remove, then Put Back", decided: "You loved it. No Labels step in the form." },
+  { key: "caret", title: "When the caret stands on a tick",
+    context: "The caret and the tick are drawn at the same place, so the caret hides the bar. These two forms differ only in that. Click right after “attached.” in each.",
+    options: [
+      { value: "lift", title: "The bar pulls up into its wedge", pick: true,
+        why: "The caret shows. The wedge stays on top of the line and points down at it, with the flag above.",
+        mock: formMock({ caret: "lift" }, MULTI, 0) },
+      { value: "stay", title: "The tick stays whole",
+        why: "As in round 7. The caret covers the bar.",
+        mock: formMock({ caret: "stay" }, MULTI, 0) },
+    ] },
+  { key: "hover", title: "When the pointer is over a tick",
+    context: "Hovering never takes the pointer: it stays an I-beam, and clicking still places the caret. Move the pointer over the ticks.",
+    options: [
+      { value: "peek", title: "A faint label peeks above it", pick: true,
+        why: "Says what is there before you click. Gone when the pointer leaves.",
+        mock: formMock({ hover: "peek" }, MULTI) },
+      { value: "grow", title: "The tick grows a little",
+        why: "As in round 7. Shows it is there, not what it is.",
+        mock: formMock({ hover: "grow" }, MULTI) },
+    ] },
+  { key: "runs", title: "Hidden characters side by side",
+    context: "The last line holds a run of six, of four kinds. A run carrying hidden data can be dozens long.",
+    options: [
+      { value: "count", title: "One tick with a count", pick: true,
+        why: "Stays one tick wide however long the run. The label says the rest.",
+        mock: both(formMock({ run: "count" }, RUNS), histMock({ run: "count" }, RUNS)) },
+      { value: "comb", title: "A comb: one tooth per character",
+        why: "Shows the length at a glance up to about five, then grows wide.",
+        mock: both(formMock({ run: "comb" }, RUNS), histMock({ run: "comb" }, RUNS)) },
+      { value: "fan", title: "One tick each, fanned out",
+        why: "As in round 7. Six ticks already cover the next word.",
+        mock: both(formMock({ run: "fan" }, RUNS), histMock({ run: "fan" }, RUNS)) },
+    ] },
+  { key: "forms", title: "The forms in an entry",
+    context: "Click a form to copy it. Top: a joiner in a redirect. Bottom: the same in text.",
+    options: [
+      { value: "three", title: "All three in the row", pick: true,
+        why: "Each one copies with a click, and its caption says where it is used.",
+        mock: entryMock("three") },
+      { value: "beside", title: "U+200D beside the name, two in the row",
+        why: "The code point reads as the character's identity, as today. The row holds only the forms you paste.",
+        mock: entryMock("beside") },
+    ] },
+  { key: "hist-start", title: "How History starts",
+    context: "The chip under a row switches between them either way.",
+    options: [
+      { value: "ticks", title: "Ticks, like the form", pick: true,
+        why: "The row reads as the text. A click opens one label.",
+        mock: histMock({ labels: false }, MULTI) },
+      { value: "labels", title: "Labels, as today",
+        why: "Every label at once, without a click.",
+        mock: histMock({ labels: true }, MULTI) },
+    ] },
+  { key: "hist-size", title: "History's type size",
+    context: "Both rows hold the same twelve lines. A row shows up to ten lines before “Show more”.",
+    options: [
+      { value: "today", title: "Today's: 14 px on 19 px lines",
+        why: "A ten-line row is 190 px, so more rows fit on screen. The ticks are sized in em, so they look the same, smaller.",
+        mock: histMock({ size: "today" }, LONG) },
+      { value: "field", title: "The field's: 16 px on 23 px lines",
+        why: "A row reads exactly like what you typed. A ten-line row is 230 px.",
+        mock: histMock({ size: "field" }, LONG) },
+    ] },
+  { key: "nojs", title: "Without JavaScript",
+    context: "Without script nothing checks the field while you type. A no-JS link can't be deleted (it has no creator token), so a warning after creation comes too late to undo.",
+    options: [
+      { value: "step", title: "A second step before creating", pick: true,
+        why: "Only text with hidden characters gets it. Like the result page's existing “Share as text” form.",
+        mock: (box) => noJsStep(frameOf(box), MULTI) },
+      { value: "after", title: "Create, then warn on the result page",
+        why: "One step, but the link already exists.",
+        mock: (box) => noJsResult(frameOf(box), MULTI, true) },
+      { value: "none", title: "Nothing without JavaScript",
+        why: "As today. The visitor's page still marks them.",
+        mock: (box) => noJsResult(frameOf(box), MULTI, false) },
+    ] },
+  { key: "domain", title: "A hidden character in a domain",
+    context: "The browser turns the whole name into punycode, a different domain. The visitor's preview card already warns about internationalized names.",
+    options: [
+      { value: "note", title: "The form says what the domain becomes", pick: true,
+        why: "You see the stored name before you share it.",
+        mock: formMock({ domainNote: true }, URL_HOST) },
+      { value: "card", title: "Leave it to the preview card",
+        why: "The form shows only the tick.",
+        mock: formMock({ domainNote: false }, URL_HOST) },
+    ] },
+];
+
+// --- Picks: kept in this browser until sent, and written out to copy.
+const STORE = "yuiolink-hidden-decisions";
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(STORE) || "{}"); } catch { saved = {}; }
+const save = () => { try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch { /* private window: picks last this visit */ } };
+const cards = document.getElementById("cards"), index = document.getElementById("index");
+const answers = document.getElementById("answers");
+const writeOut = () => {
+  const lines = ["Hidden-character decisions (design/form-hidden-characters-decide.html)", ""];
+  DECISIONS.forEach((d, k) => {
+    const n = k + 1;
+    const cell = index.querySelector(`[data-key="${d.key}"] .chosen`);
+    if (d.decided) { lines.push(`${n}. ${d.title}: decided`); if (cell) cell.textContent = "decided"; return; }
+    const o = d.options.find((x) => x.value === saved[d.key]?.value);
+    lines.push(`${n}. ${d.title}: ${o ? o.title : "(not picked)"}`);
+    const note = saved[d.key]?.note?.trim();
+    if (note) lines.push(`   Notes: ${note.replace(/\n+/g, " ")}`);
+    if (cell) cell.textContent = o ? o.title : "—";
+  });
+  answers.textContent = lines.join("\n");
+  const open = DECISIONS.filter((d) => !d.decided);
+  const picked = open.filter((d) => saved[d.key]?.value).length;
+  document.getElementById("dock-copy").textContent = `Copy Answers · ${picked} of ${open.length}`;
+};
+DECISIONS.forEach((d, k) => {
+  const n = k + 1;
+  const tr = el("tr", "", el("td", "", String(n)), el("td", "", el("a", "", d.title)), el("td", "", el("span", "chosen", "")));
+  tr.dataset.key = d.key;
+  tr.querySelector("a").href = `#d-${d.key}`;
+  index.append(tr);
+  const card = el("section", "card", el("h2", "", el("span", "n", String(n)), d.title));
+  card.id = `d-${d.key}`;
+  if (d.decided) { card.append(el("p", "decided", `✓ ${d.decided}`)); cards.append(card); return; }
+  card.append(el("p", "", d.context));
+  if (d.try) card.append(el("p", "try", d.try));
+  const opts = el("div", "opts");
+  // Mockups are built once their card is on the page: a field sizes itself
+  // to its text, which needs layout.
+  const mocks = [];
+  for (const o of d.options) {
+    const input = el("input");
+    input.type = "radio"; input.name = d.key; input.value = o.value;
+    input.checked = saved[d.key]?.value === o.value;
+    input.addEventListener("change", () => { saved[d.key] = { ...saved[d.key], value: o.value }; save(); writeOut(); });
+    const label = el("label", "", input, el("span", "", o.title));
+    if (o.liked) label.append(el("span", "tag liked", "You liked this"));
+    if (o.pick) label.append(el("span", "tag pick", "Claude's pick"));
+    const opt = el("div", "opt", label, el("p", "why", o.why));
+    const box = el("div", "mock");
+    opt.append(box);
+    opts.append(opt);
+    mocks.push(() => o.mock(box));
+  }
+  const notes = el("textarea");
+  notes.placeholder = "Notes (optional)";
+  notes.value = saved[d.key]?.note ?? "";
+  notes.addEventListener("input", () => { saved[d.key] = { ...saved[d.key], note: notes.value }; save(); writeOut(); });
+  card.append(opts, el("div", "notes", notes));
+  cards.append(card);
+  mocks.forEach((m) => m());
+});
+writeOut();
+const copyAll = async () => {
+  const ok = await copyText(answers.textContent);
+  const note = document.getElementById("copied");
+  note.textContent = ok ? "✓ Copied. Paste it into Claude." : "Copy failed: select the text below.";
+  setTimeout(() => { note.textContent = ""; }, 2500);
+};
+document.getElementById("copy").addEventListener("click", copyAll);
+document.getElementById("dock-copy").addEventListener("click", () => {
+  copyAll();
+  document.getElementById("out").scrollIntoView({ behavior: "smooth", block: "end" });
+});
+</script>
+</body>
+</html>
