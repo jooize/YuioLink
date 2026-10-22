@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en" class="js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form Hidden Characters 5</title>
+<link rel="stylesheet" href="../server/static/app.css">
+<style>
+body { display: block; padding: 28px 16px 48px; }
+.page { max-width: 1120px; margin: 0 auto; }
+h1 { font-size: 22px; margin: 0 0 6px; }
+h2 { font-size: 17px; margin: 34px 0 6px; }
+.lead, .page > ul { color: var(--text-secondary); font-size: 14px; margin: 0 0 10px; max-width: 88ch; text-align: left; line-height: 1.5; }
+.page > ul { padding-left: 20px; }
+.page code { font-family: var(--font-mono); font-size: 0.92em; }
+.row { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 26px 22px; align-items: start; }
+figure { margin: 0; min-width: 0; }
+figcaption { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 8px; text-align: left; line-height: 1.45; }
+figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
+.frame .app-window { position: static; margin: 0; width: auto; max-width: none; transform: none; min-height: 0; height: auto; }
+.samples, .lh { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 18px; }
+.lh { margin: 6px 0 14px; }
+.samples button, .lh button { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 8px;
+  border: 0.5px solid var(--field-border); background: var(--field-bg); color: var(--text); cursor: pointer; }
+.lh button[aria-pressed=true] { background: var(--accent); color: #fff; border-color: transparent; }
+.samples span, .lh span { font-size: 13px; color: var(--text-secondary); align-self: center; }
+
+/* --- the form --- */
+.hc-slot:empty { display: none; }
+.hc-slot { margin-top: 10px; text-align: left; }
+.hc-slot .history-well { padding-right: 10px; }
+.hc-slot .history-meta { margin: 6px 0 0 2px; font-size: 13px; color: var(--text-secondary); }
+.hc-slot > .history-meta:first-child { margin-top: 0; }
+.hc-field { position: relative; }
+
+/* The ticks over the field: a copy of its text in transparent ink, laid out
+   by the field's own metrics, so each tick lands on its character. No
+   isolate here, unlike every other mark: the field does not isolate a
+   direction control, so the copy must not either. */
+.hc-overlay {
+  position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+  color: transparent; border-color: transparent !important; background: none !important; box-shadow: none !important;
+}
+.hc-overlay .hid { position: relative; unicode-bidi: normal; }
+
+/* Every shape is drawn the same way in the field, in History and in the
+   specimens: over the text at the character's place, taking no width, so
+   the text keeps its own spacing. Sizes are in em, so one rule draws the
+   field's 16px and History's 14px. A run fans out by --fan (--i is the
+   place in the run). */
+.ticked .hid { position: relative; }
+.ticked .hid::after {
+  content: ""; position: absolute; margin: 0; padding: 0; border: 0; border-radius: 0; outline: 0;
+  font-size: 1em; line-height: normal; background: var(--danger);
+  top: 0.02em; height: 1.12em; width: var(--w);
+  left: calc(50% - var(--w) / 2 + var(--i, 0) * var(--fan));
+  transition: transform 0.12s ease;
+}
+.ticked .hid.hot::after { transform: scale(1.3); }
+.ticked .hid.open::after { background: var(--accent); }
+
+/* Round 4's bar. */
+.shape-bar { --w: 2.5px; --fan: 0.25em; }
+.shape-bar .hid::after { border-radius: 2px; }
+
+/* A thin bar with wedge ends: --t is the bar, --cap the wedge's height. */
+.shape-both, .shape-bottom, .shape-top { --w: 0.46em; --fan: 0.55em; --t: 1.5px; --cap: 0.24em; }
+.shape-both .hid::after {
+  clip-path: polygon(0 0, 100% 0, calc(50% + var(--t) / 2) var(--cap), calc(50% + var(--t) / 2) calc(100% - var(--cap)),
+    100% 100%, 0 100%, calc(50% - var(--t) / 2) calc(100% - var(--cap)), calc(50% - var(--t) / 2) var(--cap));
+}
+.shape-bottom .hid::after {
+  clip-path: polygon(calc(50% - var(--t) / 2) 0, calc(50% + var(--t) / 2) 0, calc(50% + var(--t) / 2) calc(100% - var(--cap)),
+    100% 100%, 0 100%, calc(50% - var(--t) / 2) calc(100% - var(--cap)));
+}
+.shape-top .hid::after {
+  clip-path: polygon(0 0, 100% 0, calc(50% + var(--t) / 2) var(--cap), calc(50% + var(--t) / 2) 100%,
+    calc(50% - var(--t) / 2) 100%, calc(50% - var(--t) / 2) var(--cap));
+}
+
+/* Round 3's wedge, under the line. History's 19px lines leave less room
+   under the text, so it sits a little higher there. */
+.shape-wedge { --w: 0.5em; --fan: 0.44em; }
+.shape-wedge .hid::after {
+  top: 1.08em; width: 0; height: 0; background: none;
+  left: calc(50% - var(--w) / 2 + var(--i, 0) * var(--fan));
+  border: 0.25em solid transparent; border-top: 0; border-bottom: 0.31em solid var(--danger);
+  transform-origin: 50% 0;
+}
+.history-well-body.shape-wedge .hid::after { top: 1.02em; }
+.shape-wedge .hid.open::after { background: none; border-bottom-color: var(--accent); }
+
+/* The specimens: the field's and History's type, without the live parts. */
+.spec { display: grid; grid-template-columns: 9.5em minmax(0, 1fr) minmax(0, 1fr); gap: 12px 18px; align-items: center; margin: 12px 0 8px; }
+.spec .head { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); text-align: left; }
+.spec .name { font-size: 14px; font-weight: 600; text-align: left; }
+.spec .name small { display: block; font-weight: 400; font-size: 12.5px; color: var(--text-secondary); }
+.spec .form-control { display: block; white-space: pre-wrap; line-height: 1.45; text-align: left; }
+.spec .history-well { margin: 0; text-align: left; }
+@media (max-width: 760px) {
+  .spec { grid-template-columns: minmax(0, 1fr); }
+  .spec .head { display: none; }
+  .spec .name { margin-top: 10px; }
+}
+.shapes { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 14px; }
+.shapes button { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 8px;
+  border: 0.5px solid var(--field-border); background: var(--field-bg); color: var(--text); cursor: pointer; }
+.shapes button[aria-pressed=true] { background: var(--accent); color: #fff; border-color: transparent; }
+
+.hc-slot .history-well-body.pv-url .bad { cursor: pointer; }
+.hc-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+/* The escape run whose entry is open, ringed as the ticks turn blue. */
+.pv-url .bad.open { box-shadow: 0 0 0 2px var(--accent); }
+
+/* --- The entry's forms. */
+.gcard { background: var(--card-bg, var(--field-bg)); border: 0.5px solid var(--card-border); border-radius: 12px; padding: 6px 10px; }
+.gcard .history-cast.pv-cast { margin: 0; }
+.pv-cast .entry.warn .what code.bad { color: var(--on-danger); font-size: 11.5px; }
+.pv-cast .entry.warn .what code:not(.bad) { color: var(--text); }
+.pv-cast .what .after { display: block; margin-top: 2px; }
+.pv-cast .entry .tiles { align-self: flex-start; }
+
+/* Forms in a row: each form over a small caption saying where it appears. */
+.what .forms { display: flex; flex-wrap: wrap; gap: 2px 16px; margin: 4px 0 0; }
+.what .form { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.what .form small { font-size: 10.5px; line-height: 1.2; color: var(--text-tertiary); }
+
+/* One capsule: the forms joined, the mark's own first; where each appears
+   shows on hover. */
+.what .capsule { display: inline-flex; vertical-align: 1px; border: 0.5px solid var(--field-border); border-radius: 5px; overflow: hidden; }
+.what .capsule code { padding: 0 6px; line-height: 18px; border-radius: 0; }
+.what .capsule code + code { border-left: 0.5px solid var(--field-border); }
+
+/* A small table: where on the left, the form on the right. */
+.what .ftable { display: grid; grid-template-columns: max-content max-content; gap: 2px 10px; align-items: center; margin: 4px 0 0; }
+.what .ftable .where { font-size: 11px; color: var(--text-tertiary); }
+
+.made { margin: 10px 0 0; text-align: center; font-size: 13px; font-weight: 600; color: var(--result-text); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Hidden characters, round 6: every way a character is written</h1>
+  <p class="lead">The ticks are now the thin bar with a wedge on top. The question here is the entry. In a redirect,
+  the mark in the copy is the stored escape run (<code>%E2%80%8D</code>), but today's entry says "marked
+  <code>\u{200D}</code>", a form that appears nowhere on screen. Each design below names every form and puts the one
+  the mark shows first, in the mark's own reverse red. A Text entry has two forms, since an escape run means nothing
+  outside an address.</p>
+
+  <h2>Four ways to write the forms</h2>
+  <div class="spec" id="gallery">
+    <span class="head"></span><span class="head">In a redirect (a joiner in the path)</span><span class="head">In text</span>
+  </div>
+
+  <h2>Live</h2>
+
+  <div class="samples">
+    <span>Load:</span>
+    <button type="button" data-sample="Ref: INV&#x200B;-2291 invoice&#x202E;fdp.exe">ZWSP + RLO</button>
+    <button type="button" data-sample="Dear team,&#10;&#10;The new rota is attached.&#x200B;&#x200B;&#x200B;&#10;Room&#xA0;4 at 10&#x202F;am, bring the&#xAD;badge.&#10;Thanks,&#10;Kim">multiline, a run of three</button>
+    <button type="button" data-sample="Minutes, 21 October&#10;Budget approved for Q3.&#x200B;&#x200B;&#10;Next: invoice&#x202E;fdp.exe from Kim,&#10;signed&#x200B; by the board.">minutes</button>
+    <button type="button" data-sample="I &#x2764;&#xFE0F; it, #&#xFE0F;&#x20E3; one, &#x845B;&#xE0100;飾区, but p&#xFE0F;ay">registered pairs + one odd</button>
+    <button type="button" data-sample="https://example.com/lo&#x200D;gin?next=%2Fhome&amp;f=invoice&#x202E;fdp.exe">URL, path + query</button>
+    <button type="button" data-long>14 lines</button>
+  </div>
+
+  <div class="shapes"><span class="head">Entry:</span></div>
+  <div class="row">
+    <figure><figcaption><b>Form</b></figcaption><div class="frame" data-form></div></figure>
+    <figure><figcaption><b>History row</b>In Ticks, as it would start.</figcaption><div class="frame" data-hist></div></figure>
+  </div>
+</div>
+
+<template id="form">
+  <main class="app-window"><div class="sheet-body centered">
+    <form novalidate>
+      <div class="hc-field">
+        <textarea class="form-control" rows="1" autocomplete="off" autocapitalize="off" spellcheck="false"
+          placeholder="Link or text to share" aria-label="Link or text to share"></textarea>
+      </div>
+      <div class="hc-slot" data-under-field></div>
+      <div class="split-btn">
+        <button class="btn split-primary" type="submit">Create Link</button>
+        <button class="btn split-clear" type="button">Clear</button>
+      </div>
+      <div class="hc-slot" data-under-button></div>
+      <p class="hc-live" aria-live="polite"></p>
+    </form>
+  </div></main>
+</template>
+
+<script>
+"use strict";
+// --- The server's rules, mirrored (in the product they come from the server).
+const INVISIBLE = [[0x00, 0x1f], [0x7f, 0x9f], [0xa0, 0xa0], [0xad, 0xad], [0x34f, 0x34f], [0x61c, 0x61c],
+  [0x115f, 0x1160], [0x17b4, 0x17b5], [0x180b, 0x180f], [0x2000, 0x200f], [0x2028, 0x202f], [0x205f, 0x206f],
+  [0x3000, 0x3000], [0x3164, 0x3164], [0xfe00, 0xfe0f], [0xfeff, 0xfeff], [0xffa0, 0xffa0], [0xfff9, 0xfffb],
+  [0xe0000, 0xe007f], [0xe0100, 0xe01ef]];
+const isInvisible = (cp) => INVISIBLE.some(([a, b]) => cp >= a && cp <= b);
+const REGISTERED = new Set(["2764-fe0f", "23-fe0f", "845b-e0100"]);
+const registered = (b, s) => b != null && REGISTERED.has(`${b.toString(16)}-${s.toString(16)}`);
+const DRESS = { 0xa0: ["NBSP", "no-break space"], 0xad: ["SHY", "soft hyphen"], 0x200b: ["ZWSP", "zero-width space"],
+  0x200c: ["ZWNJ", "zero-width non-joiner"], 0x200d: ["ZWJ", "zero-width joiner"], 0x200e: ["LRM", "left-to-right mark"],
+  0x200f: ["RLM", "right-to-left mark"], 0x202e: ["RLO", "right-to-left override"], 0x202d: ["LRO", "left-to-right override"],
+  0x202f: ["NNBSP", "narrow no-break space"], 0x2060: ["WJ", "word joiner"], 0x3000: ["IDSP", "ideographic space"],
+  0xfeff: ["BOM", "byte order mark"] };
+const hex4 = (cp) => cp.toString(16).toUpperCase().padStart(4, "0");
+const dress = (cp) => {
+  if (DRESS[cp]) return DRESS[cp];
+  const vs = cp >= 0xfe00 && cp <= 0xfe0f ? cp - 0xfe00 + 1 : cp >= 0xe0100 && cp <= 0xe01ef ? cp - 0xe0100 + 17 : 0;
+  return vs ? [`VS${vs}`, `variation selector-${vs}`] : [hex4(cp), "hidden character"];
+};
+const meaning = (cp) => {
+  if (cp === 0xad) return "It shows only where a line happens to break";
+  if (cp === 0xa0 || (cp >= 0x2000 && cp <= 0x200a) || cp === 0x202f || cp === 0x205f || cp === 0x3000) return "It looks like a space but is a different character";
+  if (cp === 0x61c || cp === 0x200e || cp === 0x200f || (cp >= 0x202a && cp <= 0x202e) || (cp >= 0x2066 && cp <= 0x2069))
+    return "It changes the direction of the text around it, so the order you see can differ from the order stored";
+  if ((cp >= 0xfe00 && cp <= 0xfe0f) || (cp >= 0xe0100 && cp <= 0xe01ef)) return "It changes how the character before it is drawn, and a run of them can carry hidden data";
+  if (cp <= 0x1f || (cp >= 0x7f && cp <= 0x9f)) return "It is a control code with no visible form";
+  return "It draws nothing, so two texts that look the same can differ";
+};
+const esc = (cp) => `\\u{${cp.toString(16).toUpperCase()}}`;
+
+// Each hidden part keeps `at`, its place in the text in UTF-16 units (the
+// field's selection counts in those), so the caret can be matched to it.
+const scan = (text) => {
+  const parts = [], entries = [];
+  const chars = [...text];
+  const count = (id, make) => { const e = entries.find((x) => x.id === id); if (e) e.count++; else entries.push({ ...make(), id, count: 1 }); };
+  let run = 0, at = 0;
+  const addText = (t) => { const last = parts.at(-1); if (last?.kind === "text") last.text += t; else parts.push({ kind: "text", text: t }); at += t.length; };
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i], cp = ch.codePointAt(0), next = chars[i + 1]?.codePointAt(0);
+    if (next != null && registered(cp, next)) { run = 0; addText(ch + chars[i + 1]); i++; continue; }
+    if (cp !== 0x0a && cp !== 0x09 && isInvisible(cp)) {
+      const id = `u${cp.toString(16).padStart(4, "0")}`;
+      parts.push({ kind: "hid", text: ch, cp, id, i: run++, at });
+      at += ch.length;
+      count(id, () => ({ kind: "hid", cp }));
+      continue;
+    }
+    run = 0;
+    addText(ch);
+  }
+  return { parts, entries, hidden: parts.filter((p) => p.kind === "hid").length };
+};
+// The entries the caret stands beside (the one after it first), or every
+// entry a selection holds.
+const idsAtCaret = (text, a, b) => {
+  const hid = scan(text).parts.filter((p) => p.kind === "hid");
+  const near = a === b
+    ? [...hid.filter((p) => p.at === a), ...hid.filter((p) => p.at + p.text.length === a)]
+    : hid.filter((p) => p.at >= a && p.at + p.text.length <= b);
+  return [...new Set(near.map((p) => p.id))];
+};
+const SPACE_LIKE = (cp) => cp === 0xa0 || (cp >= 0x2000 && cp <= 0x200a) || cp === 0x202f || cp === 0x205f || cp === 0x3000;
+const withoutHidden = (text) => scan(text).parts.map((p) => p.kind !== "hid" ? p.text
+  : SPACE_LIKE(p.cp) ? " " : (p.cp === 0x2028 || p.cp === 0x2029) ? "\n" : "").join("");
+
+// A redirect as it will be stored: the browser's own serializer (WHATWG, the
+// same standard the server's parser follows), or null when it is not one.
+const storedUrl = (value) => {
+  const t = value.trim();
+  if (!/^https?:\/\/\S+$/i.test(t.replace(/[​-‏‪-‮⁠﻿]/g, ""))) return null;
+  try { return new URL(t).href; } catch { return null; }
+};
+const urlPieces = (href) => {
+  const out = [];
+  let last = 0;
+  for (const m of href.matchAll(/(?:%[0-9A-Fa-f]{2})+/g)) {
+    out.push({ text: href.slice(last, m.index) });
+    const bytes = m[0].match(/%../g);
+    let k = 0;
+    while (k < bytes.length) {
+      const lead = parseInt(bytes[k].slice(1), 16);
+      const len = lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : lead >= 0xc0 ? 2 : 1;
+      const seq = bytes.slice(k, k + len).join("");
+      let ch = null;
+      try { ch = decodeURIComponent(seq); } catch { /* not valid UTF-8: kept as text */ }
+      const cp = ch && [...ch].length === 1 ? ch.codePointAt(0) : null;
+      out.push(cp != null && isInvisible(cp) ? { text: seq, bad: `u${cp.toString(16).padStart(4, "0")}` } : { text: seq });
+      k += len;
+    }
+    last = m.index + m[0].length;
+  }
+  out.push({ text: href.slice(last) });
+  return out;
+};
+
+// --- Parts, built as app.js builds them.
+const SVG_NS = "http://www.w3.org/2000/svg";
+const icon = (size, viewBox, shapes) => {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  for (const [k, v] of Object.entries({ width: size, height: size, viewBox, fill: "none", "aria-hidden": "true" })) svg.setAttribute(k, v);
+  for (const [name, attrs] of shapes) { const s = document.createElementNS(SVG_NS, name); for (const [k, v] of Object.entries(attrs)) s.setAttribute(k, v); svg.append(s); }
+  return svg;
+};
+const round = { stroke: "currentColor", "stroke-linecap": "round", "stroke-linejoin": "round" };
+const alertIcon = () => icon(12, "0 0 16 16", [["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
+  ["path", { d: "M8 4.6v4.2", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" }], ["circle", { cx: "8", cy: "11.2", r: ".95", fill: "currentColor" }]]);
+const checkIcon = () => icon(12, "0 0 16 16", [["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
+  ["path", { ...round, d: "M5.2 8.2 7.2 10.1 10.9 6", "stroke-width": "1.6" }]]);
+const quoteIcon = () => icon(13, "0 0 14 14", [["path", { fill: "currentColor", d: "M2 8.6C2 6 3.3 4.2 5.6 3.3l.5.9C4.8 4.9 4.1 5.9 4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H3.4C2.6 11.6 2 11 2 10.2V8.6Zm5.4 0c0-2.6 1.3-4.4 3.6-5.3l.5.9C10.2 4.9 9.5 5.9 9.4 7h1.2c.8 0 1.4.6 1.4 1.4v1.8c0 .8-.6 1.4-1.4 1.4H8.8c-.8 0-1.4-.6-1.4-1.4V8.6Z" }]]);
+const arrowIcon = () => icon(14, "0 0 14 14", [["path", { ...round, d: "M2 7h9.6M7.6 3l4 4-4 4", "stroke-width": "1.7" }]]);
+const chevronIcon = () => icon(12, "0 0 10 10", [["path", { ...round, d: "M2.5 3.8 5 6.3l2.5-2.5", "stroke-width": "1.5" }]]);
+const el = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+const markedInto = (body, parts, { labels = true } = {}) => {
+  for (const p of parts) {
+    if (p.kind !== "hid") { body.append(p.text); continue; }
+    const m = el("span", "hid", p.text);
+    if (labels) m.dataset.esc = esc(p.cp);
+    m.dataset.tell = p.id;
+    m.style.setProperty("--i", p.i);
+    body.append(m);
+  }
+};
+// The ways one character is written, the one its mark shows first: in a
+// redirect that is the stored escape run, in text the label.
+const pct = (cp) => encodeURIComponent(String.fromCodePoint(cp)).toUpperCase();
+const formsOf = (cp, ctx) => [
+  ...(ctx === "url" ? [["in the address", pct(cp)]] : []),
+  ["in text", esc(cp)],
+  ["in Unicode", `U+${hex4(cp)}`],
+];
+// The first form wears its mark's own dress (the reverse red), so the eye
+// links the entry to the mark it came from.
+const formCode = (text, first) => el("code", first ? "bad" : "", text);
+const VARIANTS = [["row", "Forms in a row"], ["capsule", "One capsule"], ["table", "Small table"], ["sentence", "In the sentence"]];
+const entryEl = (e, ctx = "text", variant = "row") => {
+  const d = el("div", `entry warn solo v-${variant}`);
+  d.dataset.name = e.id;
+  const [sym, name] = dress(e.cp);
+  d.append(el("span", "tiles", el("span", "tile sym", sym), el("span", "tile raw", String.fromCodePoint(e.cp))));
+  const forms = formsOf(e.cp, ctx);
+  const times = e.count > 1 ? ` It appears ${e.count === 2 ? "twice" : `${e.count} times`}.` : "";
+  const after = `${meaning(e.cp)}.${times} The empty box is the character.`;
+  const what = el("span", "what", el("b", "", name));
+  if (variant === "row") {
+    what.append(el("span", "forms", ...forms.map(([where, text], i) => el("span", "form", formCode(text, i === 0), el("small", "", where)))),
+      el("span", "after", after));
+  } else if (variant === "capsule") {
+    const cap = el("span", "capsule", ...forms.map(([where, text], i) => { const c = formCode(text, i === 0); c.title = where; return c; }));
+    what.append(" ", cap, el("span", "after", after));
+  } else if (variant === "table") {
+    what.append(el("span", "ftable", ...forms.flatMap(([where, text], i) => [el("span", "where", where), el("span", "", formCode(text, i === 0))])),
+      el("span", "after", after));
+  } else {
+    const [first, ...rest] = forms;
+    what.append(" ", ctx === "url" ? "is stored in the address as " : "is marked ", formCode(first[1], true),
+      ctx === "url" ? ", written " : ", code point ",
+      ...(ctx === "url" ? [formCode(rest[0][1]), " in text, code point ", formCode(rest[1][1])] : [formCode(rest[0][1])]),
+      `. ${after}`);
+  }
+  d.append(what);
+  return d;
+};
+let variant = "row";
+const castEl = (entries, ids, ctx) => {
+  const shown = ids.map((id) => entries.find((e) => e.id === id)).filter(Boolean);
+  return shown.length ? el("div", "history-cast pv-cast", ...shown.map((e) => entryEl(e, ctx, variant))) : null;
+};
+const paintOpen = (root, ids) => { for (const m of root.querySelectorAll(".hid, .bad[data-tell]")) m.classList.toggle("open", ids.includes(m.dataset.tell)); };
+
+const SHAPES = [["both", "Wedges at both ends"], ["bottom", "Wedge at the bottom"], ["top", "Wedge at the top"],
+  ["bar", "Plain bar (round 4)"], ["wedge", "Wedge under the line (round 3)"]];
+const shapeClasses = SHAPES.map(([s]) => `shape-${s}`);
+const setShape = (node, shape) => { node.classList.remove(...shapeClasses); node.classList.add("ticked", `shape-${shape}`); };
+
+// A mark near a point: within 6px of where its tick is drawn across, and on
+// its line or just under it (where a wedge is drawn). Matching only, never
+// the cursor.
+const markNear = (root, x, y, sel = ".hid[data-tell], .bad[data-tell]") => {
+  const cs = getComputedStyle(root);
+  const fs = Number.parseFloat(cs.fontSize);
+  const fanRaw = cs.getPropertyValue("--fan").trim();
+  const fan = fanRaw.endsWith("em") ? Number.parseFloat(fanRaw) * fs : Number.parseFloat(fanRaw) || 0;
+  const wedge = root.classList.contains("shape-wedge");
+  for (const m of root.querySelectorAll(sel)) {
+    const shift = (Number(m.style.getPropertyValue("--i")) || 0) * fan;
+    for (const r of m.getClientRects()) {
+      if (x >= r.left + shift - 6 && x <= r.right + shift + 6 && y >= r.top && y <= r.bottom + (wedge ? 0.45 * fs : 0)) return m;
+    }
+  }
+  return null;
+};
+// Hover only grows the wedge under the pointer. Purely drawn: the cursor
+// stays the I-beam.
+const hoverGrow = (target, root) => {
+  target.addEventListener("mousemove", (ev) => {
+    const w = markNear(root, ev.clientX, ev.clientY, ".hid");
+    root.querySelectorAll(".hid.hot").forEach((m) => m !== w && m.classList.remove("hot"));
+    w?.classList.add("hot");
+  });
+  target.addEventListener("mouseleave", () => root.querySelectorAll(".hid.hot").forEach((m) => m.classList.remove("hot")));
+};
+
+// History's row.
+const historyWell = (text, { mode = "labels", shape = null, stored = null, onMark = null, whole = false, onMore = null } = {}) => {
+  const s = scan(text);
+  const redirect = stored != null;
+  const well = el("div", `history-well ${redirect ? "redirect" : "text"}`);
+  const mark = el("span", "history-mark", redirect ? arrowIcon() : quoteIcon());
+  mark.setAttribute("aria-hidden", "true");
+  const body = el("span", `history-well-body${redirect ? " pv-url" : ""}`);
+  if (mode === "ticks") setShape(body, shape);
+  if (redirect) {
+    for (const p of urlPieces(stored)) {
+      if (!p.bad) { body.append(p.text); continue; }
+      const b = el("span", "bad", p.text);
+      b.dataset.tell = p.bad;
+      body.append(b);
+    }
+  } else markedInto(body, s.parts, { labels: mode === "labels" });
+  if (onMark) {
+    // A plain click only (detail 1, nothing selected): a drag or a
+    // double-click selects and leaves the entries alone.
+    body.addEventListener("click", (ev) => {
+      const sel = window.getSelection();
+      if (ev.detail > 1 || (sel && !sel.isCollapsed)) return;
+      const m = markNear(body, ev.clientX, ev.clientY);
+      if (m) onMark(m.dataset.tell);
+    });
+    if (mode === "ticks") hoverGrow(body, body);
+  }
+  const col = el("div", "history-well-col", body);
+  if (whole) well.classList.add("open");
+  well.append(mark, col);
+  if (!onMore) return well;
+  requestAnimationFrame(() => {
+    const cap = Number.parseFloat(getComputedStyle(body).maxHeight);
+    if (!whole && !(body.scrollHeight > cap + 1)) return;
+    if (!whole) body.classList.add("cut");
+    const more = el("button", "history-more", chevronIcon(),
+      el("span", "", whole ? "Show Less" : `${plural(text.split("\n").length, "line")}, ${plural([...text].length, "character")} total`));
+    more.type = "button";
+    more.setAttribute("aria-expanded", String(whole));
+    more.addEventListener("click", onMore);
+    col.append(more);
+  });
+  return well;
+};
+
+// --- The form.
+function setupForm(frame) {
+  let shape = "top";
+  frame.append(document.getElementById("form").content.cloneNode(true));
+  const form = frame.querySelector("form");
+  const ta = frame.querySelector("textarea");
+  const field = frame.querySelector(".hc-field");
+  const underField = frame.querySelector("[data-under-field]");
+  const underButton = frame.querySelector("[data-under-button]");
+  const submit = frame.querySelector(".split-primary");
+  const live = frame.querySelector(".hc-live");
+  const st = { mode: "ticks", before: null, after: null, open: [], whole: false, announced: 0, made: false, down: false };
+
+  const overlay = el("div", "hc-overlay");
+  setShape(overlay, shape);
+  frame.rerender = () => render();
+  overlay.setAttribute("aria-hidden", "true");
+  field.append(overlay);
+
+  const autosize = () => { ta.style.height = "auto"; ta.style.height = `${ta.scrollHeight}px`; };
+  const replaceField = (text) => {
+    ta.focus(); ta.select();
+    st.ours = true;
+    if (!document.execCommand("insertText", false, text)) ta.value = text;
+    st.ours = false;
+  };
+  const removedNow = () => st.before != null && ta.value === st.after;
+  const removeThem = () => {
+    const before = ta.value, after = withoutHidden(before);
+    replaceField(after);
+    Object.assign(st, { before, after, open: [] });
+    live.textContent = "Hidden characters removed.";
+    render();
+  };
+  const putBack = () => { const b = st.before; replaceField(b); Object.assign(st, { before: null, after: null, mode: "ticks" }); render(); };
+
+  const chip = (n) => {
+    const removed = removedNow();
+    const mode = removed ? "removed" : st.mode;
+    const c = el("button", "history-hidden");
+    c.type = "button";
+    c.dataset.mode = mode;
+    if (removed) c.append(checkIcon(), `${plural(n, "Hidden Character")} Removed`);
+    else c.append(alertIcon(), plural(n, "Hidden Character"), el("span", "history-hidden-mode", `· ${mode === "ticks" ? "Ticks" : "Labels"}`));
+    c.title = { ticks: "Show them as labels", labels: "Take them out of the text", removed: "Put them back" }[mode];
+    c.addEventListener("click", () => {
+      if (removed) putBack();
+      else if (mode === "ticks") { st.mode = "labels"; render(); }
+      else removeThem();
+      frame.querySelector(".hc-slot .history-hidden")?.focus();
+    });
+    return c;
+  };
+
+  const syncOverlay = (s) => {
+    const cs = getComputedStyle(ta);
+    for (const p of ["fontFamily", "fontSize", "fontWeight", "fontStyle", "fontStretch", "letterSpacing", "wordSpacing", "lineHeight",
+      "padding", "borderWidth", "borderStyle", "boxSizing", "whiteSpace", "overflowWrap", "wordBreak", "textAlign", "textIndent",
+      "direction", "tabSize", "alignContent", "borderRadius"]) overlay.style[p] = cs[p];
+    overlay.replaceChildren();
+    markedInto(overlay, s.parts, { labels: false });
+    overlay.append("​");
+    paintOpen(overlay, st.open);
+    overlay.style.height = `${ta.offsetHeight}px`;
+    overlay.scrollTop = ta.scrollTop;
+  };
+
+  // The entries follow the caret, never the pointer: after a click or a
+  // drag ends, after a key that moves the caret, but not after typing.
+  const follow = (ev) => {
+    let ids = idsAtCaret(ta.value, ta.selectionStart, ta.selectionEnd);
+    // A click on a wedge under the line can land the caret on the next
+    // line: the wedge itself still counts.
+    if (!ids.length && ev?.type === "pointerup" && ta.selectionStart === ta.selectionEnd) {
+      const w = shape === "wedge" && markNear(overlay, ev.clientX, ev.clientY, ".hid");
+      if (w) ids = [w.dataset.tell];
+    }
+    if (ids.join() === st.open.join()) return;
+    st.open = ids;
+    if (ids.length) live.textContent = ids.map((id) => dress(Number.parseInt(id.slice(1), 16))[1]).join(", ");
+    render();
+  };
+  ta.addEventListener("pointerdown", () => { st.down = true; });
+  document.addEventListener("pointerup", (ev) => { if (st.down) { st.down = false; follow(ev); } });
+  ta.addEventListener("keyup", (ev) => {
+    if (ev.key.startsWith("Arrow") || ["Home", "End", "PageUp", "PageDown"].includes(ev.key) || (ev.key === "a" && (ev.metaKey || ev.ctrlKey))) follow();
+  });
+  hoverGrow(ta, overlay);
+  ta.addEventListener("scroll", () => { overlay.scrollTop = ta.scrollTop; });
+
+  function render() {
+    autosize();
+    const s = scan(ta.value);
+    const n = s.hidden;
+    const removed = removedNow();
+    if (st.before != null && !removed) Object.assign(st, { before: null, after: null, mode: "ticks" });
+    st.open = st.open.filter((id) => s.entries.some((e) => e.id === id));
+    underField.replaceChildren();
+    underButton.replaceChildren();
+    const stored = storedUrl(ta.value);
+    submit.textContent = ta.value.trim() ? `Create ${stored ? "Redirect" : "Text"} Link` : "Create Link";
+    if (n && !st.announced) live.textContent = `${plural(n, "hidden character")} in the text.`;
+    st.announced = n;
+
+    if (removed) underField.append(el("div", "history-meta", chip(scan(st.before).hidden)));
+    else if (n) {
+      if (st.mode === "labels") {
+        const well = historyWell(ta.value, {
+          stored, whole: st.whole,
+          onMark: (id) => { st.open = st.open.join() === id ? [] : [id]; render(); },
+          onMore: () => { st.whole = !st.whole; render(); },
+        });
+        paintOpen(well, st.open);
+        underField.append(well);
+      }
+      const cast = castEl(s.entries, st.open, stored ? "url" : "text");
+      if (cast) underField.append(cast);
+      underField.append(el("div", "history-meta", chip(n)));
+    }
+    if (st.made) underButton.append(el("p", "made", "✓ The link would be created now (mockup)."));
+    syncOverlay(s);
+  }
+  ta.addEventListener("input", () => { if (!st.ours) st.made = false; render(); });
+  new ResizeObserver(() => syncOverlay(scan(ta.value))).observe(ta);
+  form.addEventListener("submit", (ev) => { ev.preventDefault(); st.made = Boolean(ta.value.trim()); render(); });
+  frame.querySelector(".split-clear").addEventListener("click", () => { ta.value = ""; Object.assign(st, { before: null, after: null, mode: "ticks", open: [], made: false }); render(); });
+  frame.load = (text) => { Object.assign(st, { before: null, after: null, mode: "ticks", open: [], whole: false, announced: 0, made: false }); ta.value = text; render(); };
+}
+
+// --- History, the same text as a saved row in Ticks.
+function setupHist(frame) {
+  const st = { text: "", open: [], whole: false, shape: "top" };
+  const render = () => {
+    const s = scan(st.text);
+    const stored = storedUrl(st.text);
+    const box = el("div", "hc-slot");
+    box.style.margin = "0";
+    const well = historyWell(st.text, {
+      mode: "ticks", shape: st.shape, stored, whole: st.whole,
+      onMark: (id) => { st.open = st.open.join() === id ? [] : [id]; render(); },
+      onMore: () => { st.whole = !st.whole; render(); },
+    });
+    paintOpen(well, st.open);
+    box.append(well);
+    const cast = castEl(s.entries, st.open, stored ? "url" : "text");
+    if (cast) box.append(cast);
+    if (s.hidden) box.append(el("div", "history-meta",
+      el("span", "history-hidden", alertIcon(), plural(s.hidden, "Hidden Character"), el("span", "history-hidden-mode", "· Ticks"))));
+    frame.replaceChildren(el("main", "app-window", el("div", "sheet-body centered", box)));
+  };
+  frame.load = (text) => { Object.assign(st, { text, open: [], whole: false }); render(); };
+  frame.rerender = render;
+}
+
+// --- The gallery: one joiner's entry in each design, in both contexts.
+const gallery = document.getElementById("gallery");
+const card = (node) => el("div", "gcard", node);
+for (const [v, name] of VARIANTS) {
+  const zwj = { cp: 0x200d, id: "u200d", count: 1 };
+  gallery.append(el("span", "name", name),
+    card(el("div", "history-cast pv-cast", entryEl(zwj, "url", v))),
+    card(el("div", "history-cast pv-cast", entryEl({ ...zwj, count: 2 }, "text", v))));
+}
+
+const formFrame = document.querySelector("[data-form]"), histFrame = document.querySelector("[data-hist]");
+setupForm(formFrame);
+setupHist(histFrame);
+const frames = [formFrame, histFrame];
+const shapes = document.querySelector(".shapes");
+for (const [v, name] of VARIANTS) {
+  const b = el("button", "", name);
+  b.type = "button";
+  b.setAttribute("aria-pressed", String(v === variant));
+  b.addEventListener("click", () => {
+    variant = v;
+    frames.forEach((f) => f.rerender());
+    for (const o of shapes.querySelectorAll("button")) o.setAttribute("aria-pressed", String(o === b));
+  });
+  shapes.append(b);
+}
+const load = (t) => frames.forEach((f) => f.load(t));
+for (const b of document.querySelectorAll("[data-sample]")) b.addEventListener("click", () => load(b.dataset.sample));
+document.querySelector("[data-long]").addEventListener("click", () => {
+  const lines = Array.from({ length: 14 }, (_, i) => `Line ${i + 1} of the minutes, as agreed.`);
+  lines[2] = "Budget approved for Q3.";
+  lines[12] = "Sign​ed, the board.";
+  load(lines.join("\n"));
+});
+load(document.querySelectorAll("[data-sample]")[4].dataset.sample);
+</script>
+</body>
+</html>
