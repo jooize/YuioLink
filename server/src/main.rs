@@ -1,6 +1,7 @@
 mod card;
 mod config;
 mod db;
+mod emoji;
 mod error;
 mod legal;
 mod phone;

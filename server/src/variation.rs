@@ -91,6 +91,16 @@ pub fn registered(base: char, selector: char) -> Option<&'static Variant> {
         .map(|i| &table[i].2)
 }
 
+/// The bases emoji-variation-sequences.txt registers with `selector` (VS15
+/// for text style, VS16 for emoji style), in code point order.
+pub fn emoji_bases(selector: char) -> Vec<u32> {
+    table()
+        .iter()
+        .filter(|e| e.1 == selector as u32 && e.2.registry == Registry::Emoji)
+        .map(|e| e.0)
+        .collect()
+}
+
 /// Every registered sequence, sorted by (base, selector), one entry each.
 /// Parsed once, on first use, from the embedded files.
 fn table() -> &'static [(u32, u32, Variant)] {

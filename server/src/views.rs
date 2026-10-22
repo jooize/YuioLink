@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use maud::{DOCTYPE, Markup, PreEscaped, html};
 
+use crate::emoji;
 use crate::phone;
 use crate::urlview::{self, Hazard, IdnWarning, Piece, Role, Tier, UriView};
 use crate::variation;
@@ -644,9 +645,13 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
 
         form #create-form method="post" action="/" {
             label.visually-hidden for="content" { "Link or text to share" }
-            textarea #content.form-control name="content" rows="1"
-                autocomplete="off" autocapitalize="off" spellcheck="false"
-                placeholder="Link or text to share" autofocus {}
+            // The wrapper holds the hidden-character marks app.js draws
+            // over the field.
+            div.hc-field #hc-field {
+                textarea #content.form-control name="content" rows="1"
+                    autocomplete="off" autocapitalize="off" spellcheck="false"
+                    placeholder="Link or text to share" autofocus {}
+            }
 
             div.split-btn {
                 button #submit.btn.split-primary type="submit" { "Create Link" }
@@ -853,6 +858,8 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             // The schemes a redirect may use, for app.js's kind detection, so
             // the list lives in one place (core's allowlist).
             meta name="yuiolink-schemes" content=(yuiolink_core::DEFAULT_ALLOWED_SCHEMES.join(" "));
+            // The hidden characters, for the form's marks (char_table).
+            meta name="yuiolink-chars" content=(char_table());
         },
         body,
         scripts,
@@ -2064,6 +2071,76 @@ fn char_meaning(c: char) -> &'static str {
     }
 }
 
+/// The kinds pasted text often holds for a reason: spaces that do not break,
+/// and soft hyphens. The create form gives them a gray tick, counts them
+/// apart from the rest, and its Remove leaves them in.
+pub(crate) fn is_soft(c: char) -> bool {
+    matches!(
+        c,
+        '\u{00a0}' | '\u{00ad}' | '\u{2000}'..='\u{200a}' | '\u{202f}' | '\u{205f}' | '\u{3000}'
+    )
+}
+
+/// True when a hidden character inside a domain is dropped by the URL
+/// parser (IDNA ignores it), so the address still parses, to the domain
+/// without it. Every other hidden character makes the address invalid.
+pub(crate) fn host_drops(c: char) -> bool {
+    url::Url::parse(&format!("https://exa{c}mple.com/"))
+        .is_ok_and(|u| u.host_str() == Some("example.com"))
+}
+
+/// What app.js needs to mark the create form's hidden characters as this
+/// server marks a snippet, as JSON for the landing page's `yuiolink-chars`
+/// meta: the hidden code points and the soft ones, as `[first, last]`
+/// ranges; the ones a domain drops; the bases VS15 and VS16 complete (the
+/// emoji list registers both styles for each); each character's name where
+/// it has one beyond the formula app.js shares (variation selectors, hex
+/// digits); and what each one does. Built once, from the same functions the
+/// server marks by, so the two never disagree.
+pub(crate) fn char_table() -> &'static str {
+    static TABLE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    TABLE.get_or_init(|| {
+        let hidden: Vec<char> = (0..=0x10ffff_u32)
+            .filter_map(char::from_u32)
+            .filter(|&c| urlview::is_invisible(c))
+            .collect();
+        let ranges = |keep: &dyn Fn(char) -> bool| {
+            let mut out: Vec<[u32; 2]> = Vec::new();
+            for &c in hidden.iter().filter(|&&c| keep(c)) {
+                match out.last_mut() {
+                    Some(r) if r[1] + 1 == c as u32 => r[1] = c as u32,
+                    _ => out.push([c as u32, c as u32]),
+                }
+            }
+            out
+        };
+        let names: serde_json::Map<String, serde_json::Value> = hidden
+            .iter()
+            .filter_map(|&c| {
+                let (sym, name) = char_dress(c);
+                (name != "hidden character" && !name.starts_with("variation selector-"))
+                    .then(|| ((c as u32).to_string(), serde_json::json!([sym, name])))
+            })
+            .collect();
+        let mut meanings: Vec<(&str, Vec<[u32; 2]>)> = Vec::new();
+        for &c in &hidden {
+            let text = char_meaning(c);
+            if !meanings.iter().any(|(t, _)| *t == text) {
+                meanings.push((text, ranges(&|d| char_meaning(d) == text)));
+            }
+        }
+        serde_json::json!({
+            "hidden": ranges(&|_| true),
+            "soft": ranges(&is_soft),
+            "hostDrops": ranges(&host_drops),
+            "emojiBases": variation::emoji_bases('\u{fe0f}'),
+            "names": names,
+            "meanings": meanings,
+        })
+        .to_string()
+    })
+}
+
 /// The count and place clauses: "…, twice, in the path".
 fn cast_tail(e: &CastEntry) -> Markup {
     html! {
@@ -3239,6 +3316,8 @@ fn text_mark(text: &str, i: usize, c: char, crlf: bool) -> Option<String> {
         // A selector completing a registered sequence draws as part of the
         // character before it: listed as a variant form, never marked.
         c if variation::completes(text[..i].chars().next_back(), c) => None,
+        // A joiner or tag inside an emoji draws as part of the picture.
+        c if emoji::in_emoji(text, i, c) => None,
         c if urlview::is_invisible(c) => Some(format!("\\u{{{:X}}}", c as u32)),
         _ => None,
     }
@@ -4954,5 +5033,59 @@ mod tests {
             "{s}"
         );
         assert!(!s.contains('\0'), "{s}");
+    }
+
+    #[test]
+    fn a_hidden_character_in_a_domain_is_dropped_or_refused() {
+        // The form says one of two things about a hidden character in a
+        // domain: it is dropped, or the address is not one and the link is
+        // Text. A third outcome (a different domain) would make it wrong.
+        for c in (0..=0x10ffff_u32).filter_map(char::from_u32) {
+            if !urlview::is_invisible(c) || host_drops(c) {
+                continue;
+            }
+            let addr = format!("https://exa{c}mple.com/login");
+            assert!(
+                yuiolink_core::validate_redirect(&addr, yuiolink_core::DEFAULT_ALLOWED_SCHEMES)
+                    .is_err(),
+                "U+{:04X} parses to another domain",
+                c as u32
+            );
+        }
+        assert!(host_drops('\u{200b}'));
+        assert!(!host_drops('\u{200d}'));
+    }
+
+    #[test]
+    fn the_form_gets_the_character_table() {
+        let t: serde_json::Value = serde_json::from_str(char_table()).expect("JSON");
+        assert_eq!(t["hidden"][0], serde_json::json!([0, 31]));
+        assert!(
+            t["soft"]
+                .as_array()
+                .is_some_and(|a| a.contains(&serde_json::json!([0xa0, 0xa0])))
+        );
+        assert_eq!(
+            t["names"]["8203"],
+            serde_json::json!(["ZWSP", "zero-width space"])
+        );
+        // Variation selectors are named by app.js's formula, not the table.
+        assert!(t["names"].get("65039").is_none());
+        // One list serves both selectors: the emoji file registers each base
+        // in both styles.
+        assert_eq!(
+            variation::emoji_bases('\u{fe0e}'),
+            variation::emoji_bases('\u{fe0f}')
+        );
+        assert!(
+            t["emojiBases"]
+                .as_array()
+                .is_some_and(|a| a.contains(&serde_json::json!(0x2764)))
+        );
+        let page = index_page(604_800).into_string();
+        assert!(
+            page.contains(r#"<meta name="yuiolink-chars""#),
+            "no table in the page"
+        );
     }
 }
