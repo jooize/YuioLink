@@ -135,8 +135,8 @@ h1 { font-size: 22px; margin: 0 0 6px; }
   box-shadow: 0 0 0 2px var(--accent);
 }
 /* The peek covers what it stands over, the open flag included. */
-:root { --hc-solid: #fff; }
-@media (prefers-color-scheme: dark) { :root { --hc-solid: #2c2c2e; } }
+:root { --hc-solid: #fff; --hc-gray: #6e6e73; }
+@media (prefers-color-scheme: dark) { :root { --hc-solid: #2c2c2e; --hc-gray: #8e8e93; } }
 .hc-flag.peek { z-index: 3; color: var(--danger); background: var(--hc-solid); box-shadow: inset 0 0 0 1px var(--danger), 0 1px 4px rgba(0, 0, 0, 0.18); }
 .hc-flag.peek.soft { color: var(--text-secondary); box-shadow: inset 0 0 0 1px var(--text-tertiary), 0 1px 4px rgba(0, 0, 0, 0.18); }
 
@@ -148,6 +148,12 @@ h1 { font-size: 22px; margin: 0 0 6px; }
 .hc-soft { font-size: 13px; color: var(--text-secondary); }
 button.hc-soft { font: inherit; font-size: 13px; border: 0; background: none; padding: 0; cursor: pointer; color: var(--text-secondary); }
 button.hc-soft:hover { color: var(--text); }
+/* An open soft run: its flag, its History label and its entry in grey. */
+.hc-flag.soft:not(.peek) { background: var(--hc-gray); color: #fff; }
+.ticked .hid.soft.lab::after { background: var(--hc-gray); color: #fff; }
+.pv-cast .entry.soft .what code.bad { background: var(--hc-gray); color: #fff; font-size: 11.5px; }
+.pv-cast .entry.soft .what b { color: var(--text); }
+.pv-cast .entry.soft .tile.sym { color: var(--text-secondary); border-color: var(--text-tertiary); }
 .hc-flag.say-name { font-family: var(--font); font-size: 12px; }
 
 /* History at the field's size. */
@@ -456,8 +462,8 @@ const formButton = ([where, text, ctxOf], ctx) => {
 };
 // layout "three": all three forms in the row. "beside": U+XXXX beside the
 // name, as today's entry has it, and the two forms you paste in the row.
-const entryEl = (e, ctx = "text", layout = "three") => {
-  const d = el("div", "entry warn solo");
+const entryEl = (e, ctx = "text", layout = "three", soft = false) => {
+  const d = el("div", soft ? "entry soft solo" : "entry warn solo");
   d.dataset.name = e.id;
   const [sym, name] = dress(e.cp);
   d.append(el("span", "tiles", el("span", "tile sym", sym), el("span", "tile raw", String.fromCodePoint(e.cp))));
@@ -471,9 +477,9 @@ const entryEl = (e, ctx = "text", layout = "three") => {
   d.append(what);
   return d;
 };
-const castEl = (entries, ids, ctx, layout) => {
+const castEl = (entries, ids, ctx, layout, tiers = false) => {
   const shown = ids.map((id) => entries.find((e) => e.id === id)).filter(Boolean);
-  return shown.length ? el("div", "history-cast pv-cast", ...shown.map((e) => entryEl(e, ctx, layout))) : null;
+  return shown.length ? el("div", "history-cast pv-cast", ...shown.map((e) => entryEl(e, ctx, layout, tiers && SOFT(e.cp)))) : null;
 };
 const paintOpen = (root, ids) => { for (const m of root.querySelectorAll(".hid, .bad[data-tell]")) m.classList.toggle("open", ids.includes(m.dataset.tell)); };
 
@@ -607,7 +613,11 @@ function setupForm(frame, cfgIn = {}) {
     badge.style.left = `${c.x - fr.left}px`;
     badge.style.top = `${c.top - fr.top}px`;
   };
-  const placeFlag = () => { const m = overlay.querySelector("[data-flag]"); place(flag, m, m?.dataset.flag); };
+  const placeFlag = () => {
+    const m = overlay.querySelector("[data-flag]");
+    flag.classList.toggle("soft", Boolean(m?.classList.contains("soft")));
+    place(flag, m, m?.dataset.flag);
+  };
 
   const autosize = () => { ta.style.height = "auto"; ta.style.height = `${ta.scrollHeight}px`; };
   const replaceField = (text) => {
@@ -752,7 +762,7 @@ function setupForm(frame, cfgIn = {}) {
         paintOpen(well, st.open);
         underField.append(well);
       }
-      const cast = castEl(s.entries, st.open, stored ? "url" : "text", cfg.layout);
+      const cast = castEl(s.entries, st.open, stored ? "url" : "text", cfg.layout, tiered);
       if (cast) underField.append(cast);
       underField.append(el("div", "history-meta", t.hard ? chip(t.hard) : "", softItem()));
     }
@@ -815,7 +825,7 @@ function setupHist(frame, cfg = {}) {
     });
     paintOpen(well, st.open);
     box.append(well);
-    const cast = castEl(s.entries, st.open, stored ? "url" : "text", cfg.layout ?? "three");
+    const cast = castEl(s.entries, st.open, stored ? "url" : "text", cfg.layout ?? "three", cfg.tiers === "soft");
     if (cast) box.append(cast);
     const soft = cfg.tiers === "soft" ? s.parts.filter((p) => p.kind === "hid" && SOFT(p.cp)).length : 0;
     const hard = s.hidden - soft;
