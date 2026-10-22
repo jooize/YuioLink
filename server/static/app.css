@@ -976,7 +976,6 @@ html.js .custom-field:not(.open) {
     margin: 0;
 }
 
-.hc-soft,
 .history-hidden.soft {
     color: var(--text-secondary);
 }
@@ -1776,9 +1775,18 @@ html.js .custom-field:not(.open) {
     display: none;
 }
 
+.history-well-body:not(.ticked) .hid.soft::after,
 .history-well-body.ticked .hid.soft.lab::after {
     color: #fff;
     background: var(--hc-gray);
+}
+
+/* The row's chips, red and gray, one per line. */
+.history-tiers {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
 }
 
 /* The label ignores the pointer, so text.js (and app.js, in a row) finds a

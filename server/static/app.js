@@ -728,6 +728,8 @@
                 const merged = { ...win, marksAt: other.marksAt };
                 if (other.marks) merged.marks = other.marks;
                 else delete merged.marks;
+                if (other.softRemoved) merged.softRemoved = true;
+                else delete merged.softRemoved;
                 byId.set(e.id, merged);
             } else byId.set(e.id, win);
         }
@@ -1007,9 +1009,9 @@
             return;
         }
         const mode = marksMode(it);
-        if (mode === "ticks") body.classList.add("marks-ticks", "ticked");
-        paintDisplay(c.display, body, mode === "removed");
-        if (mode !== "removed") groupRuns(it, body, mode);
+        if (mode !== "labels") body.classList.add("marks-ticks", "ticked");
+        paintDisplay(c.display, body, dropFor(it));
+        groupRuns(it, body, mode);
     };
     // Marks side by side make a run, as in the form: in Ticks one tick with a
     // count, and the run a click opened shows its label in place; in Labels
@@ -1032,34 +1034,42 @@
                 m.dataset.esc = label;
             });
             if (run.every((m) => isSoft(Number.parseInt(m.dataset.tell.slice(1), 16)))) run.forEach((m) => m.classList.add("soft"));
-            if (mode === "ticks" && opened === k) run.forEach((m) => m.classList.add("lab"));
+            if (mode !== "labels" && opened === k) run.forEach((m) => m.classList.add("lab"));
         });
     };
     // The server's tree, built as elements: a string is text, ["wbr"] a
     // line-break opportunity, [class, child...] a span. An object after the
     // class names another tag and the element's data. Only those tags and
-    // data names, class names and text come from it, never markup. `removed`
-    // leaves out the hidden characters' marks, and so the characters.
+    // data names, class names and text come from it, never markup. `drop`
+    // leaves out marks, and so their characters, by tier (`hard`, `soft`); a
+    // no-break space left out becomes a plain space, as in the form.
     const TREE_TAGS = new Set(["b", "code", "div"]);
     const TREE_DATA = new Set(["esc", "tell", "cp", "name"]);
     const treeExtra = (n) => (n[1] && typeof n[1] === "object" && !Array.isArray(n[1]) ? n[1] : null);
     const isMarkNode = (n) => Array.isArray(n) && typeof n[0] === "string" && n[0].split(" ").includes("hid");
-    // A mark Removed takes out: every kind but the soft ones, as in the form.
     const markCp = (n) => Number.parseInt(treeExtra(n)?.tell?.slice(1) ?? "", 16);
-    const isRemovable = (n) => isMarkNode(n) && !isSoft(markCp(n));
-    const paintDisplay = (nodes, parent, removed = false) => {
+    // What a mark leaves in place of its character under `drop`: null to
+    // keep the mark, else the text standing in for it.
+    const dropped = (n, drop) => {
+        if (!drop || !isMarkNode(n)) return null;
+        const cp = markCp(n);
+        if (!isSoft(cp)) return drop.hard ? "" : null;
+        return drop.soft ? (cp === 0xad ? "" : " ") : null;
+    };
+    const paintDisplay = (nodes, parent, drop = null) => {
         for (const n of nodes) {
             if (typeof n === "string") parent.append(n);
             else if (Array.isArray(n) && n.length === 1 && n[0] === "wbr") parent.append(document.createElement("wbr"));
             else if (Array.isArray(n) && typeof n[0] === "string") {
-                if (removed && isRemovable(n)) continue;
+                const instead = dropped(n, drop);
+                if (instead != null) { parent.append(instead); continue; }
                 const extra = treeExtra(n);
                 const el = document.createElement(TREE_TAGS.has(extra?.tag) ? extra.tag : "span");
                 if (n[0]) el.className = n[0];
                 for (const [k, v] of Object.entries(extra ?? {})) {
                     if (TREE_DATA.has(k) && typeof v === "string") el.dataset[k] = v;
                 }
-                paintDisplay(n.slice(extra ? 2 : 1), el, removed);
+                paintDisplay(n.slice(extra ? 2 : 1), el, drop);
                 parent.append(el);
             }
         }
@@ -1070,15 +1080,15 @@
         const n = Number(cp);
         return Number.isInteger(n) && n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : "";
     };
-    // The text a tree holds, exactly as stored; `removed` leaves out the
-    // hidden characters.
-    const treeText = (nodes, removed = false) => {
+    // The text a tree holds, exactly as stored, or with `drop` as drawn.
+    const treeText = (nodes, drop = null) => {
         let out = "";
         for (const n of nodes) {
             if (typeof n === "string") out += n;
-            else if (!Array.isArray(n) || typeof n[0] !== "string" || (removed && isRemovable(n))) continue;
+            else if (!Array.isArray(n) || typeof n[0] !== "string") continue;
+            else if (dropped(n, drop) != null) out += dropped(n, drop);
             else if (treeExtra(n)?.cp !== undefined) out += fromCp(treeExtra(n).cp);
-            else out += treeText(n.slice(treeExtra(n) ? 2 : 1), removed);
+            else out += treeText(n.slice(treeExtra(n) ? 2 : 1), drop);
         }
         return out;
     };
@@ -1106,8 +1116,38 @@
     // the default), Labels (each run wears its name) and Removed (left out of
     // the row, of a selection and of the row's Copy). The mode is the row's
     // own, `it.marks` (absent for Ticks), stamped like the eye for the merge.
+    // Removed leaves the soft kinds in; they have their own gray chip, which
+    // takes them out too (`it.softRemoved`, on the same stamp).
     const MARK_MODES = ["ticks", "labels", "removed"];
     const marksMode = (it) => (MARK_MODES.includes(it.marks) ? it.marks : "ticks");
+    const dropFor = (it) => {
+        const hard = marksMode(it) === "removed";
+        return hard || it.softRemoved ? { hard, soft: Boolean(it.softRemoved) } : null;
+    };
+    const softChip = (it, n) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "history-hidden soft";
+        chip.dataset.for = it.id;
+        chip.dataset.tier = "soft";
+        const what = plainPlural(n, "Special Character");
+        const state = document.createElement("span");
+        state.className = "history-hidden-mode";
+        state.textContent = it.softRemoved ? "\u00b7 Put Back" : "\u00b7 Remove";
+        if (it.softRemoved) {
+            chip.dataset.mode = "removed";
+            chip.append(checkIcon(), `${what} Removed`, state);
+        } else chip.append(infoIcon(), what, state);
+        chip.title = it.softRemoved ? "Put them back in the row" : "Take them out of the row";
+        chip.addEventListener("click", () => {
+            if (it.softRemoved) delete it.softRemoved;
+            else it.softRemoved = true;
+            it.marksAt = Date.now();
+            renderHistory();
+            document.querySelector(`.history-hidden[data-for="${it.id}"][data-tier="soft"]`)?.focus();
+        });
+        return chip;
+    };
     // The entry a mark opens, under the row, this page view only: row id to
     // the mark's `data-tell` and its run's place in the row.
     const castOpen = new Map();
@@ -1136,7 +1176,7 @@
         chip.addEventListener("click", () => {
             setMarksMode(it, MARK_MODES[(MARK_MODES.indexOf(mode) + 1) % MARK_MODES.length]);
             renderHistory();
-            document.querySelector(`.history-hidden[data-for="${it.id}"]`)?.focus();
+            document.querySelector(`.history-hidden[data-for="${it.id}"]:not([data-tier])`)?.focus();
         });
         return chip;
     };
@@ -1250,7 +1290,7 @@
     // The clipboard write starts inside the click, with the text to follow,
     // since Safari refuses a write begun after the fetch returns.
     const copyContents = async (it, button) => {
-        const plain = (c) => (marksMode(it) === "removed" && Array.isArray(c.display) ? treeText(c.display, true) : c.text);
+        const plain = (c) => (dropFor(it) && Array.isArray(c.display) ? treeText(c.display, dropFor(it)) : c.text);
         const full = expanded.get(it.id);
         if (full) return copyToClipboard(plain(full), button);
         if (snippetComplete(it)) return copyToClipboard(plain(rowContents(it)), button);
@@ -1473,17 +1513,18 @@
                 uses.textContent = plainPlural(it.uses, "use");
                 meta.append(uses);
             }
-            // A Text row's hidden characters, counted in what it draws, and
-            // the chip that cycles how they are drawn.
+            // A Text row's hidden characters, counted in what it draws: the
+            // chip that cycles how they are drawn, and a gray one for the
+            // soft kinds, each on its own line.
             const drawn = it.kind === "text" && it.snippet && !isCovered(it) && !isExpired(it) ? rowContents(it).display : null;
             const marks = Array.isArray(drawn) ? markCount(drawn) : 0;
             const softMarks = Array.isArray(drawn) ? markCount(drawn, true) : 0;
-            if (marks) meta.append(marksChip(it, marks));
-            if (softMarks) {
-                const note = document.createElement("span");
-                note.className = "hc-soft";
-                note.textContent = plainPlural(softMarks, "Special Character");
-                meta.append(note);
+            if (marks || softMarks) {
+                const tiers = document.createElement("span");
+                tiers.className = "history-tiers";
+                if (marks) tiers.append(marksChip(it, marks));
+                if (softMarks) tiers.append(softChip(it, softMarks));
+                meta.append(tiers);
             }
             const span = document.createElement("span");
             span.className = "countdown";
