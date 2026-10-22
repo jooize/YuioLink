@@ -916,24 +916,6 @@ html.js .custom-field:not(.open) {
     height: calc(var(--tick-cap) + 0.02em);
 }
 
-/* The caret the page draws, under the wedge, while the field's own is hidden
-   (see setupFieldMarks). */
-.hc-overlay.caret-own.focused .hid.flagged.first::before {
-    content: "";
-    display: block;
-    position: absolute;
-    left: calc(50% - 1px);
-    top: calc(0.02em + var(--tick-cap) + 1px);
-    width: 2px;
-    height: calc(1.1em - var(--tick-cap) - 1px);
-    background: var(--text);
-    animation: hc-blink 1.06s steps(1) infinite;
-}
-
-@keyframes hc-blink {
-    50% { opacity: 0; }
-}
-
 /* The flag over the run the caret stands beside, naming it; the peek is the
    same flag, quiet, over the run under the pointer, and covers what it
    stands over, the open flag included. */
@@ -994,7 +976,8 @@ html.js .custom-field:not(.open) {
     margin: 0;
 }
 
-.hc-soft {
+.hc-soft,
+.history-hidden.soft {
     color: var(--text-secondary);
 }
 
@@ -1048,14 +1031,29 @@ html.js .custom-field:not(.open) {
 }
 
 .pv-cast .what .form small {
+    display: grid;
     font-size: 10.5px;
     line-height: 1.2;
     color: var(--text-tertiary);
 }
 
+.pv-cast .what .form small > span {
+    grid-area: 1 / 1;
+    visibility: hidden;
+}
+
+.pv-cast .what .form small > span.now {
+    visibility: visible;
+}
+
+/* "Copied" is always set bold, hidden or shown, so the cell it shares
+   keeps one width. */
+.pv-cast .what .form small > span:nth-child(2) {
+    font-weight: 600;
+}
+
 .pv-cast .what .form.copied small {
     color: var(--result-text);
-    font-weight: 600;
 }
 
 .pv-cast .what .after {

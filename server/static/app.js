@@ -238,6 +238,13 @@
             ["path", { d: "M8 4.6v4.2", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" }],
             ["circle", { cx: "8", cy: "11.2", r: ".95", fill: "currentColor" }],
         ]);
+    // A ringed "i": the soft kinds, noted rather than warned about.
+    const infoIcon = () =>
+        icon(12, "0 0 16 16", [
+            ["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
+            ["circle", { cx: "8", cy: "4.9", r: ".95", fill: "currentColor" }],
+            ["path", { d: "M8 7.4v4", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" }],
+        ]);
     // A ringed check: the row's hidden characters are taken out.
     const checkIcon = () =>
         icon(12, "0 0 16 16", [
@@ -1902,27 +1909,26 @@
     // text laid out by the field's own metrics, transparent, with a tick (a
     // thin bar under a wedge) where each run of hidden characters sits. The
     // marks follow the caret, never the pointer: with the caret beside a run,
-    // a flag over it names the run and its entry opens under the field; a
-    // selection opens every entry inside it. The pointer only peeks.
-    //
-    // While the caret stands beside a run the page draws the caret itself, at
-    // the run's real place, and hides the field's: Safari draws its caret a
-    // character off beside a hidden character. Not with a coarse pointer (the
-    // phone's loupe needs the real caret), in forced colors, or while an input
-    // method composes; there the field's caret stays and the run's bar pulls
-    // up into its wedge, clear of it.
+    // a flag over it names the run, its bar pulls up into its wedge, clear of
+    // the caret, and its entry opens under the field; a selection opens every
+    // entry inside it. The pointer only peeks. The caret is always the
+    // field's own. Safari draws it a character off beside a hidden character
+    // (a WebKit bug); a caret drawn by the page would trade that for trouble
+    // with input methods, the phone's loupe and system caret settings.
     const COPY_PROPS = ["fontFamily", "fontSize", "fontWeight", "fontStyle", "fontStretch", "letterSpacing", "wordSpacing",
         "lineHeight", "paddingTop", "paddingLeft", "paddingBottom", "borderTopWidth", "borderRightWidth", "borderBottomWidth",
         "borderLeftWidth", "borderStyle", "boxSizing", "whiteSpace", "overflowWrap", "wordBreak", "textAlign", "textIndent",
         "direction", "tabSize", "alignContent", "borderRadius"];
-    const ownCaretAllowed = () => !matchMedia("(pointer: coarse), (forced-colors: active)").matches;
-    const withoutHidden = (text) => {
-        const drop = new Set(scanHidden(text).filter((m) => !m.soft).map((m) => m.at));
+    // The text without one tier of its hidden characters: with `soft`, the
+    // no-break spaces (a plain space each) and soft hyphens; else the rest.
+    const withoutHidden = (text, soft) => {
+        const drop = new Set(scanHidden(text).filter((m) => m.soft === soft).map((m) => m.at));
         let out = "";
         let at = 0;
         for (const ch of text) {
             if (!drop.has(at)) out += ch;
-            else if (ch === " " || ch === " ") out += "\n";
+            else if (ch === "\u2028" || ch === "\u2029") out += "\n";
+            else if (soft && ch !== "\u00ad") out += " ";
             at += ch.length;
         }
         return out;
@@ -1946,9 +1952,10 @@
         live.setAttribute("aria-live", "polite");
         field.after(slot, live);
         // `flag` is the run the caret stands beside (its `at`), `open` the
-        // entries shown; `before`/`after` hold the text around a Remove, so
-        // Put Back can undo it until the field changes.
-        const st = { flag: null, open: [], before: null, after: null, announced: 0, down: false, typing: false, composing: false, ours: false };
+        // entries shown; `removed` holds the text around each tier's Remove
+        // (`{ before, after }`), so Put Back can undo it until the field
+        // changes.
+        const st = { flag: null, open: [], removed: { hard: null, soft: null }, announced: 0, down: false, typing: false, ours: false };
 
         const el = (tag, cls, ...kids) => {
             const e = document.createElement(tag);
@@ -2011,31 +2018,33 @@
                 }
             }
             // A zero-width space holds open the empty line a final line break makes.
-            overlay.append(v.slice(from), "​");
+            overlay.append(v.slice(from), "\u200b");
             overlay.style.height = `${ta.offsetHeight}px`;
             overlay.scrollTop = ta.scrollTop;
-            overlay.classList.toggle("focused", document.activeElement === ta);
             fitCounts(overlay);
             placeFlag();
-            const own = st.flag != null && ta.selectionStart === ta.selectionEnd && !st.composing && ownCaretAllowed();
-            overlay.classList.toggle("caret-own", own);
-            ta.style.caretColor = own ? "transparent" : "";
         };
 
         // An entry: the character's tiles and name, the three ways to write
         // it (the one this kind of link stores in the mark's reverse red; a
         // click copies one), and what it does.
+        // The caption's three words share one cell, so the button keeps its
+        // width whichever shows.
         const formButton = (text, where, bad) => {
-            const cap = el("small", "", where);
+            const cap = el("small", "", el("span", "now", where), el("span", "", "Copied"), el("span", "", "Copy Failed"));
             const b = el("button", "form", el("code", bad ? "bad" : "", text), cap);
             b.type = "button";
             b.title = `Copy ${text}`;
             b.addEventListener("click", async () => {
                 let ok = true;
                 try { await navigator.clipboard.writeText(text); } catch { ok = false; }
-                cap.textContent = ok ? "Copied" : "Copy Failed";
+                const [w, done, failed] = cap.children;
+                for (const c of cap.children) c.classList.toggle("now", c === (ok ? done : failed));
                 b.classList.toggle("copied", ok);
-                setTimeout(() => { cap.textContent = where; b.classList.remove("copied"); }, 1300);
+                setTimeout(() => {
+                    for (const c of cap.children) c.classList.toggle("now", c === w);
+                    b.classList.remove("copied");
+                }, 1300);
             });
             return b;
         };
@@ -2064,30 +2073,36 @@
             }
             st.ours = false;
         };
-        const removedNow = () => st.before != null && ta.value === st.after;
-        const chip = (n) => {
-            const removed = removedNow();
-            const c = el("button", "history-hidden");
+        const removedNow = (tier) => st.removed[tier] != null && ta.value === st.removed[tier].after;
+        // A tier's chip: red for the kinds that hide things, gray for the
+        // soft ones. Each removes its own kind and puts it back.
+        const chip = (tier, n) => {
+            const soft = tier === "soft";
+            const removed = removedNow(tier);
+            const c = el("button", soft ? "history-hidden soft" : "history-hidden");
             c.type = "button";
             c.dataset.mode = removed ? "removed" : "ticks";
-            const what = plural(n, "Hidden Character");
+            c.dataset.tier = tier;
+            const what = plural(n, soft ? "Special Character" : "Hidden Character");
             if (removed) c.append(checkIcon(), `${what} Removed`, el("span", "history-hidden-mode", "· Put Back"));
-            else c.append(alertIcon(), what, el("span", "history-hidden-mode", "· Remove"));
+            else c.append(soft ? infoIcon() : alertIcon(), what, el("span", "history-hidden-mode", "· Remove"));
             c.addEventListener("click", () => {
+                const words = soft ? "Special characters" : "Hidden characters";
                 if (removed) {
-                    const back = st.before;
-                    st.before = st.after = null;
+                    const back = st.removed[tier].before;
+                    st.removed[tier] = null;
                     replaceField(back);
-                    live.textContent = "Hidden characters put back.";
+                    live.textContent = `${words} put back.`;
                 } else {
                     const before = ta.value;
-                    const after = withoutHidden(before);
+                    const after = withoutHidden(before, soft);
                     replaceField(after);
-                    Object.assign(st, { before, after, open: [], flag: null });
-                    live.textContent = "Hidden characters removed.";
+                    st.removed[tier] = { before, after };
+                    Object.assign(st, { open: [], flag: null });
+                    live.textContent = `${words} removed.`;
                 }
                 render();
-                slot.querySelector(".history-hidden")?.focus();
+                slot.querySelector(`.history-hidden[data-tier="${tier}"]`)?.focus();
             });
             return c;
         };
@@ -2095,7 +2110,7 @@
         const render = () => {
             const marks = scanHidden(ta.value);
             const runs = runsOfMarks(marks);
-            if (st.before != null && !removedNow()) st.before = st.after = null;
+            for (const tier of ["hard", "soft"]) if (!removedNow(tier)) st.removed[tier] = null;
             st.open = st.open.filter((id) => marks.some((m) => m.id === id));
             if (!runs.some((r) => r.at === st.flag)) st.flag = null;
             const hard = marks.filter((m) => !m.soft).length;
@@ -2107,12 +2122,12 @@
             const url = isRedirect();
             const shown = st.open.map((id) => marks.filter((m) => m.id === id)).filter((list) => list.length);
             if (shown.length) slot.append(el("div", "history-cast pv-cast", ...shown.map((list) => entryEl(list[0].cp, list.length, url))));
-            const removed = removedNow();
-            const softNote = soft ? el("span", "hc-soft", plural(soft, "Special Character")) : "";
-            if (removed) {
-                const was = scanHidden(st.before).filter((m) => !m.soft).length;
-                slot.append(el("div", "history-meta", chip(was), softNote));
-            } else if (hard || soft) slot.append(el("div", "history-meta", hard ? chip(hard) : "", softNote));
+            // A line per tier: its count, or how many were removed.
+            const was = (tier) => scanHidden(st.removed[tier].before).filter((m) => m.soft === (tier === "soft")).length;
+            for (const [tier, n] of [["hard", hard], ["soft", soft]]) {
+                if (removedNow(tier)) slot.append(el("div", "history-meta", chip(tier, was(tier))));
+                else if (n) slot.append(el("div", "history-meta", chip(tier, n)));
+            }
             // A hidden character in a domain: the server drops it, or refuses
             // the address and the link is Text.
             const t = ta.value.trim();
@@ -2145,10 +2160,7 @@
                 ids = run ? [...new Set(run.marks.map((m) => m.id))] : [];
             } else ids = [...new Set(marks.filter((m) => m.at >= a && m.at + m.ch.length <= b).map((m) => m.id))];
             if (closeOnly && (flagAt !== st.flag || st.flag == null)) [flagAt, ids] = [null, []];
-            if (flagAt === st.flag && ids.join() === st.open.join()) {
-                paintOverlay(marks); // the caret moved within the run: redraw it
-                return;
-            }
+            if (flagAt === st.flag && ids.join() === st.open.join()) return;
             Object.assign(st, { flag: flagAt, open: ids });
             if (ids.length) live.textContent = ids.map((id) => charDress(Number.parseInt(id.slice(1), 16))[1]).join(", ");
             render();
@@ -2164,7 +2176,7 @@
                 || (event.key === "a" && (event.metaKey || event.ctrlKey))) follow();
         });
         // A held arrow key moves the caret long before keyup: close what it
-        // left at once, so a drawn caret never stays behind.
+        // left at once, so a flag never stays behind.
         document.addEventListener("selectionchange", () => {
             if (document.activeElement === ta && !st.down && !st.typing) follow({ closeOnly: true });
         });
@@ -2174,10 +2186,6 @@
             st.typing = false;
             follow({ closeOnly: true });
         });
-        ta.addEventListener("compositionstart", () => { st.composing = true; render(); });
-        ta.addEventListener("compositionend", () => { st.composing = false; render(); });
-        ta.addEventListener("focus", () => { overlay.classList.add("focused"); paintOverlay(scanHidden(ta.value)); });
-        ta.addEventListener("blur", () => { overlay.classList.remove("focused"); ta.style.caretColor = ""; });
         // The peek: the flag, quiet, over the run under the pointer, unless
         // that run is the open one.
         ta.addEventListener("mousemove", (event) => {
