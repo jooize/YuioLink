@@ -86,9 +86,8 @@ h1 { font-size: 22px; margin: 0 0 6px; }
   content: attr(data-n); position: absolute; top: -0.3em; left: calc(50% + var(--w) / 2 + 0.1em);
   font: 700 0.6em/1 var(--font); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--tick);
 }
-/* Where a neighbor leaves no room beside the wedge, the count stands over
-   it; where neither fits, it goes and the bar thickens: more than one. */
-.ticked.run-count .hid.first.cnt-above:not(.lab)::before { left: 50%; transform: translateX(-50%); top: -0.82em; }
+/* Where a neighbor leaves no room beside the wedge, the count goes and the
+   bar thickens: more than one. The flag and the peek still say how many. */
 .ticked.run-count .hid.first.cnt-none:not(.lab)::before { display: none; }
 .ticked.run-count .hid.first.cnt-none { --t: 3px; }
 /* While its flag is up, nothing of the run shows under the flag. */
@@ -135,7 +134,20 @@ h1 { font-size: 22px; margin: 0 0 6px; }
   font: 700 11.5px/1.25 var(--font-mono); color: var(--on-danger); background: var(--danger);
   box-shadow: 0 0 0 2px var(--accent);
 }
-.hc-flag.peek { color: var(--danger); background: var(--field-bg); box-shadow: inset 0 0 0 1px var(--danger); }
+/* The peek covers what it stands over, the open flag included. */
+:root { --hc-solid: #fff; }
+@media (prefers-color-scheme: dark) { :root { --hc-solid: #2c2c2e; } }
+.hc-flag.peek { z-index: 3; color: var(--danger); background: var(--hc-solid); box-shadow: inset 0 0 0 1px var(--danger), 0 1px 4px rgba(0, 0, 0, 0.18); }
+.hc-flag.peek.soft { color: var(--text-secondary); box-shadow: inset 0 0 0 1px var(--text-tertiary), 0 1px 4px rgba(0, 0, 0, 0.18); }
+
+/* The common kinds from pasted text (no-break spaces, soft hyphens): a
+   grey tick, and in "toggle" none until shown. */
+.ticked .hid.soft { --tick: var(--text-tertiary); }
+.ticked .hid.soft.open { --tick: var(--accent); }
+.ticked.soft-hidden .hid.soft::after, .ticked.soft-hidden .hid.soft::before { display: none; }
+.hc-soft { font-size: 13px; color: var(--text-secondary); }
+button.hc-soft { font: inherit; font-size: 13px; border: 0; background: none; padding: 0; cursor: pointer; color: var(--text-secondary); }
+button.hc-soft:hover { color: var(--text); }
 .hc-flag.say-name { font-family: var(--font); font-size: 12px; }
 
 /* History at the field's size. */
@@ -278,8 +290,11 @@ const idsAtCaret = (text, a, b) => {
   return [...new Set(near.map((p) => p.id))];
 };
 const SPACE_LIKE = (cp) => cp === 0xa0 || (cp >= 0x2000 && cp <= 0x200a) || cp === 0x202f || cp === 0x205f || cp === 0x3000;
-const withoutHidden = (text) => scan(text).parts.map((p) => p.kind !== "hid" ? p.text
-  : SPACE_LIKE(p.cp) ? " " : (p.cp === 0x2028 || p.cp === 0x2029) ? "\n" : "").join("");
+// The kinds pasted text often holds for a reason: spaces that don't break,
+// and soft hyphens. With tiers they get a grey tick and stay on Remove.
+const SOFT = (cp) => SPACE_LIKE(cp) || cp === 0xad;
+const withoutHidden = (text, keepSoft = false) => scan(text).parts.map((p) => p.kind !== "hid" ? p.text
+  : keepSoft && SOFT(p.cp) ? p.text : SPACE_LIKE(p.cp) ? " " : (p.cp === 0x2028 || p.cp === 0x2029) ? "\n" : "").join("");
 
 // The hidden characters the server's parser (the url crate's IDNA step) drops
 // from a domain; any other one in a domain makes the address invalid, and the
@@ -373,7 +388,7 @@ const runLabel = (run, ctx, say = "name") => {
 const runIds = (run) => [...new Set(run.parts.map((p) => p.id))];
 
 // `open` is the run opened into its label (by its `at`), or null.
-const markedInto = (body, parts, { labels = false, open = null, ctx = "text", say = "name" } = {}) => {
+const markedInto = (body, parts, { labels = false, open = null, ctx = "text", say = "name", tiers = false } = {}) => {
   const runs = runsOf(parts);
   for (const p of parts) {
     if (p.kind !== "hid") { body.append(p.text); continue; }
@@ -384,14 +399,15 @@ const markedInto = (body, parts, { labels = false, open = null, ctx = "text", sa
     m.style.setProperty("--i", p.i);
     m.style.setProperty("--n", run.parts.length);
     if (p.i === 0) { m.classList.add("first"); m.dataset.n = run.parts.length; }
+    if (tiers && run.parts.every((q) => SOFT(q.cp))) m.classList.add("soft");
     if (run.at === open) m.classList.add("flagged");
     if (labels || run.at === open) { m.dataset.esc = runLabel(run, ctx, say); m.classList.add("lab"); }
     if (run.at === open && p.i === 0) m.dataset.flag = runLabel(run, ctx, say);
     body.append(m);
   }
 };
-// Counts that would run into a neighbor's tick or count: over the wedge
-// instead, and where that is taken too, none (the bar thickens).
+// Counts that would run into a neighbor's tick or count: none (the bar
+// thickens).
 const fitCounts = (root) => {
   if (!root.classList.contains("run-count")) return;
   const fs = Number.parseFloat(getComputedStyle(root).fontSize);
@@ -409,8 +425,6 @@ const fitCounts = (root) => {
     const cw = String(k.n).length * digit;
     const right = [k.x + w / 2 + gap, k.x + w / 2 + gap + cw + 1];
     if (free(...right, k.line, "tick") && free(...right, k.line, "right")) { placed.push({ a: right[0], b: right[1], line: k.line, level: "right" }); continue; }
-    const above = [k.x - cw / 2 - 1, k.x + cw / 2 + 1];
-    if (free(...above, k.line, "above") && free(...above, k.line, "right")) { k.m.classList.add("cnt-above"); placed.push({ a: above[0], b: above[1], line: k.line, level: "above" }); continue; }
     k.m.classList.add("cnt-none");
   }
 };
@@ -448,7 +462,7 @@ const entryEl = (e, ctx = "text", layout = "three") => {
   const [sym, name] = dress(e.cp);
   d.append(el("span", "tiles", el("span", "tile sym", sym), el("span", "tile raw", String.fromCodePoint(e.cp))));
   const forms = [["in code", esc(e.cp), "text"], ["in a URL", pct(e.cp), "url"]];
-  if (layout === "three") forms.push(["in Unicode", `U+${hex4(e.cp)}`, null]);
+  if (layout === "three") forms.unshift(["in Unicode", `U+${hex4(e.cp)}`, null]);
   const times = e.count > 1 ? ` It appears ${e.count === 2 ? "twice" : `${e.count} times`}.` : "";
   const what = el("span", "what", el("b", "", name));
   if (layout === "beside") what.append(" ", el("span", "cp", `U+${hex4(e.cp)}`));
@@ -503,7 +517,7 @@ const hoverGrow = (target, root) => {
 
 // History's row. In Ticks, a click on a run opens it into its label in
 // place; in Labels every run is open.
-const historyWell = (text, { labels = false, open = null, stored = null, run = "count", onMark = null, whole = false, onMore = null, say = "name" } = {}) => {
+const historyWell = (text, { labels = false, open = null, stored = null, run = "count", onMark = null, whole = false, onMore = null, say = "name", tiers = false } = {}) => {
   const s = scan(text);
   const redirect = stored != null;
   const well = el("div", `history-well ${redirect ? "redirect" : "text"}`);
@@ -517,7 +531,7 @@ const historyWell = (text, { labels = false, open = null, stored = null, run = "
       b.dataset.tell = p.bad;
       body.append(b);
     }
-  } else markedInto(body, s.parts, { labels, open, say });
+  } else markedInto(body, s.parts, { labels, open, say, tiers });
   if (onMark) {
     // A plain click only (detail 1, nothing selected): a drag or a
     // double-click selects and leaves the marks alone.
@@ -551,8 +565,9 @@ const historyWell = (text, { labels = false, open = null, stored = null, run = "
 // --- The form. cfg: caret "own" | "lift" | "stay"; hover "peek" | "grow";
 // run "count" | "comb" | "fan"; layout (the entry's); labelsCopy (round 3's
 // labeled copy under the field); domainNote; say (what a label says); debug
-// (a line naming where the caret is, for checking a browser).
-const DEFAULTS = { caret: "own", hover: "peek", run: "count", layout: "three", labelsCopy: false, domainNote: true, say: "name", debug: false };
+// (a line naming where the caret is, for checking a browser); tiers "same"
+// | "soft" (grey ticks for SOFT kinds) | "toggle" (none until shown).
+const DEFAULTS = { caret: "own", hover: "peek", run: "count", layout: "three", labelsCopy: false, domainNote: true, say: "name", debug: false, tiers: "same" };
 function setupForm(frame, cfgIn = {}) {
   const cfg = { ...DEFAULTS, ...cfgIn };
   frame.append(document.getElementById("form").content.cloneNode(true));
@@ -563,7 +578,14 @@ function setupForm(frame, cfgIn = {}) {
   const underButton = frame.querySelector("[data-under-button]");
   const submit = frame.querySelector(".split-primary");
   const live = frame.querySelector(".hc-live");
-  const st = { before: null, after: null, open: [], flag: null, announced: 0, made: false, down: false };
+  const st = { before: null, after: null, open: [], flag: null, announced: 0, made: false, down: false, showSoft: false };
+  const tiered = cfg.tiers !== "same";
+  // Hidden characters by tier: the ones the red chip counts, and the soft.
+  const tally = (text) => {
+    const hid = scan(text).parts.filter((p) => p.kind === "hid");
+    const soft = tiered ? hid.filter((p) => SOFT(p.cp)).length : 0;
+    return { hard: hid.length - soft, soft };
+  };
 
   const overlay = el("div", `hc-overlay ticked run-${cfg.run} caret-${cfg.caret}`);
   overlay.setAttribute("aria-hidden", "true");
@@ -596,7 +618,7 @@ function setupForm(frame, cfgIn = {}) {
   };
   const removedNow = () => st.before != null && ta.value === st.after;
   const removeThem = () => {
-    const before = ta.value, after = withoutHidden(before);
+    const before = ta.value, after = withoutHidden(before, tiered);
     replaceField(after);
     Object.assign(st, { before, after, open: [], flag: null });
     live.textContent = "Hidden characters removed.";
@@ -623,7 +645,8 @@ function setupForm(frame, cfgIn = {}) {
       "padding", "borderWidth", "borderStyle", "boxSizing", "whiteSpace", "overflowWrap", "wordBreak", "textAlign", "textIndent",
       "direction", "tabSize", "alignContent", "borderRadius"]) overlay.style[p] = cs[p];
     overlay.replaceChildren();
-    markedInto(overlay, s.parts, { open: cfg.labelsCopy ? null : st.flag, ctx: ctxNow(), say: cfg.say });
+    markedInto(overlay, s.parts, { open: cfg.labelsCopy ? null : st.flag, ctx: ctxNow(), say: cfg.say, tiers: tiered });
+    overlay.classList.toggle("soft-hidden", cfg.tiers === "toggle" && !st.showSoft);
     // The field cannot make room: its run keeps the ticks, and the flag
     // above them opens instead.
     for (const m of overlay.querySelectorAll(".lab")) m.classList.remove("lab");
@@ -686,7 +709,9 @@ function setupForm(frame, cfgIn = {}) {
     ta.addEventListener("mousemove", (ev) => {
       const m = markNear(overlay, ev.clientX, ev.clientY, ".hid");
       const first = m && overlay.querySelector(`.hid.first[data-run="${m.dataset.run}"]`);
-      if (!first || (!cfg.labelsCopy && Number(first.dataset.run) === st.flag)) { peek.hidden = true; return; }
+      if (!first || (!cfg.labelsCopy && Number(first.dataset.run) === st.flag)
+        || (first.classList.contains("soft") && overlay.classList.contains("soft-hidden"))) { peek.hidden = true; return; }
+      peek.classList.toggle("soft", first.classList.contains("soft"));
       const run = runsOf(scan(ta.value).parts).find((r) => String(r.at) === first.dataset.run);
       place(peek, first, runLabel(run, ctxNow(), cfg.say));
     });
@@ -709,7 +734,17 @@ function setupForm(frame, cfgIn = {}) {
     submit.textContent = ta.value.trim() ? `Create ${stored ? "Redirect" : "Text"} Link` : "Create Link";
     if (n && !st.announced) live.textContent = `${plural(n, "hidden character")} in the text.`;
     st.announced = n;
-    if (removed) underField.append(el("div", "history-meta", chip(scan(st.before).hidden)));
+    const t = tally(ta.value);
+    // The soft kinds: a quiet count, or in "toggle" a switch that shows them.
+    const softItem = () => {
+      if (!t.soft) return "";
+      if (cfg.tiers !== "toggle") return el("span", "hc-soft", plural(t.soft, "Special Character"));
+      const b = el("button", "hc-soft", st.showSoft ? `Hide ${plural(t.soft, "Special Character")}` : `Show ${plural(t.soft, "Special Character")}`);
+      b.type = "button";
+      b.addEventListener("click", () => { st.showSoft = !st.showSoft; render(); });
+      return b;
+    };
+    if (removed) underField.append(el("div", "history-meta", chip(tally(st.before).hard), softItem()));
     else if (n) {
       if (cfg.labelsCopy) {
         const well = historyWell(ta.value, { labels: true, stored, run: cfg.run, say: cfg.say,
@@ -719,16 +754,20 @@ function setupForm(frame, cfgIn = {}) {
       }
       const cast = castEl(s.entries, st.open, stored ? "url" : "text", cfg.layout);
       if (cast) underField.append(cast);
-      underField.append(el("div", "history-meta", chip(n)));
+      underField.append(el("div", "history-meta", t.hard ? chip(t.hard) : "", softItem()));
     }
     // A hidden character in the domain: the server drops it, or refuses the
     // address, and the link is Text.
     const addr = addressOf(ta.value);
-    if (cfg.domainNote && addr.refused.length)
+    const one = (list, a, b) => (list.length === 1 ? a : b);
+    if (cfg.domainNote && addr.refused.length) {
+      const clean = [...addr.host].filter((c) => !isInvisible(c.codePointAt(0))).join("").toLowerCase();
       underField.append(el("p", "hc-note", alertIcon(), el("span", "",
-        `The domain holds ${addr.refused.length === 1 ? "a hidden character" : "hidden characters"}, so this can't redirect. It will be a text link. Remove ${addr.refused.length === 1 ? "it" : "them"} to make a redirect.`)));
-    else if (cfg.domainNote && addr.dropped.length)
-      underField.append(el("p", "hc-note", alertIcon(), el("span", "", `The domain's hidden ${addr.dropped.length === 1 ? "character is" : "characters are"} dropped. The link goes to `, el("code", "", addr.host), ".")));
+        `${one(addr.refused, "Hidden character", "Hidden characters")} in domain, so this becomes a text link. Remove ${one(addr.refused, "it", "them")} to redirect to `,
+        el("code", "", clean), ".")));
+    } else if (cfg.domainNote && addr.dropped.length)
+      underField.append(el("p", "hc-note", alertIcon(), el("span", "",
+        `${one(addr.dropped, "Hidden character", "Hidden characters")} in domain ${one(addr.dropped, "is", "are")} dropped. Goes to `, el("code", "", addr.host), ".")));
     if (st.made) underButton.append(el("p", "made", "✓ The link would be created now (mockup)."));
     syncOverlay(s);
   }
@@ -761,7 +800,7 @@ function setupHist(frame, cfg = {}) {
     const box = el("div", `hc-slot${cfg.size === "field" ? " hist-field" : ""}`);
     box.style.margin = "0";
     const well = historyWell(st.text, {
-      labels: st.labels, open: st.flag, stored, run: cfg.run ?? "count", whole: st.whole, say: cfg.say ?? "name",
+      labels: st.labels, open: st.flag, stored, run: cfg.run ?? "count", whole: st.whole, say: cfg.say ?? "name", tiers: cfg.tiers === "soft",
       onMark: (m) => {
         const run = m.dataset.run;
         const same = run != null ? String(st.flag) === run : st.open.join() === m.dataset.tell;
@@ -778,14 +817,16 @@ function setupHist(frame, cfg = {}) {
     box.append(well);
     const cast = castEl(s.entries, st.open, stored ? "url" : "text", cfg.layout ?? "three");
     if (cast) box.append(cast);
+    const soft = cfg.tiers === "soft" ? s.parts.filter((p) => p.kind === "hid" && SOFT(p.cp)).length : 0;
+    const hard = s.hidden - soft;
     if (s.hidden) {
-      const c = el("button", "history-hidden", alertIcon(), plural(s.hidden, "Hidden Character"));
+      const c = el("button", "history-hidden", alertIcon(), plural(hard, "Hidden Character"));
       c.type = "button";
       if (!stored) {
         c.append(el("span", "history-hidden-mode", `· ${st.labels ? "Labels" : "Ticks"}`));
         c.addEventListener("click", () => { st.labels = !st.labels; render(); });
       }
-      box.append(el("div", "history-meta", c));
+      box.append(el("div", "history-meta", hard ? c : "", soft ? el("span", "hc-soft", plural(soft, "Special Character")) : ""));
     }
     frame.replaceChildren(el("main", "app-window", el("div", "sheet-body centered", box)));
   };
@@ -889,7 +930,7 @@ const DECISIONS = [
     context: "The third line holds a run of six, of four kinds. The last line packs runs between single letters, and one run of 40. A run carrying hidden data can be dozens long.",
     options: [
       { value: "count", title: "One tick with a count", pick: true, liked: true,
-        why: "Stays one tick wide however long the run. The count sits beside the wedge. Where a neighbor leaves no room, it stands over the wedge, and where that is taken too, the bar thickens instead.",
+        why: "Stays one tick wide however long the run. The count sits beside the wedge. Where a neighbor leaves no room, the count goes and the bar thickens. The flag and the peek still say how many.",
         mock: both(formMock({ run: "count" }, RUNS + PACKED), histMock({ run: "count" }, RUNS + PACKED)) },
       { value: "comb", title: "A comb: one tooth per character",
         why: "Shows the length at a glance up to about five, then grows wide.",
@@ -971,6 +1012,19 @@ const DECISIONS = [
       { value: "code", title: "The code: “3 × \\u{200B}”",
         why: "As in round 7. The form you would paste.",
         mock: both(formMock({ say: "code" }, MULTI, 0), histMock({ say: "code", labels: true }, RUNS)) },
+    ] },
+  { key: "soft", title: "No-break spaces and soft hyphens",
+    context: "Pasted text often holds these for a reason. In the sample, “Room 4” and “10 am” hold no-break spaces and “the­badge” a soft hyphen; “attached.” is followed by zero-width spaces. Remove keeps the soft kinds in both new options.",
+    options: [
+      { value: "soft", title: "A grey tick, and a quiet count", pick: true,
+        why: "New. They stay visible, without the red. The red chip counts only the kinds that hide things.",
+        mock: both(formMock({ tiers: "soft" }, MULTI), histMock({ tiers: "soft" }, MULTI)) },
+      { value: "toggle", title: "Hidden until you show them",
+        why: "New. Nothing marks them until you press Show Special Characters under the field.",
+        mock: formMock({ tiers: "toggle" }, MULTI) },
+      { value: "same", title: "Red, like the rest",
+        why: "As now. Every hidden character counts the same.",
+        mock: formMock({ tiers: "same" }, MULTI) },
     ] },
 ];
 
