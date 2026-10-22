@@ -98,6 +98,10 @@
 
     --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, system-ui, sans-serif;
     --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Monaco, "Cascadia Code", monospace;
+    /* The hidden-character peek: opaque, so it covers what it stands over. */
+    --hc-solid: #fff;
+    /* An open run of the soft kinds (no-break spaces, soft hyphens). */
+    --hc-gray: #6e6e73;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -159,6 +163,9 @@
         --field-bg: rgba(255, 255, 255, 0.06);
         --field-border: rgba(255, 255, 255, 0.12);
         --separator: rgba(255, 255, 255, 0.1);
+
+        --hc-solid: #2c2c2e;
+        --hc-gray: #8e8e93;
     }
 }
 
@@ -878,6 +885,207 @@ html.js .custom-field:not(.open) {
     white-space: pre-line;
 }
 
+/* Hidden characters in the field (app.js setupFieldMarks): a transparent copy
+   of the text over the field, laid out by the field's own metrics, carries
+   the ticks. */
+.hc-field {
+    position: relative;
+}
+
+.hc-overlay {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    overflow: hidden;
+    pointer-events: none;
+    color: transparent;
+    border-color: transparent;
+}
+
+.hc-overlay .hid {
+    unicode-bidi: normal;
+}
+
+.form-control.submitted + .hc-overlay {
+    opacity: 0.55;
+}
+
+/* With the caret beside it, a run's bar pulls up into its wedge, which
+   points down at the caret, so the caret is never hidden. */
+.hc-overlay .hid.flagged::after {
+    height: calc(var(--tick-cap) + 0.02em);
+}
+
+/* The caret the page draws, under the wedge, while the field's own is hidden
+   (see setupFieldMarks). */
+.hc-overlay.caret-own.focused .hid.flagged.first::before {
+    content: "";
+    display: block;
+    position: absolute;
+    left: calc(50% - 1px);
+    top: calc(0.02em + var(--tick-cap) + 1px);
+    width: 2px;
+    height: calc(1.1em - var(--tick-cap) - 1px);
+    background: var(--text);
+    animation: hc-blink 1.06s steps(1) infinite;
+}
+
+@keyframes hc-blink {
+    50% { opacity: 0; }
+}
+
+/* The flag over the run the caret stands beside, naming it; the peek is the
+   same flag, quiet, over the run under the pointer, and covers what it
+   stands over, the open flag included. */
+.hc-flag {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+    transform: translate(-50%, -100%);
+    padding: 1px 5px;
+    border-radius: 4px;
+    white-space: nowrap;
+    font: 700 12px/1.25 var(--font);
+    color: var(--on-danger);
+    background: var(--danger);
+    box-shadow: 0 0 0 2px var(--accent);
+}
+
+.hc-flag.soft {
+    color: #fff;
+    background: var(--hc-gray);
+}
+
+.hc-flag.peek {
+    z-index: 3;
+    color: var(--danger);
+    background: var(--hc-solid);
+    box-shadow: inset 0 0 0 1px var(--danger), 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.hc-flag.peek.soft {
+    color: var(--text-secondary);
+    box-shadow: inset 0 0 0 1px var(--text-tertiary), 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+/* Under the field: the open entries, the chip that removes the hidden
+   characters (and puts them back), the soft kinds' quiet count, and a note
+   about a hidden character in a domain. */
+.hc-slot {
+    margin-top: 8px;
+    text-align: left;
+}
+
+.hc-slot:empty {
+    display: none;
+}
+
+.hc-slot .history-meta {
+    margin: 6px 0 0 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.hc-slot > .history-meta:first-child {
+    margin-top: 0;
+}
+
+.hc-slot .history-cast.pv-cast {
+    margin: 0;
+}
+
+.hc-soft {
+    color: var(--text-secondary);
+}
+
+.hc-note {
+    display: flex;
+    gap: 5px;
+    align-items: flex-start;
+    margin: 6px 0 0 8px;
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: left;
+    color: var(--danger);
+}
+
+.hc-note svg {
+    flex: none;
+    margin-top: 3px;
+}
+
+.hc-note code {
+    color: var(--text);
+    font-weight: 600;
+}
+
+/* An entry's ways to write its character, each over a caption saying where
+   it is written that way. The one this link stores wears the mark's red. A
+   click copies one. */
+.pv-cast .what .forms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    margin: 3px 0 0 -5px;
+}
+
+.pv-cast .what .form {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    padding: 2px 5px;
+    border: 0;
+    border-radius: 6px;
+    font: inherit;
+    text-align: left;
+    background: none;
+    cursor: copy;
+}
+
+.pv-cast .what .form:hover {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.pv-cast .what .form small {
+    font-size: 10.5px;
+    line-height: 1.2;
+    color: var(--text-tertiary);
+}
+
+.pv-cast .what .form.copied small {
+    color: var(--result-text);
+    font-weight: 600;
+}
+
+.pv-cast .what .after {
+    display: block;
+    margin-top: 2px;
+}
+
+.pv-cast .entry.warn .what .form code:not(.bad) {
+    color: var(--text);
+}
+
+.pv-cast .entry .what .form code.bad {
+    font-size: 11.5px;
+    color: var(--on-danger);
+}
+
+.hc-slot .pv-cast .entry .tiles {
+    align-self: flex-start;
+}
+
+.pv-cast .entry.soft .what .form code.bad {
+    color: #fff;
+    background: var(--hc-gray);
+}
+
+.pv-cast .entry.soft .tile.sym {
+    color: var(--text-secondary);
+    border-color: var(--text-tertiary);
+}
+
 /* Why an address-like input will be a text link: said quietly, since nothing
    is wrong, the input just is not an address a redirect will take. */
 .form-note {
@@ -1474,9 +1682,11 @@ html.js .custom-field:not(.open) {
     line-height: 0;
 }
 
-/* A row's text is not monospaced; the label is, as in a snippet. */
+/* A row's text is not monospaced; the label is, as in a snippet. A label
+   names its run, and a name stays on one line. */
 .history-well-body .hid::after {
     font-family: var(--font-mono);
+    white-space: nowrap;
 }
 
 /* The label is its own left-to-right isolate: it sits inside the mark after
@@ -1489,16 +1699,88 @@ html.js .custom-field:not(.open) {
     unicode-bidi: isolate;
 }
 
-/* A row in Ticks: a thin red tick where each character sits, in place of
-   its label. */
-.history-well-body.marks-ticks .hid::after {
+/* A run of marks side by side wears one label, on its first mark: its name,
+   counted ("3 × zero-width space"). */
+.history-well-body .hid.rest::after {
+    display: none;
+}
+
+/* The tick, in the create form and a History row in Ticks: a thin bar under
+   a wedge, drawn over the text where a run of hidden characters sits, taking
+   no width, so the text lays out as if it were not there. --tick is its ink:
+   red, gray for the soft kinds, blue while its entry is open. */
+.ticked {
+    --tick-w: 0.46em;
+    --tick-t: 1.5px;
+    --tick-cap: 0.24em;
+}
+
+.ticked .hid {
+    position: relative;
+    --tick: var(--danger);
+}
+
+.ticked .hid.soft {
+    --tick: var(--text-tertiary);
+}
+
+.ticked .hid.open {
+    --tick: var(--accent);
+}
+
+.ticked .hid:not(.lab)::after {
     content: "";
-    display: inline-block;
-    width: 3px;
-    height: 1.05em;
+    position: absolute;
+    top: 0.02em;
+    left: calc(50% - var(--tick-w) / 2);
+    width: var(--tick-w);
+    height: 1.12em;
+    margin: 0;
     padding: 0;
-    border-radius: 2px;
-    vertical-align: -0.18em;
+    border-radius: 0;
+    font-size: 1em;
+    line-height: normal;
+    background: var(--tick);
+    clip-path: polygon(0 0, 100% 0, calc(50% + var(--tick-t) / 2) var(--tick-cap), calc(50% + var(--tick-t) / 2) 100%,
+        calc(50% - var(--tick-t) / 2) 100%, calc(50% - var(--tick-t) / 2) var(--tick-cap));
+    transition: height 0.15s ease;
+}
+
+/* A run has one tick, and its length right of the wedge. Where a neighbor
+   leaves no room (fitCounts), the count goes and the bar thickens. */
+.ticked .hid.rest:not(.lab)::after {
+    display: none;
+}
+
+.ticked .hid.first:not([data-n="1"]):not(.lab)::before {
+    content: attr(data-n);
+    position: absolute;
+    top: -0.3em;
+    left: calc(50% + var(--tick-w) / 2 + 0.1em);
+    font: 700 0.6em/1 var(--font);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--tick);
+    pointer-events: none;
+}
+
+.ticked .hid.first.cnt-none {
+    --tick-t: 3px;
+}
+
+.ticked .hid.first.cnt-none::before,
+.ticked .hid.flagged::before {
+    display: none;
+}
+
+/* The run a click opened in a History row shows its label in place. */
+.history-well-body.ticked .hid.lab.rest::after {
+    display: none;
+}
+
+.history-well-body.ticked .hid.soft.lab::after {
+    color: #fff;
+    background: var(--hc-gray);
 }
 
 /* The label ignores the pointer, so text.js (and app.js, in a row) finds a

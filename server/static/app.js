@@ -38,8 +38,110 @@
     const addressProblem = (s) => {
         const scheme = s.slice(0, s.indexOf(":")).toLowerCase();
         if (!SCHEMES.has(scheme)) return `Links can't redirect to ${scheme}: addresses, so this will be a text link.`;
+        // Asked of the server's table, not the browser: Chromium's parser takes
+        // a joiner in a domain (as punycode) where the server's refuses it.
+        if (domainHidden(s)?.refused) return "A hidden character in its domain makes this a text link.";
         if (!URL.canParse(s)) return "This isn't a valid address, so it will be a text link.";
         return "";
+    };
+
+    // --- hidden characters, as the server marks them ---
+    // The server's table (views.rs char_table), so the form marks exactly what
+    // a snippet marks: ranges of code points, the names and what each does.
+    const CHARS = (() => {
+        try {
+            return JSON.parse(document.querySelector('meta[name="yuiolink-chars"]')?.content ?? "null");
+        } catch {
+            return null;
+        }
+    })();
+    const inRanges = (list, cp) => Array.isArray(list) && list.some(([a, b]) => cp >= a && cp <= b);
+    const isHidden = (cp) => inRanges(CHARS?.hidden, cp);
+    // No-break spaces and soft hyphens: pasted text often holds them for a
+    // reason, so they get a gray tick and Remove leaves them in.
+    const isSoft = (cp) => inRanges(CHARS?.soft, cp);
+    const hostDrops = (cp) => inRanges(CHARS?.hostDrops, cp);
+    const EMOJI_BASES = new Set(CHARS?.emojiBases ?? []);
+    const hex4 = (cp) => cp.toString(16).toUpperCase().padStart(4, "0");
+    // [symbol, name], as views.rs char_dress gives them: the table's, else a
+    // variation selector's number, else the code point.
+    const charDress = (cp) => {
+        const known = CHARS?.names?.[cp];
+        if (Array.isArray(known)) return known;
+        const vs = cp >= 0xfe00 && cp <= 0xfe0f ? cp - 0xfe00 + 1 : cp >= 0xe0100 && cp <= 0xe01ef ? cp - 0xe0100 + 17 : 0;
+        return vs ? [`VS${vs}`, `variation selector-${vs}`] : [hex4(cp), "hidden character"];
+    };
+    const charMeaning = (cp) =>
+        CHARS?.meanings?.find(([, ranges]) => inRanges(ranges, cp))?.[0] ?? "It draws nothing, so two texts that look the same can differ";
+    // The hidden characters in an address's domain: the ones the server's
+    // parser drops (the link goes to the domain without them) and the ones it
+    // refuses (the address is not one, so the link is Text). `clean` is the
+    // domain without any of them. Null when the domain holds none.
+    const domainHidden = (s) => {
+        const m = /^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)/i.exec(s);
+        if (!m) return null;
+        const chars = [...m[1]];
+        const cps = chars.map((c) => c.codePointAt(0)).filter(isHidden);
+        if (!cps.length) return null;
+        let clean = chars.filter((c) => !isHidden(c.codePointAt(0))).join("");
+        try { clean = new URL(`https://${clean}`).host; } catch { /* shown as typed */ }
+        return { refused: cps.filter((c) => !hostDrops(c)).length, dropped: cps.filter(hostDrops).length, clean };
+    };
+    const EXTENDED_PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
+    const isPictographic = (ch) => ch != null && EXTENDED_PICTOGRAPHIC.test(ch);
+    // The text's hidden characters, as views.rs text_mark marks them, plus
+    // the parts of an emoji: a joiner between two emoji (a family, a flag
+    // with a rainbow), and the tags that spell a subdivision flag (Scotland's).
+    // Each keeps `at`, its place in UTF-16 units (the field's selection counts
+    // in those), and `i`, its place in its run of hidden characters.
+    const scanHidden = (text) => {
+        const chars = [...text];
+        const exempt = new Set();
+        for (let k = 0; k < chars.length; k += 1) {
+            const cp = chars[k].codePointAt(0);
+            if (cp === 0x200d) {
+                let b = k - 1;
+                while (b >= 0 && /[\u{fe0f}\u{1f3fb}-\u{1f3ff}]/u.test(chars[b])) b -= 1;
+                if (isPictographic(chars[b]) && isPictographic(chars[k + 1])) exempt.add(k);
+            } else if (cp === 0x1f3f4) {
+                let e = k + 1;
+                while (e < chars.length && chars[e].codePointAt(0) >= 0xe0020 && chars[e].codePointAt(0) <= 0xe007e) e += 1;
+                if (e > k + 1 && chars[e]?.codePointAt(0) === 0xe007f) for (let t = k + 1; t <= e; t += 1) exempt.add(t);
+            }
+        }
+        const marks = [];
+        let at = 0;
+        let run = 0;
+        let paired = false;
+        for (let k = 0; k < chars.length; k += 1) {
+            const ch = chars[k];
+            const cp = ch.codePointAt(0);
+            // A selector completing a registered pair draws as part of its base.
+            const pairs = !paired && (cp === 0xfe0e || cp === 0xfe0f) && k > 0 && EMOJI_BASES.has(chars[k - 1].codePointAt(0));
+            paired = pairs;
+            if (cp !== 0x0a && cp !== 0x09 && !pairs && !exempt.has(k) && isHidden(cp)) {
+                marks.push({ ch, cp, at, i: run, soft: isSoft(cp), id: `u${cp.toString(16).padStart(4, "0")}` });
+                run += 1;
+            } else run = 0;
+            at += ch.length;
+        }
+        return marks;
+    };
+    // Hidden characters side by side: what one tick marks and one caret opens.
+    const runsOfMarks = (marks) => {
+        const runs = [];
+        for (const m of marks) {
+            const last = runs.at(-1);
+            if (m.i > 0 && last) { last.marks.push(m); last.end = m.at + m.ch.length; }
+            else runs.push({ at: m.at, end: m.at + m.ch.length, marks: [m] });
+        }
+        return runs;
+    };
+    // What an opened run says: the character's name, counted for a run of one
+    // kind ("3 × zero-width space").
+    const runLabel = (cps) => {
+        if (cps.every((c) => c === cps[0])) return `${cps.length > 1 ? `${cps.length} × ` : ""}${charDress(cps[0])[1]}`;
+        return `${cps.length} hidden characters of ${new Set(cps).size} kinds`;
     };
     const looksLikeDomain = (s) => {
         if (/\s/.test(s)) return false;
@@ -898,8 +1000,33 @@
             return;
         }
         const mode = marksMode(it);
-        if (mode === "ticks") body.classList.add("marks-ticks");
+        if (mode === "ticks") body.classList.add("marks-ticks", "ticked");
         paintDisplay(c.display, body, mode === "removed");
+        if (mode !== "removed") groupRuns(it, body, mode);
+    };
+    // Marks side by side make a run, as in the form: in Ticks one tick with a
+    // count, and the run a click opened shows its label in place; in Labels
+    // one label each. A label names the character.
+    const groupRuns = (it, body, mode) => {
+        const runs = [];
+        for (const m of body.querySelectorAll(".hid[data-tell]")) {
+            const last = runs.at(-1);
+            if (last && m.previousSibling === last.at(-1)) last.push(m);
+            else runs.push([m]);
+        }
+        const opened = castOpen.get(it.id)?.run;
+        runs.forEach((run, k) => {
+            const label = runLabel(run.map((m) => Number.parseInt(m.dataset.tell.slice(1), 16)));
+            run.forEach((m, i) => {
+                m.dataset.run = String(k);
+                if (i > 0) { m.classList.add("rest"); return; }
+                m.classList.add("first");
+                m.dataset.n = String(run.length);
+                m.dataset.esc = label;
+            });
+            if (run.every((m) => isSoft(Number.parseInt(m.dataset.tell.slice(1), 16)))) run.forEach((m) => m.classList.add("soft"));
+            if (mode === "ticks" && opened === k) run.forEach((m) => m.classList.add("lab"));
+        });
     };
     // The server's tree, built as elements: a string is text, ["wbr"] a
     // line-break opportunity, [class, child...] a span. An object after the
@@ -910,12 +1037,15 @@
     const TREE_DATA = new Set(["esc", "tell", "cp", "name"]);
     const treeExtra = (n) => (n[1] && typeof n[1] === "object" && !Array.isArray(n[1]) ? n[1] : null);
     const isMarkNode = (n) => Array.isArray(n) && typeof n[0] === "string" && n[0].split(" ").includes("hid");
+    // A mark Removed takes out: every kind but the soft ones, as in the form.
+    const markCp = (n) => Number.parseInt(treeExtra(n)?.tell?.slice(1) ?? "", 16);
+    const isRemovable = (n) => isMarkNode(n) && !isSoft(markCp(n));
     const paintDisplay = (nodes, parent, removed = false) => {
         for (const n of nodes) {
             if (typeof n === "string") parent.append(n);
             else if (Array.isArray(n) && n.length === 1 && n[0] === "wbr") parent.append(document.createElement("wbr"));
             else if (Array.isArray(n) && typeof n[0] === "string") {
-                if (removed && isMarkNode(n)) continue;
+                if (removed && isRemovable(n)) continue;
                 const extra = treeExtra(n);
                 const el = document.createElement(TREE_TAGS.has(extra?.tag) ? extra.tag : "span");
                 if (n[0]) el.className = n[0];
@@ -939,14 +1069,17 @@
         let out = "";
         for (const n of nodes) {
             if (typeof n === "string") out += n;
-            else if (!Array.isArray(n) || typeof n[0] !== "string" || (removed && isMarkNode(n))) continue;
+            else if (!Array.isArray(n) || typeof n[0] !== "string" || (removed && isRemovable(n))) continue;
             else if (treeExtra(n)?.cp !== undefined) out += fromCp(treeExtra(n).cp);
             else out += treeText(n.slice(treeExtra(n) ? 2 : 1), removed);
         }
         return out;
     };
-    const markCount = (nodes) =>
-        nodes.reduce((sum, n) => sum + (isMarkNode(n) ? 1 : Array.isArray(n) ? markCount(n.slice(1)) : 0), 0);
+    // How many marks a tree holds that are of the kinds counted in red
+    // (`soft` false) or of the soft kinds (`soft` true).
+    const markCount = (nodes, soft = false) =>
+        nodes.reduce((sum, n) => sum + (isMarkNode(n) ? Number(isSoft(markCp(n)) === soft)
+            : Array.isArray(n) ? markCount(n.slice(1), soft) : 0), 0);
     // The same, read back from the page: a mark's label is generated content,
     // never text, so only a NUL's empty mark needs its data-cp put back.
     const exactText = (root) => {
@@ -962,17 +1095,17 @@
 
     // --- hidden characters in a Text row ---
     // A row draws its hidden characters in one of three modes, cycled by the
-    // chip in its footer: Labels (each mark wears its escape, the default),
-    // Ticks (a thin red tick where each sits) and Removed (left out of the
-    // row, of a selection and of the row's Copy). The mode is the row's own,
-    // `it.marks` (absent for Labels), stamped like the eye for the merge.
-    const MARK_MODES = ["labels", "ticks", "removed"];
-    const marksMode = (it) => (MARK_MODES.includes(it.marks) ? it.marks : "labels");
+    // chip in its footer: Ticks (a tick where each run sits, as in the form;
+    // the default), Labels (each run wears its name) and Removed (left out of
+    // the row, of a selection and of the row's Copy). The mode is the row's
+    // own, `it.marks` (absent for Ticks), stamped like the eye for the merge.
+    const MARK_MODES = ["ticks", "labels", "removed"];
+    const marksMode = (it) => (MARK_MODES.includes(it.marks) ? it.marks : "ticks");
     // The entry a mark opens, under the row, this page view only: row id to
-    // the mark's `data-tell`.
+    // the mark's `data-tell` and its run's place in the row.
     const castOpen = new Map();
     const setMarksMode = (it, mode) => {
-        if (mode === "labels") delete it.marks;
+        if (mode === "ticks") delete it.marks;
         else it.marks = mode;
         it.marksAt = Date.now();
         if (mode === "removed") castOpen.delete(it.id);
@@ -992,7 +1125,7 @@
             state.textContent = `\u00b7 ${mode === "ticks" ? "Ticks" : "Labels"}`;
             chip.append(alertIcon(), what, state);
         }
-        chip.title = { labels: "Show them as ticks", ticks: "Take them out of the row", removed: "Show them as labels" }[mode];
+        chip.title = { ticks: "Show them as labels", labels: "Take them out of the row", removed: "Show them as ticks" }[mode];
         chip.addEventListener("click", () => {
             setMarksMode(it, MARK_MODES[(MARK_MODES.indexOf(mode) + 1) % MARK_MODES.length]);
             renderHistory();
@@ -1002,9 +1135,9 @@
     };
     // What a mark means, under the row: its cast entry, the Text page's own.
     const castPanel = (it) => {
-        const tell = castOpen.get(it.id);
+        const tell = castOpen.get(it.id)?.tell;
         const cast = rowContents(it).cast;
-        if (!tell || marksMode(it) === "removed" || !Array.isArray(cast)) return null;
+        if (!tell || !Array.isArray(cast)) return null;
         const entry = cast.find((n) => Array.isArray(n) && treeExtra(n)?.name === tell);
         if (!entry) return null;
         const panel = document.createElement("div");
@@ -1018,6 +1151,8 @@
     // drag-selection leaves the entry alone. A click on the open mark puts
     // its entry away.
     const markAt = (body, x, y) => {
+        // A tick takes no width: matched within 6px of where it stands.
+        if (body.classList.contains("ticked")) return markNear(body, x, y);
         for (const m of body.querySelectorAll(".hid[data-tell]")) {
             for (const r of m.getClientRects()) {
                 if (r.width > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return m;
@@ -1031,8 +1166,9 @@
             if (sel && !sel.isCollapsed) return;
             const mark = markAt(body, event.clientX, event.clientY);
             if (!mark) return;
-            if (castOpen.get(it.id) === mark.dataset.tell) castOpen.delete(it.id);
-            else castOpen.set(it.id, mark.dataset.tell);
+            const run = Number(mark.dataset.run);
+            if (castOpen.get(it.id)?.run === run) castOpen.delete(it.id);
+            else castOpen.set(it.id, { tell: mark.dataset.tell, run });
             renderHistory();
         });
         body.addEventListener("mousemove", (event) => {
@@ -1145,6 +1281,7 @@
             well.classList.add("stacked");
             well.classList.toggle("stacked", body.getBoundingClientRect().height > 24);
             const open = well.classList.contains("open");
+            if (body.classList.contains("ticked")) fitCounts(body);
             const cut = !open && (body.scrollHeight > body.clientHeight + 1 || (it?.chars ?? 0) > SNIPPET_MAX);
             body.classList.toggle("cut", cut);
             more.hidden = !(cut || open);
@@ -1333,7 +1470,14 @@
             // the chip that cycles how they are drawn.
             const drawn = it.kind === "text" && it.snippet && !isCovered(it) && !isExpired(it) ? rowContents(it).display : null;
             const marks = Array.isArray(drawn) ? markCount(drawn) : 0;
+            const softMarks = Array.isArray(drawn) ? markCount(drawn, true) : 0;
             if (marks) meta.append(marksChip(it, marks));
+            if (softMarks) {
+                const note = document.createElement("span");
+                note.className = "hc-soft";
+                note.textContent = plainPlural(softMarks, "Special Character");
+                meta.append(note);
+            }
             const span = document.createElement("span");
             span.className = "countdown";
             span.dataset.phrase = "expires";
@@ -1391,7 +1535,7 @@
             actions.append(copy, show, remove);
             foot.append(meta, actions);
 
-            const cast = marks ? castPanel(it) : null;
+            const cast = marks || softMarks ? castPanel(it) : null;
             li.append(contentsWell(it, rowName), ...(cast ? [cast] : []), link, foot);
             listEl.append(li);
         }
@@ -1753,6 +1897,341 @@
         forget.focus();
     };
 
+    // --- hidden characters in the create form ---
+    // The field holds plain text, so the marks are drawn over it: a copy of the
+    // text laid out by the field's own metrics, transparent, with a tick (a
+    // thin bar under a wedge) where each run of hidden characters sits. The
+    // marks follow the caret, never the pointer: with the caret beside a run,
+    // a flag over it names the run and its entry opens under the field; a
+    // selection opens every entry inside it. The pointer only peeks.
+    //
+    // While the caret stands beside a run the page draws the caret itself, at
+    // the run's real place, and hides the field's: Safari draws its caret a
+    // character off beside a hidden character. Not with a coarse pointer (the
+    // phone's loupe needs the real caret), in forced colors, or while an input
+    // method composes; there the field's caret stays and the run's bar pulls
+    // up into its wedge, clear of it.
+    const COPY_PROPS = ["fontFamily", "fontSize", "fontWeight", "fontStyle", "fontStretch", "letterSpacing", "wordSpacing",
+        "lineHeight", "paddingTop", "paddingLeft", "paddingBottom", "borderTopWidth", "borderRightWidth", "borderBottomWidth",
+        "borderLeftWidth", "borderStyle", "boxSizing", "whiteSpace", "overflowWrap", "wordBreak", "textAlign", "textIndent",
+        "direction", "tabSize", "alignContent", "borderRadius"];
+    const ownCaretAllowed = () => !matchMedia("(pointer: coarse), (forced-colors: active)").matches;
+    const withoutHidden = (text) => {
+        const drop = new Set(scanHidden(text).filter((m) => !m.soft).map((m) => m.at));
+        let out = "";
+        let at = 0;
+        for (const ch of text) {
+            if (!drop.has(at)) out += ch;
+            else if (ch === " " || ch === " ") out += "\n";
+            at += ch.length;
+        }
+        return out;
+    };
+    const setupFieldMarks = (ta, isRedirect) => {
+        const field = document.getElementById("hc-field");
+        if (!field || !CHARS) return { render: () => {} };
+        const overlay = document.createElement("div");
+        overlay.className = "hc-overlay ticked";
+        overlay.setAttribute("aria-hidden", "true");
+        const flag = document.createElement("span");
+        flag.className = "hc-flag";
+        const peek = document.createElement("span");
+        peek.className = "hc-flag peek";
+        flag.hidden = peek.hidden = true;
+        field.append(overlay, flag, peek);
+        const slot = document.createElement("div");
+        slot.className = "hc-slot";
+        const live = document.createElement("p");
+        live.className = "visually-hidden";
+        live.setAttribute("aria-live", "polite");
+        field.after(slot, live);
+        // `flag` is the run the caret stands beside (its `at`), `open` the
+        // entries shown; `before`/`after` hold the text around a Remove, so
+        // Put Back can undo it until the field changes.
+        const st = { flag: null, open: [], before: null, after: null, announced: 0, down: false, typing: false, composing: false, ours: false };
+
+        const el = (tag, cls, ...kids) => {
+            const e = document.createElement(tag);
+            if (cls) e.className = cls;
+            e.append(...kids);
+            return e;
+        };
+        const pct = (cp) => encodeURIComponent(String.fromCodePoint(cp)).toUpperCase();
+        // A run's tick, its count, and its flag are placed from the first
+        // character's box.
+        const runCenter = (m) => {
+            const r = m.getClientRects()[0];
+            if (!r) return null;
+            const fs = Number.parseFloat(getComputedStyle(overlay).fontSize);
+            return { x: r.left + r.width / 2, top: r.top + 0.06 * fs, bottom: r.bottom };
+        };
+        const place = (badge, m, text) => {
+            const c = m && runCenter(m);
+            const box = ta.getBoundingClientRect();
+            badge.hidden = !c || c.top < box.top || c.bottom > box.bottom;
+            if (badge.hidden) return;
+            const fr = field.getBoundingClientRect();
+            badge.textContent = text;
+            badge.style.left = `${c.x - fr.left}px`;
+            badge.style.top = `${c.top - fr.top}px`;
+        };
+        const placeFlag = () => {
+            const m = overlay.querySelector(".hid[data-flag]");
+            flag.classList.toggle("soft", Boolean(m?.classList.contains("soft")));
+            place(flag, m, m?.dataset.flag);
+        };
+
+        // The field's text again, laid out as the field lays it out, with a
+        // mark around each hidden character.
+        const paintOverlay = (marks) => {
+            const cs = getComputedStyle(ta);
+            for (const p of COPY_PROPS) overlay.style[p] = cs[p];
+            // The field's scrollbar narrows its text; the copy has none.
+            const bars = ta.offsetWidth - ta.clientWidth - Number.parseFloat(cs.borderLeftWidth) - Number.parseFloat(cs.borderRightWidth);
+            overlay.style.paddingRight = `${Number.parseFloat(cs.paddingRight) + Math.max(0, bars)}px`;
+            overlay.replaceChildren();
+            const runs = runsOfMarks(marks);
+            const v = ta.value;
+            let from = 0;
+            for (const run of runs) {
+                for (const m of run.marks) {
+                    overlay.append(v.slice(from, m.at));
+                    const s = el("span", "hid", m.ch);
+                    s.dataset.run = String(run.at);
+                    if (run.marks.every((x) => x.soft)) s.classList.add("soft");
+                    if (st.open.includes(m.id)) s.classList.add("open");
+                    if (m.i === 0) {
+                        s.classList.add("first");
+                        s.dataset.n = String(run.marks.length);
+                        if (run.at === st.flag) s.dataset.flag = runLabel(run.marks.map((x) => x.cp));
+                    }
+                    if (run.at === st.flag) s.classList.add("flagged");
+                    overlay.append(s);
+                    from = m.at + m.ch.length;
+                }
+            }
+            // A zero-width space holds open the empty line a final line break makes.
+            overlay.append(v.slice(from), "​");
+            overlay.style.height = `${ta.offsetHeight}px`;
+            overlay.scrollTop = ta.scrollTop;
+            overlay.classList.toggle("focused", document.activeElement === ta);
+            fitCounts(overlay);
+            placeFlag();
+            const own = st.flag != null && ta.selectionStart === ta.selectionEnd && !st.composing && ownCaretAllowed();
+            overlay.classList.toggle("caret-own", own);
+            ta.style.caretColor = own ? "transparent" : "";
+        };
+
+        // An entry: the character's tiles and name, the three ways to write
+        // it (the one this kind of link stores in the mark's reverse red; a
+        // click copies one), and what it does.
+        const formButton = (text, where, bad) => {
+            const cap = el("small", "", where);
+            const b = el("button", "form", el("code", bad ? "bad" : "", text), cap);
+            b.type = "button";
+            b.title = `Copy ${text}`;
+            b.addEventListener("click", async () => {
+                let ok = true;
+                try { await navigator.clipboard.writeText(text); } catch { ok = false; }
+                cap.textContent = ok ? "Copied" : "Copy Failed";
+                b.classList.toggle("copied", ok);
+                setTimeout(() => { cap.textContent = where; b.classList.remove("copied"); }, 1300);
+            });
+            return b;
+        };
+        const entryEl = (cp, count, url) => {
+            const soft = isSoft(cp);
+            const [sym, name] = charDress(cp);
+            const times = count > 1 ? ` It appears ${count === 2 ? "twice" : `${count} times`}.` : "";
+            return el("div", `entry solo ${soft ? "soft" : "warn"}`,
+                el("span", "tiles", el("span", "tile sym", sym), el("span", "tile raw", cp ? String.fromCodePoint(cp) : "")),
+                el("span", "what", el("b", "", name),
+                    el("span", "forms",
+                        formButton(`U+${hex4(cp)}`, "in Unicode", false),
+                        formButton(`\\u{${cp.toString(16).toUpperCase()}}`, "in code", !url),
+                        formButton(pct(cp), "in a URL", url)),
+                    el("span", "after", `${charMeaning(cp)}.${times} The empty box is the character.`)));
+        };
+
+        const replaceField = (text) => {
+            ta.focus();
+            ta.select();
+            st.ours = true;
+            // insertText keeps the change on the field's undo stack.
+            if (!document.execCommand("insertText", false, text)) {
+                ta.value = text;
+                ta.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+            st.ours = false;
+        };
+        const removedNow = () => st.before != null && ta.value === st.after;
+        const chip = (n) => {
+            const removed = removedNow();
+            const c = el("button", "history-hidden");
+            c.type = "button";
+            c.dataset.mode = removed ? "removed" : "ticks";
+            const what = plural(n, "Hidden Character");
+            if (removed) c.append(checkIcon(), `${what} Removed`, el("span", "history-hidden-mode", "· Put Back"));
+            else c.append(alertIcon(), what, el("span", "history-hidden-mode", "· Remove"));
+            c.addEventListener("click", () => {
+                if (removed) {
+                    const back = st.before;
+                    st.before = st.after = null;
+                    replaceField(back);
+                    live.textContent = "Hidden characters put back.";
+                } else {
+                    const before = ta.value;
+                    const after = withoutHidden(before);
+                    replaceField(after);
+                    Object.assign(st, { before, after, open: [], flag: null });
+                    live.textContent = "Hidden characters removed.";
+                }
+                render();
+                slot.querySelector(".history-hidden")?.focus();
+            });
+            return c;
+        };
+
+        const render = () => {
+            const marks = scanHidden(ta.value);
+            const runs = runsOfMarks(marks);
+            if (st.before != null && !removedNow()) st.before = st.after = null;
+            st.open = st.open.filter((id) => marks.some((m) => m.id === id));
+            if (!runs.some((r) => r.at === st.flag)) st.flag = null;
+            const hard = marks.filter((m) => !m.soft).length;
+            const soft = marks.length - hard;
+            if (marks.length && !st.announced) live.textContent = `${plural(marks.length, "hidden character")} in the text.`;
+            st.announced = marks.length;
+            slot.replaceChildren();
+            peek.hidden = true;
+            const url = isRedirect();
+            const shown = st.open.map((id) => marks.filter((m) => m.id === id)).filter((list) => list.length);
+            if (shown.length) slot.append(el("div", "history-cast pv-cast", ...shown.map((list) => entryEl(list[0].cp, list.length, url))));
+            const removed = removedNow();
+            const softNote = soft ? el("span", "hc-soft", plural(soft, "Special Character")) : "";
+            if (removed) {
+                const was = scanHidden(st.before).filter((m) => !m.soft).length;
+                slot.append(el("div", "history-meta", chip(was), softNote));
+            } else if (hard || soft) slot.append(el("div", "history-meta", hard ? chip(hard) : "", softNote));
+            // A hidden character in a domain: the server drops it, or refuses
+            // the address and the link is Text.
+            const t = ta.value.trim();
+            const dom = looksLikeUrl(t) && SCHEMES.has(t.slice(0, t.indexOf(":")).toLowerCase()) ? domainHidden(t) : null;
+            const one = (n, a, b) => (n === 1 ? a : b);
+            if (dom?.refused) {
+                slot.append(el("p", "hc-note", alertIcon(), el("span", "",
+                    `${one(dom.refused + dom.dropped, "Hidden character", "Hidden characters")} in domain, so this becomes a text link. Remove ${one(dom.refused + dom.dropped, "it", "them")} to redirect to `,
+                    el("code", "", dom.clean), ".")));
+            } else if (dom?.dropped) {
+                slot.append(el("p", "hc-note", alertIcon(), el("span", "",
+                    `${one(dom.dropped, "Hidden character", "Hidden characters")} in domain ${one(dom.dropped, "is", "are")} dropped. Goes to `,
+                    el("code", "", dom.clean), ".")));
+            }
+            paintOverlay(marks);
+        };
+
+        // The caret decides what is open: after a click or a drag ends, and
+        // after a key that moves it. Typing only closes: a run the caret left
+        // shuts, but none opens while you type.
+        const follow = ({ closeOnly = false } = {}) => {
+            const a = ta.selectionStart;
+            const b = ta.selectionEnd;
+            const marks = scanHidden(ta.value);
+            let flagAt = null;
+            let ids;
+            if (a === b) {
+                const run = runsOfMarks(marks).find((r) => a >= r.at && a <= r.end);
+                flagAt = run ? run.at : null;
+                ids = run ? [...new Set(run.marks.map((m) => m.id))] : [];
+            } else ids = [...new Set(marks.filter((m) => m.at >= a && m.at + m.ch.length <= b).map((m) => m.id))];
+            if (closeOnly && (flagAt !== st.flag || st.flag == null)) [flagAt, ids] = [null, []];
+            if (flagAt === st.flag && ids.join() === st.open.join()) {
+                paintOverlay(marks); // the caret moved within the run: redraw it
+                return;
+            }
+            Object.assign(st, { flag: flagAt, open: ids });
+            if (ids.length) live.textContent = ids.map((id) => charDress(Number.parseInt(id.slice(1), 16))[1]).join(", ");
+            render();
+        };
+        ta.addEventListener("pointerdown", () => { st.down = true; });
+        document.addEventListener("pointerup", () => {
+            if (!st.down) return;
+            st.down = false;
+            follow();
+        });
+        ta.addEventListener("keyup", (event) => {
+            if (event.key.startsWith("Arrow") || ["Home", "End", "PageUp", "PageDown"].includes(event.key)
+                || (event.key === "a" && (event.metaKey || event.ctrlKey))) follow();
+        });
+        // A held arrow key moves the caret long before keyup: close what it
+        // left at once, so a drawn caret never stays behind.
+        document.addEventListener("selectionchange", () => {
+            if (document.activeElement === ta && !st.down && !st.typing) follow({ closeOnly: true });
+        });
+        ta.addEventListener("beforeinput", () => { st.typing = true; });
+        ta.addEventListener("input", () => {
+            render();
+            st.typing = false;
+            follow({ closeOnly: true });
+        });
+        ta.addEventListener("compositionstart", () => { st.composing = true; render(); });
+        ta.addEventListener("compositionend", () => { st.composing = false; render(); });
+        ta.addEventListener("focus", () => { overlay.classList.add("focused"); paintOverlay(scanHidden(ta.value)); });
+        ta.addEventListener("blur", () => { overlay.classList.remove("focused"); ta.style.caretColor = ""; });
+        // The peek: the flag, quiet, over the run under the pointer, unless
+        // that run is the open one.
+        ta.addEventListener("mousemove", (event) => {
+            const m = markNear(overlay, event.clientX, event.clientY);
+            const first = m && overlay.querySelector(`.hid.first[data-run="${m.dataset.run}"]`);
+            if (!first || Number(first.dataset.run) === st.flag) { peek.hidden = true; return; }
+            const run = runsOfMarks(scanHidden(ta.value)).find((r) => String(r.at) === first.dataset.run);
+            peek.classList.toggle("soft", first.classList.contains("soft"));
+            place(peek, first, runLabel(run.marks.map((x) => x.cp)));
+        });
+        ta.addEventListener("mouseleave", () => { peek.hidden = true; });
+        ta.addEventListener("scroll", () => {
+            overlay.scrollTop = ta.scrollTop;
+            placeFlag();
+            peek.hidden = true;
+        });
+        if (typeof ResizeObserver === "function") new ResizeObserver(() => paintOverlay(scanHidden(ta.value))).observe(ta);
+        render();
+        return { render };
+    };
+    // The mark near a point: within 6px of where its tick stands, on its line.
+    // A tick takes no width, so the pointer is matched to it, never the
+    // other way round.
+    const markNear = (root, x, y) => {
+        for (const m of root.querySelectorAll(".hid")) {
+            for (const r of m.getClientRects()) {
+                if (x >= r.left - 6 && x <= r.right + 6 && y >= r.top && y <= r.bottom) return m;
+            }
+        }
+        return null;
+    };
+    // A run's count stands right of its wedge; where a neighbor's tick or
+    // count leaves no room it goes, and the bar thickens instead (more than
+    // one). The flag and the peek still say how many.
+    const fitCounts = (root) => {
+        const fs = Number.parseFloat(getComputedStyle(root).fontSize);
+        const w = 0.46 * fs;
+        const digit = 0.6 * fs * 0.62;
+        const gap = 0.1 * fs;
+        const marks = [...root.querySelectorAll(".hid.first")].map((m) => {
+            m.classList.remove("cnt-none");
+            const r = m.getClientRects()[0];
+            return r && { m, x: r.left + r.width / 2, line: Math.round(r.top), n: Number(m.dataset.n) };
+        }).filter(Boolean);
+        const placed = marks.map((k) => ({ a: k.x - w / 2, b: k.x + w / 2, line: k.line }));
+        for (const k of marks) {
+            if (k.n < 2) continue;
+            const a = k.x + w / 2 + gap;
+            const b = a + String(k.n).length * digit + 1;
+            if (placed.every((p) => p.line !== k.line || b <= p.a || a >= p.b)) placed.push({ a, b, line: k.line });
+            else k.m.classList.add("cnt-none");
+        }
+    };
+
     const initCreate = () => {
         const content = document.getElementById("content");
         const form = document.getElementById("create-form");
@@ -1927,6 +2406,8 @@
         // The input value that produced the current result; the result dims when the
         // input drifts away from it.
         let resultSourceValue = null;
+        // The hidden-character marks over the field (setupFieldMarks).
+        let fieldMarks = null;
 
         const checkedValue = (name, fallback) =>
             document.querySelector(`input[name="${name}"]:checked`)?.value ?? fallback;
@@ -1960,7 +2441,9 @@
             // Input that tries to be an address but cannot be one becomes Text;
             // say so before it is sent, so a typo is caught rather than shared.
             const t = content.value.trim();
-            const problem = !altHeld && looksLikeUrl(t) ? addressProblem(t) : "";
+            // A hidden character in the domain is said under the field instead,
+            // beside its marks, with the way to a redirect.
+            const problem = !altHeld && looksLikeUrl(t) && !domainHidden(t)?.refused ? addressProblem(t) : "";
             if (formNote) {
                 formNote.textContent = problem;
                 formNote.hidden = !problem;
@@ -2131,6 +2614,7 @@
                 content.value = "";
                 autosize();
                 updateSubmitLabel();
+                fieldMarks?.render();
                 content.focus();
             });
         }
@@ -2233,6 +2717,7 @@
 
         autosize();
         updateSubmitLabel();
+        fieldMarks = setupFieldMarks(content, () => !altHeld && detectKind(content.value) === "redirect");
         setupTtl();
         renderHistory();
         applyHistoryOpen(); // open by default on load (or the remembered state)
