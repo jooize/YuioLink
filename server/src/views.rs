@@ -1019,7 +1019,7 @@ pub struct HiddenStep<'a> {
 /// Nothing is created yet: the text again, editable, its hidden characters
 /// marked and named as the Text page marks and names them, and two answers.
 /// Remove takes out the red-marked ones (the soft kinds stay, as with the
-/// form's Remove); Create With Them keeps the text as written.
+/// form's Remove); Create As Is keeps the text as written.
 pub fn hidden_step_page(s: &HiddenStep) -> Markup {
     let crlf = uniform_crlf(s.content);
     let entries = text_cast(s.content, crlf);
@@ -1066,10 +1066,10 @@ pub fn hidden_step_page(s: &HiddenStep) -> Markup {
             input type="hidden" name="link_type" value=(s.link_type);
             div.hidden-step-actions {
                 button.btn type="submit" name="hidden_chars" value="remove" {
-                    "Remove Them and Create"
+                    "Remove and Create"
                 }
                 button.btn.btn-quiet type="submit" name="hidden_chars" value="keep" {
-                    "Create With Them"
+                    "Create As Is"
                 }
             }
         }
