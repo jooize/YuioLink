@@ -1054,7 +1054,8 @@ pub fn hidden_step_page(s: &HiddenStep) -> Markup {
                 pre.text-body #text-body { (marked_text(s.content, crlf, true)) }
             }
             @if !entries.is_empty() {
-                div.pv-cast {
+                // The whole list, script or not: here it is the explanation.
+                div.pv-cast.whole {
                     @for e in &entries { (cast_entry(e, false, true)) }
                 }
             }
@@ -1073,14 +1074,7 @@ pub fn hidden_step_page(s: &HiddenStep) -> Markup {
             }
         }
     };
-    // text.js opens a mark's entry on a click, as on the Text page; without
-    // it the whole list shows.
-    document_full(
-        "YuioLink — Hidden Characters",
-        html! {},
-        body,
-        script_tag("/static/text.js"),
-    )
+    document_full("YuioLink — Hidden Characters", html! {}, body, html! {})
 }
 
 /// "1 hidden character", "3 hidden characters".
@@ -4322,8 +4316,12 @@ mod tests {
         // answer and swapping never shifts the card.
         const APP_CSS: &str = include_str!("../static/app.css");
         assert!(APP_CSS
-            .contains("html.js .pv-cast .entry {\n    grid-row: 2;\n    grid-column: 1;\n    visibility: hidden;\n}"));
-        assert!(APP_CSS.contains("html:not(.js) .pv-cast .entry + .entry {"));
+            .contains("html.js .pv-cast:not(.whole) .entry {\n    grid-row: 2;\n    grid-column: 1;\n    visibility: hidden;\n}"));
+        assert!(
+            APP_CSS.contains(
+                "html:not(.js) .pv-cast .entry + .entry,\n.pv-cast.whole .entry + .entry {"
+            )
+        );
         assert!(APP_CSS.contains("html:not(.js) .pv-index {\n    display: none;\n}"));
     }
 

@@ -2730,7 +2730,8 @@ html.js .custom-field:not(.open) {
    sole entry shows outright and several collapse to the .pv-index tile row,
    each entry staying hidden until its character is clicked (the user's call,
    2026-08-20); without the script the full list simply shows and the index
-   is dropped -- the no-JS page keeps every fact. */
+   is dropped -- the no-JS page keeps every fact. A .whole cast is that full
+   list with the script too. */
 .pv-cast {
     margin: 10px 2px 2px;
     text-align: left;
@@ -2751,7 +2752,7 @@ html.js .custom-field:not(.open) {
    entry never shifts the card under the pointer -- a min-height cannot do
    this, because prose wraps to a different line count per entry and per
    viewport. */
-html.js .pv-cast {
+html.js .pv-cast:not(.whole) {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
 }
@@ -2761,7 +2762,7 @@ html.js .pv-cast .pv-index {
     grid-column: 1;
 }
 
-html.js .pv-cast .entry {
+html.js .pv-cast:not(.whole) .entry {
     grid-row: 2;
     grid-column: 1;
     visibility: hidden;
@@ -2770,7 +2771,7 @@ html.js .pv-cast .entry {
 /* Until a character has been asked, the deck holds no room at all: the
    stacked answers rejoin the layout the moment one shows, so the one-time
    growth happens on the first ask and swapping still shifts nothing. */
-html.js .pv-cast:not(:has(.entry.shown, .entry.solo)) .entry {
+html.js .pv-cast:not(.whole, :has(.entry.shown, .entry.solo)) .entry {
     display: none;
 }
 
@@ -2785,7 +2786,8 @@ html.js .pv-cast .entry.shown {
     animation: cast-pulse 1.4s ease-out;
 }
 
-html:not(.js) .pv-cast .entry + .entry {
+html:not(.js) .pv-cast .entry + .entry,
+.pv-cast.whole .entry + .entry {
     border-top: 0.5px solid var(--card-border);
 }
 
