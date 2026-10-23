@@ -4599,6 +4599,59 @@ html.js .history-cast.pv-cast {
     color: var(--text-tertiary);
 }
 
+/* The no-JS step before a link whose text holds hidden characters: the text
+   again, the Text page's marked copy of it, and two answers. The soft kinds
+   are gray here, as in the form, since Remove leaves them in. */
+.hidden-step {
+    text-align: left;
+}
+
+.hidden-step-head {
+    display: flex;
+    gap: 5px;
+    align-items: flex-start;
+    margin: 12px 2px 8px;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--danger);
+}
+
+.hidden-step-head svg {
+    flex: none;
+    margin-top: 3px;
+}
+
+.hidden-step-head.soft {
+    margin-top: -4px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.hidden-step .text-body .hid.soft::after {
+    color: #fff;
+    background: var(--hc-gray);
+}
+
+.hidden-step-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.hidden-step-actions .btn {
+    flex: 1;
+    min-width: 150px;
+}
+
+.btn.btn-quiet {
+    color: var(--text);
+    background: var(--field-bg);
+    border: 0.5px solid var(--field-border);
+    box-shadow: none;
+}
+
 /* --- /stats: aggregate counters, no chrome beyond what the numbers need --- */
 
 .stats-h {

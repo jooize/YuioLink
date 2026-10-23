@@ -972,6 +972,9 @@ pub fn result_page(link: &CreatedLink, redo: Option<&ResultRedo>) -> Markup {
                 input type="hidden" name="kind" value="text";
                 input type="hidden" name="ttl_seconds" value=(r.ttl_seconds);
                 input type="hidden" name="link_type" value=(r.link_type);
+                // The address was created as written, so its hidden
+                // characters, if any, were already answered for.
+                input type="hidden" name="hidden_chars" value="keep";
                 button.redo-btn type="submit" { "Share the address as a text link instead" }
             }
             p.meta.redo-note {
@@ -991,6 +994,102 @@ pub fn result_page(link: &CreatedLink, redo: Option<&ResultRedo>) -> Markup {
         body,
         scripts,
     )
+}
+
+/// The no-JS form's question before it creates a link whose text holds
+/// hidden characters that hide things: what [`hidden_step_page`] shows and
+/// posts back.
+pub struct HiddenStep<'a> {
+    /// The text as submitted, in the field again.
+    pub content: &'a str,
+    /// True when the text is an address, which the page calls it.
+    pub address: bool,
+    /// The red-marked hidden characters, which Remove takes out.
+    pub hidden: usize,
+    /// The soft kinds (no-break spaces, soft hyphens), which stay.
+    pub soft: usize,
+    /// The kind the form forced, re-posted (only the redo form sends one).
+    pub kind: Option<&'a str>,
+    /// Expiry in seconds and `public` / `secret` / `once`, re-posted, so the
+    /// link made from here is the one the person asked for.
+    pub ttl_seconds: i64,
+    pub link_type: &'a str,
+}
+
+/// Nothing is created yet: the text again, editable, its hidden characters
+/// marked and named as the Text page marks and names them, and two answers.
+/// Remove takes out the red-marked ones (the soft kinds stay, as with the
+/// form's Remove); Create With Them keeps the text as written.
+pub fn hidden_step_page(s: &HiddenStep) -> Markup {
+    let crlf = uniform_crlf(s.content);
+    let entries = text_cast(s.content, crlf);
+    let what = if s.address {
+        "This address"
+    } else {
+        "This text"
+    };
+    let rows = s.content.lines().count().clamp(2, 8);
+    let body = html! {
+        (home_chip("/", "Create New Link"))
+        form.hidden-step method="post" action="/" {
+            label.visually-hidden for="content" { "Link or text to share" }
+            // A textarea drops one line feed right after its start tag, so
+            // one goes there for the text's own to survive.
+            textarea #content.form-control name="content" rows=(rows)
+                autocomplete="off" autocapitalize="off" spellcheck="false" {
+                "\n" (s.content)
+            }
+            p.hidden-step-head {
+                (alert_icon())
+                (what) " holds " (count_of(s.hidden, "hidden character")) ". Nothing is created yet."
+            }
+            @if s.soft > 0 {
+                p.hidden-step-head.soft {
+                    (info_icon())
+                    "It also holds " (count_of(s.soft, "special character"))
+                    ", such as no-break spaces. They stay either way."
+                }
+            }
+            div.text-wrap #text-wrap {
+                pre.text-body #text-body { (marked_text(s.content, crlf, true)) }
+            }
+            @if !entries.is_empty() {
+                div.pv-cast {
+                    @for e in &entries { (cast_entry(e, false, true)) }
+                }
+            }
+            @if let Some(k) = s.kind {
+                input type="hidden" name="kind" value=(k);
+            }
+            input type="hidden" name="ttl_seconds" value=(s.ttl_seconds);
+            input type="hidden" name="link_type" value=(s.link_type);
+            div.hidden-step-actions {
+                button.btn type="submit" name="hidden_chars" value="remove" {
+                    "Remove Them and Create"
+                }
+                button.btn.btn-quiet type="submit" name="hidden_chars" value="keep" {
+                    "Create With Them"
+                }
+            }
+        }
+    };
+    // text.js opens a mark's entry on a click, as on the Text page; without
+    // it the whole list shows.
+    document_full(
+        "YuioLink — Hidden Characters",
+        html! {},
+        body,
+        script_tag("/static/text.js"),
+    )
+}
+
+/// "1 hidden character", "3 hidden characters".
+fn count_of(n: usize, thing: &str) -> String {
+    if n == 1 {
+        format!("1 {thing}")
+    } else {
+        format!("{n} {thing}s")
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -1925,7 +2024,7 @@ fn cast_list(uri: &UriView, bare: bool) -> Markup {
         @if !entries.is_empty() {
             div.pv-cast {
                 @if !bare && entries.len() > 1 { (cast_index(&entries)) }
-                @for e in &entries { (cast_entry(e, solo)) }
+                @for e in &entries { (cast_entry(e, solo, false)) }
             }
         }
     }
@@ -1960,11 +2059,15 @@ fn cast_index(entries: &[CastEntry]) -> Markup {
     }
 }
 
-fn cast_entry(e: &CastEntry, solo: bool) -> Markup {
-    let warn = matches!(
-        e.kind,
-        CastKind::Hidden | CastKind::Padding | CastKind::Snippet
-    );
+/// `soft` dresses the soft kinds gray, as the create form does, where the
+/// page treats them apart from the rest (the no-JS step).
+fn cast_entry(e: &CastEntry, solo: bool, soft: bool) -> Markup {
+    let soft = soft && e.kind == CastKind::Snippet && is_soft(e.ch);
+    let warn = !soft
+        && matches!(
+            e.kind,
+            CastKind::Hidden | CastKind::Padding | CastKind::Snippet
+        );
     let (sym, name) = char_dress(e.ch);
     let name = if e.kind == CastKind::Undecodable {
         "undecodable bytes".to_string()
@@ -1974,6 +2077,9 @@ fn cast_entry(e: &CastEntry, solo: bool) -> Markup {
     let mut class = String::from("entry");
     if warn {
         class.push_str(" warn");
+    }
+    if soft {
+        class.push_str(" soft");
     }
     if solo {
         class.push_str(" solo");
@@ -2286,6 +2392,17 @@ fn alert_icon() -> Markup {
             circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4" {}
             path d="M8 4.6v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" {}
             circle cx="8" cy="11.2" r=".95" fill="currentColor" {}
+        }
+    }
+}
+
+/// A ringed "i": the soft kinds, noted rather than warned about.
+fn info_icon() -> Markup {
+    html! {
+        svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true" {
+            circle cx="8" cy="8" r="6.6" stroke="currentColor" stroke-width="1.4" {}
+            circle cx="8" cy="4.9" r=".95" fill="currentColor" {}
+            path d="M8 7.4v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" {}
         }
     }
 }
@@ -2689,11 +2806,15 @@ pub fn text_display(text: &str, whole: bool) -> Option<(serde_json::Value, serde
         unwrap: &["var"],
         keep: &["esc", "tell", "cp", "name"],
     };
-    let tree = markup_tree(&marked_text(text, crlf).into_string(), usize::MAX, &rules);
+    let tree = markup_tree(
+        &marked_text(text, crlf, false).into_string(),
+        usize::MAX,
+        &rules,
+    );
     let cast = entries
         .iter()
         .flat_map(|e| {
-            let html = cast_entry(e, true).into_string();
+            let html = cast_entry(e, true, false).into_string();
             match markup_tree(&html, usize::MAX, &rules) {
                 serde_json::Value::Array(nodes) => nodes,
                 other => vec![other],
@@ -3206,14 +3327,14 @@ fn text_body(text: &str) -> Markup {
             }
         }
         div.text-wrap #text-wrap {
-            pre.text-body #text-body { (marked_text(text, crlf)) }
+            pre.text-body #text-body { (marked_text(text, crlf, false)) }
         }
         // Below the box, so the first answer grows the page under the text
         // rather than pushing the text down under the pointer. Quiet until a
         // mark or a chip asks (text.js); without the script, the full list.
         @if !entries.is_empty() {
             div.pv-cast {
-                @for e in &entries { (cast_entry(e, false)) }
+                @for e in &entries { (cast_entry(e, false, false)) }
             }
         }
         button.btn.btn-block #copy-text type="button" hidden { "Copy" }
@@ -3323,6 +3444,37 @@ fn text_mark(text: &str, i: usize, c: char, crlf: bool) -> Option<String> {
     }
 }
 
+/// How many of `text`'s hidden characters are marked, as a snippet marks
+/// them: the ones that hide things, then the soft kinds ([`is_soft`]).
+pub(crate) fn hidden_counts(text: &str) -> (usize, usize) {
+    let crlf = uniform_crlf(text);
+    text.char_indices()
+        .filter(|&(i, c)| text_mark(text, i, c, crlf).is_some())
+        .fold((0, 0), |(hard, soft), (_, c)| {
+            if is_soft(c) {
+                (hard, soft + 1)
+            } else {
+                (hard + 1, soft)
+            }
+        })
+}
+
+/// `text` without the marked hidden characters that hide things, as the
+/// create form's Remove takes them out: a line or paragraph separator becomes
+/// a line feed, and the soft kinds stay.
+pub(crate) fn without_hidden(text: &str) -> String {
+    let crlf = uniform_crlf(text);
+    let mut out = String::with_capacity(text.len());
+    for (i, c) in text.char_indices() {
+        match c {
+            c if is_soft(c) || text_mark(text, i, c, crlf).is_none() => out.push(c),
+            '\u{2028}' | '\u{2029}' => out.push('\n'),
+            _ => {}
+        }
+    }
+    out
+}
+
 /// The snippet as the reader sees it: every character stays in the text, so a
 /// selection or the Copy button takes exactly what is stored, and a hidden
 /// character gets a mark — a `span.hid` whose escape (`data-esc`) app.css
@@ -3335,7 +3487,7 @@ fn text_mark(text: &str, i: usize, c: char, crlf: bool) -> Option<String> {
 /// return into a line feed, so it goes out as `&#13;`; it turns a NUL into
 /// U+FFFD even as a reference, so a NUL's mark is empty and carries the code
 /// point in `data-cp`, which text.js puts back when copying.
-fn marked_text(text: &str, crlf: bool) -> Markup {
+fn marked_text(text: &str, crlf: bool, soft: bool) -> Markup {
     let mut out = String::with_capacity(text.len());
     // Start of the run of characters that show as themselves.
     let mut start = 0;
@@ -3368,8 +3520,13 @@ fn marked_text(text: &str, crlf: bool) -> Markup {
             Some(esc) => {
                 let cp = (c == '\0').then_some("0");
                 let tell = mark_id(c);
+                let class = if soft && is_soft(c) {
+                    "hid soft"
+                } else {
+                    "hid"
+                };
                 out.push_str(
-                    &html! { span.hid data-esc=(esc) data-tell=(tell) data-cp=[cp] { (raw) } }
+                    &html! { span class=(class) data-esc=(esc) data-tell=(tell) data-cp=[cp] { (raw) } }
                         .into_string(),
                 );
             }

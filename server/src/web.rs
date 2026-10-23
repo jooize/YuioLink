@@ -196,6 +196,29 @@ async fn create_link(
     secret: bool,
     creator_token: Option<&str>,
 ) -> Result<Created, CreateError> {
+    let checked = check_link(state, kind_choice, raw_content, ttl_seconds, max_uses)?;
+    store_link(state, checked, secret, creator_token).await
+}
+
+/// A create request that passed every check, ready to store.
+struct Checked {
+    kind: Kind,
+    content: String,
+    content_type: Option<&'static str>,
+    ttl_seconds: i64,
+    max_uses: Option<i64>,
+}
+
+/// The checks half of [`create_link`], for a surface that has a question
+/// to ask between checking and storing (the no-JS form's hidden-character
+/// step).
+fn check_link(
+    state: &AppState,
+    kind_choice: Option<&str>,
+    raw_content: &str,
+    ttl_seconds: Result<i64, String>,
+    max_uses: Result<Option<i64>, String>,
+) -> Result<Checked, CreateError> {
     let mut errors: Vec<FieldError> = Vec::new();
     let mut fail = |field: &'static str, message: String| {
         errors.push(FieldError {
@@ -281,9 +304,29 @@ async fn create_link(
     }
     // No errors, so every piece validated: safe to unwrap the collected parts.
     let (content, content_type) = validated.expect("validated content");
-    let ttl_seconds = ttl_seconds.expect("validated ttl");
-    let max_uses = max_uses.expect("validated max_uses");
+    Ok(Checked {
+        kind,
+        content,
+        content_type,
+        ttl_seconds: ttl_seconds.expect("validated ttl"),
+        max_uses: max_uses.expect("validated max_uses"),
+    })
+}
 
+/// The storing half of [`create_link`].
+async fn store_link(
+    state: &AppState,
+    checked: Checked,
+    secret: bool,
+    creator_token: Option<&str>,
+) -> Result<Created, CreateError> {
+    let Checked {
+        kind,
+        content,
+        content_type,
+        ttl_seconds,
+        max_uses,
+    } = checked;
     let occupancy = occupancy_snapshot(&state.occupancy);
     db::insert_link(
         &state.pool,
@@ -368,13 +411,6 @@ pub async fn form_create(
     headers: HeaderMap,
     Form(form): Form<FormCreate>,
 ) -> Response {
-    if !state.limiter.allow(&client_key(&headers)) {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Html(views::error_page(429, RATE_LIMIT_MSG).into_string()),
-        )
-            .into_response();
-    }
     // Expiry: a filled exact field (number + unit) beats the slider stop; the
     // slider posts an index into TTL_STOPS. Legacy preset values still parse. A
     // parse failure is carried as an Err so it reports alongside the other
@@ -421,17 +457,56 @@ pub async fn form_create(
     // `curl` carry the sender's bytes, carriage returns included.
     let content = form.content.replace("\r\n", "\n");
 
-    match create_link(
+    // Hidden characters that hide things (zero-width, direction, tag and
+    // control characters) get a second step before anything is created: a
+    // no-JS link has no creator token, so it cannot be deleted once made, and
+    // nothing marked them while the person typed. The step posts back here
+    // with `hidden_chars`: `remove` takes them out first, `keep` creates the
+    // text as written. Anything else is no answer, and asks again.
+    let hidden_choice = form.hidden_chars.as_deref();
+    let content = if hidden_choice == Some("remove") {
+        views::without_hidden(&content)
+    } else {
+        content
+    };
+
+    let created = match check_link(
         &state,
         form.kind.as_deref(),
         &content,
         ttl_seconds,
         Ok(max_uses),
-        secret,
-        None,
-    )
-    .await
-    {
+    ) {
+        Ok(checked) => {
+            let (hidden, soft) = views::hidden_counts(&content);
+            if hidden > 0 && !matches!(hidden_choice, Some("keep" | "remove")) {
+                return Html(
+                    views::hidden_step_page(&views::HiddenStep {
+                        content: &content,
+                        address: checked.kind == Kind::Redirect,
+                        hidden,
+                        soft,
+                        kind: form.kind.as_deref(),
+                        ttl_seconds: checked.ttl_seconds,
+                        link_type: form.link_type.as_deref().unwrap_or("public"),
+                    })
+                    .into_string(),
+                )
+                .into_response();
+            }
+            // Spent only on a create: a step asks, it stores nothing.
+            if !state.limiter.allow(&client_key(&headers)) {
+                return (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    Html(views::error_page(429, RATE_LIMIT_MSG).into_string()),
+                )
+                    .into_response();
+            }
+            store_link(&state, checked, secret, None).await
+        }
+        Err(e) => Err(e),
+    };
+    match created {
         Ok(created) => {
             let row = display_of(&created);
             let inserted = &created.link;
@@ -1095,6 +1170,10 @@ pub struct FormCreate {
     /// means detection, which is what the form itself always does.
     #[serde(default)]
     pub kind: Option<String>,
+    /// The answer to the hidden-character step: `keep` or `remove`. Only that
+    /// step and the result page's redo form send it.
+    #[serde(default)]
+    pub hidden_chars: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -1863,6 +1942,112 @@ mod tests {
             .to_string();
         let d = db::get_link_live(&st.pool, &name).await.unwrap().unwrap();
         assert_eq!(d.content, "one\r\ntwo\r\n");
+    }
+
+    /// The name of the link a no-JS result page announces.
+    fn created_name(body: &str) -> String {
+        let at = body
+            .find("http://yuio.test/")
+            .expect("result names the link")
+            + 17;
+        body[at..]
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric())
+            .collect()
+    }
+
+    /// Hidden characters that hide things stop the no-JS form at a second
+    /// step: nothing is stored, and the step carries the person's choices.
+    #[tokio::test]
+    async fn the_form_asks_before_storing_hidden_characters() {
+        let st = test_state().await;
+        for answer in ["", "&hidden_chars=maybe"] {
+            let (s, _, body) = send(
+                &st,
+                post_body(
+                    "/",
+                    &format!("content=sig%E2%80%8Bned%C2%A0now&ttl_stop=7&link_type=once{answer}"),
+                ),
+            )
+            .await;
+            assert_eq!(s, StatusCode::OK, "body: {body}");
+            assert!(body.contains("Nothing is created yet"), "{body}");
+            assert!(body.contains("This text holds 1 hidden character."));
+            assert!(body.contains("It also holds 1 special character"));
+            assert!(!body.contains("http://yuio.test/"), "a link was made");
+            assert!(body.contains(r#"name="ttl_seconds" value="3600""#));
+            assert!(body.contains(r#"name="link_type" value="once""#));
+            assert!(body.contains(r#"value="remove""#) && body.contains(r#"value="keep""#));
+        }
+    }
+
+    /// The soft kinds alone, and the joiners inside an emoji, are created in
+    /// one step, as before.
+    #[tokio::test]
+    async fn the_form_creates_soft_kinds_and_emoji_in_one_step() {
+        let st = test_state().await;
+        for content in ["a%C2%A0b%C2%ADc", "%F0%9F%91%A8%E2%80%8D%F0%9F%91%A9"] {
+            let (s, _, body) = send(
+                &st,
+                post_body("/", &format!("content={content}&ttl_stop=7")),
+            )
+            .await;
+            assert_eq!(s, StatusCode::OK, "body: {body}");
+            created_name(&body);
+        }
+    }
+
+    /// Remove takes out what the step counted and keeps the soft kinds; Keep
+    /// stores the text as written.
+    #[tokio::test]
+    async fn the_steps_answers_remove_or_keep() {
+        let st = test_state().await;
+        let text = "content=a%E2%80%8Bb%C2%A0c%E2%80%A8d&ttl_stop=7";
+        for (answer, stored) in [
+            ("remove", "ab\u{a0}c\nd"),
+            ("keep", "a\u{200b}b\u{a0}c\u{2028}d"),
+        ] {
+            let (s, _, body) = send(
+                &st,
+                post_body("/", &format!("{text}&hidden_chars={answer}")),
+            )
+            .await;
+            assert_eq!(s, StatusCode::OK, "body: {body}");
+            let d = db::get_link_live(&st.pool, &created_name(&body))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(d.content, stored, "{answer}");
+        }
+    }
+
+    /// A joiner in a domain makes the address Text; the step calls it an
+    /// address only once it is one, and Remove makes it a redirect again.
+    #[tokio::test]
+    async fn removing_a_joiner_from_a_domain_makes_a_redirect() {
+        let st = test_state().await;
+        let url = "content=https%3A%2F%2Fexa%E2%80%8Dmple.com%2Flogin&ttl_stop=7";
+        let (_, _, body) = send(&st, post_body("/", url)).await;
+        assert!(
+            body.contains("This text holds 1 hidden character."),
+            "{body}"
+        );
+        let (_, _, body) = send(&st, post_body("/", &format!("{url}&hidden_chars=remove"))).await;
+        let d = db::get_link_live(&st.pool, &created_name(&body))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (d.kind.as_str(), d.content.as_str()),
+            ("redirect", "https://example.com/login")
+        );
+
+        let path = "content=https%3A%2F%2Fexample.com%2Flo%E2%80%8Dgin&ttl_stop=7";
+        let (_, _, body) = send(&st, post_body("/", path)).await;
+        assert!(
+            body.contains("This address holds 1 hidden character."),
+            "{body}"
+        );
     }
 
     fn post_body(uri: &str, body: &str) -> Request<Body> {
