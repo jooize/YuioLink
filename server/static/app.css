@@ -3790,6 +3790,14 @@ html.history-collapsed .history-body {
     mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
 }
 
+/* A wedge is centered on its character, so at a line's start or end half of
+   it stands outside the text. Room on both sides keeps it whole without
+   moving the text. */
+.history-well-body.ticked {
+    padding-inline: 0.25em;
+    margin-inline: -0.25em;
+}
+
 .history-well.open .history-well-body { max-height: none; }
 
 .history-well.text .history-well-body { white-space: pre-wrap; }

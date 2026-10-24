@@ -2020,7 +2020,9 @@
             if (badge.hidden) return;
             const fr = field.getBoundingClientRect();
             badge.textContent = text;
-            badge.style.left = `${c.x - fr.left}px`;
+            // Centered over the run, but never past the field's edges.
+            const half = badge.offsetWidth / 2;
+            badge.style.left = `${Math.min(Math.max(c.x - fr.left, half), fr.width - half)}px`;
             badge.style.top = `${c.top - fr.top}px`;
         };
         const placeFlag = () => {
