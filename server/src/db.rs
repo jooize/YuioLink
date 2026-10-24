@@ -79,7 +79,6 @@ pub async fn connect(db_path: &str) -> anyhow::Result<SqlitePool> {
         .connect_with(options)
         .await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
-    hash_plaintext_tokens(&pool).await?;
     Ok(pool)
 }
 
@@ -87,30 +86,6 @@ pub async fn connect(db_path: &str) -> anyhow::Result<SqlitePool> {
 /// bits, so a bare hash is enough (see migrations/0007_creator_token_hash.sql).
 fn token_hash(token: &str) -> Vec<u8> {
     Sha256::digest(token.as_bytes()).to_vec()
-}
-
-/// TRANSITIONAL: hash the creator tokens stored in plain text before migration
-/// 0007 and clear them. Remove this, with a migration that drops `delete_token`,
-/// in a release made at least seven days after 0007 first deployed: by then
-/// every link from before has expired.
-async fn hash_plaintext_tokens(pool: &SqlitePool) -> Result<(), sqlx::Error> {
-    let mut tx = pool.begin().await?;
-    let rows: Vec<(String, String)> =
-        sqlx::query_as("SELECT name, delete_token FROM links WHERE delete_token IS NOT NULL")
-            .fetch_all(&mut *tx)
-            .await?;
-    for (name, token) in &rows {
-        sqlx::query("UPDATE links SET creator_token_hash = ?, delete_token = NULL WHERE name = ?")
-            .bind(token_hash(token))
-            .bind(name)
-            .execute(&mut *tx)
-            .await?;
-    }
-    tx.commit().await?;
-    if !rows.is_empty() {
-        tracing::info!(count = rows.len(), "hashed plaintext creator tokens");
-    }
-    Ok(())
 }
 
 /// Read a link without consuming it — for the interstitial preview and the REST
@@ -606,41 +581,14 @@ mod tests {
         )
         .await
         .unwrap();
-        let (plain, hash): (Option<String>, Vec<u8>) =
-            sqlx::query_as("SELECT delete_token, creator_token_hash FROM links WHERE name = ?")
+        let hash: Vec<u8> =
+            sqlx::query_scalar("SELECT creator_token_hash FROM links WHERE name = ?")
                 .bind(&l.name)
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(plain, None);
         assert_eq!(hash, token_hash("tok"));
         assert!(is_creator(&pool, &l.name, "tok").await.unwrap());
         assert!(!is_creator(&pool, &l.name, "wrong").await.unwrap());
-    }
-
-    #[tokio::test]
-    async fn plaintext_tokens_from_before_0007_are_hashed_at_startup() {
-        let pool = test_pool().await;
-        let mut nl = redirect("https://example.com", None);
-        nl.creator_token = None;
-        let l = insert_link(&pool, nl, &EMPTY_OCCUPANCY).await.unwrap();
-        // A row as 0002 left it: the token in plain text, no hash.
-        sqlx::query("UPDATE links SET delete_token = 'old' WHERE name = ?")
-            .bind(&l.name)
-            .execute(&pool)
-            .await
-            .unwrap();
-        assert!(!is_creator(&pool, &l.name, "old").await.unwrap());
-
-        hash_plaintext_tokens(&pool).await.unwrap();
-        let plain: Option<String> =
-            sqlx::query_scalar("SELECT delete_token FROM links WHERE name = ?")
-                .bind(&l.name)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!(plain, None);
-        assert!(is_creator(&pool, &l.name, "old").await.unwrap());
-        assert!(delete_link(&pool, &l.name, "old").await.unwrap());
     }
 }
