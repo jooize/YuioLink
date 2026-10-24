@@ -916,13 +916,13 @@ html.js .custom-field:not(.open) {
     height: calc(var(--tick-cap) + 0.02em);
 }
 
-/* The flag over the run the caret stands beside, naming it; the peek is the
-   same flag, quiet, over the run under the pointer, and covers what it
-   stands over, the open flag included. */
+/* The flag over the run the caret stands beside, naming it; a click on it
+   closes it. The peek is the same flag, quiet, over the run under the
+   pointer, and covers what it stands over, the open flag included. */
 .hc-flag {
     position: absolute;
     z-index: 2;
-    pointer-events: none;
+    cursor: pointer;
     transform: translate(-50%, -100%);
     padding: 1px 5px;
     border-radius: 4px;
@@ -940,6 +940,7 @@ html.js .custom-field:not(.open) {
 
 .hc-flag.peek {
     z-index: 3;
+    pointer-events: none;
     color: var(--danger);
     background: var(--hc-solid);
     box-shadow: inset 0 0 0 1px var(--danger), 0 1px 4px rgba(0, 0, 0, 0.18);

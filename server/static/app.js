@@ -2025,8 +2025,10 @@
             badge.style.left = `${Math.min(Math.max(c.x - fr.left, half), fr.width - half)}px`;
             badge.style.top = `${c.top - fr.top}px`;
         };
+        // The flag shows only while the field has the caret: away from the
+        // field it would point at nothing.
         const placeFlag = () => {
-            const m = overlay.querySelector(".hid[data-flag]");
+            const m = document.activeElement === ta ? overlay.querySelector(".hid[data-flag]") : null;
             flag.classList.toggle("soft", Boolean(m?.classList.contains("soft")));
             place(flag, m, m?.dataset.flag);
         };
@@ -2223,6 +2225,21 @@
         document.addEventListener("selectionchange", () => {
             if (document.activeElement === ta && !st.down && !st.typing) follow({ closeOnly: true });
         });
+        // Escape or a click on the flag closes the run and its entry, until
+        // the caret moves to a run again. A click keeps the field focused.
+        const dismiss = () => {
+            if (st.flag == null && !st.open.length) return false;
+            Object.assign(st, { flag: null, open: [] });
+            render();
+            return true;
+        };
+        ta.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && dismiss()) event.preventDefault();
+        });
+        flag.addEventListener("pointerdown", (event) => event.preventDefault());
+        flag.addEventListener("click", dismiss);
+        ta.addEventListener("focus", placeFlag);
+        ta.addEventListener("blur", placeFlag);
         ta.addEventListener("beforeinput", () => { st.typing = true; });
         ta.addEventListener("input", () => {
             render();
