@@ -1031,7 +1031,7 @@
                 if (i > 0) { m.classList.add("rest"); return; }
                 m.classList.add("first");
                 m.dataset.n = String(run.length);
-                m.dataset.esc = label;
+                m.dataset.label = label;
             });
             if (run.every((m) => isSoft(Number.parseInt(m.dataset.tell.slice(1), 16)))) run.forEach((m) => m.classList.add("soft"));
             if (mode !== "labels" && opened === k) run.forEach((m) => m.classList.add("lab"));
@@ -1044,7 +1044,7 @@
     // leaves out marks, and so their characters, by tier (`hard`, `soft`); a
     // no-break space left out becomes a plain space, as in the form.
     const TREE_TAGS = new Set(["b", "code", "div"]);
-    const TREE_DATA = new Set(["esc", "tell", "cp", "name"]);
+    const TREE_DATA = new Set(["label", "tell", "cp", "name"]);
     const treeExtra = (n) => (n[1] && typeof n[1] === "object" && !Array.isArray(n[1]) ? n[1] : null);
     const isMarkNode = (n) => Array.isArray(n) && typeof n[0] === "string" && n[0].split(" ").includes("hid");
     const markCp = (n) => Number.parseInt(treeExtra(n)?.tell?.slice(1) ?? "", 16);
@@ -1190,6 +1190,7 @@
         const panel = document.createElement("div");
         panel.className = "history-cast pv-cast";
         paintDisplay([entry], panel);
+        copyForms(panel);
         return panel;
     };
     // A mark's label ignores the pointer (in Safari a label that takes it
@@ -1974,6 +1975,42 @@
         }
         return out;
     };
+    const el = (tag, cls, ...kids) => {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        e.append(...kids);
+        return e;
+    };
+    // One way to write a hidden character in an entry, as a button that
+    // copies it: the one this kind of link stores in the mark's reverse red.
+    // The caption's three words share one cell, so the button keeps its
+    // width whichever shows.
+    const formButton = (text, where, bad) => {
+        const cap = el("small", "", el("span", "now", where), el("span", "", "Copied"), el("span", "", "Copy Failed"));
+        const b = el("button", "form", el("code", bad ? "bad" : "", text), cap);
+        b.type = "button";
+        b.title = `Copy ${text}`;
+        b.addEventListener("click", async () => {
+            let ok = true;
+            try { await navigator.clipboard.writeText(text); } catch { ok = false; }
+            const [w, done, failed] = cap.children;
+            for (const c of cap.children) c.classList.toggle("now", c === (ok ? done : failed));
+            b.classList.toggle("copied", ok);
+            setTimeout(() => {
+                for (const c of cap.children) c.classList.toggle("now", c === w);
+                b.classList.remove("copied");
+            }, 1300);
+        });
+        return b;
+    };
+    // The server writes an entry's forms as plain text, to select without
+    // the script; each becomes a button here.
+    const copyForms = (root) => {
+        for (const f of root.querySelectorAll("span.form")) {
+            const code = f.querySelector("code");
+            if (code) f.replaceWith(formButton(code.textContent, f.querySelector("small")?.textContent ?? "", code.classList.contains("bad")));
+        }
+    };
     const setupFieldMarks = (ta, isRedirect) => {
         const field = document.getElementById("hc-field");
         if (!field || !CHARS) return { render: () => {} };
@@ -1998,13 +2035,7 @@
         // changes.
         const st = { flag: null, open: [], removed: { hard: null, soft: null }, announced: 0, down: false, typing: false, ours: false };
 
-        const el = (tag, cls, ...kids) => {
-            const e = document.createElement(tag);
-            if (cls) e.className = cls;
-            e.append(...kids);
-            return e;
-        };
-        const pct = (cp) => encodeURIComponent(String.fromCodePoint(cp)).toUpperCase();
+        const pct =(cp) => encodeURIComponent(String.fromCodePoint(cp)).toUpperCase();
         // A run's tick, its count, and its flag are placed from the first
         // character's box.
         const runCenter = (m) => {
@@ -2071,29 +2102,8 @@
         };
 
         // An entry: the character's tiles and name, the three ways to write
-        // it (the one this kind of link stores in the mark's reverse red; a
-        // click copies one), and what it does.
-        // The caption's three words share one cell, so the button keeps its
-        // width whichever shows.
-        const formButton = (text, where, bad) => {
-            const cap = el("small", "", el("span", "now", where), el("span", "", "Copied"), el("span", "", "Copy Failed"));
-            const b = el("button", "form", el("code", bad ? "bad" : "", text), cap);
-            b.type = "button";
-            b.title = `Copy ${text}`;
-            b.addEventListener("click", async () => {
-                let ok = true;
-                try { await navigator.clipboard.writeText(text); } catch { ok = false; }
-                const [w, done, failed] = cap.children;
-                for (const c of cap.children) c.classList.toggle("now", c === (ok ? done : failed));
-                b.classList.toggle("copied", ok);
-                setTimeout(() => {
-                    for (const c of cap.children) c.classList.toggle("now", c === w);
-                    b.classList.remove("copied");
-                }, 1300);
-            });
-            return b;
-        };
-        const entryEl = (cp, count, url) => {
+        // it (the server's copy_forms), and what it does.
+        const entryEl =(cp, count, url) => {
             const soft = isSoft(cp);
             const [sym, name] = charDress(cp);
             const times = count > 1 ? ` It appears ${count === 2 ? "twice" : `${count} times`}.` : "";

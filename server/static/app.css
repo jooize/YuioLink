@@ -1003,8 +1003,9 @@ html.js .custom-field:not(.open) {
 }
 
 /* An entry's ways to write its character, each over a caption saying where
-   it is written that way. The one this link stores wears the mark's red. A
-   click copies one. */
+   it is written that way. The one this link stores wears the mark's red.
+   With the script each is a button, and a click copies it; without, the
+   text is there to select. */
 .pv-cast .what .forms {
     display: flex;
     flex-wrap: wrap;
@@ -1023,10 +1024,13 @@ html.js .custom-field:not(.open) {
     font: inherit;
     text-align: left;
     background: none;
+}
+
+.pv-cast .what button.form {
     cursor: copy;
 }
 
-.pv-cast .what .form:hover {
+.pv-cast .what button.form:hover {
     background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
@@ -1042,8 +1046,10 @@ html.js .custom-field:not(.open) {
     visibility: hidden;
 }
 
+/* inherit, not visible: an entry the Text page's deck hides keeps its
+   caption hidden too. */
 .pv-cast .what .form small > span.now {
-    visibility: visible;
+    visibility: inherit;
 }
 
 /* "Copied" is always set bold, hidden or shown, so the cell it shares
@@ -1070,7 +1076,7 @@ html.js .custom-field:not(.open) {
     color: var(--on-danger);
 }
 
-.hc-slot .pv-cast .entry .tiles {
+.pv-cast .entry:has(.forms) .tiles {
     align-self: flex-start;
 }
 
@@ -1663,7 +1669,7 @@ html.js .custom-field:not(.open) {
 
 .text-body .hid::after,
 .history-well-body .hid::after {
-    content: attr(data-esc);
+    content: attr(data-label);
     pointer-events: none;
     margin: 0 1px;
     padding: 0 3px;
@@ -1689,8 +1695,8 @@ html.js .custom-field:not(.open) {
 
 /* The label is its own left-to-right isolate: it sits inside the mark after
    the real character, so a right-to-left override there would otherwise
-   reverse the label itself ("{E202}u\" for \u{202E}). An isolate resets the
-   override for everything inside it. */
+   reverse the label itself ("edirrevo tfel-ot-thgir" for U+202E). An isolate
+   resets the override for everything inside it. */
 .text-body .hid::after,
 .history-well-body .hid::after {
     direction: ltr;
@@ -1698,9 +1704,14 @@ html.js .custom-field:not(.open) {
 }
 
 /* A run of marks side by side wears one label, on its first mark: its name,
-   counted ("3 × zero-width space"). */
+   counted ("3 × zero-width space"), on one line. */
+.text-body .hid.rest::after,
 .history-well-body .hid.rest::after {
     display: none;
+}
+
+.text-body .hid::after {
+    white-space: nowrap;
 }
 
 /* The tick, in the create form and a History row in Ticks: a thin bar under

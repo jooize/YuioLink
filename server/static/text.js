@@ -73,6 +73,42 @@
         return out;
     };
 
+    // An entry's ways to write its character ship as plain text, to select
+    // without the script; each becomes a button that copies it, as in the
+    // create form. The caption's three words share one cell, so the button
+    // keeps its width whichever shows.
+    const copyForms = (cast) => {
+        for (const f of cast.querySelectorAll("span.form")) {
+            const code = f.querySelector("code");
+            const cap = f.querySelector("small");
+            if (!code || !cap) continue;
+            const text = code.textContent;
+            const [where, done, failed] = [cap.textContent, "Copied", "Copy Failed"].map((t, i) => {
+                const s = document.createElement("span");
+                if (i === 0) s.className = "now";
+                s.textContent = t;
+                return s;
+            });
+            cap.replaceChildren(where, done, failed);
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "form";
+            b.title = `Copy ${text}`;
+            b.append(code, cap);
+            b.addEventListener("click", async () => {
+                let ok = true;
+                try { await navigator.clipboard.writeText(text); } catch { ok = false; }
+                for (const c of cap.children) c.classList.toggle("now", c === (ok ? done : failed));
+                b.classList.toggle("copied", ok);
+                setTimeout(() => {
+                    for (const c of cap.children) c.classList.toggle("now", c === where);
+                    b.classList.remove("copied");
+                }, 1300);
+            });
+            f.replaceWith(b);
+        }
+    };
+
     // The cast answers when asked, the same deck the preview card uses: one
     // entry shown at a time, a click on a mark shows the entry naming its
     // character, and each chip with a data-cast (Hidden Characters, Variant
@@ -89,6 +125,7 @@
     const wireCast = (pre) => {
         const cast = document.querySelector(".pv-cast");
         if (!cast) return;
+        copyForms(cast);
         const marks = [...pre.querySelectorAll(".hid[data-tell]")];
         const chips = [...document.querySelectorAll(".pv-fact[data-cast]")];
         const settle = () => chips.forEach((c) => c.setAttribute("aria-expanded", "false"));

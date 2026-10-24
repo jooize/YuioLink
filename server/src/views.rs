@@ -1056,7 +1056,9 @@ pub fn hidden_step_page(s: &HiddenStep) -> Markup {
             @if !entries.is_empty() {
                 // The whole list, script or not: here it is the explanation.
                 div.pv-cast.whole {
-                    @for e in &entries { (cast_entry(e, false, true)) }
+                    @for e in &entries {
+                        (cast_entry(e, EntryDress { soft: true, url: s.address, ..EntryDress::default() }))
+                    }
                 }
             }
             @if let Some(k) = s.kind {
@@ -2018,7 +2020,9 @@ fn cast_list(uri: &UriView, bare: bool) -> Markup {
         @if !entries.is_empty() {
             div.pv-cast {
                 @if !bare && entries.len() > 1 { (cast_index(&entries)) }
-                @for e in &entries { (cast_entry(e, solo, false)) }
+                @for e in &entries {
+                    (cast_entry(e, EntryDress { solo, ..EntryDress::default() }))
+                }
             }
         }
     }
@@ -2053,9 +2057,24 @@ fn cast_index(entries: &[CastEntry]) -> Markup {
     }
 }
 
-/// `soft` dresses the soft kinds gray, as the create form does, where the
-/// page treats them apart from the rest (the no-JS step).
-fn cast_entry(e: &CastEntry, solo: bool, soft: bool) -> Markup {
+/// How a cast entry is dressed where it is drawn.
+#[derive(Clone, Copy, Default)]
+struct EntryDress {
+    /// Shown outright: the one entry there is.
+    solo: bool,
+    /// The soft kinds in gray, as the create form draws them, where the page
+    /// treats them apart from the rest (the no-JS step).
+    soft: bool,
+    /// The text is an address, so a hidden character's percent form is the
+    /// one it stores ([`copy_forms`]).
+    url: bool,
+}
+
+/// A text's hidden character is named, written three ways ([`copy_forms`]),
+/// and explained, as the create form's entry does it. The other kinds keep
+/// one sentence.
+fn cast_entry(e: &CastEntry, dress: EntryDress) -> Markup {
+    let EntryDress { solo, soft, url } = dress;
     let soft = soft && e.kind == CastKind::Snippet && is_soft(e.ch);
     let warn = !soft
         && matches!(
@@ -2099,17 +2118,55 @@ fn cast_entry(e: &CastEntry, solo: bool, soft: bool) -> Markup {
                     span.tile.raw { @if e.ch != '\0' { (e.ch) } }
                 }
             }
-            span.what {
-                b { (name) } " "
-                @if e.kind != CastKind::Undecodable {
-                    span.cp { "U+" (format!("{:04X}", e.ch as u32)) } " "
+            @if e.kind == CastKind::Snippet {
+                span.what {
+                    b { (name) }
+                    (copy_forms(e.ch, url))
+                    span.after {
+                        (char_meaning(e.ch)) "."
+                        @if e.count == 2 { " It appears twice." }
+                        @else if e.count > 2 { " It appears " (e.count) " times." }
+                        " The empty box is the character."
+                    }
                 }
-                "— " (cast_prose(e)) (cast_tail(e))
-                @if e.kind == CastKind::Snippet { ". " (char_meaning(e.ch)) }
-                @if matches!(e.kind, CastKind::Hidden | CastKind::Snippet) {
-                    ". The empty box is the character."
+            } @else {
+                span.what {
+                    b { (name) } " "
+                    @if e.kind != CastKind::Undecodable {
+                        span.cp { "U+" (format!("{:04X}", e.ch as u32)) } " "
+                    }
+                    "— " (cast_prose(e)) (cast_tail(e))
+                    @if e.kind == CastKind::Hidden { ". The empty box is the character." }
+                    @if e.kind == CastKind::Variant { ". The box shows the form it picks." }
                 }
-                @if e.kind == CastKind::Variant { ". The box shows the form it picks." }
+            }
+        }
+    }
+}
+
+/// The three ways to write a hidden character, each over a caption saying
+/// where it is written that way, in the create form's order. The one this
+/// kind of link stores wears the mark's red: the percent form in an address,
+/// the code escape in a text. Plain text without the script, to select;
+/// app.js and text.js make each a button that copies it.
+fn copy_forms(c: char, url: bool) -> Markup {
+    let pct: String = c
+        .encode_utf8(&mut [0; 4])
+        .bytes()
+        .map(|b| format!("%{b:02X}"))
+        .collect();
+    let forms = [
+        (format!("U+{:04X}", c as u32), "in Unicode", false),
+        (format!("\\u{{{:X}}}", c as u32), "in code", !url),
+        (pct, "in a URL", url),
+    ];
+    html! {
+        span.forms {
+            @for (text, place, bad) in forms {
+                span.form {
+                    code class=[bad.then_some("bad")] { (text) }
+                    small { span.now { (place) } }
+                }
             }
         }
     }
@@ -2121,7 +2178,8 @@ fn cast_prose(e: &CastEntry) -> Markup {
             CastKind::Space => { "stored as " code { "%20" } }
             CastKind::Padding => { "literal, used as padding" }
             CastKind::Hidden => { "stored as " code { (e.stored) } }
-            CastKind::Snippet => { "marked " code { (e.stored) } }
+            // Written out by copy_forms instead.
+            CastKind::Snippet => {}
             CastKind::Variant => { (variant_phrase(e.base, e.ch)) }
             CastKind::Kept => {
                 "kept escaped as " code { (e.stored) }
@@ -2776,8 +2834,10 @@ fn history_snippet(text: &str) -> String {
 /// the text plainly. `whole` keeps all of it (a row opened to its full
 /// contents); otherwise it is cut to the row's opening ([`history_snippet`]).
 ///
-/// A mark keeps `data-esc` (its label), `data-tell` (its entry) and, for a
-/// NUL, `data-cp`; an entry keeps its `data-name`. A registered variant form
+/// A mark keeps `data-label`, `data-tell` (its entry) and, for a NUL,
+/// `data-cp`; an entry keeps its `data-name`. A mark sheds `rest`: app.js
+/// groups the row's runs again after it leaves out a tier, so a mark that
+/// followed another here can start a run there. A registered variant form
 /// is plain text in a row, so its wrapper is dropped and only the pair stays.
 pub fn text_display(text: &str, whole: bool) -> Option<(serde_json::Value, serde_json::Value)> {
     let cut;
@@ -2796,9 +2856,9 @@ pub fn text_display(text: &str, whole: bool) -> Option<(serde_json::Value, serde
         return None;
     }
     let rules = TreeRules {
-        drop_class: &[],
+        drop_class: &["rest"],
         unwrap: &["var"],
-        keep: &["esc", "tell", "cp", "name"],
+        keep: &["label", "tell", "cp", "name"],
     };
     let tree = markup_tree(
         &marked_text(text, crlf, false).into_string(),
@@ -2808,7 +2868,11 @@ pub fn text_display(text: &str, whole: bool) -> Option<(serde_json::Value, serde
     let cast = entries
         .iter()
         .flat_map(|e| {
-            let html = cast_entry(e, true, false).into_string();
+            let dress = EntryDress {
+                solo: true,
+                ..EntryDress::default()
+            };
+            let html = cast_entry(e, dress).into_string();
             match markup_tree(&html, usize::MAX, &rules) {
                 serde_json::Value::Array(nodes) => nodes,
                 other => vec![other],
@@ -3328,7 +3392,7 @@ fn text_body(text: &str) -> Markup {
         // mark or a chip asks (text.js); without the script, the full list.
         @if !entries.is_empty() {
             div.pv-cast {
-                @for e in &entries { (cast_entry(e, false, false)) }
+                @for e in &entries { (cast_entry(e, EntryDress::default())) }
             }
         }
         button.btn.btn-block #copy-text type="button" hidden { "Copy" }
@@ -3342,15 +3406,15 @@ fn text_cast(text: &str, crlf: bool) -> Vec<CastEntry> {
     let mut out: Vec<CastEntry> = Vec::new();
     let mut prev: Option<char> = None;
     for (i, c) in text.char_indices() {
-        let entry = match text_mark(text, i, c, crlf) {
-            Some(esc) => Some((mark_id(c), None, esc, CastKind::Snippet)),
-            None if variation::completes(prev, c) => {
-                prev.map(|b| (variant_id(b, c), Some(b), String::new(), CastKind::Variant))
-            }
-            None => None,
+        let entry = if text_mark(text, i, c, crlf) {
+            Some((mark_id(c), None, CastKind::Snippet))
+        } else if variation::completes(prev, c) {
+            prev.map(|b| (variant_id(b, c), Some(b), CastKind::Variant))
+        } else {
+            None
         };
         prev = Some(c);
-        let Some((id, base, stored, kind)) = entry else {
+        let Some((id, base, kind)) = entry else {
             continue;
         };
         match out.iter_mut().find(|e| e.id == id) {
@@ -3359,7 +3423,7 @@ fn text_cast(text: &str, crlf: bool) -> Vec<CastEntry> {
                 id,
                 ch: c,
                 base,
-                stored,
+                stored: String::new(),
                 kind,
                 count: 1,
                 places: Vec::new(),
@@ -3420,22 +3484,41 @@ fn uniform_crlf(text: &str) -> bool {
             .all(|(i, &c)| c != b'\n' || (i > 0 && b[i - 1] == b'\r'))
 }
 
-/// The escape a character in a snippet is marked with, or `None` when it shows
-/// as itself. Line feeds and tabs are layout in a snippet; a carriage return is
+/// True when a character in a snippet is marked, false when it shows as
+/// itself. Line feeds and tabs are layout in a snippet; a carriage return is
 /// layout only as the uniform CRLF convention. Every other invisible or
 /// direction-changing character is marked.
-fn text_mark(text: &str, i: usize, c: char, crlf: bool) -> Option<String> {
+fn text_mark(text: &str, i: usize, c: char, crlf: bool) -> bool {
     match c {
-        '\n' | '\t' => None,
-        '\r' if crlf && text.as_bytes().get(i + 1) == Some(&b'\n') => None,
+        '\n' | '\t' => false,
+        '\r' if crlf && text.as_bytes().get(i + 1) == Some(&b'\n') => false,
         // A selector completing a registered sequence draws as part of the
         // character before it: listed as a variant form, never marked.
-        c if variation::completes(text[..i].chars().next_back(), c) => None,
+        c if variation::completes(text[..i].chars().next_back(), c) => false,
         // A joiner or tag inside an emoji draws as part of the picture.
-        c if emoji::in_emoji(text, i, c) => None,
-        c if urlview::is_invisible(c) => Some(format!("\\u{{{:X}}}", c as u32)),
-        _ => None,
+        c if emoji::in_emoji(text, i, c) => false,
+        c => urlview::is_invisible(c),
     }
+}
+
+/// What a run of marks side by side says, as app.js's `runLabel` says it:
+/// the character's name, counted when it repeats ("3 × zero-width space"),
+/// else how many characters of how many kinds.
+fn run_label(run: &[char]) -> String {
+    let Some(&first) = run.first() else {
+        return String::new();
+    };
+    if run.iter().all(|&c| c == first) {
+        let (_, name) = char_dress(first);
+        return match run.len() {
+            1 => name,
+            n => format!("{n} × {name}"),
+        };
+    }
+    let mut kinds = run.to_vec();
+    kinds.sort_unstable();
+    kinds.dedup();
+    format!("{} hidden characters of {} kinds", run.len(), kinds.len())
 }
 
 /// How many of `text`'s hidden characters are marked, as a snippet marks
@@ -3443,7 +3526,7 @@ fn text_mark(text: &str, i: usize, c: char, crlf: bool) -> Option<String> {
 pub(crate) fn hidden_counts(text: &str) -> (usize, usize) {
     let crlf = uniform_crlf(text);
     text.char_indices()
-        .filter(|&(i, c)| text_mark(text, i, c, crlf).is_some())
+        .filter(|&(i, c)| text_mark(text, i, c, crlf))
         .fold((0, 0), |(hard, soft), (_, c)| {
             if is_soft(c) {
                 (hard, soft + 1)
@@ -3461,7 +3544,7 @@ pub(crate) fn without_hidden(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for (i, c) in text.char_indices() {
         match c {
-            c if is_soft(c) || text_mark(text, i, c, crlf).is_none() => out.push(c),
+            c if is_soft(c) || !text_mark(text, i, c, crlf) => out.push(c),
             '\u{2028}' | '\u{2029}' => out.push('\n'),
             _ => {}
         }
@@ -3471,8 +3554,12 @@ pub(crate) fn without_hidden(text: &str) -> String {
 
 /// The snippet as the reader sees it: every character stays in the text, so a
 /// selection or the Copy button takes exactly what is stored, and a hidden
-/// character gets a mark — a `span.hid` whose escape (`data-esc`) app.css
+/// character gets a mark — a `span.hid` whose label (`data-label`) app.css
 /// draws beside it as generated content, never selected or copied.
+///
+/// Marks side by side make a run, which wears one label, on its first mark
+/// ([`run_label`]); the rest are `span.hid.rest`, with none. Where `soft`
+/// dresses the soft kinds gray, a run is gray when all of it is soft.
 ///
 /// A registered variation sequence is wrapped whole in a `span.var` with the
 /// `data-tell` of its cast entry: real text, so a drag or a copy is unchanged.
@@ -3486,6 +3573,10 @@ fn marked_text(text: &str, crlf: bool, soft: bool) -> Markup {
     // Start of the run of characters that show as themselves.
     let mut start = 0;
     let mut prev: Option<(usize, char)> = None;
+    // Where the last mark ended, and whether its run is gray: a mark that
+    // starts there continues the run.
+    let mut run_end = usize::MAX;
+    let mut run_soft = false;
     for (i, c) in text.char_indices() {
         // A registered base is never marked, so it is still in the pending
         // run; the check only keeps a slice from ever running backward.
@@ -3500,7 +3591,7 @@ fn marked_text(text: &str, crlf: bool, soft: bool) -> Markup {
             continue;
         }
         let mark = text_mark(text, i, c, crlf);
-        if mark.is_none() && c != '\r' {
+        if !mark && c != '\r' {
             continue;
         }
         out.push_str(&html! { (&text[start..i]) }.into_string());
@@ -3510,22 +3601,34 @@ fn marked_text(text: &str, crlf: bool, soft: bool) -> Markup {
             '\0' => PreEscaped(String::new()),
             c => html! { (c) },
         };
-        match mark {
-            Some(esc) => {
-                let cp = (c == '\0').then_some("0");
-                let tell = mark_id(c);
-                let class = if soft && is_soft(c) {
-                    "hid soft"
-                } else {
-                    "hid"
-                };
-                out.push_str(
-                    &html! { span class=(class) data-esc=(esc) data-tell=(tell) data-cp=[cp] { (raw) } }
-                        .into_string(),
-                );
-            }
-            None => out.push_str(&raw.into_string()),
+        if !mark {
+            out.push_str(&raw.into_string());
+            continue;
         }
+        let label = if i == run_end {
+            None
+        } else {
+            let run: Vec<char> = text[i..]
+                .char_indices()
+                .map_while(|(j, d)| text_mark(text, i + j, d, crlf).then_some(d))
+                .collect();
+            run_soft = soft && run.iter().all(|&d| is_soft(d));
+            Some(run_label(&run))
+        };
+        run_end = start;
+        let mut class = String::from("hid");
+        if label.is_none() {
+            class.push_str(" rest");
+        }
+        if run_soft {
+            class.push_str(" soft");
+        }
+        let cp = (c == '\0').then_some("0");
+        let tell = mark_id(c);
+        out.push_str(
+            &html! { span class=(class) data-label=[label] data-tell=(tell) data-cp=[cp] { (raw) } }
+                .into_string(),
+        );
     }
     out.push_str(&html! { (&text[start..]) }.into_string());
     PreEscaped(out)
@@ -4038,14 +4141,16 @@ mod tests {
         assert_eq!(text_of, text);
         let json = tree.to_string();
         assert!(
-            json.contains("[\"hid\",{\"esc\":\"\\\\u{200B}\",\"tell\":\"u200b\"},\"\u{200b}\"]"),
+            json.contains(
+                "[\"hid\",{\"label\":\"zero-width space\",\"tell\":\"u200b\"},\"\u{200b}\"]"
+            ),
             "{json}"
         );
         // The override is marked, and the NUL's mark is empty with its code
         // point beside it; the lone CR is the character itself.
         assert!(json.contains(r#""tell":"u202e""#), "{json}");
         assert!(
-            json.contains(r#"["hid",{"cp":"0","esc":"\\u{0}","tell":"u0000"}]"#),
+            json.contains(r#"["hid",{"cp":"0","label":"hidden character","tell":"u0000"}]"#),
             "{json}"
         );
         assert!(json.contains(r#""tell":"u000d"},"\r"]"#), "{json}");
@@ -5066,11 +5171,13 @@ mod tests {
     fn a_snippet_marks_hidden_characters_and_keeps_them_in_the_text() {
         let s = snippet("pay\u{200b}pal\u{202e}txt");
         assert!(
-            s.contains("pay<span class=\"hid\" data-esc=\"\\u{200B}\" data-tell=\"u200b\">\u{200b}</span>pal"),
+            s.contains("pay<span class=\"hid\" data-label=\"zero-width space\" data-tell=\"u200b\">\u{200b}</span>pal"),
             "{s}"
         );
         assert!(
-            s.contains("data-esc=\"\\u{202E}\" data-tell=\"u202e\">\u{202e}</span>txt"),
+            s.contains(
+                "data-label=\"right-to-left override\" data-tell=\"u202e\">\u{202e}</span>txt"
+            ),
             "{s}"
         );
         assert!(s.contains("Hidden Characters"), "{s}");
@@ -5101,7 +5208,7 @@ mod tests {
         assert!(!s.contains("CRLF Line Endings"), "{s}");
         assert!(
             s.contains(
-                "one<span class=\"hid\" data-esc=\"\\u{D}\" data-tell=\"u000d\">&#13;</span>\ntwo"
+                "one<span class=\"hid\" data-label=\"carriage return\" data-tell=\"u000d\">&#13;</span>\ntwo"
             ),
             "{s}"
         );
@@ -5112,7 +5219,7 @@ mod tests {
         assert!(s.contains("CRLF Line Endings"), "{s}");
         assert!(
             s.contains(
-                "a<span class=\"hid\" data-esc=\"\\u{D}\" data-tell=\"u000d\">&#13;</span>b&#13;\n"
+                "a<span class=\"hid\" data-label=\"carriage return\" data-tell=\"u000d\">&#13;</span>b&#13;\n"
             ),
             "{s}"
         );
@@ -5126,7 +5233,7 @@ mod tests {
         let cast = &s[s.find(r#"<div class="pv-cast">"#).expect("a cast")..];
         assert!(cast.contains(r#"data-name="u200b""#), "{s}");
         assert!(cast.contains("zero-width space"), "{s}");
-        assert!(cast.contains(", twice"), "{s}");
+        assert!(cast.contains("It appears twice."), "{s}");
         assert!(cast.contains("It draws nothing"), "{s}");
         assert!(cast.contains("right-to-left override"), "{s}");
         assert!(cast.contains("It changes the direction"), "{s}");
@@ -5184,10 +5291,57 @@ mod tests {
     fn a_nul_travels_as_its_code_point() {
         let s = snippet("a\0b");
         assert!(
-            s.contains("a<span class=\"hid\" data-esc=\"\\u{0}\" data-tell=\"u0000\" data-cp=\"0\"></span>b"),
+            s.contains("a<span class=\"hid\" data-label=\"hidden character\" data-tell=\"u0000\" data-cp=\"0\"></span>b"),
             "{s}"
         );
         assert!(!s.contains('\0'), "{s}");
+    }
+
+    #[test]
+    fn a_run_of_marks_wears_one_label() {
+        let s = snippet("a\u{200b}\u{200b}\u{200b}b\u{200b}\u{202e}c");
+        assert!(
+            s.contains(concat!(
+                "a<span class=\"hid\" data-label=\"3 × zero-width space\" data-tell=\"u200b\">\u{200b}</span>",
+                "<span class=\"hid rest\" data-tell=\"u200b\">\u{200b}</span>",
+                "<span class=\"hid rest\" data-tell=\"u200b\">\u{200b}</span>b",
+            )),
+            "{s}"
+        );
+        assert!(
+            s.contains(r#"data-label="2 hidden characters of 2 kinds" data-tell="u200b""#),
+            "{s}"
+        );
+        // A row groups its runs itself, after it leaves out a tier.
+        let (tree, _) = text_display("a\u{200b}\u{200b}b", false).expect("marked");
+        assert!(!tree.to_string().contains("rest"), "{tree}");
+    }
+
+    #[test]
+    fn an_entry_writes_its_character_three_ways() {
+        let s = snippet("a\u{200b}b");
+        assert!(
+            s.contains(concat!(
+                r#"<span class="forms">"#,
+                r#"<span class="form"><code>U+200B</code><small><span class="now">in Unicode</span></small></span>"#,
+                r#"<span class="form"><code class="bad">\u{200B}</code><small><span class="now">in code</span></small></span>"#,
+                r#"<span class="form"><code>%E2%80%8B</code><small><span class="now">in a URL</span></small></span>"#,
+                "</span>",
+            )),
+            "{s}"
+        );
+        // An address stores the percent form.
+        let e = &text_cast("a\u{200b}b", false)[0];
+        let url = EntryDress {
+            url: true,
+            ..EntryDress::default()
+        };
+        let html = cast_entry(e, url).into_string();
+        assert!(
+            html.contains(r#"<code class="bad">%E2%80%8B</code>"#),
+            "{html}"
+        );
+        assert!(html.contains(r#"<code>\u{200B}</code>"#), "{html}");
     }
 
     #[test]

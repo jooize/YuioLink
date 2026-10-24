@@ -1981,7 +1981,7 @@ mod tests {
             // Every entry shows, script or not, and the soft kinds are gray.
             assert!(body.contains(r#"<div class="pv-cast whole">"#));
             assert!(body.contains(r#"<div class="entry soft" data-name="u00a0""#));
-            assert!(body.contains(r#"<span class="hid soft" data-esc="\u{A0}""#));
+            assert!(body.contains(r#"<span class="hid soft" data-label="no-break space""#));
         }
     }
 
