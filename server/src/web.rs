@@ -100,6 +100,7 @@ pub fn router(state: AppState) -> Router {
         // `yuiolink_core::RESERVED_NAMES`, or a link issued under that word is
         // unreachable for its whole life (a GET lands on this route, not the link).
         .route("/help", get(help))
+        .route("/demo", get(demo))
         .route("/colophon", get(colophon))
         .route("/legal", get(legal))
         .route("/legal/{version}", get(legal_version))
@@ -1323,6 +1324,12 @@ impl IntoResponse for ApiError {
 /// targets the instance the reader is actually on.
 pub async fn help(State(state): State<AppState>) -> Response {
     Html(views::help_page(&state.base_url).into_string()).into_response()
+}
+
+/// `GET /demo` — every way YuioLink shows hidden characters, on sample text:
+/// live copies of the create form's field and a Text page. Fully static.
+pub async fn demo() -> Response {
+    Html(views::demo_page().into_string()).into_response()
 }
 
 /// `GET /colophon` — the licence and the third-party attributions. Fully static:
@@ -2610,6 +2617,32 @@ mod tests {
         }
         // The curl line must target the configured instance, not a hardcoded host.
         assert!(body.contains(&format!("{}create", st.base_url)), "{body}");
+    }
+
+    /// /demo carries a field per sample, its text as JSON (a control
+    /// character escaped, never raw), the tables app.js marks by, and a Text
+    /// page rendering with its cast.
+    #[tokio::test]
+    async fn demo_page_holds_every_sample_and_a_text_page() {
+        let st = test_state().await;
+        let (s, _, body) = send(&st, get("/demo")).await;
+        assert_eq!(s, StatusCode::OK);
+        assert_eq!(
+            body.matches("<textarea class=\"form-control demo-field\"")
+                .count(),
+            views::DEMO_SAMPLES.len()
+        );
+        assert!(
+            body.contains(r#"data-sample="&quot;bell\u0007 hi"#),
+            "{body}"
+        );
+        assert!(body.contains(r#"<meta name="yuiolink-chars""#), "{body}");
+        assert!(
+            body.contains(r#"<pre class="text-body" id="text-body">"#),
+            "{body}"
+        );
+        assert!(body.contains(r#"class="pv-cast""#), "{body}");
+        assert!(body.contains("/static/text.js"), "{body}");
     }
 
     #[tokio::test]

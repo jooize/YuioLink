@@ -159,7 +159,7 @@ fn pick_index(count: usize) -> usize {
 /// containing a dot (`wordlist.txt`) or a slash (`static/app.css`) cannot collide
 /// and need no entry, but listing them is harmless.
 pub const RESERVED_NAMES: &[&str] = &[
-    "api", "colophon", "create", "healthz", "help", "legal", "openapi", "robots", "static",
+    "api", "colophon", "create", "demo", "healthz", "help", "legal", "openapi", "robots", "static",
     "stats", "wordlist",
 ];
 

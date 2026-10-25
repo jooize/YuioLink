@@ -23,16 +23,18 @@ off `DEFAULT_ALLOWED_SCHEMES` is printed and given no control.
 | `/:name/card.png` | GET | The og:image share card (redirects only). Spends no use; `Cache-Control: max-age=3600`. |
 | `/:name/qr.svg` | GET | The QR code beside a created link: `<base_url><name>` as an SVG, accent-blue ink on a white tile. No database lookup, so it answers for any name-shaped segment and reveals nothing about whether a link exists; anything else is **404**. `Cache-Control: max-age=3600`. |
 | `/help` | GET | The usage page: why links expire, what the three types and two kinds are for, worked scenarios, and the `curl` endpoint (printed with this instance's base URL, so a copied command targets the host being read). Static — touches no database. |
+| `/demo` | GET | Every way the site shows hidden characters, on sample text: live copies of the create form's field (nothing there creates a link) and a Text page rendering. Static — touches no database. |
 | `/healthz` | GET | Deploy/update health probe. Touches the database, so a failed migration reads as unhealthy. |
 | `/stats` | GET | Public aggregate counters: live links, created (by type and kind), opened, previewed, revealed, expired, and the last 7 UTC days. Reads the `stats` table, which holds nothing but `(day, metric, count)` — no IP, user agent, referrer, link name, or destination, and no per-event row. Degrades to zeroes rather than 500ing. |
 | `/wordlist.txt` | GET | The curated 3,456-word name list as plain text (linked from the landing page's Privacy/Security disclosure — the namespace is public by design). |
-| `/static/app.css`, `/static/app.js`, `/static/text.js`, `/static/preview.js` | GET | Embedded assets; `Cache-Control: public, max-age=3600`. |
+| `/static/app.css`, `/static/app.js`, `/static/text.js`, `/static/preview.js` | GET | Embedded assets; `Cache-Control: public, max-age=31536000, immutable`. Pages link them with `?v=<version>-<fingerprint>`, so changed bytes are a new URL. |
+| `/static/variations.json` | GET | The registered variation sequences outside the emoji list, as JSON (selector to bases), cached like the assets above. app.js fetches it the first time the create form holds a variation selector, so the form marks only the selectors the server marks. |
 
 ## Terminal convenience
 
 | Route | Method | Behavior |
 |-------|--------|----------|
-| `/create` | POST | `curl -d url=<url> [-d ttl=10m\|2h\|3d] [-d uses=1] https://yuio.link/create` → the short URL as plain text (JSON with `Accept: application/json`). Kind is auto-detected; `--data-binary @file` becomes a Text link. Rate-limited. No delete token is issued. |
+| `/create` | POST | `curl -d url=<url> [-d ttl=10m\|2h\|3d] [-d uses=1] https://yuio.link/create` → the short URL as plain text (JSON with `Accept: application/json`). Kind is auto-detected; `--data-binary @file` becomes a Text link. Rate-limited. No creator token is issued. |
 
 `ttl` and `uses` are peeled off the **end** of the body, so an unencoded URL
 keeps its own `?a=1&b=2` query as long as they come last. That leniency cannot

@@ -2035,7 +2035,7 @@
         }
     };
     const setupFieldMarks = (ta, isRedirect) => {
-        const field = document.getElementById("hc-field");
+        const field = ta.closest(".hc-field");
         if (!field || !CHARS) return { render: () => {} };
         const overlay = document.createElement("div");
         overlay.className = "hc-overlay ticked";
@@ -2901,10 +2901,29 @@
         }
     });
 
+    // /demo: copies of the form's field, each holding a sample (sent as JSON,
+    // since HTML cannot carry every character as written) and marked as the
+    // form marks. They grow with their text; nothing here creates a link.
+    const initDemo = (fields) => {
+        for (const ta of fields) {
+            try { ta.value = JSON.parse(ta.dataset.sample); } catch { /* keep the HTML text */ }
+            const grow = () => {
+                ta.style.height = "auto";
+                ta.style.height = `${ta.scrollHeight}px`;
+            };
+            ta.addEventListener("input", grow);
+            grow();
+            setupFieldMarks(ta, () => detectKind(ta.value) === "redirect");
+        }
+    };
+
     document.addEventListener("DOMContentLoaded", () => {
         loadPersisted();
+        const demo = document.querySelectorAll("textarea.demo-field");
         if (document.getElementById("create-form")) {
             initCreate();
+        } else if (demo.length) {
+            initDemo(demo);
         } else {
             // Result page: turn the server-rendered meta into a live countdown, wire
             // copy + ⌘C, and select the link.

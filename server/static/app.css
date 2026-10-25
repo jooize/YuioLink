@@ -4825,6 +4825,27 @@ main p.help-note {
     color: var(--text-tertiary);
 }
 
+/* --- /demo: one sample per case, each in a copy of the form's field. --- */
+
+.demo-case {
+    margin: 18px 0 0;
+}
+
+.demo-title {
+    margin: 0 0 2px;
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+main p.demo-note {
+    margin: 0 0 8px;
+    color: var(--text-secondary);
+}
+
+.demo-text {
+    margin-top: 10px;
+}
+
 /* /legal placeholder: a contact address that does not exist yet. Dashed and
    quiet so it cannot be mistaken for a live address; replaced in place when a
    publishable one exists. */

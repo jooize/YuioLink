@@ -3904,6 +3904,129 @@ pub fn help_page(base_url: &str) -> Markup {
     )
 }
 
+/// The samples on `/demo`: a title, what to notice, and the text. Each one
+/// shows one thing the form does with hidden characters.
+pub(crate) const DEMO_SAMPLES: &[(&str, &str, &str)] = &[
+    (
+        "One hidden character",
+        "A zero-width space between two letters. Its tick stands where it is. Put the caret beside it to see its name.",
+        "pass\u{200b}word",
+    ),
+    (
+        "A run",
+        "Hidden characters side by side make one run: one tick and a count.",
+        "pass\u{200b}\u{200b}\u{200b}word",
+    ),
+    (
+        "Crowded runs",
+        "Where a count has no room, the bar thickens instead. The flag still says how many.",
+        "x\u{200b}\u{200b}x\u{200c}\u{200c}x\u{2060}\u{2060}x",
+    ),
+    (
+        "Special characters",
+        "No-break spaces and soft hyphens often belong in pasted text. They get a gray tick and a gray line of their own.",
+        "10\u{a0}km, co\u{ad}operate",
+    ),
+    (
+        "Both kinds",
+        "Each kind has its own line. Remove one and the other stays, and Put Back undoes it.",
+        "pass\u{200b}word in 10\u{a0}km",
+    ),
+    (
+        "Direction",
+        "A right-to-left override reverses what follows it, so the order you see differs from the order stored.",
+        "abc\u{202e}def",
+    ),
+    (
+        "In a domain, refused",
+        "A joiner makes the domain invalid, so the link becomes a text link.",
+        "https://exa\u{200d}mple.com/login",
+    ),
+    (
+        "In a domain, dropped",
+        "A zero-width space is dropped from the domain, so the link goes to example.com.",
+        "https://exa\u{200b}mple.com/login",
+    ),
+    (
+        "In an address",
+        "A redirect stores a hidden character percent-encoded, so its URL form is the one in red.",
+        "https://example.com/pay\u{200b}ment",
+    ),
+    (
+        "Emoji",
+        "The joiners inside a family emoji and the tags of a subdivision flag are part of the emoji, so nothing is marked.",
+        "\u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467} \u{1f3f4}\u{e0067}\u{e0062}\u{e0073}\u{e0063}\u{e0074}\u{e007f} \u{1f3f3}\u{fe0f}\u{200d}\u{1f308}",
+    ),
+    (
+        "Variation selectors",
+        "A selector that picks a registered form (an emoji style, a math or Han glyph) belongs to its character. Any other is marked.",
+        "\u{2764}\u{fe0f} 0\u{fe00} \u{845b}\u{e0100} a\u{fe00}",
+    ),
+    (
+        "Controls and tags",
+        "Controls carry their Unicode names. Tag characters mirror ASCII, so a run of them can spell text no one sees.",
+        "bell\u{7} hi\u{e0068}\u{e0069}",
+    ),
+];
+
+/// The sample on `/demo`'s Text page: several kinds at once.
+const DEMO_TEXT: &str = "Wi-Fi: pass\u{200b}word\nRoom: 10\u{a0}km away\nFamily: \u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467}\nFile: abc\u{202e}def\u{202c}\nBell: \u{7}";
+
+/// `/demo`: every way YuioLink shows hidden characters, on sample text. The
+/// form's field is live (app.js marks each copy as it marks the real one,
+/// and nothing here can create a link); the Text page part is the server's
+/// own rendering, wired by text.js. Each field's text travels as JSON in
+/// `data-sample`, since HTML cannot carry every character as written (a NUL
+/// becomes U+FFFD, a CR a line feed); the field's content is the fallback
+/// without JavaScript.
+pub fn demo_page() -> Markup {
+    let body = html! {
+        (home_chip("/", "Back to YuioLink"))
+        h2.help-title { "Hidden Characters" }
+        p.help-lead {
+            "Some characters draw nothing, or look like others. YuioLink marks them "
+            "wherever it shows text you or someone else typed. These samples show "
+            "each case. Nothing on this page creates a link."
+        }
+        h3.help-h { "In the form" }
+        p.help-p {
+            "Each field works like the one on the front page. Move the caret beside a "
+            "tick to see what it is, hover over one to peek, and try Remove and Put Back."
+        }
+        @for (title, note, text) in DEMO_SAMPLES {
+            section.demo-case {
+                h4.demo-title { (title) }
+                p.help-p.demo-note { (note) }
+                div.hc-field {
+                    textarea.form-control.demo-field rows="1" autocomplete="off"
+                        autocapitalize="off" spellcheck="false" aria-label=(title)
+                        data-sample=(serde_json::to_string(text).unwrap_or_default()) { (text) }
+                }
+            }
+        }
+        h3.help-h { "On a text link's page" }
+        p.help-p {
+            "A text link's page marks the same characters. Click a mark or the chip to "
+            "see each one, written three ways to copy."
+        }
+        div.demo-text { (text_body(DEMO_TEXT)) }
+    };
+    let scripts = html! {
+        (script_tag("/static/app.js"))
+        (script_tag("/static/text.js"))
+    };
+    document_full(
+        "YuioLink — Demo",
+        html! {
+            meta name="description" content="How YuioLink shows characters you cannot see.";
+            meta name="yuiolink-schemes" content=(yuiolink_core::DEFAULT_ALLOWED_SCHEMES.join(" "));
+            meta name="yuiolink-chars" content=(char_table());
+        },
+        body,
+        scripts,
+    )
+}
+
 /// `GET /colophon` — what YuioLink is made of: the licence it is offered under,
 /// and the third-party work it carries that the licence does not cover.
 ///
