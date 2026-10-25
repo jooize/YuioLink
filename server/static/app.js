@@ -86,13 +86,14 @@
         || VARIANTS?.get(sel)?.has(base) === true;
     const hex4 = (cp) => cp.toString(16).toUpperCase().padStart(4, "0");
     // [symbol, name], as views.rs char_dress gives them: the table's, else a
-    // variation selector's number or a tag's ASCII twin, else the code point.
+    // variation selector's number or a tag's ASCII twin, else an unassigned
+    // code point.
     const charDress = (cp) => {
         const known = CHARS?.names?.[cp];
         if (Array.isArray(known)) return known;
         if (cp >= 0xe0020 && cp <= 0xe007e) return [hex4(cp), cp === 0xe0020 ? "tag space" : `tag ${String.fromCodePoint(cp - 0xe0000)}`];
         const vs = cp >= 0xfe00 && cp <= 0xfe0f ? cp - 0xfe00 + 1 : cp >= 0xe0100 && cp <= 0xe01ef ? cp - 0xe0100 + 17 : 0;
-        return vs ? [`VS${vs}`, `variation selector-${vs}`] : [hex4(cp), "hidden character"];
+        return vs ? [`VS${vs}`, `variation selector-${vs}`] : [hex4(cp), "unassigned code point"];
     };
     const charMeaning = (cp) =>
         CHARS?.meanings?.find(([, ranges]) => inRanges(ranges, cp))?.[0] ?? "It draws nothing, so two texts that look the same can differ";
@@ -112,15 +113,16 @@
     };
     const EXTENDED_PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
     const isPictographic = (ch) => ch != null && EXTENDED_PICTOGRAPHIC.test(ch);
-    // The text's hidden characters, as views.rs text_mark marks them, plus
-    // the parts of an emoji: a joiner between two emoji (a family, a flag
-    // with a rainbow), and the tags that spell a subdivision flag (Scotland's).
+    // The text's hidden characters, as views.rs text_mark marks them: not
+    // the parts of an emoji (a joiner between two emoji, as in a family or a
+    // flag with a rainbow, and the tags that spell a subdivision flag, as
+    // Scotland's), except in an address, where the preview card marks them.
     // Each keeps `at`, its place in UTF-16 units (the field's selection counts
     // in those), and `i`, its place in its run of hidden characters.
-    const scanHidden = (text) => {
+    const scanHidden = (text, address) => {
         const chars = [...text];
         const exempt = new Set();
-        for (let k = 0; k < chars.length; k += 1) {
+        for (let k = 0; k < chars.length && !address; k += 1) {
             const cp = chars[k].codePointAt(0);
             if (cp === 0x200d) {
                 let b = k - 1;
@@ -160,9 +162,15 @@
         }
         return runs;
     };
-    // What an opened run says: the character's name, counted for a run of one
-    // kind ("3 × zero-width space").
+    // What an opened run says: the text a run of tag characters spells
+    // (`tags spelling "hi"`), else the character's name, counted for a run of
+    // one kind ("3 × zero-width space").
     const runLabel = (cps) => {
+        if (cps.length > 1 && cps.every((c) => c >= 0xe0020 && c <= 0xe007e)) {
+            // A long message stops short, as views.rs run_label does.
+            const spelled = String.fromCodePoint(...cps.slice(0, 40).map((c) => c - 0xe0000));
+            return `tags spelling "${spelled}${cps.length > 40 ? "…" : ""}"`;
+        }
         if (cps.every((c) => c === cps[0])) return `${cps.length > 1 ? `${cps.length} × ` : ""}${charDress(cps[0])[1]}`;
         return `${cps.length} hidden characters of ${new Set(cps).size} kinds`;
     };
@@ -1986,8 +1994,8 @@
         "direction", "tabSize", "alignContent", "borderRadius"];
     // The text without one tier of its hidden characters: with `soft`, the
     // no-break spaces (a plain space each) and soft hyphens; else the rest.
-    const withoutHidden = (text, soft) => {
-        const drop = new Set(scanHidden(text).filter((m) => m.soft === soft).map((m) => m.at));
+    const withoutHidden = (text, soft, address) => {
+        const drop = new Set(scanHidden(text, address).filter((m) => m.soft === soft).map((m) => m.at));
         let out = "";
         let at = 0;
         for (const ch of text) {
@@ -2037,6 +2045,7 @@
     const setupFieldMarks = (ta, isRedirect) => {
         const field = ta.closest(".hc-field");
         if (!field || !CHARS) return { render: () => {} };
+        const scan = (text) => scanHidden(text, isRedirect(text));
         const overlay = document.createElement("div");
         overlay.className = "hc-overlay ticked";
         overlay.setAttribute("aria-hidden", "true");
@@ -2173,7 +2182,7 @@
                     live.textContent = `${words} put back.`;
                 } else {
                     const before = ta.value;
-                    const after = withoutHidden(before, soft);
+                    const after = withoutHidden(before, soft, isRedirect(before));
                     replaceField(after);
                     st.removed[tier] = { before, after };
                     Object.assign(st, { open: [], flag: null });
@@ -2186,7 +2195,7 @@
         };
 
         const render = () => {
-            const marks = scanHidden(ta.value);
+            const marks = scan(ta.value);
             if (!VARIANTS && marks.some((m) => isSelector(m.cp))) loadVariants().then(() => { if (VARIANTS) render(); });
             const runs = runsOfMarks(marks);
             for (const tier of ["hard", "soft"]) if (!removedNow(tier)) st.removed[tier] = null;
@@ -2198,11 +2207,11 @@
             st.announced = marks.length;
             slot.replaceChildren();
             peek.hidden = true;
-            const url = isRedirect();
+            const url = isRedirect(ta.value);
             const shown = st.open.map((id) => marks.filter((m) => m.id === id)).filter((list) => list.length);
             if (shown.length) slot.append(el("div", "history-cast pv-cast", ...shown.map((list) => entryEl(list[0].cp, list.length, url))));
             // A line per tier: its count, or how many were removed.
-            const was = (tier) => scanHidden(st.removed[tier].before).filter((m) => m.soft === (tier === "soft")).length;
+            const was = (tier) => scan(st.removed[tier].before).filter((m) => m.soft === (tier === "soft")).length;
             for (const [tier, n] of [["hard", hard], ["soft", soft]]) {
                 if (removedNow(tier)) slot.append(el("div", "history-meta", chip(tier, was(tier))));
                 else if (n) slot.append(el("div", "history-meta", chip(tier, n)));
@@ -2230,7 +2239,7 @@
         const follow = ({ closeOnly = false } = {}) => {
             const a = ta.selectionStart;
             const b = ta.selectionEnd;
-            const marks = scanHidden(ta.value);
+            const marks = scan(ta.value);
             let flagAt = null;
             let ids;
             if (a === b) {
@@ -2286,7 +2295,7 @@
             const m = markNear(overlay, event.clientX, event.clientY);
             const first = m && overlay.querySelector(`.hid.first[data-run="${m.dataset.run}"]`);
             if (!first || Number(first.dataset.run) === st.flag) { peek.hidden = true; return; }
-            const run = runsOfMarks(scanHidden(ta.value)).find((r) => String(r.at) === first.dataset.run);
+            const run = runsOfMarks(scan(ta.value)).find((r) => String(r.at) === first.dataset.run);
             peek.classList.toggle("soft", first.classList.contains("soft"));
             place(peek, first, runLabel(run.marks.map((x) => x.cp)));
         });
@@ -2296,7 +2305,7 @@
             placeFlag();
             peek.hidden = true;
         });
-        if (typeof ResizeObserver === "function") new ResizeObserver(() => paintOverlay(scanHidden(ta.value))).observe(ta);
+        if (typeof ResizeObserver === "function") new ResizeObserver(() => paintOverlay(scan(ta.value))).observe(ta);
         render();
         return { render };
     };
@@ -2819,7 +2828,7 @@
 
         autosize();
         updateSubmitLabel();
-        fieldMarks = setupFieldMarks(content, () => !altHeld && detectKind(content.value) === "redirect");
+        fieldMarks = setupFieldMarks(content, (text) => !altHeld && detectKind(text) === "redirect");
         setupTtl();
         renderHistory();
         applyHistoryOpen(); // open by default on load (or the remembered state)
@@ -2913,7 +2922,7 @@
             };
             ta.addEventListener("input", grow);
             grow();
-            setupFieldMarks(ta, () => detectKind(ta.value) === "redirect");
+            setupFieldMarks(ta, (text) => detectKind(text) === "redirect");
         }
     };
 

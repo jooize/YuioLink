@@ -1022,8 +1022,8 @@ pub struct HiddenStep<'a> {
 /// Remove takes out the red-marked ones (the soft kinds stay, as with the
 /// form's Remove); Create As Is keeps the text as written.
 pub fn hidden_step_page(s: &HiddenStep) -> Markup {
-    let crlf = uniform_crlf(s.content);
-    let entries = text_cast(s.content, crlf);
+    let r = Reading::of(s.content, s.address);
+    let entries = text_cast(s.content, r);
     let what = if s.address {
         "This address"
     } else {
@@ -1052,7 +1052,7 @@ pub fn hidden_step_page(s: &HiddenStep) -> Markup {
                 }
             }
             div.text-wrap #text-wrap {
-                pre.text-body #text-body { (marked_text(s.content, crlf, true)) }
+                pre.text-body #text-body { (marked_text(s.content, r, true)) }
             }
             @if !entries.is_empty() {
                 // The whole list, script or not: here it is the explanation.
@@ -1789,6 +1789,9 @@ struct CastEntry {
     places: Vec<CastPlace>,
 }
 
+/// What [`char_dress`] names a code point with no character behind it.
+const UNASSIGNED: &str = "unassigned code point";
+
 /// The Unicode-chart dress for a character you cannot see: the short symbol
 /// worn by the dotted tile, and a lowercase name for the prose. Characters
 /// outside the table keep their hex digits as the symbol.
@@ -1945,7 +1948,8 @@ fn char_dress(c: char) -> (String, String) {
                 '\u{fffb}' => "interlinear annotation terminator",
                 '\u{e0001}' => "language tag",
                 '\u{e007f}' => "cancel tag",
-                _ => "hidden character",
+                // The rest of the hidden ranges: slots Unicode has not filled.
+                _ => UNASSIGNED,
             };
             return (format!("{:04X}", c as u32), name.to_string());
         }
@@ -2373,7 +2377,7 @@ pub(crate) fn char_table() -> &'static str {
             .iter()
             .filter_map(|&c| {
                 let (sym, name) = char_dress(c);
-                let formula = name == "hidden character"
+                let formula = name == UNASSIGNED
                     || name.starts_with("variation selector-")
                     || ('\u{e0020}'..='\u{e007e}').contains(&c);
                 (!formula).then(|| ((c as u32).to_string(), serde_json::json!([sym, name])))
@@ -2947,8 +2951,8 @@ pub fn text_display(text: &str, whole: bool) -> Option<(serde_json::Value, serde
         cut = history_snippet(text);
         &cut
     };
-    let crlf = uniform_crlf(text);
-    let entries: Vec<CastEntry> = text_cast(text, crlf)
+    let r = Reading::of(text, false);
+    let entries: Vec<CastEntry> = text_cast(text, r)
         .into_iter()
         .filter(|e| e.kind == CastKind::Snippet)
         .collect();
@@ -2961,7 +2965,7 @@ pub fn text_display(text: &str, whole: bool) -> Option<(serde_json::Value, serde
         keep: &["label", "tell", "cp", "name"],
     };
     let tree = markup_tree(
-        &marked_text(text, crlf, false).into_string(),
+        &marked_text(text, r, false).into_string(),
         usize::MAX,
         &rules,
     );
@@ -3465,8 +3469,9 @@ pub fn text_view_page(base_host: &str, name: &str, text: &str) -> Markup {
 /// `text.js`, so a visitor without JavaScript gets the whole snippet in flow and
 /// scrolls the page, rather than a box they cannot open.
 fn text_body(text: &str) -> Markup {
-    let crlf = uniform_crlf(text);
-    let entries = text_cast(text, crlf);
+    let r = Reading::of(text, false);
+    let crlf = r.crlf;
+    let entries = text_cast(text, r);
     let hidden = entries
         .iter()
         .filter(|e| e.kind == CastKind::Snippet)
@@ -3485,7 +3490,7 @@ fn text_body(text: &str) -> Markup {
             }
         }
         div.text-wrap #text-wrap {
-            pre.text-body #text-body { (marked_text(text, crlf, false)) }
+            pre.text-body #text-body { (marked_text(text, r, false)) }
         }
         // Below the box, so the first answer grows the page under the text
         // rather than pushing the text down under the pointer. Quiet until a
@@ -3502,11 +3507,11 @@ fn text_body(text: &str) -> Markup {
 /// One cast entry per distinct marked character, and one per distinct
 /// registered variation sequence, in order of first appearance, each counting
 /// how often the snippet holds it.
-fn text_cast(text: &str, crlf: bool) -> Vec<CastEntry> {
+fn text_cast(text: &str, r: Reading) -> Vec<CastEntry> {
     let mut out: Vec<CastEntry> = Vec::new();
     let mut prev: Option<char> = None;
     for (i, c) in text.char_indices() {
-        let entry = if text_mark(text, i, c, crlf) {
+        let entry = if text_mark(text, i, c, r) {
             Some((mark_id(c), None, CastKind::Snippet))
         } else if variation::completes(prev, c) {
             prev.map(|b| (variant_id(b, c), Some(b), CastKind::Variant))
@@ -3584,30 +3589,61 @@ fn uniform_crlf(text: &str) -> bool {
             .all(|(i, &c)| c != b'\n' || (i > 0 && b[i - 1] == b'\r'))
 }
 
+/// How a snippet is read for its marks: whether its line breaks are the
+/// uniform CRLF convention, and whether it is an address.
+#[derive(Clone, Copy)]
+struct Reading {
+    crlf: bool,
+    address: bool,
+}
+
+impl Reading {
+    fn of(text: &str, address: bool) -> Self {
+        Reading {
+            crlf: uniform_crlf(text),
+            address,
+        }
+    }
+}
+
 /// True when a character in a snippet is marked, false when it shows as
 /// itself. Line feeds and tabs are layout in a snippet; a carriage return is
 /// layout only as the uniform CRLF convention. Every other invisible or
 /// direction-changing character is marked.
-fn text_mark(text: &str, i: usize, c: char, crlf: bool) -> bool {
+fn text_mark(text: &str, i: usize, c: char, r: Reading) -> bool {
     match c {
         '\n' | '\t' => false,
-        '\r' if crlf && text.as_bytes().get(i + 1) == Some(&b'\n') => false,
+        '\r' if r.crlf && text.as_bytes().get(i + 1) == Some(&b'\n') => false,
         // A selector completing a registered sequence draws as part of the
         // character before it: listed as a variant form, never marked.
         c if variation::completes(text[..i].chars().next_back(), c) => false,
-        // A joiner or tag inside an emoji draws as part of the picture.
-        c if emoji::in_emoji(text, i, c) => false,
+        // A joiner or tag inside an emoji draws as part of the picture. In an
+        // address it is marked all the same, as the preview card marks it:
+        // where a destination is at stake, the form and the card fail closed.
+        c if !r.address && emoji::in_emoji(text, i, c) => false,
         c => urlview::is_invisible(c),
     }
 }
 
 /// What a run of marks side by side says, as app.js's `runLabel` says it:
-/// the character's name, counted when it repeats ("3 × zero-width space"),
-/// else how many characters of how many kinds.
+/// the text a run of tag characters spells (`tags spelling "hi"`), else the
+/// character's name, counted when it repeats ("3 × zero-width space"), else
+/// how many characters of how many kinds.
 fn run_label(run: &[char]) -> String {
+    const SPELLED_MAX: usize = 40;
     let Some(&first) = run.first() else {
         return String::new();
     };
+    if run.len() > 1 && run.iter().all(|c| ('\u{e0020}'..='\u{e007e}').contains(c)) {
+        // A long message stops short; its entry still lists each character.
+        let spelled: String = run
+            .iter()
+            .take(SPELLED_MAX)
+            .filter_map(|&c| char::from_u32(c as u32 - 0xe0000))
+            .collect();
+        let more = if run.len() > SPELLED_MAX { "…" } else { "" };
+        return format!("tags spelling \"{spelled}{more}\"");
+    }
     if run.iter().all(|&c| c == first) {
         let (_, name) = char_dress(first);
         return match run.len() {
@@ -3623,10 +3659,10 @@ fn run_label(run: &[char]) -> String {
 
 /// How many of `text`'s hidden characters are marked, as a snippet marks
 /// them: the ones that hide things, then the soft kinds ([`is_soft`]).
-pub(crate) fn hidden_counts(text: &str) -> (usize, usize) {
-    let crlf = uniform_crlf(text);
+pub(crate) fn hidden_counts(text: &str, address: bool) -> (usize, usize) {
+    let r = Reading::of(text, address);
     text.char_indices()
-        .filter(|&(i, c)| text_mark(text, i, c, crlf))
+        .filter(|&(i, c)| text_mark(text, i, c, r))
         .fold((0, 0), |(hard, soft), (_, c)| {
             if is_soft(c) {
                 (hard, soft + 1)
@@ -3639,12 +3675,12 @@ pub(crate) fn hidden_counts(text: &str) -> (usize, usize) {
 /// `text` without the marked hidden characters that hide things, as the
 /// create form's Remove takes them out: a line or paragraph separator becomes
 /// a line feed, and the soft kinds stay.
-pub(crate) fn without_hidden(text: &str) -> String {
-    let crlf = uniform_crlf(text);
+pub(crate) fn without_hidden(text: &str, address: bool) -> String {
+    let r = Reading::of(text, address);
     let mut out = String::with_capacity(text.len());
     for (i, c) in text.char_indices() {
         match c {
-            c if is_soft(c) || !text_mark(text, i, c, crlf) => out.push(c),
+            c if is_soft(c) || !text_mark(text, i, c, r) => out.push(c),
             '\u{2028}' | '\u{2029}' => out.push('\n'),
             _ => {}
         }
@@ -3668,7 +3704,7 @@ pub(crate) fn without_hidden(text: &str) -> String {
 /// return into a line feed, so it goes out as `&#13;`; it turns a NUL into
 /// U+FFFD even as a reference, so a NUL's mark is empty and carries the code
 /// point in `data-cp`, which text.js puts back when copying.
-fn marked_text(text: &str, crlf: bool, soft: bool) -> Markup {
+fn marked_text(text: &str, r: Reading, soft: bool) -> Markup {
     let mut out = String::with_capacity(text.len());
     // Start of the run of characters that show as themselves.
     let mut start = 0;
@@ -3690,7 +3726,7 @@ fn marked_text(text: &str, crlf: bool, soft: bool) -> Markup {
             prev = None;
             continue;
         }
-        let mark = text_mark(text, i, c, crlf);
+        let mark = text_mark(text, i, c, r);
         if !mark && c != '\r' {
             continue;
         }
@@ -3710,7 +3746,7 @@ fn marked_text(text: &str, crlf: bool, soft: bool) -> Markup {
         } else {
             let run: Vec<char> = text[i..]
                 .char_indices()
-                .map_while(|(j, d)| text_mark(text, i + j, d, crlf).then_some(d))
+                .map_while(|(j, d)| text_mark(text, i + j, d, r).then_some(d))
                 .collect();
             run_soft = soft && run.iter().all(|&d| is_soft(d));
             Some(run_label(&run))
@@ -4602,6 +4638,30 @@ mod tests {
         assert!(c.contains(r#"<span class="dsp" data-tell="u0020""#), "{c}");
     }
 
+    /// A run of tag characters says what it spells; a long one stops short.
+    #[test]
+    fn a_tag_run_says_what_it_spells() {
+        let tags = |s: &str| -> Vec<char> {
+            s.chars()
+                .filter_map(|c| char::from_u32(c as u32 + 0xe0000))
+                .collect()
+        };
+        assert_eq!(run_label(&tags("hi")), "tags spelling \"hi\"");
+        assert_eq!(run_label(&tags("h")), "tag h");
+        let long = run_label(&tags(&"a".repeat(41)));
+        assert_eq!(long, format!("tags spelling \"{}…\"", "a".repeat(40)));
+        // A cancel tag is no letter: the run counts its kinds instead.
+        let mut run = tags("hi");
+        run.push('\u{e007f}');
+        assert_eq!(run_label(&run), "3 hidden characters of 3 kinds");
+        let marked =
+            marked_text("x\u{e0068}\u{e0069}", Reading::of("", false), false).into_string();
+        assert!(
+            marked.contains(r#"data-label="tags spelling &quot;hi&quot;""#),
+            "{marked}"
+        );
+    }
+
     /// The cast (design note 29): every marked character gets one entry in the
     /// fold. The markup is one page for everyone — the stylesheet keyed on
     /// `html.js` hides the entries behind a click when the script is present
@@ -4618,13 +4678,13 @@ mod tests {
         assert_eq!(dress('\u{2062}'), ("2062".into(), "invisible times".into()));
         assert_eq!(dress('\u{e0061}'), ("E0061".into(), "tag a".into()));
         assert_eq!(dress('\u{e0020}'), ("E0020".into(), "tag space".into()));
-        // Unassigned code points inside the hidden ranges keep the plain word.
+        // Unassigned code points inside the hidden ranges say so.
         for c in ['\u{2065}', '\u{e0000}', '\u{e0002}'] {
-            assert_eq!(dress(c).1, "hidden character", "{:04X}", c as u32);
+            assert_eq!(dress(c).1, "unassigned code point", "{:04X}", c as u32);
         }
         let unnamed: Vec<String> = (0..=0x10ffff_u32)
             .filter_map(char::from_u32)
-            .filter(|&c| urlview::is_invisible(c) && char_dress(c).1 == "hidden character")
+            .filter(|&c| urlview::is_invisible(c) && char_dress(c).1 == UNASSIGNED)
             .map(|c| format!("{:04X}", c as u32))
             .collect();
         // The rest: one unassigned format slot and the tag block's gaps.
@@ -5584,7 +5644,7 @@ mod tests {
             "{s}"
         );
         // An address stores the percent form.
-        let e = &text_cast("a\u{200b}b", false)[0];
+        let e = &text_cast("a\u{200b}b", Reading::of("a\u{200b}b", false))[0];
         let url = EntryDress {
             url: true,
             ..EntryDress::default()

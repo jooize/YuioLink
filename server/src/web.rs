@@ -214,6 +214,16 @@ struct Checked {
 /// The checks half of [`create_link`], for a surface that has a question
 /// to ask between checking and storing (the no-JS form's hidden-character
 /// step).
+/// The kind a create asked for: the one named, else what the content looks
+/// like (an unknown name too, which [`check_link`] reports).
+fn chosen_kind(kind_choice: Option<&str>, content: &str) -> Kind {
+    match kind_choice {
+        Some("redirect") => Kind::Redirect,
+        Some("text") => Kind::Text,
+        _ => detect_kind(content),
+    }
+}
+
 fn check_link(
     state: &AppState,
     kind_choice: Option<&str>,
@@ -231,15 +241,10 @@ fn check_link(
 
     // An unknown kind is its own error; detection still classifies the content so
     // the remaining checks run against something sensible.
-    let kind = match kind_choice {
-        None | Some("") | Some("auto") => detect_kind(raw_content),
-        Some("redirect") => Kind::Redirect,
-        Some("text") => Kind::Text,
-        Some(_) => {
-            fail("kind", "That is not a link type we recognize.".into());
-            detect_kind(raw_content)
-        }
-    };
+    if !matches!(kind_choice, None | Some("" | "auto" | "redirect" | "text")) {
+        fail("kind", "That is not a link type we recognize.".into());
+    }
+    let kind = chosen_kind(kind_choice, raw_content);
 
     // Content: empty, else (for redirects) trimmed + normalized + scheme-checked —
     // text is kept exactly as typed (newlines and all) — then the size cap. For a
@@ -467,7 +472,9 @@ pub async fn form_create(
     // text as written. Anything else is no answer, and asks again.
     let hidden_choice = form.hidden_chars.as_deref();
     let content = if hidden_choice == Some("remove") {
-        views::without_hidden(&content)
+        // Read as the step read it: an address marks an emoji's joiners too.
+        let address = chosen_kind(form.kind.as_deref(), &content) == Kind::Redirect;
+        views::without_hidden(&content, address)
     } else {
         content
     };
@@ -480,7 +487,7 @@ pub async fn form_create(
         Ok(max_uses),
     ) {
         Ok(checked) => {
-            let (hidden, soft) = views::hidden_counts(&content);
+            let (hidden, soft) = views::hidden_counts(&content, checked.kind == Kind::Redirect);
             if hidden > 0 && !matches!(hidden_choice, Some("keep" | "remove")) {
                 return Html(
                     views::hidden_step_page(&views::HiddenStep {
@@ -2021,6 +2028,27 @@ mod tests {
             assert_eq!(s, StatusCode::OK, "body: {body}");
             created_name(&body);
         }
+    }
+
+    /// In an address an emoji's joiners are marked, as its preview card marks
+    /// them, so the step asks, and Remove takes them out.
+    #[tokio::test]
+    async fn an_address_asks_about_an_emojis_joiners() {
+        let st = test_state().await;
+        let text = "content=https://example.com/%F0%9F%91%A8%E2%80%8D%F0%9F%91%A9&ttl_stop=7";
+        let (s, _, body) = send(&st, post_body("/", text)).await;
+        assert_eq!(s, StatusCode::OK, "body: {body}");
+        assert!(
+            body.contains("This address holds 1 hidden character."),
+            "{body}"
+        );
+        let (s, _, body) = send(&st, post_body("/", &format!("{text}&hidden_chars=remove"))).await;
+        assert_eq!(s, StatusCode::OK, "body: {body}");
+        let d = db::get_link_live(&st.pool, &created_name(&body))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(d.content, "https://example.com/%F0%9F%91%A8%F0%9F%91%A9");
     }
 
     /// Remove takes out what the step counted and keeps the soft kinds; Keep
