@@ -28,6 +28,11 @@ idna = "1"
 unicode-security = "0.1"
 psl = "2"
 
+# Grapheme clusters (UAX #29): a mark inside one user-perceived character wraps
+# the whole character, so it never splits its shaping (an emoji's joiners, an
+# Indic conjunct's). app.js does the same with the browser's Intl.Segmenter.
+unicode-segmentation = "1"
+
 # Phone-number classification for `tel:` and `sms:` previews: the Rust port of
 # Google's libphonenumber (Whisperfish). It is here for PhoneNumberType, not for
 # formatting -- PremiumRate is the one real `tel:` hazard, and nothing else in

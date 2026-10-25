@@ -2414,6 +2414,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "unicode-segmentation"
+version = "1.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
+
+[[package]]
 name = "unicode-vo"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2670,6 +2676,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "unicode-security",
+ "unicode-segmentation",
  "url",
  "yuiolink-core",
 ]

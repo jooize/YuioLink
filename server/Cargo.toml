@@ -26,6 +26,7 @@ tracing-subscriber.workspace = true
 url.workspace = true
 idna.workspace = true
 unicode-security.workspace = true
+unicode-segmentation.workspace = true
 psl.workspace = true
 
 # Reveal-token signing + per-process secret

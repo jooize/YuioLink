@@ -1070,24 +1070,28 @@
     // Marks side by side make a run, as in the form: in Ticks one tick with a
     // count, and the run a click opened shows its label in place; in Labels
     // one label each. A label names the character.
+    // A cluster (a grapheme marked whole) is a run of its own.
     const groupRuns = (it, body, mode) => {
         const runs = [];
         for (const m of body.querySelectorAll(".hid[data-tell]")) {
             const last = runs.at(-1);
-            if (last && m.previousSibling === last.at(-1)) last.push(m);
+            const joins = last && m.previousSibling === last.at(-1)
+                && !m.classList.contains("cluster") && !last[0].classList.contains("cluster");
+            if (joins) last.push(m);
             else runs.push([m]);
         }
         const opened = castOpen.get(it.id)?.run;
         runs.forEach((run, k) => {
-            const label = runLabel(run.map((m) => Number.parseInt(m.dataset.tell.slice(1), 16)));
+            const cps = run.flatMap((m) => idsCps(m.dataset.inner ?? m.dataset.tell));
+            const label = runLabel(cps);
             run.forEach((m, i) => {
                 m.dataset.run = String(k);
                 if (i > 0) { m.classList.add("rest"); return; }
                 m.classList.add("first");
-                m.dataset.n = String(run.length);
+                m.dataset.n = String(cps.length);
                 m.dataset.label = label;
             });
-            if (run.every((m) => isSoft(Number.parseInt(m.dataset.tell.slice(1), 16)))) run.forEach((m) => m.classList.add("soft"));
+            if (cps.every(isSoft)) run.forEach((m) => m.classList.add("soft"));
             if (mode !== "labels" && opened === k) run.forEach((m) => m.classList.add("lab"));
         });
     };
@@ -1098,14 +1102,32 @@
     // leaves out marks, and so their characters, by tier (`hard`, `soft`); a
     // no-break space left out becomes a plain space, as in the form.
     const TREE_TAGS = new Set(["b", "code", "div"]);
-    const TREE_DATA = new Set(["label", "tell", "cp", "name"]);
+    const TREE_DATA = new Set(["label", "tell", "inner", "cp", "name"]);
     const treeExtra = (n) => (n[1] && typeof n[1] === "object" && !Array.isArray(n[1]) ? n[1] : null);
     const isMarkNode = (n) => Array.isArray(n) && typeof n[0] === "string" && n[0].split(" ").includes("hid");
-    const markCp = (n) => Number.parseInt(treeExtra(n)?.tell?.slice(1) ?? "", 16);
+    // Mark ids ("u200d u200d") as code points.
+    const idsCps = (ids) => (ids ?? "").split(" ").map((id) => Number.parseInt(id.slice(1), 16));
+    // The code points a mark stands for: a cluster's every mark, else its one.
+    const markCps = (n) => idsCps(treeExtra(n)?.inner ?? treeExtra(n)?.tell);
+    const markCp = (n) => markCps(n)[0];
+    // A cluster's text without its marks, taken in order. Where its text
+    // holds the same character marked and not, the first of them goes: the
+    // same string either way, as they are alike.
+    const clusterLeft = (n) => {
+        const left = markCps(n);
+        let out = "";
+        for (const ch of n.slice(2).filter((s) => typeof s === "string").join("")) {
+            if (ch.codePointAt(0) === left[0]) left.shift();
+            else out += ch;
+        }
+        return out;
+    };
     // What a mark leaves in place of its character under `drop`: null to
-    // keep the mark, else the text standing in for it.
+    // keep the mark, else the text standing in for it. A cluster is always
+    // of the red tier (views.rs marked_text) and leaves its drawn characters.
     const dropped = (n, drop) => {
         if (!drop || !isMarkNode(n)) return null;
+        if (treeExtra(n)?.inner) return drop.hard ? clusterLeft(n) : null;
         const cp = markCp(n);
         if (!isSoft(cp)) return drop.hard ? "" : null;
         return drop.soft ? (cp === 0xad ? "" : " ") : null;
@@ -1149,7 +1171,7 @@
     // How many marks a tree holds that are of the kinds counted in red
     // (`soft` false) or of the soft kinds (`soft` true).
     const markCount = (nodes, soft = false) =>
-        nodes.reduce((sum, n) => sum + (isMarkNode(n) ? Number(isSoft(markCp(n)) === soft)
+        nodes.reduce((sum, n) => sum + (isMarkNode(n) ? markCps(n).filter((cp) => isSoft(cp) === soft).length
             : Array.isArray(n) ? markCount(n.slice(1), soft) : 0), 0);
     // The same, read back from the page: a mark's label is generated content,
     // never text, so only a NUL's empty mark needs its data-cp put back.

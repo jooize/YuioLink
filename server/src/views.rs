@@ -7,6 +7,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use maud::{DOCTYPE, Markup, PreEscaped, html};
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::emoji;
 use crate::phone;
@@ -2938,8 +2939,8 @@ fn history_snippet(text: &str) -> String {
 /// the text plainly. `whole` keeps all of it (a row opened to its full
 /// contents); otherwise it is cut to the row's opening ([`history_snippet`]).
 ///
-/// A mark keeps `data-label`, `data-tell` (its entry) and, for a NUL,
-/// `data-cp`; an entry keeps its `data-name`. A mark sheds `rest`: app.js
+/// A mark keeps `data-label`, `data-tell` (its entry), for a cluster
+/// `data-inner` and, for a NUL, `data-cp`; an entry keeps its `data-name`. A mark sheds `rest`: app.js
 /// groups the row's runs again after it leaves out a tier, so a mark that
 /// followed another here can start a run there. A registered variant form
 /// is plain text in a row, so its wrapper is dropped and only the pair stays.
@@ -2962,7 +2963,7 @@ pub fn text_display(text: &str, whole: bool) -> Option<(serde_json::Value, serde
     let rules = TreeRules {
         drop_class: &["rest"],
         unwrap: &["var"],
-        keep: &["label", "tell", "cp", "name"],
+        keep: &["label", "tell", "inner", "cp", "name"],
     };
     let tree = markup_tree(
         &marked_text(text, r, false).into_string(),
@@ -3625,6 +3626,32 @@ fn text_mark(text: &str, i: usize, c: char, r: Reading) -> bool {
     }
 }
 
+/// The graphemes of `text` that hold a mark with a character drawn after it,
+/// as byte ranges: an emoji's joiners in an address, the joiner in an Indic
+/// conjunct. Such a grapheme is marked whole (`span.hid.cluster`), as app.js's
+/// `runsOfMarks` draws it in the create form: a span around the mark alone
+/// splits the grapheme's shaping (the family emoji fell apart into three
+/// people, the conjunct into a half letter). A CR LF pair is never one: its
+/// carriage return keeps its own mark.
+fn mark_clusters(text: &str, r: Reading) -> Vec<(usize, usize)> {
+    text.grapheme_indices(true)
+        .filter(|(_, g)| g.chars().nth(1).is_some() && !g.contains('\r'))
+        .filter_map(|(at, g)| {
+            let mut marked = false;
+            let mut drawn_after = false;
+            for (j, c) in g.char_indices() {
+                if text_mark(text, at + j, c, r) {
+                    marked = true;
+                    drawn_after = false;
+                } else if marked {
+                    drawn_after = true;
+                }
+            }
+            drawn_after.then_some((at, at + g.len()))
+        })
+        .collect()
+}
+
 /// What a run of marks side by side says, as app.js's `runLabel` says it:
 /// the text a run of tag characters spells (`tags spelling "hi"`), else the
 /// character's name, counted when it repeats ("3 × zero-width space"), else
@@ -3700,6 +3727,14 @@ pub(crate) fn without_hidden(text: &str, address: bool) -> String {
 /// A registered variation sequence is wrapped whole in a `span.var` with the
 /// `data-tell` of its cast entry: real text, so a drag or a copy is unchanged.
 ///
+/// A grapheme holding a mark with a character drawn after it
+/// ([`mark_clusters`]) is one `span.hid.cluster` around the whole grapheme,
+/// and a run of its own: its label names every mark inside, `data-tell` is
+/// the first one's entry, and `data-inner` lists each mark's id in order, for
+/// app.js to count and leave them out. Inside it a variant form is plain text.
+/// It is always of the red tier: the soft kinds are spaces and the soft
+/// hyphen, which end a grapheme, so none is ever inside one.
+///
 /// Two characters cannot travel raw through HTML. The parser turns a carriage
 /// return into a line feed, so it goes out as `&#13;`; it turns a NUL into
 /// U+FFFD even as a reference, so a NUL's mark is empty and carries the code
@@ -3713,7 +3748,40 @@ fn marked_text(text: &str, r: Reading, soft: bool) -> Markup {
     // starts there continues the run.
     let mut run_end = usize::MAX;
     let mut run_soft = false;
+    let clusters = mark_clusters(text, r);
+    let starts_cluster = |i: usize| clusters.binary_search_by_key(&i, |&(from, _)| from);
+    // The end of the cluster being passed over.
+    let mut skip = 0;
     for (i, c) in text.char_indices() {
+        if i < skip {
+            continue;
+        }
+        if let Ok(k) = starts_cluster(i) {
+            let (from, to) = clusters[k];
+            let marks: Vec<char> = text[from..to]
+                .char_indices()
+                .filter(|&(j, d)| text_mark(text, from + j, d, r))
+                .map(|(_, d)| d)
+                .collect();
+            let inner = marks
+                .iter()
+                .map(|&d| mark_id(d))
+                .collect::<Vec<_>>()
+                .join(" ");
+            out.push_str(&html! { (&text[start..from]) }.into_string());
+            out.push_str(
+                &html! {
+                    span.hid.cluster data-label=(run_label(&marks)) data-tell=(mark_id(marks[0]))
+                        data-inner=(inner) { (&text[from..to]) }
+                }
+                .into_string(),
+            );
+            start = to;
+            skip = to;
+            prev = None;
+            run_end = usize::MAX;
+            continue;
+        }
         // A registered base is never marked, so it is still in the pending
         // run; the check only keeps a slice from ever running backward.
         let base = prev.filter(|&(at, b)| at >= start && variation::completes(Some(b), c));
@@ -3744,9 +3812,12 @@ fn marked_text(text: &str, r: Reading, soft: bool) -> Markup {
         let label = if i == run_end {
             None
         } else {
+            // A cluster is a run of its own, so this one stops at it.
             let run: Vec<char> = text[i..]
                 .char_indices()
-                .map_while(|(j, d)| text_mark(text, i + j, d, r).then_some(d))
+                .map_while(|(j, d)| {
+                    (starts_cluster(i + j).is_err() && text_mark(text, i + j, d, r)).then_some(d)
+                })
                 .collect();
             run_soft = soft && run.iter().all(|&d| is_soft(d));
             Some(run_label(&run))
@@ -4712,6 +4783,39 @@ mod tests {
             marked.contains(r#"data-label="tags spelling &quot;hi&quot;""#),
             "{marked}"
         );
+    }
+
+    /// A mark with a character drawn after it in the same grapheme marks the
+    /// whole grapheme, so its shaping holds: a span around the joiner alone
+    /// drew the family as three people and the conjunct as a half letter.
+    #[test]
+    fn a_mark_inside_a_grapheme_marks_the_whole_grapheme() {
+        let text =
+            |s: &str, address: bool| marked_text(s, Reading::of(s, address), false).into_string();
+        // Devanagari KA, VIRAMA, ZWJ, SSA: one grapheme (a conjunct).
+        assert_eq!(
+            text("\u{915}\u{94d}\u{200d}\u{937}!", false),
+            "<span class=\"hid cluster\" data-label=\"zero-width joiner\" \
+             data-tell=\"u200d\" data-inner=\"u200d\">\u{915}\u{94d}\u{200d}\u{937}</span>!"
+        );
+        // The family's joiners are part of the picture in text, marked in an
+        // address: one run of two, labeled once.
+        let family = "\u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467}";
+        assert_eq!(text(family, false), family);
+        let marked = text(&format!("a{family}\u{200b}"), true);
+        assert_eq!(
+            marked,
+            format!(
+                "a<span class=\"hid cluster\" data-label=\"2 × zero-width joiner\" \
+                 data-tell=\"u200d\" data-inner=\"u200d u200d\">{family}</span>\
+                 <span class=\"hid\" data-label=\"zero-width space\" data-tell=\"u200b\">\u{200b}</span>"
+            )
+        );
+        // A mark ending its grapheme stays a mark of its own, and so does a
+        // carriage return before a line feed.
+        assert!(!text("a\u{200d}", false).contains("cluster"));
+        assert!(!text("a\r\nb\nc", false).contains("cluster"));
+        assert!(text("a\r\nb\nc", false).contains("&#13;"));
     }
 
     /// The cast (design note 29): every marked character gets one entry in the
