@@ -62,12 +62,35 @@
     const isSoft = (cp) => inRanges(CHARS?.soft, cp);
     const hostDrops = (cp) => inRanges(CHARS?.hostDrops, cp);
     const EMOJI_BASES = new Set(CHARS?.emojiBases ?? []);
+    const isSelector = (cp) => (cp >= 0xfe00 && cp <= 0xfe0f) || (cp >= 0xe0100 && cp <= 0xe01ef)
+        || (cp >= 0x180b && cp <= 0x180d) || cp === 0x180f;
+    // The other registered sequences (math and letter forms, CJK
+    // compatibility, Han glyphs), selector -> bases: ~70 KB, so fetched only
+    // once the text holds a selector. Until it arrives, or if it fails, such
+    // a selector is marked: the form fails closed.
+    let VARIANTS = null;
+    let variantsLoading = null;
+    const loadVariants = () => {
+        variantsLoading ??= fetch(CHARS?.variants ?? "/static/variations.json")
+            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+            .then((table) => {
+                VARIANTS = new Map(Object.entries(table).map(([sel, gaps]) => {
+                    let base = 0;
+                    return [Number(sel), new Set(gaps.map((g) => (base += g)))];
+                }));
+            })
+            .catch(() => {}); // stays marked; no retry on every keystroke
+        return variantsLoading;
+    };
+    const registered = (base, sel) => (EMOJI_BASES.has(base) && (sel === 0xfe0e || sel === 0xfe0f))
+        || VARIANTS?.get(sel)?.has(base) === true;
     const hex4 = (cp) => cp.toString(16).toUpperCase().padStart(4, "0");
     // [symbol, name], as views.rs char_dress gives them: the table's, else a
-    // variation selector's number, else the code point.
+    // variation selector's number or a tag's ASCII twin, else the code point.
     const charDress = (cp) => {
         const known = CHARS?.names?.[cp];
         if (Array.isArray(known)) return known;
+        if (cp >= 0xe0020 && cp <= 0xe007e) return [hex4(cp), cp === 0xe0020 ? "tag space" : `tag ${String.fromCodePoint(cp - 0xe0000)}`];
         const vs = cp >= 0xfe00 && cp <= 0xfe0f ? cp - 0xfe00 + 1 : cp >= 0xe0100 && cp <= 0xe01ef ? cp - 0xe0100 + 17 : 0;
         return vs ? [`VS${vs}`, `variation selector-${vs}`] : [hex4(cp), "hidden character"];
     };
@@ -117,7 +140,7 @@
             const ch = chars[k];
             const cp = ch.codePointAt(0);
             // A selector completing a registered pair draws as part of its base.
-            const pairs = !paired && (cp === 0xfe0e || cp === 0xfe0f) && k > 0 && EMOJI_BASES.has(chars[k - 1].codePointAt(0));
+            const pairs = !paired && isSelector(cp) && k > 0 && registered(chars[k - 1].codePointAt(0), cp);
             paired = pairs;
             if (cp !== 0x0a && cp !== 0x09 && !pairs && !exempt.has(k) && isHidden(cp)) {
                 marks.push({ ch, cp, at, i: run, soft: isSoft(cp), id: `u${cp.toString(16).padStart(4, "0")}` });
@@ -2164,6 +2187,7 @@
 
         const render = () => {
             const marks = scanHidden(ta.value);
+            if (!VARIANTS && marks.some((m) => isSelector(m.cp))) loadVariants().then(() => { if (VARIANTS) render(); });
             const runs = runsOfMarks(marks);
             for (const tier of ["hard", "soft"]) if (!removedNow(tier)) st.removed[tier] = null;
             st.open = st.open.filter((id) => marks.some((m) => m.id === id));

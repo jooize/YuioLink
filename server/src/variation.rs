@@ -101,6 +101,34 @@ pub fn emoji_bases(selector: char) -> Vec<u32> {
         .collect()
 }
 
+/// Every registered sequence outside the emoji list, for app.js to fetch when
+/// the create form holds a selector (the emoji ones ship in the page, see
+/// [`emoji_bases`]): JSON mapping each selector's code point to the bases it
+/// completes, ascending, each written as its distance from the one before
+/// (the first from zero). About 70 KB, 16 KB compressed. Built once.
+pub fn client_table() -> &'static str {
+    static JSON: OnceLock<String> = OnceLock::new();
+    JSON.get_or_init(|| {
+        let mut by: std::collections::BTreeMap<u32, Vec<u32>> = Default::default();
+        for e in table().iter().filter(|e| e.2.registry != Registry::Emoji) {
+            by.entry(e.1).or_default().push(e.0);
+        }
+        let map: serde_json::Map<String, serde_json::Value> = by
+            .into_iter()
+            .map(|(selector, bases)| {
+                // `table` is sorted by base first, so each list ascends.
+                let gaps: Vec<u32> = std::iter::once(0)
+                    .chain(bases.iter().copied())
+                    .zip(&bases)
+                    .map(|(prev, &b)| b - prev)
+                    .collect();
+                (selector.to_string(), serde_json::json!(gaps))
+            })
+            .collect();
+        serde_json::Value::Object(map).to_string()
+    })
+}
+
 /// Every registered sequence, sorted by (base, selector), one entry each.
 /// Parsed once, on first use, from the embedded files.
 fn table() -> &'static [(u32, u32, Variant)] {
@@ -224,6 +252,33 @@ mod tests {
         // Every data line parsed: 1437 standardized + 742 emoji + 29642
         // distinct IVD sequences (39509 lines, shared across collections).
         assert_eq!(table().len(), 1437 + 742 + 29642);
+    }
+
+    /// Decoding the client table gives back exactly the registered pairs
+    /// outside the emoji list, as app.js reads it.
+    #[test]
+    fn the_client_table_holds_every_non_emoji_sequence() {
+        let json: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(client_table()).unwrap();
+        let mut pairs = Vec::new();
+        for (selector, gaps) in &json {
+            let selector: u32 = selector.parse().unwrap();
+            let mut base = 0;
+            for gap in gaps.as_array().unwrap() {
+                base += gap.as_u64().unwrap() as u32;
+                pairs.push((base, selector));
+            }
+        }
+        pairs.sort_unstable();
+        let want: Vec<(u32, u32)> = table()
+            .iter()
+            .filter(|e| e.2.registry != Registry::Emoji)
+            .map(|e| (e.0, e.1))
+            .collect();
+        assert_eq!(pairs, want);
+        assert!(pairs.contains(&('0' as u32, 0xfe00)));
+        assert!(pairs.contains(&(0x845b, 0xe0100)));
+        assert!(!pairs.contains(&(0x2764, 0xfe0f)), "emoji ship in the page");
     }
 
     #[test]

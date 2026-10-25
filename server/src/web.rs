@@ -93,6 +93,7 @@ pub fn router(state: AppState) -> Router {
         .route("/static/app.js", get(app_js))
         .route("/static/text.js", get(text_js))
         .route("/static/preview.js", get(preview_js))
+        .route("/static/variations.json", get(variations_json))
         .route("/wordlist.txt", get(wordlist_txt))
         .route("/robots.txt", get(robots_txt))
         // Any bare segment added here shadows `/{name}` and must also go in
@@ -1591,6 +1592,20 @@ static_asset!(app_js, "app.js", "text/javascript; charset=utf-8");
 static_asset!(text_js, "text.js", "text/javascript; charset=utf-8");
 static_asset!(preview_js, "preview.js", "text/javascript; charset=utf-8");
 
+/// `GET /static/variations.json`: the registered variation sequences outside
+/// the emoji list (`variation::client_table`), which app.js fetches only when
+/// the create form holds a selector. Cached like the files above: the page
+/// links it through `asset_url`, whose fingerprint covers these bytes too.
+pub async fn variations_json() -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "application/json"),
+            (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
+        ],
+        crate::variation::client_table(),
+    )
+}
+
 /// `GET /api/v0/openapi.yaml` — the API description, embedded from
 /// `server/openapi.yaml` (inside the crate, so the container build context has
 /// it) so the served spec always matches the built binary.
@@ -3051,6 +3066,31 @@ mod tests {
                 .contains("immutable"),
             "only the pages go uncached — the versioned assets keep their year"
         );
+    }
+
+    /// The landing page says where the variation table is, and the table is
+    /// there: JSON, cached for its year under the same fingerprint.
+    #[tokio::test]
+    async fn the_landing_page_links_the_variation_table() {
+        let st = test_state().await;
+        let (_, _, page) = send(&st, get("/")).await;
+        assert!(
+            page.contains("&quot;variants&quot;:&quot;/static/variations.json?v="),
+            "the yuiolink-chars meta names the table"
+        );
+        let (status, headers, body) = send(&st, get("/static/variations.json")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers.get("content-type").unwrap(), "application/json");
+        assert!(
+            headers
+                .get("cache-control")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .contains("immutable")
+        );
+        let table: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(table.get("65024").is_some(), "VS1 has bases: {table:.80}");
     }
 
     /// Every response leaves through the same middleware, including the ones no

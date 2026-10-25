@@ -38,8 +38,8 @@ fn asset_url(path: &str) -> String {
 
 /// An FNV-1a fingerprint over every embedded static asset, computed once per
 /// process. Not cryptographic — it only has to change when the bytes do. One
-/// combined stamp for all four files keeps every page's references in step;
-/// the files are small enough that over-busting three of them costs nothing.
+/// combined stamp for all five files keeps every page's references in step;
+/// the files are small enough that over-busting four of them costs nothing.
 fn asset_stamp() -> &'static str {
     static STAMP: std::sync::OnceLock<String> = std::sync::OnceLock::new();
     STAMP.get_or_init(|| {
@@ -49,6 +49,7 @@ fn asset_stamp() -> &'static str {
             include_str!("../static/app.js"),
             include_str!("../static/text.js"),
             include_str!("../static/preview.js"),
+            crate::variation::client_table(),
         ] {
             for byte in file.bytes() {
                 hash ^= u64::from(byte);
@@ -1797,8 +1798,70 @@ fn char_dress(c: char) -> (String, String) {
         '\t' => ("TAB", "tab"),
         '\n' => ("LF", "line feed"),
         '\r' => ("CR", "carriage return"),
+        // The other controls by their Unicode aliases (NameAliases.txt): the
+        // abbreviation for the tile, the control name for the prose.
+        '\u{0000}' => ("NUL", "null"),
+        '\u{0001}' => ("SOH", "start of heading"),
+        '\u{0002}' => ("STX", "start of text"),
+        '\u{0003}' => ("ETX", "end of text"),
+        '\u{0004}' => ("EOT", "end of transmission"),
+        '\u{0005}' => ("ENQ", "enquiry"),
+        '\u{0006}' => ("ACK", "acknowledge"),
+        '\u{0007}' => ("BEL", "alert"),
+        '\u{0008}' => ("BS", "backspace"),
+        '\u{000b}' => ("VT", "line tabulation"),
+        '\u{000c}' => ("FF", "form feed"),
+        '\u{000e}' => ("SO", "shift out"),
+        '\u{000f}' => ("SI", "shift in"),
+        '\u{0010}' => ("DLE", "data link escape"),
+        '\u{0011}' => ("DC1", "device control one"),
+        '\u{0012}' => ("DC2", "device control two"),
+        '\u{0013}' => ("DC3", "device control three"),
+        '\u{0014}' => ("DC4", "device control four"),
+        '\u{0015}' => ("NAK", "negative acknowledge"),
+        '\u{0016}' => ("SYN", "synchronous idle"),
+        '\u{0017}' => ("ETB", "end of transmission block"),
+        '\u{0018}' => ("CAN", "cancel"),
+        '\u{0019}' => ("EOM", "end of medium"),
+        '\u{001a}' => ("SUB", "substitute"),
+        '\u{001c}' => ("FS", "information separator four"),
+        '\u{001d}' => ("GS", "information separator three"),
+        '\u{001e}' => ("RS", "information separator two"),
+        '\u{001f}' => ("US", "information separator one"),
         '\u{001b}' => ("ESC", "escape character"),
         '\u{007f}' => ("DEL", "delete"),
+        '\u{0080}' => ("PAD", "padding character"),
+        '\u{0081}' => ("HOP", "high octet preset"),
+        '\u{0082}' => ("BPH", "break permitted here"),
+        '\u{0083}' => ("NBH", "no break here"),
+        '\u{0084}' => ("IND", "index"),
+        '\u{0085}' => ("NEL", "next line"),
+        '\u{0086}' => ("SSA", "start of selected area"),
+        '\u{0087}' => ("ESA", "end of selected area"),
+        '\u{0088}' => ("HTS", "character tabulation set"),
+        '\u{0089}' => ("HTJ", "character tabulation with justification"),
+        '\u{008a}' => ("VTS", "line tabulation set"),
+        '\u{008b}' => ("PLD", "partial line forward"),
+        '\u{008c}' => ("PLU", "partial line backward"),
+        '\u{008d}' => ("RI", "reverse line feed"),
+        '\u{008e}' => ("SS2", "single shift two"),
+        '\u{008f}' => ("SS3", "single shift three"),
+        '\u{0090}' => ("DCS", "device control string"),
+        '\u{0091}' => ("PU1", "private use one"),
+        '\u{0092}' => ("PU2", "private use two"),
+        '\u{0093}' => ("STS", "set transmit state"),
+        '\u{0094}' => ("CCH", "cancel character"),
+        '\u{0095}' => ("MW", "message waiting"),
+        '\u{0096}' => ("SPA", "start of guarded area"),
+        '\u{0097}' => ("EPA", "end of guarded area"),
+        '\u{0098}' => ("SOS", "start of string"),
+        '\u{0099}' => ("SGC", "single graphic character introducer"),
+        '\u{009a}' => ("SCI", "single character introducer"),
+        '\u{009b}' => ("CSI", "control sequence introducer"),
+        '\u{009c}' => ("ST", "string terminator"),
+        '\u{009d}' => ("OSC", "operating system command"),
+        '\u{009e}' => ("PM", "privacy message"),
+        '\u{009f}' => ("APC", "application program command"),
         '\u{00a0}' => ("NBSP", "no-break space"),
         '\u{00ad}' => ("SHY", "soft hyphen"),
         '\u{034f}' => ("CGJ", "combining grapheme joiner"),
@@ -1835,7 +1898,7 @@ fn char_dress(c: char) -> (String, String) {
         '\u{2068}' => ("FSI", "first strong isolate"),
         '\u{2069}' => ("PDI", "pop directional isolate"),
         '\u{3000}' => ("IDSP", "ideographic space"),
-        '\u{3164}' => ("HF", "hangul filler"),
+        '\u{3164}' => ("HF", "Hangul filler"),
         '\u{feff}' => ("BOM", "byte order mark"),
         '&' => ("&", "ampersand"),
         '=' => ("=", "equals sign"),
@@ -1852,7 +1915,40 @@ fn char_dress(c: char) -> (String, String) {
             };
             return (format!("VS{n}"), format!("variation selector-{n}"));
         }
-        _ => return (format!("{:04X}", c as u32), "hidden character".to_string()),
+        // A tag character mirrors an ASCII one, which its name shows: a run
+        // of them can spell text no one sees.
+        '\u{e0020}' => return (format!("{:04X}", c as u32), "tag space".to_string()),
+        '\u{e0021}'..='\u{e007e}' => {
+            let ascii = char::from_u32(c as u32 - 0xe0000).unwrap_or('?');
+            return (format!("{:04X}", c as u32), format!("tag {ascii}"));
+        }
+        // Unicode's own names, where it gives no abbreviation.
+        _ => {
+            let name = match c {
+                '\u{115f}' => "Hangul choseong filler",
+                '\u{1160}' => "Hangul jungseong filler",
+                '\u{17b4}' => "Khmer vowel inherent AQ",
+                '\u{17b5}' => "Khmer vowel inherent AA",
+                '\u{2061}' => "function application",
+                '\u{2062}' => "invisible times",
+                '\u{2063}' => "invisible separator",
+                '\u{2064}' => "invisible plus",
+                '\u{206a}' => "inhibit symmetric swapping",
+                '\u{206b}' => "activate symmetric swapping",
+                '\u{206c}' => "inhibit Arabic form shaping",
+                '\u{206d}' => "activate Arabic form shaping",
+                '\u{206e}' => "national digit shapes",
+                '\u{206f}' => "nominal digit shapes",
+                '\u{ffa0}' => "halfwidth Hangul filler",
+                '\u{fff9}' => "interlinear annotation anchor",
+                '\u{fffa}' => "interlinear annotation separator",
+                '\u{fffb}' => "interlinear annotation terminator",
+                '\u{e0001}' => "language tag",
+                '\u{e007f}' => "cancel tag",
+                _ => "hidden character",
+            };
+            return (format!("{:04X}", c as u32), name.to_string());
+        }
     };
     (sym.to_string(), name.to_string())
 }
@@ -2252,9 +2348,10 @@ pub(crate) fn host_drops(c: char) -> bool {
 /// meta: the hidden code points and the soft ones, as `[first, last]`
 /// ranges; the ones a domain drops; the bases VS15 and VS16 complete (the
 /// emoji list registers both styles for each); each character's name where
-/// it has one beyond the formula app.js shares (variation selectors, hex
-/// digits); and what each one does. Built once, from the same functions the
-/// server marks by, so the two never disagree.
+/// it has one beyond the formula app.js shares (variation selectors, tag
+/// characters, hex digits); what each one does; and where to fetch the other registered
+/// variation sequences. Built once, from the same functions the server marks
+/// by, so the two never disagree.
 pub(crate) fn char_table() -> &'static str {
     static TABLE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
     TABLE.get_or_init(|| {
@@ -2276,8 +2373,10 @@ pub(crate) fn char_table() -> &'static str {
             .iter()
             .filter_map(|&c| {
                 let (sym, name) = char_dress(c);
-                (name != "hidden character" && !name.starts_with("variation selector-"))
-                    .then(|| ((c as u32).to_string(), serde_json::json!([sym, name])))
+                let formula = name == "hidden character"
+                    || name.starts_with("variation selector-")
+                    || ('\u{e0020}'..='\u{e007e}').contains(&c);
+                (!formula).then(|| ((c as u32).to_string(), serde_json::json!([sym, name])))
             })
             .collect();
         let mut meanings: Vec<(&str, Vec<[u32; 2]>)> = Vec::new();
@@ -2292,6 +2391,7 @@ pub(crate) fn char_table() -> &'static str {
             "soft": ranges(&is_soft),
             "hostDrops": ranges(&host_drops),
             "emojiBases": variation::emoji_bases('\u{fe0f}'),
+            "variants": asset_url("/static/variations.json"),
             "names": names,
             "meanings": meanings,
         })
@@ -4150,7 +4250,7 @@ mod tests {
         // point beside it; the lone CR is the character itself.
         assert!(json.contains(r#""tell":"u202e""#), "{json}");
         assert!(
-            json.contains(r#"["hid",{"cp":"0","label":"hidden character","tell":"u0000"}]"#),
+            json.contains(r#"["hid",{"cp":"0","label":"null","tell":"u0000"}]"#),
             "{json}"
         );
         assert!(json.contains(r#""tell":"u000d"},"\r"]"#), "{json}");
@@ -4383,6 +4483,36 @@ mod tests {
     /// fold. The markup is one page for everyone — the stylesheet keyed on
     /// `html.js` hides the entries behind a click when the script is present
     /// and shows the full list when it is not.
+    #[test]
+    fn every_assigned_hidden_character_has_a_name() {
+        let dress = char_dress;
+        assert_eq!(dress('\0'), ("NUL".into(), "null".into()));
+        assert_eq!(dress('\u{0007}'), ("BEL".into(), "alert".into()));
+        assert_eq!(
+            dress('\u{009b}'),
+            ("CSI".into(), "control sequence introducer".into())
+        );
+        assert_eq!(dress('\u{2062}'), ("2062".into(), "invisible times".into()));
+        assert_eq!(dress('\u{e0061}'), ("E0061".into(), "tag a".into()));
+        assert_eq!(dress('\u{e0020}'), ("E0020".into(), "tag space".into()));
+        // Unassigned code points inside the hidden ranges keep the plain word.
+        for c in ['\u{2065}', '\u{e0000}', '\u{e0002}'] {
+            assert_eq!(dress(c).1, "hidden character", "{:04X}", c as u32);
+        }
+        let unnamed: Vec<String> = (0..=0x10ffff_u32)
+            .filter_map(char::from_u32)
+            .filter(|&c| urlview::is_invisible(c) && char_dress(c).1 == "hidden character")
+            .map(|c| format!("{:04X}", c as u32))
+            .collect();
+        // The rest: one unassigned format slot and the tag block's gaps.
+        let gaps: Vec<String> = [0x2065, 0xe0000]
+            .into_iter()
+            .chain(0xe0002..=0xe001f_u32)
+            .map(|c| format!("{c:04X}"))
+            .collect();
+        assert_eq!(unnamed, gaps);
+    }
+
     #[test]
     fn the_cast_names_every_marked_character() {
         let c = card("https://example.com/my%20file?user=admin%E2%80%8B&q=a%26b");
@@ -5291,7 +5421,7 @@ mod tests {
     fn a_nul_travels_as_its_code_point() {
         let s = snippet("a\0b");
         assert!(
-            s.contains("a<span class=\"hid\" data-label=\"hidden character\" data-tell=\"u0000\" data-cp=\"0\"></span>b"),
+            s.contains("a<span class=\"hid\" data-label=\"null\" data-tell=\"u0000\" data-cp=\"0\"></span>b"),
             "{s}"
         );
         assert!(!s.contains('\0'), "{s}");
