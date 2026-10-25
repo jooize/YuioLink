@@ -3990,8 +3990,13 @@ pub(crate) const DEMO_SAMPLES: &[(&str, &str, &str)] = &[
     ),
     (
         "Emoji",
-        "The joiners inside a family emoji and the tags of a subdivision flag are part of the emoji, so nothing is marked.",
+        "The joiners inside a family emoji and the tags of a subdivision flag are part of the emoji, so in text nothing is marked.",
         "\u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467} \u{1f3f4}\u{e0067}\u{e0062}\u{e0073}\u{e0063}\u{e0074}\u{e007f} \u{1f3f3}\u{fe0f}\u{200d}\u{1f308}",
+    ),
+    (
+        "Emoji in an address",
+        "In an address the same joiners are marked, as the redirect's page marks them. Where a destination is at stake, nothing hidden passes unmarked.",
+        "https://example.com/\u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467}",
     ),
     (
         "Variation selectors",
@@ -4005,16 +4010,21 @@ pub(crate) const DEMO_SAMPLES: &[(&str, &str, &str)] = &[
     ),
 ];
 
-/// The sample on `/demo`'s Text page: several kinds at once.
+/// The sample on `/demo/text`: several kinds at once.
 const DEMO_TEXT: &str = "Wi-Fi: pass\u{200b}word\nRoom: 10\u{a0}km away\nFamily: \u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467}\nFile: abc\u{202e}def\u{202c}\nBell: \u{7}";
+
+/// The sample on `/demo/redirect`: a hidden character in the path, a
+/// direction override in the query, an emoji's joiners in the fragment.
+pub(crate) const DEMO_ADDRESS: &str = "https://example.com/pay\u{200b}ment?to=abc\u{202e}def#\u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467}";
 
 /// `/demo`: every way YuioLink shows hidden characters, on sample text. The
 /// form's field is live (app.js marks each copy as it marks the real one,
-/// and nothing here can create a link); the Text page part is the server's
-/// own rendering, wired by text.js. Each field's text travels as JSON in
+/// and nothing here can create a link). Each field's text travels as JSON in
 /// `data-sample`, since HTML cannot carry every character as written (a NUL
 /// becomes U+FFFD, a CR a line feed); the field's content is the fallback
-/// without JavaScript.
+/// without JavaScript. A link's pages are their own: text.js and preview.js
+/// each wire a whole page, so the samples of both live at `/demo/text` and
+/// `/demo/redirect`.
 pub fn demo_page() -> Markup {
     let body = html! {
         (home_chip("/", "Back to YuioLink"))
@@ -4040,17 +4050,17 @@ pub fn demo_page() -> Markup {
                 }
             }
         }
-        h3.help-h { "On a text link's page" }
+        h3.help-h { "On a link's page" }
         p.help-p {
-            "A text link's page marks the same characters. Click a mark or the chip to "
-            "see each one, written three ways to copy."
+            "A link's page marks the same characters. Click a mark or the chip to see "
+            "each one, written three ways to copy. Two sample pages show it: a "
+            a href="/demo/text" { "text link" }
+            " and a "
+            a href="/demo/redirect" { "redirect" }
+            "."
         }
-        div.demo-text { (text_body(DEMO_TEXT)) }
     };
-    let scripts = html! {
-        (script_tag("/static/app.js"))
-        (script_tag("/static/text.js"))
-    };
+    let scripts = script_tag("/static/app.js");
     document_full(
         "YuioLink — Demo",
         html! {
@@ -4060,6 +4070,48 @@ pub fn demo_page() -> Markup {
         },
         body,
         scripts,
+    )
+}
+
+/// What the demo's link pages say in place of an expiry: they are samples.
+const DEMO_LINE: &str = "A sample page. Nothing is stored, and it never expires.";
+
+/// `/demo/text`: a text link's page, as the server renders one, on
+/// [`DEMO_TEXT`]. Its name is `demo`, a reserved word no link can have, so the
+/// heading never stands for someone's real link.
+pub fn demo_text_page(base_host: &str) -> Markup {
+    let body = html! {
+        (link_heading(Kind::Text, "demo", base_host, home_chip("/demo", "Back to Demo")))
+        (text_body(DEMO_TEXT))
+        p.pv-meta { (DEMO_LINE) }
+    };
+    document_link(
+        &link_title("Text", "demo", None),
+        html! {},
+        body,
+        script_tag("/static/text.js"),
+    )
+}
+
+/// `/demo/redirect`: a redirect's preview page on [`DEMO_ADDRESS`], stored as
+/// a create would store it. Its button goes where the sample points, as a real
+/// one would.
+pub fn demo_redirect_page(base_host: &str) -> Markup {
+    let href =
+        yuiolink_core::validate_redirect(DEMO_ADDRESS, yuiolink_core::DEFAULT_ALLOWED_SCHEMES)
+            .unwrap_or_else(|_| DEMO_ADDRESS.to_string());
+    let uri = urlview::parse_uri(&href);
+    let body = html! {
+        (link_heading(Kind::Redirect, "demo", base_host, home_chip("/demo", "Back to Demo")))
+        (pv_arrow())
+        (card_body(&uri, &href))
+        p.pv-meta { (DEMO_LINE) }
+    };
+    document_link(
+        &link_title("Redirect", "demo", Some(&uri.card_domain())),
+        html! {},
+        body,
+        script_tag("/static/preview.js"),
     )
 }
 

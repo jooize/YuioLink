@@ -4842,10 +4842,6 @@ main p.demo-note {
     color: var(--text-secondary);
 }
 
-.demo-text {
-    margin-top: 10px;
-}
-
 /* /legal placeholder: a contact address that does not exist yet. Dashed and
    quiet so it cannot be mistaken for a live address; replaced in place when a
    publishable one exists. */

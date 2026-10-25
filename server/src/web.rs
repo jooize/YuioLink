@@ -101,6 +101,8 @@ pub fn router(state: AppState) -> Router {
         // unreachable for its whole life (a GET lands on this route, not the link).
         .route("/help", get(help))
         .route("/demo", get(demo))
+        .route("/demo/text", get(demo_text))
+        .route("/demo/redirect", get(demo_redirect))
         .route("/colophon", get(colophon))
         .route("/legal", get(legal))
         .route("/legal/{version}", get(legal_version))
@@ -1334,9 +1336,22 @@ pub async fn help(State(state): State<AppState>) -> Response {
 }
 
 /// `GET /demo` — every way YuioLink shows hidden characters, on sample text:
-/// live copies of the create form's field and a Text page. Fully static.
+/// live copies of the create form's field. Fully static.
 pub async fn demo() -> Response {
     Html(views::demo_page().into_string()).into_response()
+}
+
+/// `GET /demo/text` — a text link's page on sample text. Touches no database.
+pub async fn demo_text(State(state): State<AppState>) -> Response {
+    let base_host = views::host_from_base(&state.base_url);
+    Html(views::demo_text_page(base_host).into_string()).into_response()
+}
+
+/// `GET /demo/redirect` — a redirect's preview page on a sample address.
+/// Touches no database.
+pub async fn demo_redirect(State(state): State<AppState>) -> Response {
+    let base_host = views::host_from_base(&state.base_url);
+    Html(views::demo_redirect_page(base_host).into_string()).into_response()
 }
 
 /// `GET /colophon` — the licence and the third-party attributions. Fully static:
@@ -2648,10 +2663,10 @@ mod tests {
     }
 
     /// /demo carries a field per sample, its text as JSON (a control
-    /// character escaped, never raw), the tables app.js marks by, and a Text
-    /// page rendering with its cast.
+    /// character escaped, never raw), the tables app.js marks by, and links
+    /// to the two sample link pages.
     #[tokio::test]
-    async fn demo_page_holds_every_sample_and_a_text_page() {
+    async fn demo_page_holds_every_sample_and_links_its_pages() {
         let st = test_state().await;
         let (s, _, body) = send(&st, get("/demo")).await;
         assert_eq!(s, StatusCode::OK);
@@ -2665,12 +2680,37 @@ mod tests {
             "{body}"
         );
         assert!(body.contains(r#"<meta name="yuiolink-chars""#), "{body}");
+        assert!(body.contains(r#"href="/demo/text""#), "{body}");
+        assert!(body.contains(r#"href="/demo/redirect""#), "{body}");
+        assert!(!body.contains("/static/text.js"), "{body}");
+    }
+
+    /// The sample link pages are the real ones: a text link's page with its
+    /// cast and Copy button, and a redirect's card marking its address.
+    #[tokio::test]
+    async fn demo_link_pages_render_the_real_pages() {
+        let st = test_state().await;
+        let (s, _, text) = send(&st, get("/demo/text")).await;
+        assert_eq!(s, StatusCode::OK);
         assert!(
-            body.contains(r#"<pre class="text-body" id="text-body">"#),
-            "{body}"
+            text.contains(r#"<pre class="text-body" id="text-body">"#),
+            "{text}"
         );
-        assert!(body.contains(r#"class="pv-cast""#), "{body}");
-        assert!(body.contains("/static/text.js"), "{body}");
+        assert!(text.contains(r#"id="copy-text""#), "{text}");
+        assert!(text.contains("/static/text.js"), "{text}");
+        let (s, _, card) = send(&st, get("/demo/redirect")).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(
+            yuiolink_core::validate_redirect(views::DEMO_ADDRESS, DEFAULT_ALLOWED_SCHEMES).is_ok()
+        );
+        assert!(card.contains("example.com"), "{card}");
+        // The path's ZWSP and the fragment's joiners are marked.
+        assert!(card.contains(r#"data-tell="u200b""#), "{card}");
+        assert!(card.contains(r#"data-tell="u200d""#), "{card}");
+        assert!(card.contains("/static/preview.js"), "{card}");
+        for page in [&text, &card] {
+            assert!(page.contains("A sample page. Nothing is stored"), "{page}");
+        }
     }
 
     #[tokio::test]

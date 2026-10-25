@@ -23,7 +23,9 @@ off `DEFAULT_ALLOWED_SCHEMES` is printed and given no control.
 | `/:name/card.png` | GET | The og:image share card (redirects only). Spends no use; `Cache-Control: max-age=3600`. |
 | `/:name/qr.svg` | GET | The QR code beside a created link: `<base_url><name>` as an SVG, accent-blue ink on a white tile. No database lookup, so it answers for any name-shaped segment and reveals nothing about whether a link exists; anything else is **404**. `Cache-Control: max-age=3600`. |
 | `/help` | GET | The usage page: why links expire, what the three types and two kinds are for, worked scenarios, and the `curl` endpoint (printed with this instance's base URL, so a copied command targets the host being read). Static — touches no database. |
-| `/demo` | GET | Every way the site shows hidden characters, on sample text: live copies of the create form's field (nothing there creates a link) and a Text page rendering. Static — touches no database. |
+| `/demo` | GET | Every way the site shows hidden characters, on sample text: live copies of the create form's field (nothing there creates a link), and links to the two sample link pages. Static — touches no database. |
+| `/demo/text` | GET | A text link's page on a sample, named `demo` (a reserved word, so never a real link). Touches no database. |
+| `/demo/redirect` | GET | A redirect's preview page on a sample address, named `demo`. Its button goes to the sample's destination, example.com. Touches no database. |
 | `/healthz` | GET | Deploy/update health probe. Touches the database, so a failed migration reads as unhealthy. |
 | `/stats` | GET | Public aggregate counters: live links, created (by type and kind), opened, previewed, revealed, expired, and the last 7 UTC days. Reads the `stats` table, which holds nothing but `(day, metric, count)` — no IP, user agent, referrer, link name, or destination, and no per-event row. Degrades to zeroes rather than 500ing. |
 | `/wordlist.txt` | GET | The curated 3,456-word name list as plain text (linked from the landing page's Privacy/Security disclosure — the namespace is public by design). |
