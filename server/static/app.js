@@ -152,12 +152,35 @@
         }
         return marks;
     };
+    const GRAPHEMES = typeof Intl.Segmenter === "function" ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
     // Hidden characters side by side: what one tick marks and one caret opens.
-    const runsOfMarks = (marks) => {
+    // Marks inside one grapheme with a visible character after them (the
+    // joiners of an emoji, in an address) make one run spanning the grapheme:
+    // the caret moves by graphemes, so it can only stand at its edges, and the
+    // grapheme is drawn whole (`cluster`), as the field draws it.
+    const runsOfMarks = (marks, text) => {
+        const inner = new Map();
+        if (GRAPHEMES && marks.length) {
+            const at = new Set(marks.map((m) => m.at));
+            for (const { index, segment } of GRAPHEMES.segment(text)) {
+                let k = index;
+                let lastMark = -1;
+                let visibleAfter = false;
+                for (const ch of segment) {
+                    if (at.has(k)) { lastMark = k; visibleAfter = false; } else if (lastMark >= 0) visibleAfter = true;
+                    k += ch.length;
+                }
+                if (visibleAfter) inner.set(index, index + segment.length);
+            }
+        }
         const runs = [];
         for (const m of marks) {
             const last = runs.at(-1);
-            if (m.i > 0 && last) { last.marks.push(m); last.end = m.at + m.ch.length; }
+            const home = [...inner].find(([from, to]) => m.at >= from && m.at < to);
+            if (home) {
+                if (last?.cluster && last.at === home[0]) last.marks.push(m);
+                else runs.push({ at: home[0], end: home[1], marks: [m], cluster: true });
+            } else if (m.i > 0 && last && !last.cluster) { last.marks.push(m); last.end = m.at + m.ch.length; }
             else runs.push({ at: m.at, end: m.at + m.ch.length, marks: [m] });
         }
         return runs;
@@ -2105,16 +2128,17 @@
             const bars = ta.offsetWidth - ta.clientWidth - Number.parseFloat(cs.borderLeftWidth) - Number.parseFloat(cs.borderRightWidth);
             overlay.style.paddingRight = `${Number.parseFloat(cs.paddingRight) + Math.max(0, bars)}px`;
             overlay.replaceChildren();
-            const runs = runsOfMarks(marks);
+            const runs = runsOfMarks(marks, ta.value);
             const v = ta.value;
             let from = 0;
             for (const run of runs) {
-                for (const m of run.marks) {
+                const parts = run.cluster ? [{ at: run.at, ch: v.slice(run.at, run.end), i: 0 }] : run.marks;
+                for (const m of parts) {
                     overlay.append(v.slice(from, m.at));
-                    const s = el("span", "hid", m.ch);
+                    const s = el("span", run.cluster ? "hid cluster" : "hid", m.ch);
                     s.dataset.run = String(run.at);
                     if (run.marks.every((x) => x.soft)) s.classList.add("soft");
-                    if (st.open.includes(m.id)) s.classList.add("open");
+                    if ((run.cluster ? run.marks : [m]).some((x) => st.open.includes(x.id))) s.classList.add("open");
                     if (m.i === 0) {
                         s.classList.add("first");
                         s.dataset.n = String(run.marks.length);
@@ -2197,7 +2221,7 @@
         const render = () => {
             const marks = scan(ta.value);
             if (!VARIANTS && marks.some((m) => isSelector(m.cp))) loadVariants().then(() => { if (VARIANTS) render(); });
-            const runs = runsOfMarks(marks);
+            const runs = runsOfMarks(marks, ta.value);
             for (const tier of ["hard", "soft"]) if (!removedNow(tier)) st.removed[tier] = null;
             st.open = st.open.filter((id) => marks.some((m) => m.id === id));
             if (!runs.some((r) => r.at === st.flag)) st.flag = null;
@@ -2243,7 +2267,7 @@
             let flagAt = null;
             let ids;
             if (a === b) {
-                const run = runsOfMarks(marks).find((r) => a >= r.at && a <= r.end);
+                const run = runsOfMarks(marks, ta.value).find((r) => a >= r.at && a <= r.end);
                 flagAt = run ? run.at : null;
                 ids = run ? [...new Set(run.marks.map((m) => m.id))] : [];
             } else ids = [...new Set(marks.filter((m) => m.at >= a && m.at + m.ch.length <= b).map((m) => m.id))];
@@ -2295,7 +2319,7 @@
             const m = markNear(overlay, event.clientX, event.clientY);
             const first = m && overlay.querySelector(`.hid.first[data-run="${m.dataset.run}"]`);
             if (!first || Number(first.dataset.run) === st.flag) { peek.hidden = true; return; }
-            const run = runsOfMarks(scan(ta.value)).find((r) => String(r.at) === first.dataset.run);
+            const run = runsOfMarks(scan(ta.value), ta.value).find((r) => String(r.at) === first.dataset.run);
             peek.classList.toggle("soft", first.classList.contains("soft"));
             place(peek, first, runLabel(run.marks.map((x) => x.cp)));
         });
