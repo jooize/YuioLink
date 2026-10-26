@@ -2486,6 +2486,7 @@
             peek.hidden = true;
         });
         if (typeof ResizeObserver === "function") new ResizeObserver(() => paintOverlay(scan(ta.value))).observe(ta);
+        afterFonts(() => paintOverlay(scan(ta.value)));
         render();
         return { render };
     };
@@ -2499,6 +2500,12 @@
     // A character drawn inside another's shape has no box of its own, so
     // then the point where it starts. The boxes are `host`'s children, so
     // it must be positioned.
+    //
+    // Measured text goes stale whenever its font changes, so marks are
+    // placed again on resize and when fonts finish loading (`afterFonts`).
+    // A web font that arrives after the first placement redraws the text
+    // at new widths in a box of the same size, which no ResizeObserver
+    // hears. The site uses system fonts today; this keeps a web font safe.
     const placeMarks = (host, marks) => {
         const h = host.getBoundingClientRect();
         const ox = h.left + host.clientLeft - host.scrollLeft;
@@ -2540,6 +2547,9 @@
             });
         }
     };
+    // Calls `fn` each time a batch of fonts finishes loading (FontFaceSet's
+    // `loadingdone`), so whatever measured the text measures it again.
+    const afterFonts = (fn) => document.fonts?.addEventListener?.("loadingdone", () => fn());
     // The mark near a point: within 6px of where its tick stands, on its line.
     // A tick takes no width, so the pointer is matched to it, never the
     // other way round.
@@ -3003,6 +3013,9 @@
                 if (w !== width) { width = w; fitWells(); }
             }).observe(list);
         }
+        // A font that arrives late changes what the rows measure: their
+        // stacking, their cut and their marks.
+        afterFonts(fitWells);
 
         document.getElementById("history-clear-open")?.addEventListener("click", () => {
             setClearMenu(true);
