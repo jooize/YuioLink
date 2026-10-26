@@ -182,30 +182,259 @@
             });
         }
     };
-    const placeWords = (pre) => {
+    const readWords = (pre) => {
         let list;
         try {
             list = JSON.parse(pre.dataset.words ?? "[]");
         } catch {
-            return;
+            return [];
         }
-        if (!Array.isArray(list)) return;
-        const marks = list
+        if (!Array.isArray(list)) return [];
+        return list
             .filter((w) => Array.isArray(w) && Number.isInteger(w[0]) && Number.isInteger(w[1])
                 && w[0] <= w[1] && /^w[0-9a-f]+$/.test(w[2]))
-            .sort((x, y) => x[0] - y[0])
-            .map(([at, end, tell]) => {
+            .map(([at, end, tell]) => ({ at, end, tell }));
+    };
+
+    // A run's count stands right of its wedge; where a neighbor's tick or
+    // count leaves no room it goes, and the bar thickens instead. As app.js
+    // fitCounts does it.
+    const fitCounts = (root) => {
+        const fs = Number.parseFloat(getComputedStyle(root).fontSize);
+        const w = 0.46 * fs;
+        const digit = 0.6 * fs * 0.62;
+        const gap = 0.1 * fs;
+        const marks = [...root.querySelectorAll(".hid.first")].map((m) => {
+            m.classList.remove("cnt-none");
+            const r = m.getClientRects()[0];
+            const after = m.classList.contains("cluster") ? r?.right + 0.08 * fs : null;
+            return r && { m, x: r.left + r.width / 2, after, line: Math.round(r.top), n: Number(m.dataset.n) };
+        }).filter(Boolean);
+        const placed = marks.map((k) => ({ a: k.x - w / 2, b: k.x + w / 2, line: k.line }));
+        for (const k of marks) {
+            if (k.n < 2) continue;
+            const a = k.after ?? k.x + w / 2 + gap;
+            const b = a + String(k.n).length * digit + 1;
+            if (placed.every((p) => p.line !== k.line || b <= p.a || a >= p.b)) placed.push({ a, b, line: k.line });
+            else k.m.classList.add("cnt-none");
+        }
+    };
+
+    // The characters that set direction (Unicode's Bidi_Control). Drawn
+    // plain, one would reorder the line around it; each keeps an isolate
+    // of its own, as in Labels.
+    const BIDI_CONTROL = /^[؜‎‏‪-‮⁦-⁩]$/u;
+    // A mark's ids ("u200b", or a cluster's "u200d w200d"); the letter is
+    // its tier, `w` for a joiner where spelling puts it.
+    const idsOf = (m) => (m.dataset.inner ?? m.dataset.tell ?? "").split(" ").filter(Boolean);
+    const idCp = (id) => Number.parseInt(id.slice(1), 16);
+    // A cluster's text without its counted marks, taken in order, as
+    // app.js clusterLeft does it.
+    const clusterLeft = (text, ids) => {
+        const left = ids.filter((id) => id.startsWith("u")).map(idCp);
+        let out = "";
+        for (const ch of text) {
+            if (ch.codePointAt(0) === left[0]) left.shift();
+            else out += ch;
+        }
+        return out;
+    };
+    const svgIcon = (parts) => {
+        const ns = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(ns, "svg");
+        for (const [k, v] of Object.entries({ width: "12", height: "12", viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true" })) {
+            svg.setAttribute(k, v);
+        }
+        for (const [tag, attrs] of parts) {
+            const el = document.createElementNS(ns, tag);
+            for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+            svg.append(el);
+        }
+        return svg;
+    };
+    // A ringed check: the characters are taken out (app.js checkIcon).
+    const checkIcon = () => svgIcon([
+        ["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
+        ["path", { d: "M5.2 8.2 7.2 10.1 10.9 6", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round", "stroke-linejoin": "round" }],
+    ]);
+
+    // The text draws its hidden characters as a History row does, in a
+    // mode the red chip steps through: Labels (each run named in the line,
+    // as the server drew it, so nothing moves when this script arrives),
+    // Ticks (a tick where each run sits, beside the text) and Removed (left
+    // out of the text, and so of a selection and of Copy). The gray chip
+    // takes the soft kinds out, a no-break space becoming a plain space, and
+    // puts them back. Both hold for this page view.
+    //
+    // Every drawing starts again from the server's text (`src`): removing
+    // a tier can join two runs or split one, so each run is named anew,
+    // from the names the cast entries give.
+    const setupMarks = (pre) => {
+        const src = [...pre.childNodes].map((n) => n.cloneNode(true));
+        const words = readWords(pre);
+        const soft = new Set((document.querySelector(".pv-fact.soft")?.dataset.cast ?? "").split(" ").filter(Boolean));
+        const names = new Map([...document.querySelectorAll(".pv-cast .entry[data-name]")]
+            .map((e) => [e.dataset.name, e.querySelector(".what b")?.textContent ?? ""]));
+        // As views.rs run_label names a run.
+        const runLabel = (ids) => {
+            const cps = ids.map(idCp);
+            if (cps.length > 1 && cps.every((c) => c >= 0xe0020 && c <= 0xe007e)) {
+                const spelled = String.fromCodePoint(...cps.slice(0, 40).map((c) => c - 0xe0000));
+                return `tags spelling "${spelled}${cps.length > 40 ? "…" : ""}"`;
+            }
+            if (ids.every((id) => id === ids[0])) return `${ids.length > 1 ? `${ids.length} × ` : ""}${names.get(ids[0]) ?? ""}`;
+            return `${ids.length} hidden characters of ${new Set(ids).size} kinds`;
+        };
+        const st = { mode: "labels", softOut: false };
+        let placed = [];
+        const place = () => {
+            placeMarks(pre, placed);
+            if (pre.classList.contains("ticked")) fitCounts(pre);
+        };
+        const draw = () => {
+            const isMark = (n) => n.nodeType === Node.ELEMENT_NODE && n.classList.contains("hid");
+            // The server's text with the tiers taken out; `shifts` says where
+            // it changed length, to move the listed joiners with it.
+            const out = [];
+            const shifts = [];
+            let at = 0;
+            for (const n of src) {
+                const len = n.textContent.length;
+                let instead = null;
+                if (isMark(n)) {
+                    const ids = idsOf(n);
+                    if (n.dataset.inner) {
+                        if (st.mode === "removed") instead = clusterLeft(n.textContent, ids);
+                    } else if (soft.has(ids[0])) {
+                        if (st.softOut) instead = idCp(ids[0]) === 0xad ? "" : " ";
+                    } else if (st.mode === "removed") instead = "";
+                }
+                at += len;
+                if (instead == null) {
+                    out.push(n.cloneNode(true));
+                    continue;
+                }
+                if (instead) out.push(document.createTextNode(instead));
+                shifts.push([at, instead.length - len]);
+            }
+            // Runs anew: marks side by side, a cluster always alone.
+            const runs = [];
+            out.forEach((n, i) => {
+                if (!isMark(n)) return;
+                const prev = runs.at(-1);
+                const alone = (m) => m.classList.contains("cluster");
+                if (prev && out[i - 1] === prev.at(-1) && !alone(n) && !alone(prev[0])) prev.push(n);
+                else runs.push([n]);
+            });
+            runs.forEach((run, k) => {
+                const ids = run.flatMap(idsOf);
+                run.forEach((m, i) => {
+                    m.dataset.run = String(k);
+                    m.classList.toggle("first", i === 0);
+                    m.classList.toggle("rest", i > 0);
+                    m.classList.toggle("soft", ids.every((id) => soft.has(id)));
+                    if (i > 0) delete m.dataset.label;
+                    // A cluster keeps the server's name for its marks.
+                    else if (!m.dataset.inner) m.dataset.label = runLabel(ids);
+                });
+                run[0].dataset.n = String(ids.length);
+            });
+            // In Ticks each mark gives way to its plain characters, and an
+            // empty box over them takes its classes and data. A NUL keeps its
+            // empty span, for its data-cp; a direction control an isolate.
+            const ticked = st.mode === "ticks";
+            const flat = [];
+            const boxes = [];
+            let pos = 0;
+            for (const n of out) {
+                const len = n.textContent.length;
+                if (ticked && isMark(n)) {
+                    const box = document.createElement("span");
+                    box.className = n.className;
+                    for (const k of ["run", "n", "tell", "inner"]) {
+                        if (n.dataset[k] !== undefined) box.dataset[k] = n.dataset[k];
+                    }
+                    let plain = document.createTextNode(n.textContent);
+                    if (n.dataset.cp !== undefined) {
+                        plain = document.createElement("span");
+                        plain.dataset.cp = n.dataset.cp;
+                    } else if (BIDI_CONTROL.test(n.textContent)) {
+                        plain = document.createElement("span");
+                        plain.className = "iso";
+                        plain.textContent = n.textContent;
+                    }
+                    flat.push(plain);
+                    boxes.push({ at: pos, end: pos + len, box });
+                } else flat.push(n);
+                pos += len;
+            }
+            const moved = (o) => o + shifts.reduce((d, [end, delta]) => d + (end <= o ? delta : 0), 0);
+            for (const w of words) {
                 const box = document.createElement("span");
                 box.className = "hid word";
-                box.dataset.tell = tell;
-                return { at, end, box };
+                box.dataset.tell = w.tell;
+                boxes.push({ at: moved(w.at), end: moved(w.end), box });
+            }
+            boxes.sort((a, b) => a.at - b.at);
+            pre.replaceChildren(...flat);
+            // Adjacent text nodes become one, so nothing splits a word.
+            pre.normalize();
+            pre.classList.toggle("ticked", ticked);
+            pre.append(...boxes.map((m) => m.box));
+            placed = boxes;
+            place();
+        };
+        draw();
+        // Placed again whenever the text wraps anew (the window's width, the
+        // fold opening) or a font that arrives late redraws it.
+        if (typeof ResizeObserver === "function") new ResizeObserver(place).observe(pre);
+        document.fonts?.addEventListener?.("loadingdone", place);
+
+        const tiers = document.getElementById("text-tiers");
+        if (!tiers) return;
+        const live = document.createElement("p");
+        live.className = "visually-hidden";
+        live.setAttribute("aria-live", "polite");
+        tiers.after(live);
+        // Each chip keeps the server's count and icon; only its state is
+        // drawn here.
+        const wire = (chip, paint, step) => {
+            if (!chip) return;
+            const what = [...chip.childNodes].find((n) => n.nodeType === Node.TEXT_NODE)?.data ?? "";
+            const icon = chip.querySelector("svg");
+            const mode = (text) => {
+                const s = document.createElement("span");
+                s.className = "hidden-chip-mode";
+                s.textContent = `· ${text}`;
+                return s;
+            };
+            const render = () => paint(chip, { what, icon, mode });
+            chip.addEventListener("click", () => {
+                live.textContent = step();
+                render();
+                draw();
             });
-        if (!marks.length) return;
-        pre.append(...marks.map((m) => m.box));
-        placeMarks(pre, marks);
-        // Placed again whenever the text wraps anew: the window's width, the
-        // fold opening.
-        if (typeof ResizeObserver === "function") new ResizeObserver(() => placeMarks(pre, marks)).observe(pre);
+            render();
+        };
+        const MODES = ["labels", "ticks", "removed"];
+        wire(tiers.querySelector('[data-tier="hard"]'), (chip, { what, icon, mode }) => {
+            chip.dataset.mode = st.mode;
+            if (st.mode === "removed") chip.replaceChildren(checkIcon(), `${what} Removed`);
+            else chip.replaceChildren(icon, what, mode(st.mode === "ticks" ? "Ticks" : "Labels"));
+            chip.title = { labels: "Show them as ticks", ticks: "Take them out of the text", removed: "Show them as labels" }[st.mode];
+        }, () => {
+            st.mode = MODES[(MODES.indexOf(st.mode) + 1) % MODES.length];
+            return { labels: "Hidden characters shown as labels.", ticks: "Hidden characters shown as ticks.", removed: "Hidden characters removed." }[st.mode];
+        });
+        wire(tiers.querySelector('[data-tier="soft"]'), (chip, { what, icon, mode }) => {
+            chip.dataset.mode = st.softOut ? "removed" : "kept";
+            if (st.softOut) chip.replaceChildren(checkIcon(), `${what} Removed`, mode("Put Back"));
+            else chip.replaceChildren(icon, what, mode("Remove"));
+            chip.title = st.softOut ? "Put them back in the text" : "Take them out of the text";
+        }, () => {
+            st.softOut = !st.softOut;
+            return st.softOut ? "Special characters removed." : "Special characters put back.";
+        });
     };
 
     // The cast answers when asked, the same deck the preview card uses: one
@@ -225,7 +454,6 @@
         const cast = document.querySelector(".pv-cast");
         if (!cast) return;
         copyForms(cast);
-        const marks = [...pre.querySelectorAll(".hid[data-tell]")];
         const chips = [...document.querySelectorAll(".pv-fact[data-cast]")];
         const settle = () => chips.forEach((c) => c.setAttribute("aria-expanded", "false"));
         const entryFor = (name) => cast.querySelector(`.entry[data-name="${name}"]`);
@@ -235,11 +463,12 @@
             void entry.offsetWidth; // restart the pulse
             entry.classList.add("shown");
         };
-        // A joiner where spelling puts it draws only a wedge, taking no room
-        // in the line, so it is matched within 6px of where it stands.
+        // A tick, and a joiner where spelling puts it, take no room in the
+        // line, so each is matched within 6px of where it stands. The marks
+        // are looked up each time: a change of mode draws them anew.
         const markAt = (x, y) =>
-            marks.find((m) => {
-                const pad = m.classList.contains("word") ? 6 : 0;
+            [...pre.querySelectorAll(".hid[data-tell]")].find((m) => {
+                const pad = m.classList.contains("word") || pre.classList.contains("ticked") ? 6 : 0;
                 return [...m.getClientRects()].some(
                     (r) => x >= r.left - pad && x <= r.right + pad && y >= r.top && y <= r.bottom,
                 );
@@ -294,7 +523,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
         const pre = document.getElementById("text-body");
-        if (pre) placeWords(pre);
+        if (pre) setupMarks(pre);
         if (pre) wireCast(pre);
         const wrap = document.getElementById("text-wrap");
         const copyBtn = document.getElementById("copy-text");

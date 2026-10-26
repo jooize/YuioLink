@@ -3497,23 +3497,31 @@ fn text_body(text: &str) -> Markup {
     let r = Reading::of(text, false);
     let crlf = r.crlf;
     let entries = text_cast(text, r);
-    let ids = |kind: CastKind| {
+    let ids = |pick: &dyn Fn(&CastEntry) -> bool| {
         entries
             .iter()
-            .filter(|e| e.kind == kind)
+            .filter(|e| pick(e))
             .map(|e| e.id.as_str())
             .collect::<Vec<_>>()
             .join(" ")
     };
-    let hidden = ids(CastKind::Snippet);
-    let spelling = ids(CastKind::Spelling);
+    // The soft kinds in gray, apart from the kinds that hide things, as the
+    // create form and History draw them. text.js reads which ids are soft
+    // from the Special Characters fact.
+    let hidden = ids(&|e| e.kind == CastKind::Snippet && !is_soft(e.ch));
+    let special = ids(&|e| e.kind == CastKind::Snippet && is_soft(e.ch));
+    let spelling = ids(&|e| e.kind == CastKind::Spelling);
     let variants = variant_ids(&entries);
-    let marked = marked_text(text, r, false, Words::Listed);
+    let marked = marked_text(text, r, true, Words::Listed);
+    let (hard, soft) = hidden_counts(text, false);
     html! {
         @if crlf || !entries.is_empty() {
             div.pv-facts {
                 @if !hidden.is_empty() {
                     span.pv-fact.warn data-cast=(hidden) { (alert_icon()) "Hidden Characters" }
+                }
+                @if !special.is_empty() {
+                    span.pv-fact.soft data-cast=(special) { (info_icon()) "Special Characters" }
                 }
                 @if !spelling.is_empty() {
                     span.pv-fact.word data-cast=(spelling) { "Joiners in Words" }
@@ -3527,12 +3535,36 @@ fn text_body(text: &str) -> Markup {
             // there for the text's own to survive.
             pre.text-body #text-body data-words=[marked.words_attr()] { "\n" (marked.html) }
         }
+        // How the text draws its marks, as in a History row: the red chip
+        // steps Labels, Ticks, Removed; the gray one removes the soft kinds
+        // and puts them back. Removed leaves them out of a selection and of
+        // Copy too. Only the script can act on them, so without it the
+        // stylesheet hides the row; drawn here, it takes its room from the
+        // start and nothing moves when the script arrives.
+        @if hard + soft > 0 {
+            div.hidden-tiers.text-tiers #text-tiers {
+                @if hard > 0 {
+                    button.hidden-chip type="button" data-tier="hard" data-mode="labels" title="Show them as ticks" {
+                        (alert_icon()) (count_of(hard, "Hidden Character"))
+                        span.hidden-chip-mode { "· Labels" }
+                    }
+                }
+                @if soft > 0 {
+                    button.hidden-chip.soft type="button" data-tier="soft" title="Take them out of the text" {
+                        (info_icon()) (count_of(soft, "Special Character"))
+                        span.hidden-chip-mode { "· Remove" }
+                    }
+                }
+            }
+        }
         // Below the box, so the first answer grows the page under the text
         // rather than pushing the text down under the pointer. Quiet until a
         // mark or a chip asks (text.js); without the script, the full list.
         @if !entries.is_empty() {
             div.pv-cast {
-                @for e in &entries { (cast_entry(e, EntryDress::default())) }
+                @for e in &entries {
+                    (cast_entry(e, EntryDress { soft: true, ..EntryDress::default() }))
+                }
             }
         }
         button.btn.btn-block #copy-text type="button" hidden { "Copy" }
@@ -5067,6 +5099,46 @@ mod tests {
     /// A page leaves the joiners spelling puts in words as plain text, since
     /// an element inside a word changes how it is drawn, and lists where
     /// they sit for text.js, in a script's string offsets. Red marks stay.
+    #[test]
+    fn a_text_page_offers_ways_to_draw_its_hidden_characters() {
+        // Two that hide things and a no-break space: the space is gray, in
+        // the fact, the label and the entry, and counted apart.
+        let page = text_body("pass\u{200b}\u{200b}word 10\u{a0}km").into_string();
+        assert!(page.contains(r#"data-cast="u200b">"#), "{page}");
+        assert!(
+            page.contains(r#"<span class="pv-fact soft" data-cast="u00a0">"#),
+            "{page}"
+        );
+        assert!(
+            page.contains(r#"class="hid soft" data-label="no-break space""#),
+            "{page}"
+        );
+        assert!(
+            page.contains(r#"class="entry soft" data-name="u00a0""#),
+            "{page}"
+        );
+        // The chips text.js wires, with the server's counts.
+        assert!(
+            page.contains(r#"<div class="hidden-tiers text-tiers" id="text-tiers">"#),
+            "{page}"
+        );
+        assert!(page.contains("2 Hidden Characters"), "{page}");
+        assert!(page.contains("1 Special Character<"), "{page}");
+        assert!(
+            page.contains(r#"data-tier="hard" data-mode="labels""#),
+            "{page}"
+        );
+        // Nothing to draw another way: no chips.
+        let plain = text_body("plain text").into_string();
+        assert!(!plain.contains("text-tiers"), "{plain}");
+        // Only spelling joiners: no chips either; they are never counted.
+        let persian = text_body("می\u{200c}خواهم").into_string();
+        assert!(!persian.contains("text-tiers"), "{persian}");
+        // Without the script nothing can act on them.
+        const APP_CSS: &str = include_str!("../static/app.css");
+        assert!(APP_CSS.contains("html:not(.js) .text-tiers {\n    display: none;\n}"));
+    }
+
     #[test]
     fn a_page_lists_spelling_joiners_beside_the_text() {
         let listed = |s: &str| marked_text(s, Reading::of(s, false), false, Words::Listed);

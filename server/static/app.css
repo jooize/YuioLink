@@ -1676,8 +1676,10 @@ html.js .custom-field:not(.open) {
     unicode-bidi: isolate;
 }
 
-/* A direction control whose mark is drawn beside the row's text (app.js
-   setBeside) keeps an isolate of its own, so it reorders nothing. */
+/* A direction control whose mark is drawn beside the text (app.js
+   setBeside, text.js in Ticks) keeps an isolate of its own, so it reorders
+   nothing. */
+.text-body .iso,
 .history-well-body .iso {
     unicode-bidi: isolate;
 }
@@ -1880,6 +1882,7 @@ html.js .custom-field:not(.open) {
     display: none;
 }
 
+.text-body:not(.ticked) .hid.soft::after,
 .history-well-body:not(.ticked) .hid.soft::after,
 .history-well-body.ticked .hid.soft.lab::after,
 .history-well-body.ticked .hid.word.lab::after {
@@ -1893,6 +1896,17 @@ html.js .custom-field:not(.open) {
     flex-direction: column;
     align-items: flex-start;
     gap: 2px;
+}
+
+/* The Text page's chips, under its box: only text.js can act on them, so
+   without it they are not shown. */
+.text-tiers {
+    margin: 8px 0 0 14px;
+    font-size: 12.5px;
+}
+
+html:not(.js) .text-tiers {
+    display: none;
 }
 
 /* The label ignores the pointer, so text.js (and app.js, in a row) finds a
@@ -2641,6 +2655,18 @@ html.js .custom-field:not(.open) {
 .pv-fact svg {
     flex: none;
     color: var(--danger);
+}
+
+/* The soft kinds, noted rather than warned about: a warning's shape in
+   gray. */
+.pv-fact.soft {
+    background: transparent;
+    border: none;
+    padding: 3px 0;
+}
+
+.pv-fact.soft svg {
+    color: inherit;
 }
 
 /* A flag is a region's own mark and already has a shape of its own; a pill
@@ -4776,11 +4802,6 @@ html.js .history-cast.pv-cast {
     margin-top: -4px;
     font-weight: 500;
     color: var(--text-secondary);
-}
-
-.hidden-step .text-body .hid.soft::after {
-    color: #fff;
-    background: var(--hc-gray);
 }
 
 .hidden-step-actions {
