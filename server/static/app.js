@@ -1101,7 +1101,7 @@
     // data names, class names and text come from it, never markup. `drop`
     // leaves out marks, and so their characters, by tier (`hard`, `soft`); a
     // no-break space left out becomes a plain space, as in the form.
-    const TREE_TAGS = new Set(["b", "code", "div"]);
+    const TREE_TAGS = new Set(["b", "code", "div", "small"]);
     const TREE_DATA = new Set(["label", "tell", "inner", "cp", "name"]);
     const treeExtra = (n) => (n[1] && typeof n[1] === "object" && !Array.isArray(n[1]) ? n[1] : null);
     const isMarkNode = (n) => Array.isArray(n) && typeof n[0] === "string" && n[0].split(" ").includes("hid");
