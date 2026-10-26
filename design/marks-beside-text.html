@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marks Beside the Text</title>
+<style>
+:root {
+    --bg: #f5f5f7;
+    --card: #fff;
+    --text: #1d1d1f;
+    --muted: #6e6e73;
+    --line: #d2d2d7;
+    --red: #d70015;
+    --gray: #8e8e93;
+    --accent: #0071e3;
+    --ok: #1a8f3c;
+    --ghost: rgba(215, 0, 21, 0.55);
+    --font: -apple-system, system-ui, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #000;
+        --card: #1c1c1e;
+        --text: #f5f5f7;
+        --muted: #a1a1a6;
+        --line: #3a3a3c;
+        --red: #ff5d54;
+        --gray: #8e8e93;
+        --accent: #4da3ff;
+        --ok: #30d158;
+        --ghost: rgba(255, 93, 84, 0.6);
+    }
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    padding: 32px 16px 64px;
+    font: 15px/1.5 var(--font);
+    color: var(--text);
+    background: var(--bg);
+}
+main { max-width: 980px; margin: 0 auto; }
+h1 { font-size: 28px; margin: 0 0 4px; }
+h2 { font-size: 19px; margin: 40px 0 6px; }
+p { margin: 6px 0; max-width: 70ch; }
+.lead { color: var(--muted); font-size: 16px; }
+.card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    margin-top: 12px;
+    overflow-x: auto;
+}
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 13px; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+.sample { font-size: 34px; line-height: 1.5; white-space: nowrap; position: relative; }
+.name { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.verdict { font-size: 13px; white-space: nowrap; }
+.verdict.ok { color: var(--ok); }
+.verdict.bad { color: var(--red); }
+
+/* Today: the joiner wrapped in an element, its tick drawn by ::after. */
+.wrapped .m { position: relative; }
+.wrapped .m::after {
+    content: "";
+    position: absolute;
+    top: 0.05em;
+    left: calc(50% - 0.17em);
+    width: 0.34em;
+    height: 0.2em;
+    background: var(--tick, var(--gray));
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.wrapped .m.red { --tick: var(--red); }
+
+/* Proposed: the text untouched, the tick a box beside it. */
+.mark {
+    position: absolute;
+    width: 0.34em;
+    height: 0.2em;
+    margin-left: -0.17em;
+    background: var(--gray);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    pointer-events: none;
+}
+.mark.red { background: var(--red); }
+
+/* The exploded view of the two layers. */
+.layers { display: grid; gap: 10px; }
+.layer {
+    position: relative;
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    padding: 10px 14px 10px 150px;
+    min-height: 74px;
+}
+.layer .tag {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    width: 128px;
+}
+.layer .tag small { display: block; font-weight: 400; }
+.layer.result { border-style: solid; }
+.ghost { color: var(--ghost); }
+.arrow { text-align: center; color: var(--muted); font-size: 13px; }
+
+.views td:first-child { font-weight: 600; white-space: nowrap; }
+.now { color: var(--muted); font-size: 13px; display: block; }
+.chg { color: var(--accent); font-weight: 600; }
+.same { color: var(--muted); }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.note { font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Marks Beside the Text</h1>
+<p class="lead">The text is drawn once, exactly as stored, and every mark is drawn beside it. The browser measures where each character falls, and the mark is placed there.</p>
+
+<h2>1. The problem, live in this browser</h2>
+<p>Each row draws one word three ways. <b>Plain</b> has no mark. <b>Wrapped</b> is how History and the Text page mark it today: the joiner sits inside its own element, which also draws the wedge. <b>Beside</b> is the proposal: the text is left whole and the wedge is placed over it. Safari draws some Wrapped words differently from Plain. Chromium does too, because of the wedge itself. Each verdict compares a word's width with Plain.</p>
+<div class="card">
+<table id="cmp">
+<thead><tr><th>Word</th><th>Plain</th><th>Wrapped (today)</th><th>Beside (proposed)</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<p class="note">Widths are measured here, by this page's script, in whichever browser opened it. A word can also change shape at the same width: compare the Persian abbreviation's last letter with Plain. The red wedge in the last row is a hidden character that is not part of the spelling.</p>
+
+<h2>2. How it is built</h2>
+<p>There are two layers. The text layer is one unbroken run of text, nothing inside it. The mark layer holds one small box per mark, each placed where the browser says that character sits. The marks take the pointer away from nothing: selecting and copying act on the text alone.</p>
+<div class="card">
+<div class="layers">
+    <div class="layer"><span class="tag">Mark layer<small>a box per mark, no text</small></span><div class="sample" id="layer-marks"></div></div>
+    <div class="arrow">placed over the text by measuring each character's position</div>
+    <div class="layer"><span class="tag">Text layer<small>one text, untouched</small></span><div class="sample" id="layer-text"></div></div>
+    <div class="arrow">drawn together</div>
+    <div class="layer result"><span class="tag">What you see</span><div class="sample" id="layer-both"></div></div>
+</div>
+</div>
+
+<h2>3. Every view</h2>
+<p>A tick, a wedge and the emoji cap take no width, so they can always sit beside the text. A label is different: it writes a hidden character's name into the line on purpose, to show what is there. A label is a rewrite of the line rather than a mark on it, so it stays in the line.</p>
+<div class="card">
+<table class="views">
+<thead><tr><th>View</th><th>With JavaScript</th><th>Without JavaScript</th></tr></thead>
+<tbody>
+<tr><td>Create form</td>
+    <td><span class="same">Every mark beside the text. Done in v0.15.15.</span></td>
+    <td><span class="same">No marks in the field. The step page lists them before creating.</span></td></tr>
+<tr><td>History, Ticks</td>
+    <td><span class="chg">Every mark beside the text, red and gray.</span><span class="now">Today: wrapped, so red ticks and gray wedges both change the word.</span></td>
+    <td><span class="same">History needs JavaScript.</span></td></tr>
+<tr><td>History, Labels</td>
+    <td>Red: <span class="same">names in the line, unchanged.</span> Gray: <span class="chg">wedges beside the text.</span></td>
+    <td><span class="same">History needs JavaScript.</span></td></tr>
+<tr><td>History, Removed</td>
+    <td>Red: <span class="same">gone from the text, unchanged.</span> Gray: <span class="chg">wedges beside the text</span> (Remove keeps spelling joiners).</td>
+    <td><span class="same">History needs JavaScript.</span></td></tr>
+<tr><td>Text page</td>
+    <td>Red: <span class="same">names in the line, unchanged.</span> Gray: <span class="chg">wedges beside the text.</span> Clicking a mark still opens its entry.</td>
+    <td>Red: <span class="same">names in the line, unchanged.</span> Gray: <span class="chg">text untouched, no wedge.</span> Still listed under “Joiners in Words”.</td></tr>
+<tr><td>No-JS step page</td>
+    <td><span class="same">The script does not run there.</span></td>
+    <td>Red: <span class="same">names in the line, unchanged.</span> Gray: <span class="chg">text untouched, no wedge.</span></td></tr>
+</tbody>
+</table>
+</div>
+<p class="note"><span class="chg">Blue</span> marks what changes. Without JavaScript nothing can measure, so a gray joiner (ordinary spelling) is left alone rather than marked in a way that changes the word. A red one keeps its label, because showing where a suspicious character sits matters more there.</p>
+
+<h2>4. What was ruled out</h2>
+<div class="card">
+<table>
+<thead><tr><th>Approach</th><th>Why not</th></tr></thead>
+<tbody>
+<tr><td>Style the wrapper so it does not split the word</td><td>Safari splits at any element, whatever its style. No CSS prevents it.</td></tr>
+<tr><td>The browser’s Highlight API</td><td>It colors text without wrapping it, but only glyphs that are drawn. A zero-width character has nothing to color, so there is nothing to put a wedge on.</td></tr>
+<tr><td>Wrap the whole word in one element</td><td>The word stays whole, but without measuring, the wedge cannot go to the joiner’s spot inside the word. Only good enough for a page without JavaScript, and there leaving the word alone is simpler.</td></tr>
+</tbody>
+</table>
+</div>
+</main>
+<script>
+"use strict";
+// Each sample: its name, the text before the mark, the mark, the text after,
+// and whether the mark is red (not spelling).
+const SAMPLES = [
+    ["Kannada RA, joiner before a virama", "ರ", "‍", "್ಯ", false],
+    ["Sinhala yansaya, joiner after a virama", "ස්", "‍", "ය", false],
+    ["Persian abbreviation, joiner after heh", "به", "‍", ".", false],
+    ["Hindi conjunct, joiner after a virama", "क्", "‍", "ष", false],
+    ["Persian, non-joiner inside a word", "می", "‌", "خواهم", false],
+    ["Latin, non-joiner between letters", "sig", "‌", "ned", true],
+];
+const el = (tag, cls, ...kids) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    e.append(...kids);
+    return e;
+};
+// Place a wedge over character `at` of the text node inside `host`.
+const placeBeside = (host, node, at, len, red) => {
+    const range = document.createRange();
+    range.setStart(node, at);
+    range.setEnd(node, at + len);
+    let r = range.getClientRects()[0];
+    if (!r) {
+        range.collapse(true);
+        r = range.getBoundingClientRect();
+    }
+    const h = host.getBoundingClientRect();
+    const m = el("span", red ? "mark red" : "mark");
+    m.style.left = `${r.left - h.left + r.width / 2}px`;
+    m.style.top = `${r.top - h.top + 0.05 * Number.parseFloat(getComputedStyle(host).fontSize)}px`;
+    host.append(m);
+};
+// The width of the word itself: everything in the box except placed marks.
+const width = (e) => {
+    const range = document.createRange();
+    range.setStart(e, 0);
+    range.setEnd(e, [...e.childNodes].filter((n) => !n.classList?.contains("mark")).length);
+    return range.getBoundingClientRect().width;
+};
+const body = document.querySelector("#cmp tbody");
+const draw = () => {
+    body.replaceChildren();
+    for (const [name, a, mark, b, red] of SAMPLES) {
+        const plain = el("div", "sample", a + mark + b);
+        const wrapped = el("div", "sample wrapped", a, el("span", red ? "m red" : "m", mark), b);
+        const beside = el("div", "sample", a + mark + b);
+        const v1 = el("div", "verdict");
+        const v2 = el("div", "verdict");
+        body.append(el("tr", "",
+            el("td", "", el("div", "name", name)),
+            el("td", "", plain),
+            el("td", "", wrapped, v1),
+            el("td", "", beside, v2)));
+        placeBeside(beside, beside.firstChild, a.length, mark.length, red);
+        const pw = width(plain);
+        for (const [box, v] of [[wrapped, v1], [beside, v2]]) {
+            const w = width(box);
+            const same = Math.abs(w - pw) < 0.75;
+            v.className = `verdict ${same ? "ok" : "bad"}`;
+            v.textContent = same ? `✓ same width as plain (${Math.round(w)} px)` : `✗ ${Math.round(w)} px wide, plain is ${Math.round(pw)} px`;
+        }
+    }
+    // The exploded view: Kannada and Latin, one line.
+    const text = "ರ‍್ಯ  sig‌ned";
+    const marksAt = [[1, false], [text.indexOf("‌"), true]];
+    const t = document.getElementById("layer-text");
+    const both = document.getElementById("layer-both");
+    const only = document.getElementById("layer-marks");
+    t.textContent = text;
+    both.textContent = text;
+    only.replaceChildren(el("span", "ghost", text));
+    for (const [at, red] of marksAt) {
+        placeBeside(both, both.firstChild, at, 1, red);
+        placeBeside(only, only.firstChild.firstChild, at, 1, red);
+    }
+    only.firstChild.style.visibility = "hidden";
+};
+document.fonts.ready.then(draw);
+</script>
+</body>
+</html>
