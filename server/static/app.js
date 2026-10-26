@@ -335,6 +335,14 @@
             ["path", { d: "M8 4.6v4.2", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" }],
             ["circle", { cx: "8", cy: "11.2", r: ".95", fill: "currentColor" }],
         ]);
+    // A rounded triangle with "!": a domain's hidden characters, which change
+    // where a link goes rather than hide in its text.
+    const cautionIcon = () =>
+        icon(12, "0 0 16 16", [
+            ["path", { d: "M8 1.9 14.6 13.6H1.4Z", stroke: "currentColor", "stroke-width": "1.4", "stroke-linejoin": "round" }],
+            ["path", { d: "M8 6.2v3.4", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" }],
+            ["circle", { cx: "8", cy: "11.6", r: ".9", fill: "currentColor" }],
+        ]);
     // A ringed "i": the soft kinds, noted rather than warned about.
     const infoIcon = () =>
         icon(12, "0 0 16 16", [
@@ -2344,19 +2352,18 @@
                 if (removedNow(tier)) slot.append(el("div", "history-meta", chip(tier, was(tier))));
                 else if (n) slot.append(el("div", "history-meta", chip(tier, n)));
             }
-            // A hidden character in a domain: the server drops it, or refuses
-            // the address and the link is Text.
+            // A hidden character in a domain: the URL standard ignores some
+            // (the server drops them) and forbids the rest (the address is
+            // not one, so the link is Text). One line, saying which.
             const t = ta.value.trim();
             const dom = looksLikeUrl(t) && SCHEMES.has(t.slice(0, t.indexOf(":")).toLowerCase()) ? domainHidden(t) : null;
-            const one = (n, a, b) => (n === 1 ? a : b);
+            const these = (n) => (n === 1 ? "this hidden character" : "these hidden characters");
             if (dom?.refused) {
-                slot.append(el("p", "hc-note", alertIcon(), el("span", "",
-                    `${one(dom.refused + dom.dropped, "Hidden character", "Hidden characters")} in domain, so this becomes a text link. Remove ${one(dom.refused + dom.dropped, "it", "them")} to redirect to `,
-                    el("code", "", dom.clean), ".")));
+                slot.append(el("p", "hc-note", cautionIcon(), el("span", "",
+                    `Domains forbid ${these(dom.refused)}: text link until removed.`)));
             } else if (dom?.dropped) {
-                slot.append(el("p", "hc-note", alertIcon(), el("span", "",
-                    `${one(dom.dropped, "Hidden character", "Hidden characters")} in domain ${one(dom.dropped, "is", "are")} dropped. Goes to `,
-                    el("code", "", dom.clean), ".")));
+                slot.append(el("p", "hc-note", cautionIcon(), el("span", "",
+                    `Domains ignore ${these(dom.dropped)}: goes to `, el("code", "", dom.clean), ".")));
             }
             paintOverlay(marks);
         };

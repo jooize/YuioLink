@@ -987,10 +987,11 @@ html.js .custom-field:not(.open) {
     gap: 5px;
     align-items: flex-start;
     margin: 6px 0 0 8px;
+    max-width: none;
     font-size: 13px;
     line-height: 1.4;
     text-align: left;
-    color: var(--danger);
+    color: var(--warn);
 }
 
 .hc-note svg {

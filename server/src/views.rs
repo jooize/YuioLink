@@ -4031,6 +4031,15 @@ pub fn help_page(base_url: &str) -> Markup {
             a href="/demo" { "demo page" }
             " shows every case on sample text."
         }
+        p.help-p {
+            "In a domain, the URL standard that browsers follow decides. It ignores a few "
+            "hidden characters, such as the zero-width space, so the link goes to the domain "
+            "without them. It forbids the rest, such as joiners and direction overrides, so the "
+            "address is not a valid one and the link becomes text. Letters beyond plain ASCII "
+            "are a separate case: they are visible, and DNS stores them as punycode, an ASCII "
+            "form that starts with xn--. A redirect's page shows that form only when a name "
+            "mixes scripts, as lookalike domains do."
+        }
 
         h3.help-h { "What it is for" }
         dl.help-cases {
@@ -4134,13 +4143,13 @@ pub(crate) const DEMO_SAMPLES: &[(&str, &str, &str)] = &[
         "abc\u{202e}def",
     ),
     (
-        "In a domain, refused",
-        "A joiner makes the domain invalid, so the link becomes a text link.",
+        "In a domain, forbidden",
+        "The URL standard forbids a joiner in a domain, so the address is not a valid one and the link becomes a text link.",
         "https://exa\u{200d}mple.com/login",
     ),
     (
-        "In a domain, dropped",
-        "A zero-width space is dropped from the domain, so the link goes to example.com.",
+        "In a domain, ignored",
+        "The URL standard ignores a zero-width space in a domain, so the link goes to example.com.",
         "https://exa\u{200b}mple.com/login",
     ),
     (
