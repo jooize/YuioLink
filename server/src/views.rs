@@ -4150,8 +4150,8 @@ pub(crate) const DEMO_SAMPLES: &[(&str, &str, &str)] = &[
     ),
     (
         "Joiners in words",
-        "Persian writes a zero-width non-joiner inside many words, and Hindi and Sinhala put a joiner after a virama to pick a letter form. Where spelling puts one, it gets only a small gray wedge, is never counted and never removed. Between Latin letters the same character is red.",
-        "\u{645}\u{6cc}\u{200c}\u{62e}\u{648}\u{627}\u{647}\u{645} \u{915}\u{94d}\u{200d}\u{937} \u{dc3}\u{dca}\u{200d}\u{dba} sig\u{200c}ned",
+        "Persian writes a zero-width non-joiner inside many words. Hindi and Sinhala put a joiner after a virama to pick a letter form, and Kannada puts one before it. A Persian abbreviation ends on a joiner to keep a letter's joined shape. Where spelling puts one, it gets only a small gray wedge, is never counted and never removed. Between Latin letters the same character is red.",
+        "\u{645}\u{6cc}\u{200c}\u{62e}\u{648}\u{627}\u{647}\u{645} \u{915}\u{94d}\u{200d}\u{937} \u{dc3}\u{dca}\u{200d}\u{dba} \u{cb0}\u{200d}\u{ccd}\u{caf} \u{647}\u{200d}. sig\u{200c}ned",
     ),
     (
         "Emoji",

@@ -82,11 +82,12 @@
             .catch(() => {}); // stays marked; no retry on every keystroke
         return variantsLoading;
     };
-    // Where a joiner is ordinary spelling (views.rs spelled, RFC 5892's
-    // CONTEXTJ): right after a virama, or a non-joiner between a letter that
-    // joins forward and one that joins back, past transparent marks. The
-    // ranges (~7 KB) are fetched once the text holds a joiner; until then,
-    // or if that fails, every joiner is red.
+    // Where a joiner is ordinary spelling (joining.rs spells): right after a
+    // virama; a non-joiner between a letter that joins forward and one that
+    // joins back, past transparent marks; a joiner right before a virama,
+    // after a letter of its script; a joiner with a letter joining toward it
+    // on exactly one side. The ranges are fetched once the text holds a
+    // joiner; until then, or if that fails, every joiner is red.
     let JOINING = null;
     let joiningLoading = null;
     const loadJoining = () => {
@@ -101,14 +102,19 @@
         if (!JOINING) return false;
         const at = (j) => chars[j]?.codePointAt(0);
         if (at(k - 1) != null && inRanges(JOINING.virama, at(k - 1))) return true;
-        if (at(k) !== 0x200c) return false;
         const past = (j, step) => {
             while (at(j) != null && inRanges(JOINING.transparent, at(j))) j += step;
             return at(j);
         };
         const back = past(k - 1, -1);
         const ahead = past(k + 1, 1);
-        return back != null && ahead != null && inRanges(JOINING.forward, back) && inRanges(JOINING.back, ahead);
+        const forward = back != null && inRanges(JOINING.forward, back);
+        const backward = ahead != null && inRanges(JOINING.back, ahead);
+        if (at(k) === 0x200c) return forward && backward;
+        const next = at(k + 1);
+        const beforeVirama = next != null && back != null && (JOINING.scripts ?? [])
+            .some((sc) => inRanges(sc.viramas, next) && inRanges(sc.letters, back));
+        return beforeVirama || forward !== backward;
     };
     const registered = (base, sel) => (EMOJI_BASES.has(base) && (sel === 0xfe0e || sel === 0xfe0f))
         || VARIANTS?.get(sel)?.has(base) === true;
