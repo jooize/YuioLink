@@ -1082,6 +1082,11 @@ html.js .custom-field:not(.open) {
     align-self: flex-start;
 }
 
+/* Its name's line is centered on the 30px squares beside it. */
+.pv-cast .entry:has(.forms) .what {
+    margin-top: calc((30px - 1lh) / 2);
+}
+
 .pv-cast .entry.soft .what .form code.bad {
     color: #fff;
     background: var(--hc-gray);
@@ -2865,6 +2870,9 @@ html.js .pv-cast:not(.whole) .entry {
     grid-row: 2;
     grid-column: 1;
     visibility: hidden;
+    /* Each at its own height, at the top of the cell: stretched to the
+       tallest, a short entry centered its text below its squares. */
+    align-self: start;
 }
 
 /* Until a character has been asked, the deck holds no room at all: the

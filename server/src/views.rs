@@ -5174,7 +5174,10 @@ mod tests {
         // answer and swapping never shifts the card.
         const APP_CSS: &str = include_str!("../static/app.css");
         assert!(APP_CSS
-            .contains("html.js .pv-cast:not(.whole) .entry {\n    grid-row: 2;\n    grid-column: 1;\n    visibility: hidden;\n}"));
+            .contains("html.js .pv-cast:not(.whole) .entry {\n    grid-row: 2;\n    grid-column: 1;\n    visibility: hidden;\n"));
+        // Each at its own height, or a short entry centers its text below
+        // its squares.
+        assert!(APP_CSS.contains("    align-self: start;\n}"));
         assert!(
             APP_CSS.contains(
                 "html:not(.js) .pv-cast .entry + .entry,\n.pv-cast.whole .entry + .entry {"
