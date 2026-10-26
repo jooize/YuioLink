@@ -2225,22 +2225,42 @@
         };
 
         // The field's text again, laid out as the field lays it out, with a
-        // mark around each hidden character.
+        // mark over each hidden character. The copy is one unbroken text
+        // node: an element boundary inside a word changes how its letters
+        // join (WebKit splits shaping at any span, Chromium at a generated
+        // box), and the marks would drift from the letters the field draws.
+        // So each mark is its own box beside the text, placed over the
+        // characters it stands for by measuring them.
         const paintOverlay = (marks) => {
             const cs = getComputedStyle(ta);
             for (const p of COPY_PROPS) overlay.style[p] = cs[p];
             // The field's scrollbar narrows its text; the copy has none.
             const bars = ta.offsetWidth - ta.clientWidth - Number.parseFloat(cs.borderLeftWidth) - Number.parseFloat(cs.borderRightWidth);
             overlay.style.paddingRight = `${Number.parseFloat(cs.paddingRight) + Math.max(0, bars)}px`;
-            overlay.replaceChildren();
-            const runs = runsOfMarks(marks, ta.value);
             const v = ta.value;
-            let from = 0;
-            for (const run of runs) {
+            // A zero-width space holds open the empty line a final line break makes.
+            const text = document.createTextNode(`${v}\u200b`);
+            overlay.replaceChildren(text);
+            overlay.style.height = `${ta.offsetHeight}px`;
+            overlay.scrollTop = ta.scrollTop;
+            const o = overlay.getBoundingClientRect();
+            const ox = o.left + overlay.clientLeft - overlay.scrollLeft;
+            const oy = o.top + overlay.clientTop - overlay.scrollTop;
+            const range = document.createRange();
+            // The box of v[a..b]; a character drawn inside another's shape
+            // can have none, so then the point where it starts.
+            const boxOf = (a, b) => {
+                range.setStart(text, a);
+                range.setEnd(text, b);
+                const r = range.getClientRects()[0];
+                if (r) return r;
+                range.collapse(true);
+                return range.getBoundingClientRect();
+            };
+            for (const run of runsOfMarks(marks, v)) {
                 const parts = run.cluster ? [{ at: run.at, ch: v.slice(run.at, run.end), i: 0 }] : run.marks;
                 for (const m of parts) {
-                    overlay.append(v.slice(from, m.at));
-                    const s = el("span", run.cluster ? "hid cluster" : "hid", m.ch);
+                    const s = el("span", run.cluster ? "hid cluster" : "hid");
                     s.dataset.run = String(run.at);
                     if (run.marks.every((x) => x.soft)) s.classList.add("soft");
                     if (run.word) s.classList.add("word");
@@ -2251,14 +2271,17 @@
                         if (run.at === st.flag) s.dataset.flag = runLabel(run.marks.map((x) => x.cp));
                     }
                     if (run.at === st.flag) s.classList.add("flagged");
+                    const r = boxOf(m.at, m.at + m.ch.length);
+                    Object.assign(s.style, {
+                        position: "absolute",
+                        left: `${r.left - ox}px`,
+                        top: `${r.top - oy}px`,
+                        width: `${r.width}px`,
+                        height: `${r.height}px`,
+                    });
                     overlay.append(s);
-                    from = m.at + m.ch.length;
                 }
             }
-            // A zero-width space holds open the empty line a final line break makes.
-            overlay.append(v.slice(from), "\u200b");
-            overlay.style.height = `${ta.offsetHeight}px`;
-            overlay.scrollTop = ta.scrollTop;
             fitCounts(overlay);
             placeFlag();
         };
