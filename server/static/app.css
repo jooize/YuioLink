@@ -978,7 +978,7 @@ html.js .custom-field:not(.open) {
     margin: 0;
 }
 
-.history-hidden.soft {
+.hidden-chip.soft {
     color: var(--text-secondary);
 }
 
@@ -1888,7 +1888,7 @@ html.js .custom-field:not(.open) {
 }
 
 /* The row's chips, red and gray, one per line. */
-.history-tiers {
+.hidden-tiers {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -4185,7 +4185,7 @@ html.history-collapsed .history-body {
    naming the mode; green with a check once they are taken out. The hover is
    a wash behind the whole chip, never an underline. The negative margins put
    the words where a plain item's would be; the padding is the wash. */
-.history-hidden {
+.hidden-chip {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -4200,20 +4200,20 @@ html.history-collapsed .history-body {
     cursor: pointer;
 }
 
-.history-hidden:hover {
+.hidden-chip:hover {
     background: color-mix(in srgb, currentColor 10%, transparent);
 }
 
-.history-hidden[data-mode="removed"] {
+.hidden-chip[data-mode="removed"] {
     color: var(--result-text);
 }
 
-.history-hidden svg {
+.hidden-chip svg {
     flex: none;
     display: block;
 }
 
-.history-hidden-mode {
+.hidden-chip-mode {
     font-weight: 500;
     color: var(--text-secondary);
 }

@@ -1302,12 +1302,12 @@
     const softChip = (it, n) => {
         const chip = document.createElement("button");
         chip.type = "button";
-        chip.className = "history-hidden soft";
+        chip.className = "hidden-chip soft";
         chip.dataset.for = it.id;
         chip.dataset.tier = "soft";
         const what = plainPlural(n, "Special Character");
         const state = document.createElement("span");
-        state.className = "history-hidden-mode";
+        state.className = "hidden-chip-mode";
         state.textContent = it.softRemoved ? "\u00b7 Put Back" : "\u00b7 Remove";
         if (it.softRemoved) {
             chip.dataset.mode = "removed";
@@ -1319,7 +1319,7 @@
             else it.softRemoved = true;
             it.marksAt = Date.now();
             renderHistory();
-            document.querySelector(`.history-hidden[data-for="${it.id}"][data-tier="soft"]`)?.focus();
+            document.querySelector(`.hidden-chip[data-for="${it.id}"][data-tier="soft"]`)?.focus();
         });
         return chip;
     };
@@ -1336,14 +1336,14 @@
         const mode = marksMode(it);
         const chip = document.createElement("button");
         chip.type = "button";
-        chip.className = "history-hidden";
+        chip.className = "hidden-chip";
         chip.dataset.mode = mode;
         chip.dataset.for = it.id;
         const what = plainPlural(n, "Hidden Character");
         if (mode === "removed") chip.append(checkIcon(), `${what} Removed`);
         else {
             const state = document.createElement("span");
-            state.className = "history-hidden-mode";
+            state.className = "hidden-chip-mode";
             state.textContent = `\u00b7 ${mode === "ticks" ? "Ticks" : "Labels"}`;
             chip.append(alertIcon(), what, state);
         }
@@ -1351,7 +1351,7 @@
         chip.addEventListener("click", () => {
             setMarksMode(it, MARK_MODES[(MARK_MODES.indexOf(mode) + 1) % MARK_MODES.length]);
             renderHistory();
-            document.querySelector(`.history-hidden[data-for="${it.id}"]:not([data-tier])`)?.focus();
+            document.querySelector(`.hidden-chip[data-for="${it.id}"]:not([data-tier])`)?.focus();
         });
         return chip;
     };
@@ -1706,7 +1706,7 @@
             const softMarks = Array.isArray(drawn) ? markCount(drawn, true) : 0;
             if (marks || softMarks) {
                 const tiers = document.createElement("span");
-                tiers.className = "history-tiers";
+                tiers.className = "hidden-tiers";
                 if (marks) tiers.append(marksChip(it, marks));
                 if (softMarks) tiers.append(softChip(it, softMarks));
                 meta.append(tiers);
@@ -2341,13 +2341,13 @@
         const chip = (tier, n) => {
             const soft = tier === "soft";
             const removed = removedNow(tier);
-            const c = el("button", soft ? "history-hidden soft" : "history-hidden");
+            const c = el("button", soft ? "hidden-chip soft" : "hidden-chip");
             c.type = "button";
             c.dataset.mode = removed ? "removed" : "ticks";
             c.dataset.tier = tier;
             const what = plural(n, soft ? "Special Character" : "Hidden Character");
-            if (removed) c.append(checkIcon(), `${what} Removed`, el("span", "history-hidden-mode", "· Put Back"));
-            else c.append(soft ? infoIcon() : alertIcon(), what, el("span", "history-hidden-mode", "· Remove"));
+            if (removed) c.append(checkIcon(), `${what} Removed`, el("span", "hidden-chip-mode", "· Put Back"));
+            else c.append(soft ? infoIcon() : alertIcon(), what, el("span", "hidden-chip-mode", "· Remove"));
             c.addEventListener("click", () => {
                 const words = soft ? "Special characters" : "Hidden characters";
                 if (removed) {
@@ -2364,7 +2364,7 @@
                     live.textContent = `${words} removed.`;
                 }
                 render();
-                slot.querySelector(`.history-hidden[data-tier="${tier}"]`)?.focus();
+                slot.querySelector(`.hidden-chip[data-tier="${tier}"]`)?.focus();
             });
             return c;
         };
