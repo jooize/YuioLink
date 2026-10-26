@@ -1055,7 +1055,8 @@ pub fn hidden_step_page(s: &HiddenStep) -> Markup {
                 }
             }
             div.text-wrap #text-wrap {
-                pre.text-body #text-body { (marked_text(s.content, r, true)) }
+                // A pre drops one line feed right after its start tag.
+                pre.text-body #text-body { "\n" (marked_text(s.content, r, true)) }
             }
             @if !entries.is_empty() {
                 // The whole list, script or not: here it is the explanation.
@@ -3518,7 +3519,9 @@ fn text_body(text: &str) -> Markup {
             }
         }
         div.text-wrap #text-wrap {
-            pre.text-body #text-body { (marked_text(text, r, false)) }
+            // A pre drops one line feed right after its start tag, so one goes
+            // there for the text's own to survive.
+            pre.text-body #text-body { "\n" (marked_text(text, r, false)) }
         }
         // Below the box, so the first answer grows the page under the text
         // rather than pushing the text down under the pointer. Quiet until a
@@ -4978,6 +4981,15 @@ mod tests {
         .into_string();
         assert!(entry.contains(r#"class="entry soft word""#), "{entry}");
         assert!(entry.contains("Persian, Hindi"), "{entry}");
+    }
+
+    /// A pre drops one line feed right after its start tag (HTML's parsing
+    /// rule), so the snippet leads with one: a text that starts with a line
+    /// feed keeps it, on the page and in what Copy takes.
+    #[test]
+    fn a_snippet_keeps_its_leading_line_feed() {
+        let page = text_body("\nfirst").into_string();
+        assert!(page.contains(">\n\nfirst</pre>"), "{page}");
     }
 
     /// The cast (design note 29): every marked character gets one entry in the
