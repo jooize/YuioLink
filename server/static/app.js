@@ -143,7 +143,8 @@
         if (!cps.length) return null;
         let clean = chars.filter((c) => !isHidden(c.codePointAt(0))).join("");
         try { clean = new URL(`https://${clean}`).host; } catch { /* shown as typed */ }
-        return { refused: cps.filter((c) => !hostDrops(c)).length, dropped: cps.filter(hostDrops).length, clean };
+        const dropped = cps.filter(hostDrops);
+        return { refused: cps.length - dropped.length, dropped: dropped.length, softDropped: dropped.filter(isSoft).length, clean };
     };
     const EXTENDED_PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
     const isPictographic = (ch) => ch != null && EXTENDED_PICTOGRAPHIC.test(ch);
@@ -2380,13 +2381,14 @@
             // not one, so the link is Text). One line, saying which.
             const t = ta.value.trim();
             const dom = looksLikeUrl(t) && SCHEMES.has(t.slice(0, t.indexOf(":")).toLowerCase()) ? domainHidden(t) : null;
-            const these = (n) => (n === 1 ? "this hidden character" : "these hidden characters");
+            // A soft hyphen is a special character here, as its chip says.
+            const these = (n, soft = false) => `${n === 1 ? "this" : "these"} ${soft ? "special" : "hidden"} ${n === 1 ? "character" : "characters"}`;
             if (dom?.refused) {
                 slot.append(el("p", "hc-note", cautionIcon(), el("span", "",
                     `Domains forbid ${these(dom.refused)}: text link until removed.`)));
             } else if (dom?.dropped) {
                 slot.append(el("p", "hc-note", cautionIcon(), el("span", "",
-                    `Domains ignore ${these(dom.dropped)}: goes to `, el("code", "", dom.clean), ".")));
+                    `Domains ignore ${these(dom.dropped, dom.softDropped === dom.dropped)}: goes to `, el("code", "", dom.clean), ".")));
             }
             paintOverlay(marks);
         };
