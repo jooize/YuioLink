@@ -4021,6 +4021,17 @@ pub fn help_page(base_url: &str) -> Markup {
             "offers to share it as a text link instead."
         }
 
+        h3.help-h #hidden { "Hidden characters" }
+        p.help-p {
+            "Some characters draw nothing: zero-width spaces, direction overrides, tag "
+            "characters. The form puts a small tick where each one sits, names it when the "
+            "caret is beside it, and can remove them before you create the link. The page your "
+            "recipient opens marks them too. Joiners that Persian, Hindi and many other "
+            "languages write inside words get a quieter gray mark. The "
+            a href="/demo" { "demo page" }
+            " shows every case on sample text."
+        }
+
         h3.help-h { "What it is for" }
         dl.help-cases {
             dt { "A long address onto your phone" }
