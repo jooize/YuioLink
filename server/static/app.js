@@ -82,6 +82,34 @@
             .catch(() => {}); // stays marked; no retry on every keystroke
         return variantsLoading;
     };
+    // Where a joiner is ordinary spelling (views.rs spelled, RFC 5892's
+    // CONTEXTJ): right after a virama, or a non-joiner between a letter that
+    // joins forward and one that joins back, past transparent marks. The
+    // ranges (~7 KB) are fetched once the text holds a joiner; until then,
+    // or if that fails, every joiner is red.
+    let JOINING = null;
+    let joiningLoading = null;
+    const loadJoining = () => {
+        joiningLoading ??= fetch(CHARS?.joining ?? "/static/joining.json")
+            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+            .then((table) => { JOINING = table; })
+            .catch(() => {}); // stays red; no retry on every keystroke
+        return joiningLoading;
+    };
+    const isJoiner = (cp) => cp === 0x200c || cp === 0x200d;
+    const spells = (chars, k) => {
+        if (!JOINING) return false;
+        const at = (j) => chars[j]?.codePointAt(0);
+        if (at(k - 1) != null && inRanges(JOINING.virama, at(k - 1))) return true;
+        if (at(k) !== 0x200c) return false;
+        const past = (j, step) => {
+            while (at(j) != null && inRanges(JOINING.transparent, at(j))) j += step;
+            return at(j);
+        };
+        const back = past(k - 1, -1);
+        const ahead = past(k + 1, 1);
+        return back != null && ahead != null && inRanges(JOINING.forward, back) && inRanges(JOINING.back, ahead);
+    };
     const registered = (base, sel) => (EMOJI_BASES.has(base) && (sel === 0xfe0e || sel === 0xfe0f))
         || VARIANTS?.get(sel)?.has(base) === true;
     const hex4 = (cp) => cp.toString(16).toUpperCase().padStart(4, "0");
@@ -117,8 +145,10 @@
     // the parts of an emoji (a joiner between two emoji, as in a family or a
     // flag with a rainbow, and the tags that spell a subdivision flag, as
     // Scotland's), except in an address, where the preview card marks them.
-    // Each keeps `at`, its place in UTF-16 units (the field's selection counts
-    // in those), and `i`, its place in its run of hidden characters.
+    // A joiner where spelling puts it is `word`: the quiet tier, never in an
+    // address either. Each keeps `at`, its place in UTF-16 units (the
+    // field's selection counts in those), and `i`, its place in its run of
+    // hidden characters.
     const scanHidden = (text, address) => {
         const chars = [...text];
         const exempt = new Set();
@@ -145,7 +175,9 @@
             const pairs = !paired && isSelector(cp) && k > 0 && registered(chars[k - 1].codePointAt(0), cp);
             paired = pairs;
             if (cp !== 0x0a && cp !== 0x09 && !pairs && !exempt.has(k) && isHidden(cp)) {
-                marks.push({ ch, cp, at, i: run, soft: isSoft(cp), id: `u${cp.toString(16).padStart(4, "0")}` });
+                const word = !address && isJoiner(cp) && spells(chars, k);
+                const id = `${word ? "w" : "u"}${cp.toString(16).padStart(4, "0")}`;
+                marks.push({ ch, cp, at, i: run, word, soft: !word && isSoft(cp), id });
                 run += 1;
             } else run = 0;
             at += ch.length;
@@ -157,7 +189,9 @@
     // Marks inside one grapheme with a visible character after them (the
     // joiners of an emoji, in an address) make one run spanning the grapheme:
     // the caret moves by graphemes, so it can only stand at its edges, and the
-    // grapheme is drawn whole (`cluster`), as the field draws it.
+    // grapheme is drawn whole (`cluster`), as the field draws it. A joiner
+    // where spelling puts it is a run of its own, as views.rs marked_text
+    // makes it; a cluster is quiet (`word`) only when all its marks are.
     const runsOfMarks = (marks, text) => {
         const inner = new Map();
         if (GRAPHEMES && marks.length) {
@@ -180,9 +214,12 @@
             if (home) {
                 if (last?.cluster && last.at === home[0]) last.marks.push(m);
                 else runs.push({ at: home[0], end: home[1], marks: [m], cluster: true });
-            } else if (m.i > 0 && last && !last.cluster) { last.marks.push(m); last.end = m.at + m.ch.length; }
-            else runs.push({ at: m.at, end: m.at + m.ch.length, marks: [m] });
+            } else if (m.i > 0 && last && !last.cluster && !last.marks[0].word && !m.word) {
+                last.marks.push(m);
+                last.end = m.at + m.ch.length;
+            } else runs.push({ at: m.at, end: m.at + m.ch.length, marks: [m] });
         }
+        for (const r of runs) r.word = r.marks.every((m) => m.word);
         return runs;
     };
     // What an opened run says: the text a run of tag characters spells
@@ -1070,13 +1107,14 @@
     // Marks side by side make a run, as in the form: in Ticks one tick with a
     // count, and the run a click opened shows its label in place; in Labels
     // one label each. A label names the character.
-    // A cluster (a grapheme marked whole) is a run of its own.
+    // A cluster (a grapheme marked whole) is a run of its own, and so is a
+    // joiner where spelling puts it (`word`).
     const groupRuns = (it, body, mode) => {
         const runs = [];
+        const alone = (m) => m.classList.contains("cluster") || m.classList.contains("word");
         for (const m of body.querySelectorAll(".hid[data-tell]")) {
             const last = runs.at(-1);
-            const joins = last && m.previousSibling === last.at(-1)
-                && !m.classList.contains("cluster") && !last[0].classList.contains("cluster");
+            const joins = last && m.previousSibling === last.at(-1) && !alone(m) && !alone(last[0]);
             if (joins) last.push(m);
             else runs.push([m]);
         }
@@ -1105,16 +1143,20 @@
     const TREE_DATA = new Set(["label", "tell", "inner", "cp", "name"]);
     const treeExtra = (n) => (n[1] && typeof n[1] === "object" && !Array.isArray(n[1]) ? n[1] : null);
     const isMarkNode = (n) => Array.isArray(n) && typeof n[0] === "string" && n[0].split(" ").includes("hid");
-    // Mark ids ("u200d u200d") as code points.
-    const idsCps = (ids) => (ids ?? "").split(" ").map((id) => Number.parseInt(id.slice(1), 16));
-    // The code points a mark stands for: a cluster's every mark, else its one.
-    const markCps = (n) => idsCps(treeExtra(n)?.inner ?? treeExtra(n)?.tell);
+    // Mark ids ("u200d w200d") as code points. An id's letter is its tier:
+    // `w` for a joiner where spelling puts it, else `u`.
+    const idsCps = (ids) => (ids ?? "").split(" ").filter(Boolean).map((id) => Number.parseInt(id.slice(1), 16));
+    // The ids a mark stands for: a cluster's every mark, else its one.
+    const markIds = (n) => (treeExtra(n)?.inner ?? treeExtra(n)?.tell ?? "").split(" ").filter(Boolean);
+    const markCps = (n) => idsCps(markIds(n).join(" "));
     const markCp = (n) => markCps(n)[0];
-    // A cluster's text without its marks, taken in order. Where its text
-    // holds the same character marked and not, the first of them goes: the
-    // same string either way, as they are alike.
+    // The code points of a mark's red and gray tiers, never its spelling joiners.
+    const counted = (n) => idsCps(markIds(n).filter((id) => id.startsWith("u")).join(" "));
+    // A cluster's text without its counted marks, taken in order. Where its
+    // text holds the same character marked and not, the first of them goes:
+    // the same string either way, as they are alike.
     const clusterLeft = (n) => {
-        const left = markCps(n);
+        const left = counted(n);
         let out = "";
         for (const ch of n.slice(2).filter((s) => typeof s === "string").join("")) {
             if (ch.codePointAt(0) === left[0]) left.shift();
@@ -1123,10 +1165,11 @@
         return out;
     };
     // What a mark leaves in place of its character under `drop`: null to
-    // keep the mark, else the text standing in for it. A cluster is always
-    // of the red tier (views.rs marked_text) and leaves its drawn characters.
+    // keep the mark, else the text standing in for it. A cluster's red marks
+    // go with the red tier (views.rs marked_text), leaving its drawn
+    // characters. A joiner where spelling puts it always stays.
     const dropped = (n, drop) => {
-        if (!drop || !isMarkNode(n)) return null;
+        if (!drop || !isMarkNode(n) || !counted(n).length) return null;
         if (treeExtra(n)?.inner) return drop.hard ? clusterLeft(n) : null;
         const cp = markCp(n);
         if (!isSoft(cp)) return drop.hard ? "" : null;
@@ -1171,7 +1214,7 @@
     // How many marks a tree holds that are of the kinds counted in red
     // (`soft` false) or of the soft kinds (`soft` true).
     const markCount = (nodes, soft = false) =>
-        nodes.reduce((sum, n) => sum + (isMarkNode(n) ? markCps(n).filter((cp) => isSoft(cp) === soft).length
+        nodes.reduce((sum, n) => sum + (isMarkNode(n) ? counted(n).filter((cp) => isSoft(cp) === soft).length
             : Array.isArray(n) ? markCount(n.slice(1), soft) : 0), 0);
     // The same, read back from the page: a mark's label is generated content,
     // never text, so only a NUL's empty mark needs its data-cp put back.
@@ -1277,6 +1320,9 @@
     const markAt = (body, x, y) => {
         // A tick takes no width: matched within 6px of where it stands.
         if (body.classList.contains("ticked")) return markNear(body, x, y);
+        // A spelling joiner keeps its tick in Labels, so it is matched the same way.
+        const word = markNear(body, x, y, ".hid.word");
+        if (word) return word;
         for (const m of body.querySelectorAll(".hid[data-tell]")) {
             for (const r of m.getClientRects()) {
                 if (r.width > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return m;
@@ -1660,7 +1706,8 @@
             actions.append(copy, show, remove);
             foot.append(meta, actions);
 
-            const cast = marks || softMarks ? castPanel(it) : null;
+            // Spelling joiners alone get no chip, but their entries still open.
+            const cast = Array.isArray(drawn) ? castPanel(it) : null;
             li.append(contentsWell(it, rowName), ...(cast ? [cast] : []), link, foot);
             listEl.append(li);
         }
@@ -2039,8 +2086,9 @@
         "direction", "tabSize", "alignContent", "borderRadius"];
     // The text without one tier of its hidden characters: with `soft`, the
     // no-break spaces (a plain space each) and soft hyphens; else the rest.
+    // A joiner where spelling puts it stays either way.
     const withoutHidden = (text, soft, address) => {
-        const drop = new Set(scanHidden(text, address).filter((m) => m.soft === soft).map((m) => m.at));
+        const drop = new Set(scanHidden(text, address).filter((m) => !m.word && m.soft === soft).map((m) => m.at));
         let out = "";
         let at = 0;
         for (const ch of text) {
@@ -2137,7 +2185,7 @@
         // field it would point at nothing.
         const placeFlag = () => {
             const m = document.activeElement === ta ? overlay.querySelector(".hid[data-flag]") : null;
-            flag.classList.toggle("soft", Boolean(m?.classList.contains("soft")));
+            flag.classList.toggle("soft", Boolean(m?.matches(".soft, .word")));
             place(flag, m, m?.dataset.flag);
         };
 
@@ -2160,6 +2208,7 @@
                     const s = el("span", run.cluster ? "hid cluster" : "hid", m.ch);
                     s.dataset.run = String(run.at);
                     if (run.marks.every((x) => x.soft)) s.classList.add("soft");
+                    if (run.word) s.classList.add("word");
                     if ((run.cluster ? run.marks : [m]).some((x) => st.open.includes(x.id))) s.classList.add("open");
                     if (m.i === 0) {
                         s.classList.add("first");
@@ -2180,19 +2229,20 @@
         };
 
         // An entry: the character's tiles and name, the three ways to write
-        // it (the server's copy_forms), and what it does.
-        const entryEl =(cp, count, url) => {
-            const soft = isSoft(cp);
+        // it (the server's copy_forms), and what it does. A joiner where
+        // spelling puts it is gray and says so.
+        const entryEl = (cp, count, url, word) => {
+            const soft = word || isSoft(cp);
             const [sym, name] = charDress(cp);
             const times = count > 1 ? ` It appears ${count === 2 ? "twice" : `${count} times`}.` : "";
-            return el("div", `entry solo ${soft ? "soft" : "warn"}`,
+            return el("div", `entry solo ${soft ? "soft" : "warn"}${word ? " word" : ""}`,
                 el("span", "tiles", el("span", "tile sym", sym), el("span", "tile raw", cp ? String.fromCodePoint(cp) : "")),
                 el("span", "what", el("b", "", name),
                     el("span", "forms",
                         formButton(`U+${hex4(cp)}`, "in Unicode", false),
                         formButton(`\\u{${cp.toString(16).toUpperCase()}}`, "in code", !url),
                         formButton(pct(cp), "in a URL", url)),
-                    el("span", "after", `${charMeaning(cp)}.${times} The empty box is the character.`)));
+                    el("span", "after", `${word && CHARS?.spelling ? CHARS.spelling : charMeaning(cp)}.${times} The empty box is the character.`)));
         };
 
         const replaceField = (text) => {
@@ -2243,21 +2293,22 @@
         const render = () => {
             const marks = scan(ta.value);
             if (!VARIANTS && marks.some((m) => isSelector(m.cp))) loadVariants().then(() => { if (VARIANTS) render(); });
+            if (!JOINING && marks.some((m) => isJoiner(m.cp))) loadJoining().then(() => { if (JOINING) render(); });
             const runs = runsOfMarks(marks, ta.value);
             for (const tier of ["hard", "soft"]) if (!removedNow(tier)) st.removed[tier] = null;
             st.open = st.open.filter((id) => marks.some((m) => m.id === id));
             if (!runs.some((r) => r.at === st.flag)) st.flag = null;
-            const hard = marks.filter((m) => !m.soft).length;
-            const soft = marks.length - hard;
-            if (marks.length && !st.announced) live.textContent = `${plural(marks.length, "hidden character")} in the text.`;
-            st.announced = marks.length;
+            const hard = marks.filter((m) => !m.soft && !m.word).length;
+            const soft = marks.filter((m) => m.soft).length;
+            if (hard + soft && !st.announced) live.textContent = `${plural(hard + soft, "hidden character")} in the text.`;
+            st.announced = hard + soft;
             slot.replaceChildren();
             peek.hidden = true;
             const url = isRedirect(ta.value);
             const shown = st.open.map((id) => marks.filter((m) => m.id === id)).filter((list) => list.length);
-            if (shown.length) slot.append(el("div", "history-cast pv-cast", ...shown.map((list) => entryEl(list[0].cp, list.length, url))));
+            if (shown.length) slot.append(el("div", "history-cast pv-cast", ...shown.map((list) => entryEl(list[0].cp, list.length, url, list[0].word))));
             // A line per tier: its count, or how many were removed.
-            const was = (tier) => scan(st.removed[tier].before).filter((m) => m.soft === (tier === "soft")).length;
+            const was = (tier) => scan(st.removed[tier].before).filter((m) => !m.word && m.soft === (tier === "soft")).length;
             for (const [tier, n] of [["hard", hard], ["soft", soft]]) {
                 if (removedNow(tier)) slot.append(el("div", "history-meta", chip(tier, was(tier))));
                 else if (n) slot.append(el("div", "history-meta", chip(tier, n)));
@@ -2342,7 +2393,7 @@
             const first = m && overlay.querySelector(`.hid.first[data-run="${m.dataset.run}"]`);
             if (!first || Number(first.dataset.run) === st.flag) { peek.hidden = true; return; }
             const run = runsOfMarks(scan(ta.value), ta.value).find((r) => String(r.at) === first.dataset.run);
-            peek.classList.toggle("soft", first.classList.contains("soft"));
+            peek.classList.toggle("soft", first.matches(".soft, .word"));
             place(peek, first, runLabel(run.marks.map((x) => x.cp)));
         });
         ta.addEventListener("mouseleave", () => { peek.hidden = true; });
@@ -2358,8 +2409,8 @@
     // The mark near a point: within 6px of where its tick stands, on its line.
     // A tick takes no width, so the pointer is matched to it, never the
     // other way round.
-    const markNear = (root, x, y) => {
-        for (const m of root.querySelectorAll(".hid")) {
+    const markNear = (root, x, y, which = ".hid") => {
+        for (const m of root.querySelectorAll(which)) {
             for (const r of m.getClientRects()) {
                 if (x >= r.left - 6 && x <= r.right + 6 && y >= r.top && y <= r.bottom) return m;
             }

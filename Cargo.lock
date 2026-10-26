@@ -2659,6 +2659,7 @@ dependencies = [
  "base64",
  "hmac",
  "http-body-util",
+ "icu_properties",
  "idna",
  "maud",
  "phonenumber",

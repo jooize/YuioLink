@@ -31,6 +31,7 @@ off `DEFAULT_ALLOWED_SCHEMES` is printed and given no control.
 | `/wordlist.txt` | GET | The curated 3,456-word name list as plain text (linked from the landing page's Privacy/Security disclosure — the namespace is public by design). |
 | `/static/app.css`, `/static/app.js`, `/static/text.js`, `/static/preview.js` | GET | Embedded assets; `Cache-Control: public, max-age=31536000, immutable`. Pages link them with `?v=<version>-<fingerprint>`, so changed bytes are a new URL. |
 | `/static/variations.json` | GET | The registered variation sequences outside the emoji list, as JSON (selector to bases), cached like the assets above. app.js fetches it the first time the create form holds a variation selector, so the form marks only the selectors the server marks. |
+| `/static/joining.json` | GET | The Unicode ranges behind the joiners that are ordinary spelling (viramas and joining types, RFC 5892 CONTEXTJ), as JSON, cached like the assets above. app.js fetches it the first time the create form holds a zero-width joiner or non-joiner, so the form puts the same joiners in the quiet word tier as the server. |
 
 ## Terminal convenience
 

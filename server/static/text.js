@@ -136,12 +136,15 @@
             void entry.offsetWidth; // restart the pulse
             entry.classList.add("shown");
         };
+        // A joiner where spelling puts it draws only a tick and takes no
+        // width, so it is matched within 6px of where it stands.
         const markAt = (x, y) =>
-            marks.find((m) =>
-                [...m.getClientRects()].some(
-                    (r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom,
-                ),
-            );
+            marks.find((m) => {
+                const pad = m.classList.contains("word") ? 6 : 0;
+                return [...m.getClientRects()].some(
+                    (r) => x >= r.left - pad && x <= r.right + pad && y >= r.top && y <= r.bottom,
+                );
+            });
 
         pre.addEventListener("click", (event) => {
             const sel = window.getSelection();

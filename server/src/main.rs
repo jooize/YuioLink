@@ -3,6 +3,7 @@ mod config;
 mod db;
 mod emoji;
 mod error;
+mod joining;
 mod legal;
 mod phone;
 mod qr;

@@ -10,6 +10,7 @@ use maud::{DOCTYPE, Markup, PreEscaped, html};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::emoji;
+use crate::joining;
 use crate::phone;
 use crate::urlview::{self, Hazard, IdnWarning, Piece, Role, Tier, UriView};
 use crate::variation;
@@ -39,8 +40,8 @@ fn asset_url(path: &str) -> String {
 
 /// An FNV-1a fingerprint over every embedded static asset, computed once per
 /// process. Not cryptographic — it only has to change when the bytes do. One
-/// combined stamp for all five files keeps every page's references in step;
-/// the files are small enough that over-busting four of them costs nothing.
+/// combined stamp for all six files keeps every page's references in step;
+/// the files are small enough that over-busting five of them costs nothing.
 fn asset_stamp() -> &'static str {
     static STAMP: std::sync::OnceLock<String> = std::sync::OnceLock::new();
     STAMP.get_or_init(|| {
@@ -51,6 +52,7 @@ fn asset_stamp() -> &'static str {
             include_str!("../static/text.js"),
             include_str!("../static/preview.js"),
             crate::variation::client_table(),
+            crate::joining::client_table(),
         ] {
             for byte in file.bytes() {
                 hash ^= u64::from(byte);
@@ -1744,7 +1746,7 @@ fn escape_runs(value: &str) -> Vec<(String, bool)> {
 // --------------------------------------------------------------------------
 
 /// Why a marked character is in the cast at all — the story its entry tells.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CastKind {
     /// A space stored as `%20` (the dotted receipt).
     Space,
@@ -1759,6 +1761,9 @@ enum CastKind {
     /// A hidden character in a Text snippet: kept in the text, marked by its
     /// escape, and explained by what it does.
     Snippet,
+    /// A joiner in a Text snippet where spelling puts one ([`spelled`]):
+    /// marked in the quiet word tier, named and written out as a Snippet is.
+    Spelling,
     /// A variation selector completing a registered sequence with the
     /// character before it: drawn as part of that character, never marked,
     /// listed under the Variant Forms fact.
@@ -2176,7 +2181,10 @@ struct EntryDress {
 /// one sentence.
 fn cast_entry(e: &CastEntry, dress: EntryDress) -> Markup {
     let EntryDress { solo, soft, url } = dress;
-    let soft = soft && e.kind == CastKind::Snippet && is_soft(e.ch);
+    let snippet = matches!(e.kind, CastKind::Snippet | CastKind::Spelling);
+    // A spelling joiner is always gray: no page counts it with the rest.
+    let soft =
+        e.kind == CastKind::Spelling || (soft && e.kind == CastKind::Snippet && is_soft(e.ch));
     let warn = !soft
         && matches!(
             e.kind,
@@ -2194,6 +2202,9 @@ fn cast_entry(e: &CastEntry, dress: EntryDress) -> Markup {
     }
     if soft {
         class.push_str(" soft");
+    }
+    if e.kind == CastKind::Spelling {
+        class.push_str(" word");
     }
     if solo {
         class.push_str(" solo");
@@ -2219,12 +2230,12 @@ fn cast_entry(e: &CastEntry, dress: EntryDress) -> Markup {
                     span.tile.raw { @if e.ch != '\0' { (e.ch) } }
                 }
             }
-            @if e.kind == CastKind::Snippet {
+            @if snippet {
                 span.what {
                     b { (name) }
                     (copy_forms(e.ch, url))
                     span.after {
-                        (char_meaning(e.ch)) "."
+                        @if e.kind == CastKind::Spelling { (SPELLING_MEANING) } @else { (char_meaning(e.ch)) } "."
                         @if e.count == 2 { " It appears twice." }
                         @else if e.count > 2 { " It appears " (e.count) " times." }
                         " The empty box is the character."
@@ -2280,7 +2291,7 @@ fn cast_prose(e: &CastEntry) -> Markup {
             CastKind::Padding => { "literal, used as padding" }
             CastKind::Hidden => { "stored as " code { (e.stored) } }
             // Written out by copy_forms instead.
-            CastKind::Snippet => {}
+            CastKind::Snippet | CastKind::Spelling => {}
             CastKind::Variant => { (variant_phrase(e.base, e.ch)) }
             CastKind::Kept => {
                 "kept escaped as " code { (e.stored) }
@@ -2293,6 +2304,11 @@ fn cast_prose(e: &CastEntry) -> Markup {
         }
     }
 }
+
+/// What a joiner does where spelling puts it ([`spelled`]), in place of
+/// [`char_meaning`]'s warning.
+const SPELLING_MEANING: &str = "It sets how the letters beside it join or combine. Persian, Hindi \
+     and many other languages write it inside words, and here it sits where that spelling puts it";
 
 /// What a hidden character in a snippet does, in one sentence: the reason it
 /// is marked at all.
@@ -2352,7 +2368,9 @@ pub(crate) fn host_drops(c: char) -> bool {
 /// server marks a snippet, as JSON for the landing page's `yuiolink-chars`
 /// meta: the hidden code points and the soft ones, as `[first, last]`
 /// ranges; the ones a domain drops; the bases VS15 and VS16 complete (the
-/// emoji list registers both styles for each); each character's name where
+/// emoji list registers both styles for each); where to fetch the joining
+/// table ([`joining::client_table`]) and what a joiner spelling puts in a
+/// word does; each character's name where
 /// it has one beyond the formula app.js shares (variation selectors, tag
 /// characters, hex digits); what each one does; and where to fetch the other registered
 /// variation sequences. Built once, from the same functions the server marks
@@ -2396,9 +2414,11 @@ pub(crate) fn char_table() -> &'static str {
             "soft": ranges(&is_soft),
             "hostDrops": ranges(&host_drops),
             "emojiBases": variation::emoji_bases('\u{fe0f}'),
+            "joining": asset_url("/static/joining.json"),
             "variants": asset_url("/static/variations.json"),
             "names": names,
             "meanings": meanings,
+            "spelling": SPELLING_MEANING,
         })
         .to_string()
     })
@@ -2955,7 +2975,7 @@ pub fn text_display(text: &str, whole: bool) -> Option<(serde_json::Value, serde
     let r = Reading::of(text, false);
     let entries: Vec<CastEntry> = text_cast(text, r)
         .into_iter()
-        .filter(|e| e.kind == CastKind::Snippet)
+        .filter(|e| matches!(e.kind, CastKind::Snippet | CastKind::Spelling))
         .collect();
     if entries.is_empty() {
         return None;
@@ -3473,18 +3493,25 @@ fn text_body(text: &str) -> Markup {
     let r = Reading::of(text, false);
     let crlf = r.crlf;
     let entries = text_cast(text, r);
-    let hidden = entries
-        .iter()
-        .filter(|e| e.kind == CastKind::Snippet)
-        .map(|e| e.id.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
+    let ids = |kind: CastKind| {
+        entries
+            .iter()
+            .filter(|e| e.kind == kind)
+            .map(|e| e.id.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    let hidden = ids(CastKind::Snippet);
+    let spelling = ids(CastKind::Spelling);
     let variants = variant_ids(&entries);
     html! {
         @if crlf || !entries.is_empty() {
             div.pv-facts {
                 @if !hidden.is_empty() {
                     span.pv-fact.warn data-cast=(hidden) { (alert_icon()) "Hidden Characters" }
+                }
+                @if !spelling.is_empty() {
+                    span.pv-fact.word data-cast=(spelling) { "Joiners in Words" }
                 }
                 @if let Some(ids) = &variants { (variant_fact(ids)) }
                 @if crlf { span.pv-fact { "CRLF Line Endings" } }
@@ -3513,7 +3540,11 @@ fn text_cast(text: &str, r: Reading) -> Vec<CastEntry> {
     let mut prev: Option<char> = None;
     for (i, c) in text.char_indices() {
         let entry = if text_mark(text, i, c, r) {
-            Some((mark_id(c), None, CastKind::Snippet))
+            Some(if spelled(text, i, c, r) {
+                (word_id(c), None, CastKind::Spelling)
+            } else {
+                (mark_id(c), None, CastKind::Snippet)
+            })
         } else if variation::completes(prev, c) {
             prev.map(|b| (variant_id(b, c), Some(b), CastKind::Variant))
         } else {
@@ -3543,6 +3574,12 @@ fn text_cast(text: &str, r: Reading) -> Vec<CastEntry> {
 /// their character.
 fn mark_id(c: char) -> String {
     format!("u{:04x}", c as u32)
+}
+
+/// The `data-tell` id of a joiner where spelling puts one: an entry apart
+/// from the same character's red one, which says something else.
+fn word_id(c: char) -> String {
+    format!("w{:04x}", c as u32)
 }
 
 /// The cast id of a registered sequence: base and selector together, since
@@ -3626,6 +3663,13 @@ fn text_mark(text: &str, i: usize, c: char, r: Reading) -> bool {
     }
 }
 
+/// True when a marked character is a joiner where spelling puts one: the
+/// quiet word tier ([`joining::spells`]). Never in an address, where every
+/// hidden character is red, as the preview card marks it.
+fn spelled(text: &str, i: usize, c: char, r: Reading) -> bool {
+    !r.address && joining::spells(text, i, c)
+}
+
 /// The graphemes of `text` that hold a mark with a character drawn after it,
 /// as byte ranges: an emoji's joiners in an address, the joiner in an Indic
 /// conjunct. Such a grapheme is marked whole (`span.hid.cluster`), as app.js's
@@ -3685,11 +3729,12 @@ fn run_label(run: &[char]) -> String {
 }
 
 /// How many of `text`'s hidden characters are marked, as a snippet marks
-/// them: the ones that hide things, then the soft kinds ([`is_soft`]).
+/// them: the ones that hide things, then the soft kinds ([`is_soft`]). The
+/// joiners spelling puts in words ([`spelled`]) count as neither.
 pub(crate) fn hidden_counts(text: &str, address: bool) -> (usize, usize) {
     let r = Reading::of(text, address);
     text.char_indices()
-        .filter(|&(i, c)| text_mark(text, i, c, r))
+        .filter(|&(i, c)| text_mark(text, i, c, r) && !spelled(text, i, c, r))
         .fold((0, 0), |(hard, soft), (_, c)| {
             if is_soft(c) {
                 (hard, soft + 1)
@@ -3701,13 +3746,14 @@ pub(crate) fn hidden_counts(text: &str, address: bool) -> (usize, usize) {
 
 /// `text` without the marked hidden characters that hide things, as the
 /// create form's Remove takes them out: a line or paragraph separator becomes
-/// a line feed, and the soft kinds stay.
+/// a line feed, and the soft kinds and the joiners spelling puts in words
+/// stay.
 pub(crate) fn without_hidden(text: &str, address: bool) -> String {
     let r = Reading::of(text, address);
     let mut out = String::with_capacity(text.len());
     for (i, c) in text.char_indices() {
         match c {
-            c if is_soft(c) || !text_mark(text, i, c, r) => out.push(c),
+            c if is_soft(c) || !text_mark(text, i, c, r) || spelled(text, i, c, r) => out.push(c),
             '\u{2028}' | '\u{2029}' => out.push('\n'),
             _ => {}
         }
@@ -3722,7 +3768,9 @@ pub(crate) fn without_hidden(text: &str, address: bool) -> String {
 ///
 /// Marks side by side make a run, which wears one label, on its first mark
 /// ([`run_label`]); the rest are `span.hid.rest`, with none. Where `soft`
-/// dresses the soft kinds gray, a run is gray when all of it is soft.
+/// dresses the soft kinds gray, a run is gray when all of it is soft. A
+/// joiner where spelling puts it ([`spelled`]) is `span.hid.word`, a run of
+/// its own, with its own entry ([`word_id`]).
 ///
 /// A registered variation sequence is wrapped whole in a `span.var` with the
 /// `data-tell` of its cast entry: real text, so a drag or a copy is unchanged.
@@ -3730,10 +3778,13 @@ pub(crate) fn without_hidden(text: &str, address: bool) -> String {
 /// A grapheme holding a mark with a character drawn after it
 /// ([`mark_clusters`]) is one `span.hid.cluster` around the whole grapheme,
 /// and a run of its own: its label names every mark inside, `data-tell` is
-/// the first one's entry, and `data-inner` lists each mark's id in order, for
-/// app.js to count and leave them out. Inside it a variant form is plain text.
-/// It is always of the red tier: the soft kinds are spaces and the soft
-/// hyphen, which end a grapheme, so none is ever inside one.
+/// the first red one's entry (else the first's), and `data-inner` lists each
+/// mark's id in order, for
+/// app.js to count and leave them out; an id says its mark's tier (`w` for a
+/// joiner spelling puts there, [`word_id`]). Inside it a variant form is plain
+/// text. It is red unless all its marks are spelling (`word`): the soft kinds
+/// are spaces and the soft hyphen, which end a grapheme, so none is ever
+/// inside one.
 ///
 /// Two characters cannot travel raw through HTML. The parser turns a carriage
 /// return into a line feed, so it goes out as `&#13;`; it turns a NUL into
@@ -3758,21 +3809,36 @@ fn marked_text(text: &str, r: Reading, soft: bool) -> Markup {
         }
         if let Ok(k) = starts_cluster(i) {
             let (from, to) = clusters[k];
-            let marks: Vec<char> = text[from..to]
+            let at: Vec<(usize, char)> = text[from..to]
                 .char_indices()
                 .filter(|&(j, d)| text_mark(text, from + j, d, r))
-                .map(|(_, d)| d)
                 .collect();
-            let inner = marks
+            let marks: Vec<char> = at.iter().map(|&(_, d)| d).collect();
+            // Each mark's id says its tier: a conjunct's joiner, where
+            // spelling puts it, is quiet, and the cluster with it when all
+            // its marks are. Its entry is the first red one's, if any.
+            let ids: Vec<String> = at
                 .iter()
-                .map(|&d| mark_id(d))
-                .collect::<Vec<_>>()
-                .join(" ");
+                .map(|&(j, d)| {
+                    if spelled(text, from + j, d, r) {
+                        word_id(d)
+                    } else {
+                        mark_id(d)
+                    }
+                })
+                .collect();
+            let word = ids.iter().all(|id| id.starts_with('w'));
+            let tell = ids.iter().find(|id| id.starts_with('u')).unwrap_or(&ids[0]);
+            let class = if word {
+                "hid cluster word"
+            } else {
+                "hid cluster"
+            };
             out.push_str(&html! { (&text[start..from]) }.into_string());
             out.push_str(
                 &html! {
-                    span.hid.cluster data-label=(run_label(&marks)) data-tell=(mark_id(marks[0]))
-                        data-inner=(inner) { (&text[from..to]) }
+                    span class=(class) data-label=(run_label(&marks)) data-tell=(tell)
+                        data-inner=(ids.join(" ")) { (&text[from..to]) }
                 }
                 .into_string(),
             );
@@ -3809,20 +3875,29 @@ fn marked_text(text: &str, r: Reading, soft: bool) -> Markup {
             out.push_str(&raw.into_string());
             continue;
         }
-        let label = if i == run_end {
+        // A joiner spelling puts in a word is a run of its own, quiet.
+        let word = spelled(text, i, c, r);
+        let label = if i == run_end && !word {
             None
+        } else if word {
+            run_soft = false;
+            Some(run_label(&[c]))
         } else {
-            // A cluster is a run of its own, so this one stops at it.
+            // A cluster or a spelling joiner is a run of its own, so this one
+            // stops at it.
             let run: Vec<char> = text[i..]
                 .char_indices()
                 .map_while(|(j, d)| {
-                    (starts_cluster(i + j).is_err() && text_mark(text, i + j, d, r)).then_some(d)
+                    (starts_cluster(i + j).is_err()
+                        && text_mark(text, i + j, d, r)
+                        && !spelled(text, i + j, d, r))
+                    .then_some(d)
                 })
                 .collect();
             run_soft = soft && run.iter().all(|&d| is_soft(d));
             Some(run_label(&run))
         };
-        run_end = start;
+        run_end = if word { usize::MAX } else { start };
         let mut class = String::from("hid");
         if label.is_none() {
             class.push_str(" rest");
@@ -3830,8 +3905,11 @@ fn marked_text(text: &str, r: Reading, soft: bool) -> Markup {
         if run_soft {
             class.push_str(" soft");
         }
+        if word {
+            class.push_str(" word");
+        }
         let cp = (c == '\0').then_some("0");
-        let tell = mark_id(c);
+        let tell = if word { word_id(c) } else { mark_id(c) };
         out.push_str(
             &html! { span class=(class) data-label=[label] data-tell=(tell) data-cp=[cp] { (raw) } }
                 .into_string(),
@@ -4060,6 +4138,11 @@ pub(crate) const DEMO_SAMPLES: &[(&str, &str, &str)] = &[
         "https://example.com/pay\u{200b}ment",
     ),
     (
+        "Joiners in words",
+        "Persian writes a zero-width non-joiner inside many words, and Hindi and Sinhala put a joiner after a virama to pick a letter form. Where spelling puts one, it gets only a small gray wedge, is never counted and never removed. Between Latin letters the same character is red.",
+        "\u{645}\u{6cc}\u{200c}\u{62e}\u{648}\u{627}\u{647}\u{645} \u{915}\u{94d}\u{200d}\u{937} \u{dc3}\u{dca}\u{200d}\u{dba} sig\u{200c}ned",
+    ),
+    (
         "Emoji",
         "The joiners inside a family emoji and the tags of a subdivision flag are part of the emoji, so in text nothing is marked.",
         "\u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467} \u{1f3f4}\u{e0067}\u{e0062}\u{e0073}\u{e0063}\u{e0074}\u{e007f} \u{1f3f3}\u{fe0f}\u{200d}\u{1f308}",
@@ -4082,7 +4165,7 @@ pub(crate) const DEMO_SAMPLES: &[(&str, &str, &str)] = &[
 ];
 
 /// The sample on `/demo/text`: several kinds at once.
-const DEMO_TEXT: &str = "Wi-Fi: pass\u{200b}word\nRoom: 10\u{a0}km away\nFamily: \u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467}\nFile: abc\u{202e}def\u{202c}\nBell: \u{7}";
+const DEMO_TEXT: &str = "Wi-Fi: pass\u{200b}word\nRoom: 10\u{a0}km away\nFamily: \u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467}\nFile: abc\u{202e}def\u{202c}\nBell: \u{7}\nPersian: \u{645}\u{6cc}\u{200c}\u{62e}\u{648}\u{627}\u{647}\u{645}\nHindi: \u{915}\u{94d}\u{200d}\u{937}";
 
 /// The sample on `/demo/redirect`: a hidden character in the path, a
 /// direction override in the query, an emoji's joiners in the fragment.
@@ -4792,9 +4875,16 @@ mod tests {
     fn a_mark_inside_a_grapheme_marks_the_whole_grapheme() {
         let text =
             |s: &str, address: bool| marked_text(s, Reading::of(s, address), false).into_string();
-        // Devanagari KA, VIRAMA, ZWJ, SSA: one grapheme (a conjunct).
+        // Devanagari KA, VIRAMA, ZWJ, SSA: one grapheme (a conjunct). In a
+        // text the joiner is spelling, so the cluster is quiet; in an
+        // address it is red.
         assert_eq!(
             text("\u{915}\u{94d}\u{200d}\u{937}!", false),
+            "<span class=\"hid cluster word\" data-label=\"zero-width joiner\" \
+             data-tell=\"w200d\" data-inner=\"w200d\">\u{915}\u{94d}\u{200d}\u{937}</span>!"
+        );
+        assert_eq!(
+            text("\u{915}\u{94d}\u{200d}\u{937}!", true),
             "<span class=\"hid cluster\" data-label=\"zero-width joiner\" \
              data-tell=\"u200d\" data-inner=\"u200d\">\u{915}\u{94d}\u{200d}\u{937}</span>!"
         );
@@ -4816,6 +4906,58 @@ mod tests {
         assert!(!text("a\u{200d}", false).contains("cluster"));
         assert!(!text("a\r\nb\nc", false).contains("cluster"));
         assert!(text("a\r\nb\nc", false).contains("&#13;"));
+    }
+
+    /// A joiner where spelling puts it is marked in the quiet word tier: a
+    /// run of its own, its own entry (gray, saying so), never counted for the
+    /// step and never taken out by Remove. The same joiner elsewhere is red.
+    #[test]
+    fn spelling_joiners_are_the_quiet_word_tier() {
+        let persian = "می\u{200c}خواهم";
+        let r = Reading::of(persian, false);
+        let marked = marked_text(persian, r, false).into_string();
+        assert!(
+            marked.contains(
+                r#"<span class="hid word" data-label="zero-width non-joiner" data-tell="w200c">"#
+            ),
+            "{marked}"
+        );
+        assert_eq!(hidden_counts(persian, false), (0, 0));
+        assert_eq!(without_hidden(persian, false), persian);
+        // In an address it is red, counted and removed.
+        assert_eq!(hidden_counts(persian, true), (1, 0));
+        assert_eq!(without_hidden(persian, true), "میخواهم");
+        // Next to a red mark, each keeps its own run and entry.
+        let both = "می\u{200c}\u{200b}خواهم sig\u{200c}ned";
+        let r = Reading::of(both, false);
+        let marked = marked_text(both, r, false).into_string();
+        assert!(marked.contains(r#"data-tell="w200c""#), "{marked}");
+        assert!(
+            marked
+                .contains(r#"<span class="hid" data-label="zero-width space" data-tell="u200b">"#),
+            "{marked}"
+        );
+        assert!(marked.contains(r#"data-tell="u200c""#), "{marked}");
+        assert_eq!(hidden_counts(both, false), (2, 0));
+        let ids: Vec<(String, CastKind)> = text_cast(both, r)
+            .into_iter()
+            .map(|e| (e.id, e.kind))
+            .collect();
+        assert_eq!(
+            ids,
+            [
+                ("w200c".to_string(), CastKind::Spelling),
+                ("u200b".to_string(), CastKind::Snippet),
+                ("u200c".to_string(), CastKind::Snippet),
+            ]
+        );
+        let entry = cast_entry(
+            &text_cast(persian, Reading::of(persian, false))[0],
+            EntryDress::default(),
+        )
+        .into_string();
+        assert!(entry.contains(r#"class="entry soft word""#), "{entry}");
+        assert!(entry.contains("Persian, Hindi"), "{entry}");
     }
 
     /// The cast (design note 29): every marked character gets one entry in the

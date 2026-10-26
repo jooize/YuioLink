@@ -94,6 +94,7 @@ pub fn router(state: AppState) -> Router {
         .route("/static/text.js", get(text_js))
         .route("/static/preview.js", get(preview_js))
         .route("/static/variations.json", get(variations_json))
+        .route("/static/joining.json", get(joining_json))
         .route("/wordlist.txt", get(wordlist_txt))
         .route("/robots.txt", get(robots_txt))
         // Any bare segment added here shadows `/{name}` and must also go in
@@ -1635,6 +1636,20 @@ pub async fn variations_json() -> impl IntoResponse {
     )
 }
 
+/// `GET /static/joining.json`: the Unicode ranges behind the joiners that are
+/// ordinary spelling (`joining::client_table`), which app.js fetches only when
+/// the create form holds a joiner. Cached like variations.json, under the same
+/// fingerprint.
+pub async fn joining_json() -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "application/json"),
+            (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
+        ],
+        crate::joining::client_table(),
+    )
+}
+
 /// `GET /api/v0/openapi.yaml` — the API description, embedded from
 /// `server/openapi.yaml` (inside the crate, so the container build context has
 /// it) so the served spec always matches the built binary.
@@ -2029,12 +2044,18 @@ mod tests {
         }
     }
 
-    /// The soft kinds alone, and the joiners inside an emoji, are created in
-    /// one step, as before.
+    /// The soft kinds alone, the joiners inside an emoji, and the joiners
+    /// spelling puts in words (Persian "mi-khaham", a Hindi conjunct) are
+    /// created in one step, as before.
     #[tokio::test]
     async fn the_form_creates_soft_kinds_and_emoji_in_one_step() {
         let st = test_state().await;
-        for content in ["a%C2%A0b%C2%ADc", "%F0%9F%91%A8%E2%80%8D%F0%9F%91%A9"] {
+        for content in [
+            "a%C2%A0b%C2%ADc",
+            "%F0%9F%91%A8%E2%80%8D%F0%9F%91%A9",
+            "%D9%85%DB%8C%E2%80%8C%D8%AE%D9%88%D8%A7%D9%87%D9%85",
+            "%E0%A4%95%E0%A5%8D%E2%80%8D%E0%A4%B7",
+        ] {
             let (s, _, body) = send(
                 &st,
                 post_body("/", &format!("content={content}&ttl_stop=7")),
@@ -3192,6 +3213,22 @@ mod tests {
         );
         let table: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert!(table.get("65024").is_some(), "VS1 has bases: {table:.80}");
+    }
+
+    /// The same for the joining table: named in the meta, served as JSON.
+    #[tokio::test]
+    async fn the_landing_page_links_the_joining_table() {
+        let st = test_state().await;
+        let (_, _, page) = send(&st, get("/")).await;
+        assert!(
+            page.contains("&quot;joining&quot;:&quot;/static/joining.json?v="),
+            "the yuiolink-chars meta names the table"
+        );
+        let (status, headers, body) = send(&st, get("/static/joining.json")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers.get("content-type").unwrap(), "application/json");
+        let table: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(table["virama"].as_array().is_some_and(|v| !v.is_empty()));
     }
 
     /// Every response leaves through the same middleware, including the ones no

@@ -33,6 +33,11 @@ psl = "2"
 # Indic conjunct's). app.js does the same with the browser's Intl.Segmenter.
 unicode-segmentation = "1"
 
+# Joining_Type and Canonical_Combining_Class, for the joiners that are ordinary
+# spelling (RFC 5892's CONTEXTJ rules): ICU4X's compiled data, the same crate
+# idna already builds on, so its Unicode version is the URL parser's.
+icu_properties = "2"
+
 # Phone-number classification for `tel:` and `sms:` previews: the Rust port of
 # Google's libphonenumber (Whisperfish). It is here for PhoneNumberType, not for
 # formatting -- PremiumRate is the one real `tel:` hazard, and nothing else in

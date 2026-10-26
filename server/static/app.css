@@ -1782,13 +1782,53 @@ html.js .custom-field:not(.open) {
     display: none;
 }
 
+/* The quiet word tier: a joiner where spelling puts it (views.rs spelled),
+   as Persian and the Indic scripts write one inside words. Only a small gray
+   wedge where it sits, everywhere a mark is drawn, Labels and the Text page
+   included: one sits in many words, so a label in the line would bury the
+   text. Its name shows in its flag and its entry. No isolate: a joiner
+   changes no direction, and an isolate would cut the very shaping it is
+   there for. */
+.text-body .hid.word,
+.history-well-body .hid.word,
+.hc-overlay .hid.word {
+    position: relative;
+    unicode-bidi: normal;
+    --tick: var(--text-tertiary);
+}
+
+.text-body .hid.word.open,
+.history-well-body .hid.word.open,
+.hc-overlay .hid.word.open {
+    --tick: var(--accent);
+}
+
+.text-body .hid.word::after,
+.history-well-body .hid.word:not(.lab)::after,
+.hc-overlay .hid.word::after {
+    content: "";
+    position: absolute;
+    top: 0.02em;
+    left: calc(50% - 0.17em);
+    width: 0.34em;
+    height: 0.2em;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    outline: 0;
+    line-height: normal;
+    background: var(--tick);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
 /* The run a click opened in a History row shows its label in place. */
 .history-well-body.ticked .hid.lab.rest::after {
     display: none;
 }
 
 .history-well-body:not(.ticked) .hid.soft::after,
-.history-well-body.ticked .hid.soft.lab::after {
+.history-well-body.ticked .hid.soft.lab::after,
+.history-well-body.ticked .hid.word.lab::after {
     color: #fff;
     background: var(--hc-gray);
 }
