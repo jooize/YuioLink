@@ -1745,7 +1745,7 @@ html.js .custom-field:not(.open) {
 }
 
 .ticked .hid.soft {
-    --tick: var(--text-tertiary);
+    --tick: var(--hc-gray);
 }
 
 .ticked .hid.open {
@@ -1829,18 +1829,20 @@ html.js .custom-field:not(.open) {
 }
 
 /* The quiet word tier: a joiner where spelling puts it (views.rs spelled),
-   as Persian and the Indic scripts write one inside words. Only a small gray
-   wedge where it sits, everywhere a mark is drawn, Labels and the Text page
-   included: one sits in many words, so a label in the line would bury the
-   text. Its name shows in its flag and its entry. Like every mark without
-   a label, it is an empty box beside the text (app.js placeMarks), since
-   an element around it would cut the very shaping it is there for. */
+   as Persian and the Indic scripts write one inside words. Only a gray wedge
+   where it sits, a red tick's head without its bar, everywhere a mark is
+   drawn, Labels and the Text page included: one sits in many words, so a
+   label in the line would bury the text. Its gray is the soft kinds' (3:1
+   or more on the field in both themes); a lighter one all but vanished.
+   Its name shows in its flag and its entry. Like every mark without a
+   label, it is an empty box beside the text (app.js placeMarks), since an
+   element around it would cut the very shaping it is there for. */
 .text-body .hid.word,
 .history-well-body .hid.word,
 .hc-overlay .hid.word {
     position: relative;
     unicode-bidi: normal;
-    --tick: var(--text-tertiary);
+    --tick: var(--hc-gray);
 }
 
 .text-body .hid.word.open,
@@ -1855,9 +1857,9 @@ html.js .custom-field:not(.open) {
     content: "";
     position: absolute;
     top: 0.02em;
-    left: calc(50% - 0.17em);
-    width: 0.34em;
-    height: 0.2em;
+    left: calc(50% - 0.23em);
+    width: 0.46em;
+    height: 0.26em;
     margin: 0;
     padding: 0;
     border-radius: 0;
