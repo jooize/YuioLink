@@ -1686,7 +1686,11 @@ html.js .custom-field:not(.open) {
 
 .text-body .hid::after,
 .history-well-body .hid::after {
-    content: attr(data-label);
+    /* The trailing zero-width space lets the line break after a label. A
+       label otherwise joins the letters on both sides into one word, and a
+       few labels in a row make a word longer than the line, which then
+       wraps twice. */
+    content: attr(data-label) "\200B";
     pointer-events: none;
     margin: 0 1px;
     padding: 0 3px;
