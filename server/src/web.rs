@@ -2714,7 +2714,7 @@ mod tests {
         let (s, _, text) = send(&st, get("/demo/text")).await;
         assert_eq!(s, StatusCode::OK);
         assert!(
-            text.contains(r#"<pre class="text-body" id="text-body">"#),
+            text.contains(r#"<pre class="text-body" id="text-body" data-words="[["#),
             "{text}"
         );
         assert!(text.contains(r#"id="copy-text""#), "{text}");

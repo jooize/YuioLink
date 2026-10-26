@@ -133,6 +133,81 @@
         return b;
     };
 
+    // Marks are drawn beside the text, never in it: an element boundary
+    // inside a word changes how its letters join (WebKit splits shaping at
+    // any element, Chromium at a generated box), so the server leaves the
+    // joiners spelling puts in words as plain text and lists where they sit
+    // (`data-words`: `[[start, end, id], ...]`, string offsets into the
+    // text). Each gets an empty box over its characters, placed by measuring
+    // them, which draws its wedge and is found by a click like any mark. A
+    // character drawn inside another's shape has no box of its own, so then
+    // the point where it starts. As app.js placeMarks does it.
+    const placeMarks = (host, marks) => {
+        const h = host.getBoundingClientRect();
+        const ox = h.left + host.clientLeft - host.scrollLeft;
+        const oy = h.top + host.clientTop - host.scrollTop;
+        const walk = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+        let node = walk.nextNode();
+        let base = 0;
+        // A start at the seam of two text nodes takes the later one, an end
+        // the earlier; marks come in order, so the walk never goes back.
+        const seek = (i, start) => {
+            while (node && (start ? i >= base + node.length : i > base + node.length)) {
+                const next = walk.nextNode();
+                if (!next) break;
+                base += node.length;
+                node = next;
+            }
+            return node && i >= base && i <= base + node.length ? [node, i - base] : null;
+        };
+        const range = document.createRange();
+        for (const { at, end, box } of marks) {
+            const a = seek(at, true);
+            const b = a && seek(end, false);
+            box.hidden = !b;
+            if (!b) continue;
+            range.setStart(...a);
+            range.setEnd(...b);
+            let r = range.getClientRects()[0];
+            if (!r) {
+                range.collapse(true);
+                r = range.getBoundingClientRect();
+            }
+            Object.assign(box.style, {
+                position: "absolute",
+                left: `${r.left - ox}px`,
+                top: `${r.top - oy}px`,
+                width: `${r.width}px`,
+                height: `${r.height}px`,
+            });
+        }
+    };
+    const placeWords = (pre) => {
+        let list;
+        try {
+            list = JSON.parse(pre.dataset.words ?? "[]");
+        } catch {
+            return;
+        }
+        if (!Array.isArray(list)) return;
+        const marks = list
+            .filter((w) => Array.isArray(w) && Number.isInteger(w[0]) && Number.isInteger(w[1])
+                && w[0] <= w[1] && /^w[0-9a-f]+$/.test(w[2]))
+            .sort((x, y) => x[0] - y[0])
+            .map(([at, end, tell]) => {
+                const box = document.createElement("span");
+                box.className = "hid word";
+                box.dataset.tell = tell;
+                return { at, end, box };
+            });
+        if (!marks.length) return;
+        pre.append(...marks.map((m) => m.box));
+        placeMarks(pre, marks);
+        // Placed again whenever the text wraps anew: the window's width, the
+        // fold opening.
+        if (typeof ResizeObserver === "function") new ResizeObserver(() => placeMarks(pre, marks)).observe(pre);
+    };
+
     // The cast answers when asked, the same deck the preview card uses: one
     // entry shown at a time, a click on a mark shows the entry naming its
     // character, and each chip with a data-cast (Hidden Characters, Variant
@@ -160,8 +235,8 @@
             void entry.offsetWidth; // restart the pulse
             entry.classList.add("shown");
         };
-        // A joiner where spelling puts it draws only a tick and takes no
-        // width, so it is matched within 6px of where it stands.
+        // A joiner where spelling puts it draws only a wedge, taking no room
+        // in the line, so it is matched within 6px of where it stands.
         const markAt = (x, y) =>
             marks.find((m) => {
                 const pad = m.classList.contains("word") ? 6 : 0;
@@ -219,6 +294,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
         const pre = document.getElementById("text-body");
+        if (pre) placeWords(pre);
         if (pre) wireCast(pre);
         const wrap = document.getElementById("text-wrap");
         const copyBtn = document.getElementById("copy-text");

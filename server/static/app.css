@@ -1626,6 +1626,8 @@ html.js .custom-field:not(.open) {
 }
 
 .text-body {
+    /* Its quiet marks are boxes placed over its text (text.js). */
+    position: relative;
     margin: 0;
     padding: 14px;
     font-family: var(--font-mono);

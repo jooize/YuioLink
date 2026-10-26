@@ -1055,8 +1055,9 @@ pub fn hidden_step_page(s: &HiddenStep) -> Markup {
                 }
             }
             div.text-wrap #text-wrap {
-                // A pre drops one line feed right after its start tag.
-                pre.text-body #text-body { "\n" (marked_text(s.content, r, true)) }
+                // A pre drops one line feed right after its start tag. The
+                // step loads no script, so its joiners in words go unmarked.
+                pre.text-body #text-body { "\n" (marked_text(s.content, r, true, Words::Listed).html) }
             }
             @if !entries.is_empty() {
                 // The whole list, script or not: here it is the explanation.
@@ -2987,7 +2988,9 @@ pub fn text_display(text: &str, whole: bool) -> Option<(serde_json::Value, serde
         keep: &["label", "tell", "inner", "cp", "name"],
     };
     let tree = markup_tree(
-        &marked_text(text, r, false).into_string(),
+        &marked_text(text, r, false, Words::Wrapped)
+            .html
+            .into_string(),
         usize::MAX,
         &rules,
     );
@@ -3505,6 +3508,7 @@ fn text_body(text: &str) -> Markup {
     let hidden = ids(CastKind::Snippet);
     let spelling = ids(CastKind::Spelling);
     let variants = variant_ids(&entries);
+    let marked = marked_text(text, r, false, Words::Listed);
     html! {
         @if crlf || !entries.is_empty() {
             div.pv-facts {
@@ -3521,7 +3525,7 @@ fn text_body(text: &str) -> Markup {
         div.text-wrap #text-wrap {
             // A pre drops one line feed right after its start tag, so one goes
             // there for the text's own to survive.
-            pre.text-body #text-body { "\n" (marked_text(text, r, false)) }
+            pre.text-body #text-body data-words=[marked.words_attr()] { "\n" (marked.html) }
         }
         // Below the box, so the first answer grows the page under the text
         // rather than pushing the text down under the pointer. Quiet until a
@@ -3772,8 +3776,9 @@ pub(crate) fn without_hidden(text: &str, address: bool) -> String {
 /// Marks side by side make a run, which wears one label, on its first mark
 /// ([`run_label`]); the rest are `span.hid.rest`, with none. Where `soft`
 /// dresses the soft kinds gray, a run is gray when all of it is soft. A
-/// joiner where spelling puts it ([`spelled`]) is `span.hid.word`, a run of
-/// its own, with its own entry ([`word_id`]).
+/// joiner where spelling puts it ([`spelled`]) is a run of its own, with
+/// its own entry ([`word_id`]): `span.hid.word` or plain text, as `words`
+/// says ([`Words`]).
 ///
 /// A registered variation sequence is wrapped whole in a `span.var` with the
 /// `data-tell` of its cast entry: real text, so a drag or a copy is unchanged.
@@ -3785,16 +3790,30 @@ pub(crate) fn without_hidden(text: &str, address: bool) -> String {
 /// mark's id in order, for
 /// app.js to count and leave them out; an id says its mark's tier (`w` for a
 /// joiner spelling puts there, [`word_id`]). Inside it a variant form is plain
-/// text. It is red unless all its marks are spelling (`word`): the soft kinds
-/// are spaces and the soft hyphen, which end a grapheme, so none is ever
-/// inside one.
+/// text. It is red unless all its marks are spelling (`word`), and then
+/// plain text too when `words` lists them: the soft kinds are spaces and the
+/// soft hyphen, which end a grapheme, so none is ever inside one.
 ///
 /// Two characters cannot travel raw through HTML. The parser turns a carriage
 /// return into a line feed, so it goes out as `&#13;`; it turns a NUL into
 /// U+FFFD even as a reference, so a NUL's mark is empty and carries the code
 /// point in `data-cp`, which text.js puts back when copying.
-fn marked_text(text: &str, r: Reading, soft: bool) -> Markup {
+fn marked_text(text: &str, r: Reading, soft: bool, words: Words) -> Marked {
     let mut out = String::with_capacity(text.len());
+    let mut listed = Vec::new();
+    // Where byte `i` falls in the text the page holds, in UTF-16 units, the
+    // way a script counts: every character but a NUL, whose mark is empty.
+    // Asked in order, so it counts each stretch once.
+    let mut cursor = (0, 0);
+    let mut dom = |i: usize| {
+        cursor.1 += text[cursor.0..i]
+            .chars()
+            .filter(|&c| c != '\0')
+            .map(char::len_utf16)
+            .sum::<usize>();
+        cursor.0 = i;
+        cursor.1
+    };
     // Start of the run of characters that show as themselves.
     let mut start = 0;
     let mut prev: Option<(usize, char)> = None;
@@ -3832,6 +3851,14 @@ fn marked_text(text: &str, r: Reading, soft: bool) -> Markup {
                 .collect();
             let word = ids.iter().all(|id| id.starts_with('w'));
             let tell = ids.iter().find(|id| id.starts_with('u')).unwrap_or(&ids[0]);
+            if word && words == Words::Listed {
+                // Plain text, left in the stretch being passed over.
+                listed.push((dom(from), dom(to), tell.clone()));
+                skip = to;
+                prev = None;
+                run_end = usize::MAX;
+                continue;
+            }
             let class = if word {
                 "hid cluster word"
             } else {
@@ -3867,6 +3894,14 @@ fn marked_text(text: &str, r: Reading, soft: bool) -> Markup {
         if !mark && c != '\r' {
             continue;
         }
+        // A joiner spelling puts in a word is a run of its own, quiet.
+        let word = mark && spelled(text, i, c, r);
+        if word && words == Words::Listed {
+            let at = dom(i);
+            listed.push((at, at + c.len_utf16(), word_id(c)));
+            run_end = usize::MAX;
+            continue;
+        }
         out.push_str(&html! { (&text[start..i]) }.into_string());
         start = i + c.len_utf8();
         let raw = match c {
@@ -3878,8 +3913,6 @@ fn marked_text(text: &str, r: Reading, soft: bool) -> Markup {
             out.push_str(&raw.into_string());
             continue;
         }
-        // A joiner spelling puts in a word is a run of its own, quiet.
-        let word = spelled(text, i, c, r);
         let label = if i == run_end && !word {
             None
         } else if word {
@@ -3919,7 +3952,42 @@ fn marked_text(text: &str, r: Reading, soft: bool) -> Markup {
         );
     }
     out.push_str(&html! { (&text[start..]) }.into_string());
-    PreEscaped(out)
+    Marked {
+        html: PreEscaped(out),
+        words: listed,
+    }
+}
+
+/// Where [`marked_text`] puts the joiners spelling puts in words: in the
+/// markup as `span.hid.word` (a History row's tree, which app.js draws as
+/// data), or nowhere in it (a page). An element around a character inside
+/// a word changes how the word is drawn (WebKit splits shaping at any
+/// element, Chromium at a generated box), and these sit inside words by
+/// definition. So a page leaves them as plain text, and a script that can
+/// measure draws their wedges beside it ([`Marked::words`]).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Words {
+    Wrapped,
+    Listed,
+}
+
+/// A snippet as [`marked_text`] marks it.
+struct Marked {
+    html: Markup,
+    /// The joiners left as plain text ([`Words::Listed`]), each as where it
+    /// starts and ends in the page's text, in UTF-16 units (a script's
+    /// string offsets), and its entry's id. A grapheme marked whole is one,
+    /// spanning the grapheme.
+    words: Vec<(usize, usize, String)>,
+}
+
+impl Marked {
+    /// The `data-words` a page's snippet carries for text.js: the listed
+    /// joiners as JSON, `[[start, end, id], ...]`; none when there are none.
+    fn words_attr(&self) -> Option<String> {
+        (!self.words.is_empty())
+            .then(|| serde_json::to_string(&self.words).expect("plain numbers and strings"))
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -4188,7 +4256,7 @@ pub(crate) const DEMO_SAMPLES: &[(&str, &str, &str)] = &[
 ];
 
 /// The sample on `/demo/text`: several kinds at once.
-const DEMO_TEXT: &str = "Wi-Fi: pass\u{200b}word\nRoom: 10\u{a0}km away\nFamily: \u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467}\nFile: abc\u{202e}def\u{202c}\nBell: \u{7}\nPersian: \u{645}\u{6cc}\u{200c}\u{62e}\u{648}\u{627}\u{647}\u{645}\nHindi: \u{915}\u{94d}\u{200d}\u{937}";
+const DEMO_TEXT: &str = "Wi-Fi: pass\u{200b}word\nRoom: 10\u{a0}km away\nFamily: \u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467}\nFile: abc\u{202e}def\u{202c}\nBell: \u{7}\nPersian: \u{645}\u{6cc}\u{200c}\u{62e}\u{648}\u{627}\u{647}\u{645}\nAbbreviation: \u{628}\u{647}\u{200d}.\nHindi: \u{915}\u{94d}\u{200d}\u{937}\nKannada: \u{cb0}\u{200d}\u{ccd}\u{caf}\nSinhala: \u{dc3}\u{dca}\u{200d}\u{dba}";
 
 /// The sample on `/demo/redirect`: a hidden character in the path, a
 /// direction override in the query, an emoji's joiners in the fragment.
@@ -4883,8 +4951,14 @@ mod tests {
         let mut run = tags("hi");
         run.push('\u{e007f}');
         assert_eq!(run_label(&run), "3 hidden characters of 3 kinds");
-        let marked =
-            marked_text("x\u{e0068}\u{e0069}", Reading::of("", false), false).into_string();
+        let marked = marked_text(
+            "x\u{e0068}\u{e0069}",
+            Reading::of("", false),
+            false,
+            Words::Wrapped,
+        )
+        .html
+        .into_string();
         assert!(
             marked.contains(r#"data-label="tags spelling &quot;hi&quot;""#),
             "{marked}"
@@ -4896,8 +4970,11 @@ mod tests {
     /// drew the family as three people and the conjunct as a half letter.
     #[test]
     fn a_mark_inside_a_grapheme_marks_the_whole_grapheme() {
-        let text =
-            |s: &str, address: bool| marked_text(s, Reading::of(s, address), false).into_string();
+        let text = |s: &str, address: bool| {
+            marked_text(s, Reading::of(s, address), false, Words::Wrapped)
+                .html
+                .into_string()
+        };
         // Devanagari KA, VIRAMA, ZWJ, SSA: one grapheme (a conjunct). In a
         // text the joiner is spelling, so the cluster is quiet; in an
         // address it is red.
@@ -4938,7 +5015,9 @@ mod tests {
     fn spelling_joiners_are_the_quiet_word_tier() {
         let persian = "می\u{200c}خواهم";
         let r = Reading::of(persian, false);
-        let marked = marked_text(persian, r, false).into_string();
+        let marked = marked_text(persian, r, false, Words::Wrapped)
+            .html
+            .into_string();
         assert!(
             marked.contains(
                 r#"<span class="hid word" data-label="zero-width non-joiner" data-tell="w200c">"#
@@ -4953,7 +5032,9 @@ mod tests {
         // Next to a red mark, each keeps its own run and entry.
         let both = "می\u{200c}\u{200b}خواهم sig\u{200c}ned";
         let r = Reading::of(both, false);
-        let marked = marked_text(both, r, false).into_string();
+        let marked = marked_text(both, r, false, Words::Wrapped)
+            .html
+            .into_string();
         assert!(marked.contains(r#"data-tell="w200c""#), "{marked}");
         assert!(
             marked
@@ -4981,6 +5062,35 @@ mod tests {
         .into_string();
         assert!(entry.contains(r#"class="entry soft word""#), "{entry}");
         assert!(entry.contains("Persian, Hindi"), "{entry}");
+    }
+
+    /// A page leaves the joiners spelling puts in words as plain text, since
+    /// an element inside a word changes how it is drawn, and lists where
+    /// they sit for text.js, in a script's string offsets. Red marks stay.
+    #[test]
+    fn a_page_lists_spelling_joiners_beside_the_text() {
+        let listed = |s: &str| marked_text(s, Reading::of(s, false), false, Words::Listed);
+        // Persian ZWNJ after two letters; an astral character and a NUL
+        // before it shift the offsets (two units, and none: its mark is empty).
+        let persian = "\u{1f600}\0می\u{200c}خواهم";
+        let m = listed(persian);
+        let html = m.html.into_string();
+        assert!(!html.contains("word"), "{html}");
+        assert!(html.contains("می\u{200c}خواهم"), "{html}");
+        assert!(html.contains(r#"data-cp="0""#), "{html}");
+        assert_eq!(m.words, [(4, 5, "w200c".to_string())]);
+        // A conjunct marked whole spans its grapheme; a red joiner beside
+        // the word keeps its span.
+        let m = listed("\u{915}\u{94d}\u{200d}\u{937} a\u{200b}");
+        assert_eq!(m.words, [(0, 4, "w200d".to_string())]);
+        assert_eq!(m.words_attr().as_deref(), Some(r#"[[0,4,"w200d"]]"#));
+        let html = m.html.into_string();
+        assert!(
+            html.starts_with("\u{915}\u{94d}\u{200d}\u{937} a<span"),
+            "{html}"
+        );
+        assert!(html.contains(r#"data-tell="u200b""#), "{html}");
+        assert_eq!(listed("plain").words_attr(), None);
     }
 
     /// A pre drops one line feed right after its start tag (HTML's parsing
