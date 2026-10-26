@@ -1118,6 +1118,47 @@
         if (mode !== "labels") body.classList.add("marks-ticks", "ticked");
         paintDisplay(c.display, body, dropFor(it));
         groupRuns(it, body, mode);
+        beside.set(body, setBeside(body));
+    };
+    // A row's marks as placeMarks takes them, per body; fitWells places them,
+    // once the row has its width.
+    const beside = new WeakMap();
+    // The characters that set direction (Unicode's Bidi_Control). Drawn
+    // plain, one would reorder the row's text around it; each stays in an
+    // isolate of its own, which holds its effect to itself, as in Labels.
+    const BIDI_CONTROL = /^[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]$/u;
+    // Every mark that draws no label goes beside the text (placeMarks): in
+    // Ticks all of them but the run a click opened, elsewhere the joiners
+    // spelling puts in words. Its span gives way to its plain characters
+    // and an empty box takes its classes and data. A NUL keeps its empty
+    // span, for its data-cp; a direction control keeps an isolate.
+    const setBeside = (body) => {
+        const ticked = body.classList.contains("ticked");
+        const marks = [];
+        let at = 0;
+        for (const node of [...body.childNodes]) {
+            const text = node.textContent;
+            const mark = node.nodeType === Node.ELEMENT_NODE && node.classList.contains("hid")
+                && !node.classList.contains("lab") && (ticked || node.classList.contains("word"));
+            if (mark) {
+                const box = el("span", node.className);
+                for (const k of ["run", "n", "tell", "inner"]) {
+                    if (node.dataset[k] !== undefined) box.dataset[k] = node.dataset[k];
+                }
+                let plain = document.createTextNode(text);
+                if (node.dataset.cp !== undefined) {
+                    plain = el("span");
+                    plain.dataset.cp = node.dataset.cp;
+                } else if (BIDI_CONTROL.test(text)) plain = el("span", "iso", text);
+                node.replaceWith(plain);
+                marks.push({ at, end: at + text.length, box });
+            }
+            at += text.length;
+        }
+        // Adjacent text nodes become one, so nothing splits a word.
+        body.normalize();
+        body.append(...marks.map((m) => m.box));
+        return marks;
     };
     // Marks side by side make a run, as in the form: in Ticks one tick with a
     // count, and the run a click opened shows its label in place; in Labels
@@ -1470,6 +1511,8 @@
             well.classList.add("stacked");
             well.classList.toggle("stacked", body.getBoundingClientRect().height > 24);
             const open = well.classList.contains("open");
+            const marks = beside.get(body);
+            if (marks?.length) placeMarks(body, marks);
             if (body.classList.contains("ticked")) fitCounts(body);
             const cut = !open && (body.scrollHeight > body.clientHeight + 1 || (it?.chars ?? 0) > SNIPPET_MAX);
             body.classList.toggle("cut", cut);
@@ -2227,11 +2270,8 @@
 
         // The field's text again, laid out as the field lays it out, with a
         // mark over each hidden character. The copy is one unbroken text
-        // node: an element boundary inside a word changes how its letters
-        // join (WebKit splits shaping at any span, Chromium at a generated
-        // box), and the marks would drift from the letters the field draws.
-        // So each mark is its own box beside the text, placed over the
-        // characters it stands for by measuring them.
+        // node, and each mark its own box beside it (placeMarks), or the
+        // marks would drift from the letters the field draws.
         const paintOverlay = (marks) => {
             const cs = getComputedStyle(ta);
             for (const p of COPY_PROPS) overlay.style[p] = cs[p];
@@ -2240,24 +2280,10 @@
             overlay.style.paddingRight = `${Number.parseFloat(cs.paddingRight) + Math.max(0, bars)}px`;
             const v = ta.value;
             // A zero-width space holds open the empty line a final line break makes.
-            const text = document.createTextNode(`${v}\u200b`);
-            overlay.replaceChildren(text);
+            overlay.replaceChildren(`${v}\u200b`);
             overlay.style.height = `${ta.offsetHeight}px`;
             overlay.scrollTop = ta.scrollTop;
-            const o = overlay.getBoundingClientRect();
-            const ox = o.left + overlay.clientLeft - overlay.scrollLeft;
-            const oy = o.top + overlay.clientTop - overlay.scrollTop;
-            const range = document.createRange();
-            // The box of v[a..b]; a character drawn inside another's shape
-            // can have none, so then the point where it starts.
-            const boxOf = (a, b) => {
-                range.setStart(text, a);
-                range.setEnd(text, b);
-                const r = range.getClientRects()[0];
-                if (r) return r;
-                range.collapse(true);
-                return range.getBoundingClientRect();
-            };
+            const boxes = [];
             for (const run of runsOfMarks(marks, v)) {
                 const parts = run.cluster ? [{ at: run.at, ch: v.slice(run.at, run.end), i: 0 }] : run.marks;
                 for (const m of parts) {
@@ -2272,17 +2298,11 @@
                         if (run.at === st.flag) s.dataset.flag = runLabel(run.marks.map((x) => x.cp));
                     }
                     if (run.at === st.flag) s.classList.add("flagged");
-                    const r = boxOf(m.at, m.at + m.ch.length);
-                    Object.assign(s.style, {
-                        position: "absolute",
-                        left: `${r.left - ox}px`,
-                        top: `${r.top - oy}px`,
-                        width: `${r.width}px`,
-                        height: `${r.height}px`,
-                    });
-                    overlay.append(s);
+                    boxes.push({ at: m.at, end: m.at + m.ch.length, box: s });
                 }
             }
+            overlay.append(...boxes.map((b) => b.box));
+            placeMarks(overlay, boxes);
             fitCounts(overlay);
             placeFlag();
         };
@@ -2468,6 +2488,57 @@
         if (typeof ResizeObserver === "function") new ResizeObserver(() => paintOverlay(scan(ta.value))).observe(ta);
         render();
         return { render };
+    };
+    // Marks are drawn beside the text, never in it: an element boundary
+    // inside a word changes how its letters join (WebKit splits shaping at
+    // any element, Chromium at a generated box such as a tick), so a word
+    // wrapped to be marked is drawn differently from the same word plain.
+    // Each mark is an empty box over the characters it stands for, placed
+    // by measuring them: `marks` holds `{ at, end, box }` in order, where
+    // `at` and `end` count `host`'s text (every text node in it, in order).
+    // A character drawn inside another's shape has no box of its own, so
+    // then the point where it starts. The boxes are `host`'s children, so
+    // it must be positioned.
+    const placeMarks = (host, marks) => {
+        const h = host.getBoundingClientRect();
+        const ox = h.left + host.clientLeft - host.scrollLeft;
+        const oy = h.top + host.clientTop - host.scrollTop;
+        const walk = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+        let node = walk.nextNode();
+        let base = 0;
+        // The text node and offset of position `i`. A start at the seam of
+        // two nodes takes the later one, an end the earlier; marks come in
+        // order, so the walk never goes back.
+        const seek = (i, start) => {
+            while (node && (start ? i >= base + node.length : i > base + node.length)) {
+                const next = walk.nextNode();
+                if (!next) break;
+                base += node.length;
+                node = next;
+            }
+            return node && i >= base && i <= base + node.length ? [node, i - base] : null;
+        };
+        const range = document.createRange();
+        for (const { at, end, box } of marks) {
+            const a = seek(at, true);
+            const b = a && seek(end, false);
+            box.hidden = !b;
+            if (!b) continue;
+            range.setStart(...a);
+            range.setEnd(...b);
+            let r = range.getClientRects()[0];
+            if (!r) {
+                range.collapse(true);
+                r = range.getBoundingClientRect();
+            }
+            Object.assign(box.style, {
+                position: "absolute",
+                left: `${r.left - ox}px`,
+                top: `${r.top - oy}px`,
+                width: `${r.width}px`,
+                height: `${r.height}px`,
+            });
+        }
     };
     // The mark near a point: within 6px of where its tick stands, on its line.
     // A tick takes no width, so the pointer is matched to it, never the

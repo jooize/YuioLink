@@ -1669,6 +1669,12 @@ html.js .custom-field:not(.open) {
     unicode-bidi: isolate;
 }
 
+/* A direction control whose mark is drawn beside the row's text (app.js
+   setBeside) keeps an isolate of its own, so it reorders nothing. */
+.history-well-body .iso {
+    unicode-bidi: isolate;
+}
+
 .text-body .hid::after,
 .history-well-body .hid::after {
     content: attr(data-label);
@@ -1819,9 +1825,9 @@ html.js .custom-field:not(.open) {
    as Persian and the Indic scripts write one inside words. Only a small gray
    wedge where it sits, everywhere a mark is drawn, Labels and the Text page
    included: one sits in many words, so a label in the line would bury the
-   text. Its name shows in its flag and its entry. No isolate: a joiner
-   changes no direction, and an isolate would cut the very shaping it is
-   there for. */
+   text. Its name shows in its flag and its entry. Like every mark without
+   a label, it is an empty box beside the text (app.js placeMarks), since
+   an element around it would cut the very shaping it is there for. */
 .text-body .hid.word,
 .history-well-body .hid.word,
 .hc-overlay .hid.word {
@@ -1852,6 +1858,12 @@ html.js .custom-field:not(.open) {
     line-height: normal;
     background: var(--tick);
     clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+/* Over a grapheme marked whole it stands as high as in the form, clear of
+   a headline (Devanagari draws one along the top, which hid it). */
+.history-well-body .hid.cluster.word:not(.lab)::after {
+    top: -0.06em;
 }
 
 /* The run a click opened in a History row shows its label in place. */
@@ -3892,6 +3904,8 @@ html.history-collapsed .history-body {
 /* Up to ten 19px lines. Past that the last line fades out: the row ends
    mid-text on purpose, and the note below says how much there is. */
 .history-well-body {
+    /* Its marks are boxes placed over its text (app.js placeMarks). */
+    position: relative;
     max-height: 190px;
     overflow: hidden;
     overflow-wrap: anywhere;
