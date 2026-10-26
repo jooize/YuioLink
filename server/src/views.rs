@@ -4149,7 +4149,7 @@ pub(crate) const DEMO_SAMPLES: &[(&str, &str, &str)] = &[
     ),
     (
         "Emoji in an address",
-        "In an address the same joiners are marked, as the redirect's page marks them. Where a destination is at stake, nothing hidden passes unmarked.",
+        "In an address the same joiners are marked, as the redirect's page marks them: a ring around the whole picture, with the tick on top. Where a destination is at stake, nothing hidden passes unmarked.",
         "https://example.com/\u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467}",
     ),
     (

@@ -918,12 +918,13 @@ html.js .custom-field:not(.open) {
 
 /* The flag over the run the caret stands beside, naming it; a click on it
    closes it. The peek is the same flag, quiet, over the run under the
-   pointer, and covers what it stands over, the open flag included. */
+   pointer, and covers what it stands over, the open flag included. It
+   stands a little above the line, clear of its letters. */
 .hc-flag {
     position: absolute;
     z-index: 2;
     cursor: pointer;
-    transform: translate(-50%, -100%);
+    transform: translate(-50%, calc(-100% - 4px));
     padding: 1px 5px;
     border-radius: 4px;
     white-space: nowrap;
@@ -1780,6 +1781,25 @@ html.js .custom-field:not(.open) {
 .ticked .hid.first.cnt-none::before,
 .ticked .hid.flagged::before {
     display: none;
+}
+
+/* A grapheme marked whole (an emoji with joiners in an address): a ring
+   around the picture and the wedge on top, so the tick names the whole
+   character and no bar crosses it. */
+.ticked .hid.cluster:not(.word, .lab) {
+    border-radius: 0.22em;
+    outline: 1.5px solid var(--tick);
+    outline-offset: 1px;
+}
+
+.ticked .hid.cluster:not(.lab)::after {
+    top: -0.06em;
+    height: var(--tick-cap);
+}
+
+/* Its count stands past the ring, not on it. */
+.ticked .hid.cluster.first:not([data-n="1"]):not(.lab)::before {
+    left: calc(100% + 0.2em);
 }
 
 /* The quiet word tier: a joiner where spelling puts it (views.rs spelled),

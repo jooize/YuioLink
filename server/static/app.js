@@ -2428,12 +2428,14 @@
         const marks = [...root.querySelectorAll(".hid.first")].map((m) => {
             m.classList.remove("cnt-none");
             const r = m.getClientRects()[0];
-            return r && { m, x: r.left + r.width / 2, line: Math.round(r.top), n: Number(m.dataset.n) };
+            // A cluster's count stands past its ring (app.css).
+            const after = m.classList.contains("cluster") ? r?.right + 0.2 * fs : null;
+            return r && { m, x: r.left + r.width / 2, after, line: Math.round(r.top), n: Number(m.dataset.n) };
         }).filter(Boolean);
         const placed = marks.map((k) => ({ a: k.x - w / 2, b: k.x + w / 2, line: k.line }));
         for (const k of marks) {
             if (k.n < 2) continue;
-            const a = k.x + w / 2 + gap;
+            const a = k.after ?? k.x + w / 2 + gap;
             const b = a + String(k.n).length * digit + 1;
             if (placed.every((p) => p.line !== k.line || b <= p.a || a >= p.b)) placed.push({ a, b, line: k.line });
             else k.m.classList.add("cnt-none");
