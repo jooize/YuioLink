@@ -109,6 +109,30 @@
         }
     };
 
+    // An open entry's close button, as app.js draws it: a cross. A press
+    // keeps the focus where it was.
+    const closeButton = (close) => {
+        const ns = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(ns, "svg");
+        for (const [k, v] of Object.entries({ width: "14", height: "14", viewBox: "0 0 14 14", fill: "none", "aria-hidden": "true" })) {
+            svg.setAttribute(k, v);
+        }
+        const path = document.createElementNS(ns, "path");
+        for (const [k, v] of Object.entries({ d: "M3.8 3.8l6.4 6.4M10.2 3.8l-6.4 6.4", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" })) {
+            path.setAttribute(k, v);
+        }
+        svg.append(path);
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "entry-close";
+        b.title = "Close";
+        b.setAttribute("aria-label", "Close");
+        b.append(svg);
+        b.addEventListener("pointerdown", (event) => event.preventDefault());
+        b.addEventListener("click", close);
+        return b;
+    };
+
     // The cast answers when asked, the same deck the preview card uses: one
     // entry shown at a time, a click on a mark shows the entry naming its
     // character, and each chip with a data-cast (Hidden Characters, Variant
@@ -145,6 +169,17 @@
                     (r) => x >= r.left - pad && x <= r.right + pad && y >= r.top && y <= r.bottom,
                 );
             });
+        // Each entry closes with a button: a shown entry is otherwise put
+        // away only by stepping a chip past the last. From the keyboard the
+        // focus goes back to the first chip, since the button goes with its
+        // entry. A whole list or a sole entry stays open, so it has none.
+        const closable = cast.classList.contains("whole") ? [] : cast.querySelectorAll(".entry:not(.solo)");
+        for (const entry of closable) entry.append(closeButton(() => {
+            const had = document.activeElement?.closest(".entry") === entry;
+            show(null);
+            settle();
+            if (had) chips[0]?.focus({ preventScroll: true });
+        }));
 
         pre.addEventListener("click", (event) => {
             const sel = window.getSelection();

@@ -1310,6 +1310,10 @@
         panel.className = "history-cast pv-cast";
         paintDisplay([entry], panel);
         copyForms(panel);
+        panel.firstElementChild?.append(closeButton(() => {
+            castOpen.delete(it.id);
+            renderHistory();
+        }, null));
         return panel;
     };
     // A mark's label ignores the pointer (in Safari a label that takes it
@@ -2127,6 +2131,23 @@
         });
         return b;
     };
+    // An open entry's close button. A press keeps the focus where it was (the
+    // field keeps its caret); one from the keyboard hands it to `back`, since
+    // the button goes with its entry.
+    const closeButton = (close, back) => {
+        const b = el("button", "entry-close",
+            icon(14, "0 0 14 14", [["path", { ...round, d: "M3.8 3.8l6.4 6.4M10.2 3.8l-6.4 6.4", "stroke-width": "1.6" }]]));
+        b.type = "button";
+        b.title = "Close";
+        b.setAttribute("aria-label", "Close");
+        b.addEventListener("pointerdown", (event) => event.preventDefault());
+        b.addEventListener("click", () => {
+            const had = document.activeElement === b;
+            close();
+            if (had) back?.focus({ preventScroll: true });
+        });
+        return b;
+    };
     // The server writes an entry's forms as plain text, to select without
     // the script; each becomes a button here.
     const copyForms = (root) => {
@@ -2306,7 +2327,11 @@
             peek.hidden = true;
             const url = isRedirect(ta.value);
             const shown = st.open.map((id) => marks.filter((m) => m.id === id)).filter((list) => list.length);
-            if (shown.length) slot.append(el("div", "history-cast pv-cast", ...shown.map((list) => entryEl(list[0].cp, list.length, url, list[0].word))));
+            if (shown.length) {
+                const entries = shown.map((list) => entryEl(list[0].cp, list.length, url, list[0].word));
+                entries[0].append(closeButton(() => dismiss(), ta));
+                slot.append(el("div", "history-cast pv-cast", ...entries));
+            }
             // A line per tier: its count, or how many were removed.
             const was = (tier) => scan(st.removed[tier].before).filter((m) => !m.word && m.soft === (tier === "soft")).length;
             for (const [tier, n] of [["hard", hard], ["soft", soft]]) {

@@ -2858,6 +2858,34 @@ html.js .pv-cast .entry.shown {
     animation: cast-pulse 1.4s ease-out;
 }
 
+/* An open entry's close button (app.js, text.js): the one way to put it
+   away on a touch screen, or once the field has lost the caret. */
+.pv-cast .entry-close {
+    flex: none;
+    align-self: flex-start;
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    margin: -4px -2px 0 auto;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: var(--text-tertiary);
+    background: transparent;
+    cursor: pointer;
+}
+
+.pv-cast .entry-close:hover {
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
+}
+
+.pv-cast .entry-close:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
 html:not(.js) .pv-cast .entry + .entry,
 .pv-cast.whole .entry + .entry {
     border-top: 0.5px solid var(--card-border);
