@@ -2459,8 +2459,8 @@
         const marks = [...root.querySelectorAll(".hid.first")].map((m) => {
             m.classList.remove("cnt-none");
             const r = m.getClientRects()[0];
-            // A cluster's count stands past its ring (app.css).
-            const after = m.classList.contains("cluster") ? r?.right + 0.2 * fs : null;
+            // A cluster's count stands just past its cap (app.css).
+            const after = m.classList.contains("cluster") ? r?.right + 0.08 * fs : null;
             return r && { m, x: r.left + r.width / 2, after, line: Math.round(r.top), n: Number(m.dataset.n) };
         }).filter(Boolean);
         const placed = marks.map((k) => ({ a: k.x - w / 2, b: k.x + w / 2, line: k.line }));
