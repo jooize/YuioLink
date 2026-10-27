@@ -89,9 +89,10 @@ p { margin: 6px 0; max-width: 72ch; }
 .opt > .small { margin-bottom: 12px; }
 .opt.mine { outline: 2px solid var(--accent); outline-offset: -1px; }
 
-/* E1: the controls and the entry stay on screen while the text scrolls. */
+/* E1: while an entry is open, it and the controls stay on screen as the
+   text scrolls. With none open, the controls scroll away with the page. */
 .head { background: var(--card); }
-.opt[data-opt="e1"] .head { position: sticky; top: 0; z-index: 2; padding-top: 6px; margin-top: -6px; }
+.opt[data-opt="e1"] .head:has(.entry) { position: sticky; top: 0; z-index: 2; padding-top: 6px; margin-top: -6px; }
 .opt[data-opt="e1"] .head.stuck { box-shadow: 0 6px 8px -8px rgba(0, 0, 0, 0.35); }
 
 /* The text box, as the Text page draws it. */
@@ -287,8 +288,8 @@ p { margin: 6px 0; max-width: 72ch; }
 <div class="grid">
 
 <section class="opt mine" data-opt="e1">
-    <h3>E1. Entry under the controls, both pinned <span class="pick">my pick</span></h3>
-    <p class="small">The entry opens between the controls and the box. While you scroll a long text, the controls and the open entry stay at the top of the window. When a click in the text opens the entry, the page scrolls by the entry's height, so the text stays under the pointer.</p>
+    <h3>E1. Entry under the controls, pinned while open <span class="pick">your pick</span></h3>
+    <p class="small">The entry opens between the controls and the box. While an entry is open, it and the controls stay at the top of the window as you scroll a long text; with none open, they scroll away with the page. When a click in the text opens the entry, the page scrolls by the entry's height, so the text stays under the pointer.</p>
     <div class="head"><div class="ctrl"></div><div class="pv-cast deck"></div></div>
     <div class="text-wrap"><pre class="text-body"></pre></div>
     <button class="copy" type="button">Copy</button>
