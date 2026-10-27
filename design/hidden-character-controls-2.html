@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hidden Character Controls 2</title>
+<style>
+:root {
+    --bg: #f5f5f7;
+    --card: #fff;
+    --text: #1d1d1f;
+    --muted: #6e6e73;
+    --line: #d2d2d7;
+    --red: #d70015;
+    --gray: #8e8e93;
+    --gray-ink: #6e6e73;
+    --amber: #975d00;
+    --amber-mark: #b07000;
+    --accent: #007aff;
+    --ok: #1a7f37;
+    --font: -apple-system, system-ui, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #000;
+        --card: #1c1c1e;
+        --text: #f5f5f7;
+        --muted: #a1a1a6;
+        --line: #3a3a3c;
+        --red: #ff5d54;
+        --gray: #8e8e93;
+        --gray-ink: #a1a1a6;
+        --amber: #ffd60a;
+        --amber-mark: #e0b400;
+        --accent: #0a84ff;
+        --ok: #30d158;
+    }
+}
+:root[data-theme="dark"] {
+    --bg: #000;
+    --card: #1c1c1e;
+    --text: #f5f5f7;
+    --muted: #a1a1a6;
+    --line: #3a3a3c;
+    --red: #ff5d54;
+    --gray: #8e8e93;
+    --gray-ink: #a1a1a6;
+    --amber: #ffd60a;
+    --amber-mark: #e0b400;
+    --accent: #0a84ff;
+    --ok: #30d158;
+}
+/* The special characters' hue: gray today, amber to try. */
+body { --soft-mark: var(--gray); --soft-ink: var(--gray-ink); }
+body[data-soft="amber"] { --soft-mark: var(--amber-mark); --soft-ink: var(--amber); }
+
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    padding: 32px 16px 80px;
+    font: 15px/1.5 var(--font);
+    color: var(--text);
+    background: var(--bg);
+}
+main { max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 28px; margin: 0 0 4px; }
+h2 { font-size: 20px; margin: 44px 0 6px; }
+h3 { font-size: 16px; margin: 0 0 2px; }
+p { margin: 6px 0; max-width: 72ch; }
+.lead { color: var(--muted); font-size: 16px; }
+.small { font-size: 13px; color: var(--muted); }
+.pick { color: var(--accent); font-weight: 600; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; margin: 14px 0 0; font-size: 14px; }
+.toolbar label { display: inline-flex; gap: 6px; align-items: center; }
+.toolbar > button { font: inherit; padding: 4px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; margin-top: 14px; align-items: start; }
+.opt {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    min-width: 0;
+}
+.opt > .small { margin-bottom: 12px; }
+.opt.mine { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* The facts row, as the Text page has it today: a name steps its entries. */
+.facts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 8px 2px; font-size: 11px; font-weight: 600; }
+.facts button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; color: var(--gray-ink); cursor: pointer; }
+.facts .hard { color: var(--red); }
+.facts .soft { color: var(--soft-ink); }
+
+.box {
+    position: relative;
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+    font: 16px/1.6 var(--font);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.lab::after {
+    content: attr(data-label) "\200B";
+    margin: 0 1px;
+    padding: 0 3px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #fff;
+    background: var(--red);
+    white-space: nowrap;
+}
+.lab.soft::after { background: var(--soft-mark); }
+.lab.open::after { background: var(--accent); }
+
+.tick { position: relative; }
+.tick::after {
+    content: "";
+    position: absolute;
+    left: -0.23em;
+    top: 0.05em;
+    width: 0.46em;
+    height: 1.25em;
+    background: var(--red);
+    clip-path: polygon(0 0, 100% 0, calc(50% + 0.75px) 0.24em, calc(50% + 0.75px) 100%, calc(50% - 0.75px) 100%, calc(50% - 0.75px) 0.24em);
+    pointer-events: none;
+}
+.tick.soft::after { background: var(--soft-mark); }
+.tick.open::after { background: var(--accent); }
+
+.wedge {
+    position: absolute;
+    width: 0.46em;
+    height: 0.26em;
+    margin-left: -0.23em;
+    background: var(--gray);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    pointer-events: none;
+}
+.wedge.open { background: var(--accent); }
+
+/* Controls: chips in one column, the switch in its own, so the switch
+   never wraps and a chip's longer text wraps inside its column. */
+.ctrl {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    align-items: start;
+    font-size: 12.5px;
+}
+.ctrl.below { margin: 8px 0 0 8px; }
+.ctrl.above { margin: 0 0 8px 8px; }
+/* The switch sits on the box's side: top of the row under it, bottom of
+   the row over it. Narrow, it takes a row of its own, still next to the box. */
+.ctrl .seg { justify-self: end; }
+.ctrl.below .seg { align-self: start; }
+.ctrl.above .seg { align-self: end; }
+.opt { container-type: inline-size; }
+@container (max-width: 440px) {
+    .ctrl { grid-template-columns: minmax(0, 1fr); row-gap: 6px; }
+    .ctrl.below .seg { order: -1; }
+}
+.pair > .chip:first-child { padding-right: 2px; }
+.chips { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.pair { display: inline-grid; grid-template-columns: minmax(0, max-content) auto; align-items: start; column-gap: 2px; margin: 0 -6px; max-width: calc(100% + 12px); }
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    border: 0;
+    border-radius: 6px;
+    font: inherit;
+    font-weight: 600;
+    color: var(--red);
+    background: none;
+    cursor: pointer;
+    text-align: left;
+}
+.chip:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.chip.soft { color: var(--soft-ink); }
+.chip.word { color: var(--gray-ink); }
+.chip.done { color: var(--ok); }
+.chip.static { cursor: default; }
+.chip.static:hover { background: none; }
+.chip.verb { font-weight: 400; color: var(--gray-ink); padding-left: 3px; min-width: 5.6em; }
+.chip svg { flex: none; }
+.chip[aria-expanded="true"] { text-decoration: underline; text-underline-offset: 3px; }
+
+.seg { display: inline-flex; padding: 2px; border-radius: 8px; background: color-mix(in srgb, var(--gray) 16%, transparent); font-size: 12px; }
+.seg button { font: inherit; font-weight: 600; border: 0; border-radius: 6px; padding: 1px 9px; background: none; color: var(--gray-ink); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.18); }
+
+/* One entry at a time, under the box, as today. */
+.deck:empty { display: none; }
+.entry {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    margin-top: 10px;
+    padding: 10px 34px 10px 10px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--gray) 9%, transparent);
+    font-size: 13px;
+}
+.entry .tile { width: 38px; height: 38px; border: 1.5px dotted var(--gray); border-radius: 8px; display: grid; place-items: center; font: 700 10px ui-monospace, monospace; color: var(--gray-ink); }
+.entry.hard .tile { border-color: var(--red); color: var(--red); }
+.entry b { font-size: 14px; }
+.entry .of { color: var(--muted); }
+.entry .x { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border: 0; border-radius: 50%; background: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; }
+
+.copy {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 9px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font: 600 15px var(--font);
+}
+.copy small { display: block; font-weight: 400; font-size: 12px; opacity: 0.88; }
+
+.answers { margin-top: 10px; }
+.answers dt { font-weight: 600; margin-top: 12px; }
+.answers dd { margin: 2px 0 0; max-width: 72ch; }
+</style>
+</head>
+<body>
+<main>
+<h1>Hidden Character Controls, Round 2</h1>
+<p class="lead">Your notes on round 1, built in. Joiners in words now start hidden. A chip's name opens its characters one at a time, as the facts row does today, and its verb acts.</p>
+
+<div class="toolbar">
+    <label><input type="checkbox" id="hold" checked> A2 holds the box's height</label>
+    <span class="seg" id="softhue" role="group" aria-label="Special characters' color"><button type="button" data-v="gray" aria-pressed="true">Special: Gray</button><button type="button" data-v="amber" aria-pressed="false">Amber</button></span>
+    <button type="button" id="reset">Reset all</button>
+</div>
+
+<div class="grid">
+
+<section class="opt" data-opt="a">
+    <h3>A2. Under the box, the switch beside it</h3>
+    <p class="small">The switch sits on the edge nearest the box, in a column of its own (a row of its own on a phone), so it never wraps. The facts row stays above and still opens the entries.</p>
+    <div class="facts"></div>
+    <pre class="box"></pre>
+    <div class="ctrl below"></div>
+    <div class="deck"></div>
+    <button class="copy" type="button">Copy</button>
+</section>
+
+<section class="opt mine" data-opt="c">
+    <h3>C2. Above the box <span class="pick">my pick</span></h3>
+    <p class="small">The facts row and the controls become one row, so the counts appear once. The name opens the entries (one past the last closes them), the verb acts. Copy says what it carries.</p>
+    <div class="ctrl above"></div>
+    <pre class="box"></pre>
+    <div class="deck"></div>
+    <button class="copy" type="button">Copy</button>
+</section>
+
+</div>
+
+<h2>Your questions</h2>
+<dl class="answers">
+    <dt>Does C lose stepping through the characters?</dt>
+    <dd>No. In C2 each chip has two parts: the name steps through that tier's entries, as the facts row does today, and the verb after it acts. The entry shows “2 of 4” and a close button. Stepping through the joiners shows their marks in blue even while they are hidden, so you can find them without turning them on.</dd>
+    <dt>Is holding the height needed for C?</dt>
+    <dd>Not for the controls, since they sit above the part that changes. One edge remains: when the page is scrolled to its very bottom and gets shorter, the browser scrolls up to fit, and everything shifts down. The hold would cover that too, and it costs little, so I would keep it in either option.</dd>
+    <dt>Other colors than red and gray?</dt>
+    <dd>Red stays: it means the character hides something. For the special characters, try the amber switch above. Amber already means “check this” in the domain note, but a no-break space or a soft hyphen is rarely a problem, and amber pulls the eye nearly as hard as red. I would keep gray (~65%). Joiners stay gray too: they start hidden, and blue is taken by the open entry. Green, rose and teal already mean removed, Public and Text.</dd>
+    <dt>Why “Removed” left the chip</dt>
+    <dd>“4 Hidden Characters Removed” is longer than the name it replaces, so the verb after it moved away from the pointer: sideways, or onto a new line on a phone. The name now stays the same, and the green check says the characters are out. With the verb's width also held, every control moves 0 px when clicked, measured at 1200 and 390 px.</dd>
+    <dt>Copy's sublabel</dt>
+    <dd>It names what is still in the text: “With Hidden and Special Characters”, then “With a Special Character” after one Remove, and “Without Hidden or Special Characters” once both are out. Joiners are never named, since they are spelling. A2 can carry the same sublabel.</dd>
+</dl>
+</main>
+
+<script>
+"use strict";
+
+const ICON = {
+    alert: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.2v4.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.4" r="0.95" fill="currentColor"/></svg>',
+    info: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.2v4.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.6" r="0.95" fill="currentColor"/></svg>',
+    check: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 8.3l2 2 4-4.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    wedge: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10l-5 7z" fill="currentColor"/></svg>',
+};
+
+const H = (id, label) => ({ tier: "hard", id, label });
+const S = (id, label, ch) => ({ tier: "soft", id, label, ch });
+const LINES = [
+    { parts: ["Wi-Fi: pass", H("u200b", "zero-width space"), "word"] },
+    { parts: ["Room: 10", S("u00a0", "no-break space", " "), "km away"] },
+    { parts: ["Family: \u{1f468}‍\u{1f469}‍\u{1f467}"] },
+    { parts: ["File: abc", H("u202e", "right-to-left override"), "def", H("u202c", "pop directional formatting")] },
+    { parts: ["Bell: ", H("u0007", "alert")] },
+    { parts: ["Persian: می‌خواهم"], words: true },
+    { parts: ["Abbreviation: به‍."], words: true },
+    { parts: ["Hindi: क्‍ष"], words: true },
+    { parts: ["Kannada: ರ‍್ಯ"], words: true },
+    { parts: ["Sinhala: ස්‍ය"], words: true },
+];
+const ENTRIES = {
+    hard: [
+        { id: "u200b", sym: "ZWSP", name: "zero-width space", cp: "U+200B", times: 1 },
+        { id: "u202e", sym: "RLO", name: "right-to-left override", cp: "U+202E", times: 1 },
+        { id: "u202c", sym: "PDF", name: "pop directional formatting", cp: "U+202C", times: 1 },
+        { id: "u0007", sym: "BEL", name: "alert", cp: "U+0007", times: 1 },
+    ],
+    soft: [{ id: "u00a0", sym: "NBSP", name: "no-break space", cp: "U+00A0", times: 1 }],
+    word: [
+        { id: "w200c", sym: "ZWNJ", name: "zero-width non-joiner", cp: "U+200C", times: 1 },
+        { id: "w200d", sym: "ZWJ", name: "zero-width joiner", cp: "U+200D", times: 4 },
+    ],
+};
+const COUNT = { hard: 4, soft: 1, word: 5 };
+
+const draw = (box, state, holdOn) => {
+    const before = box.getBoundingClientRect().height;
+    box.replaceChildren();
+    const lines = LINES.map((line, n) => {
+        const nodes = [];
+        for (const p of line.parts) {
+            if (typeof p === "string") { nodes.push(document.createTextNode(p)); continue; }
+            if (state.out[p.tier]) { if (p.ch) nodes.push(document.createTextNode(" ")); continue; }
+            if (p.ch) nodes.push(document.createTextNode(p.ch));
+            const s = document.createElement("span");
+            s.className = `${state.view === "labels" ? "lab" : "tick"} ${p.tier}${state.open === p.id ? " open" : ""}`;
+            if (state.view === "labels") s.dataset.label = p.label;
+            nodes.push(s);
+        }
+        if (n < LINES.length - 1) nodes.push(document.createTextNode("\n"));
+        return { line, nodes };
+    });
+    for (const { nodes } of lines) box.append(...nodes);
+    const at = box.getBoundingClientRect();
+    const fs = Number.parseFloat(getComputedStyle(box).fontSize);
+    const wedges = [];
+    for (const { line, nodes } of lines) {
+        if (!line.words) continue;
+        for (const node of nodes) {
+            if (node.nodeType !== Node.TEXT_NODE) continue;
+            for (const m of node.data.matchAll(/[‌‍]/g)) {
+                const id = m[0] === "‌" ? "w200c" : "w200d";
+                // Hidden joiners still show while their entry is open.
+                if (!state.words && state.open !== id) continue;
+                const r = document.createRange();
+                r.setStart(node, m.index);
+                r.setEnd(node, m.index + 1);
+                let rect = r.getClientRects()[0];
+                if (!rect) { r.collapse(true); rect = r.getBoundingClientRect(); }
+                const w = document.createElement("span");
+                w.className = `wedge${state.open === id ? " open" : ""}`;
+                w.style.left = `${rect.left + rect.width / 2 - at.left - box.clientLeft}px`;
+                w.style.top = `${rect.top - at.top - box.clientTop - 0.12 * fs}px`;
+                wedges.push(w);
+            }
+        }
+    }
+    box.append(...wedges);
+    if (!holdOn) { box.style.minHeight = ""; return; }
+    if (box.dataset.width !== String(box.clientWidth)) { box.style.minHeight = ""; box.dataset.width = String(box.clientWidth); }
+    else if (box.getBoundingClientRect().height < before) box.style.minHeight = `${before}px`;
+};
+
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const whatOf = (tier) => ({
+    hard: plural(COUNT.hard, "Hidden Character"),
+    soft: plural(COUNT.soft, "Special Character"),
+    word: `${COUNT.word} Joiners in Words`,
+}[tier]);
+const objOf = (tier) => {
+    const n = COUNT[tier];
+    const w = tier === "hard" ? "hidden" : "special";
+    return n === 1 ? `the ${w} character` : `the ${n} ${w} characters`;
+};
+
+const btn = (cls, html, title, onClick) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = cls;
+    b.innerHTML = html;
+    if (title) b.title = title;
+    b.addEventListener("click", onClick);
+    return b;
+};
+const esc = (s) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+
+// Copy names what it carries.
+const carries = (state) => {
+    const kept = ["hard", "soft"].filter((t) => !state.out[t]);
+    const one = (t) => COUNT[t] === 1 ? `a ${t === "hard" ? "Hidden" : "Special"} Character` : `${t === "hard" ? "Hidden" : "Special"} Characters`;
+    if (kept.length === 2) return "With Hidden and Special Characters";
+    if (kept.length === 1) return `With ${one(kept[0])}`;
+    return "Without Hidden or Special Characters";
+};
+
+const hold = document.getElementById("hold");
+const fresh = () => ({ view: "labels", out: { hard: false, soft: false }, words: false, open: null, step: { tier: null, i: -1 } });
+const boards = [];
+
+const setup = (sec) => {
+    const opt = sec.dataset.opt;
+    const box = sec.querySelector(".box");
+    const ctrl = sec.querySelector(".ctrl");
+    const facts = sec.querySelector(".facts");
+    const deck = sec.querySelector(".deck");
+    const copy = sec.querySelector(".copy");
+    let state = fresh();
+
+    // A name steps through its tier's entries; one past the last closes.
+    const step = (tier) => {
+        const list = ENTRIES[tier];
+        const i = state.step.tier === tier ? state.step.i + 1 : 0;
+        if (i >= list.length) { state.step = { tier: null, i: -1 }; state.open = null; }
+        else { state.step = { tier, i }; state.open = list[i].id; }
+        redraw();
+    };
+    const close = () => { state.step = { tier: null, i: -1 }; state.open = null; redraw(); };
+
+    const sw = () => {
+        const seg = document.createElement("span");
+        seg.className = "seg";
+        seg.setAttribute("role", "group");
+        seg.setAttribute("aria-label", "Draw marks as");
+        for (const v of ["labels", "ticks"]) {
+            const b = btn("", v === "labels" ? "Labels" : "Ticks", "", () => { state.view = v; redraw(); });
+            b.setAttribute("aria-pressed", String(state.view === v));
+            seg.append(b);
+        }
+        return seg;
+    };
+
+    const pair = (tier, named) => {
+        const p = document.createElement("span");
+        p.className = "pair";
+        const cls = tier === "hard" ? "chip" : `chip ${tier}`;
+        if (tier === "word") {
+            const nameEl = named
+                ? btn(cls, `${ICON.wedge}${esc(whatOf(tier))}`, "Show them one at a time", () => step(tier))
+                : btn(`${cls} static`, `${ICON.wedge}${esc(whatOf(tier))}`, "", () => {});
+            if (named) nameEl.setAttribute("aria-expanded", String(state.step.tier === tier));
+            p.append(nameEl, btn("chip verb", `· ${state.words ? "Hide" : "Show"}`,
+                state.words ? "Hide the marks; the joiners stay in the text" : "Show where the joiners are",
+                () => { state.words = !state.words; redraw(); }));
+            return p;
+        }
+        const out = state.out[tier];
+        const icon = out ? ICON.check : tier === "hard" ? ICON.alert : ICON.info;
+        // The name stays as it was, so the verb stays under the pointer;
+        // the green check says it is out.
+        const text = whatOf(tier);
+        let nameEl;
+        if (named && !out) {
+            nameEl = btn(cls, `${icon}${esc(text)}`, "Show them one at a time", () => step(tier));
+            nameEl.setAttribute("aria-expanded", String(state.step.tier === tier));
+        } else nameEl = btn(`${cls}${out ? " done" : ""} static`, `${icon}${esc(text)}`, "", () => {});
+        p.append(nameEl, btn("chip verb", `· ${out ? "Put Back" : "Remove"}`,
+            out ? `Put ${objOf(tier)} back` : `Take ${objOf(tier)} out of the text`,
+            () => {
+                state.out[tier] = !out;
+                if (state.step.tier === tier) close();
+                redraw();
+            }));
+        return p;
+    };
+
+    const redraw = () => {
+        draw(box, state, opt === "a" && hold.checked);
+        if (facts) {
+            facts.replaceChildren(
+                btn("hard", `${ICON.alert}Hidden Characters`, "", () => step("hard")),
+                btn("soft", `${ICON.info}Special Characters`, "", () => step("soft")),
+                btn("", "Joiners in Words", "", () => step("word")));
+        }
+        const chips = document.createElement("div");
+        chips.className = "chips";
+        // A2's chips act only; the facts row names. C2's chips do both.
+        chips.append(pair("hard", opt === "c"), pair("soft", opt === "c"), pair("word", opt === "c"));
+        ctrl.replaceChildren(chips, sw());
+        deck.replaceChildren();
+        if (state.step.tier) {
+            const list = ENTRIES[state.step.tier];
+            const e = list[state.step.i];
+            const card = document.createElement("div");
+            card.className = `entry ${state.step.tier}`;
+            const times = e.times > 1 ? ` It appears ${e.times} times.` : "";
+            card.innerHTML = `<span class="tile">${e.sym}</span><span><b>${e.name}</b> <span class="of">· ${state.step.i + 1} of ${list.length}</span><br>${e.cp}.${times}</span>`;
+            card.append(btn("x", "×", "Close", close));
+            deck.append(card);
+        }
+        copy.replaceChildren("Copy");
+        const s = document.createElement("small");
+        s.textContent = carries(state);
+        copy.append(s);
+    };
+    boards.push({ redraw, reset: () => { state = fresh(); box.style.minHeight = ""; redraw(); } });
+    redraw();
+};
+
+document.querySelectorAll(".opt").forEach(setup);
+document.getElementById("reset").addEventListener("click", () => boards.forEach((b) => b.reset()));
+hold.addEventListener("change", () => boards.forEach((b) => b.reset()));
+document.querySelectorAll("#softhue button").forEach((b) => b.addEventListener("click", () => {
+    document.body.dataset.soft = b.dataset.v;
+    document.querySelectorAll("#softhue button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+}));
+let width = innerWidth;
+addEventListener("resize", () => { if (innerWidth !== width) { width = innerWidth; boards.forEach((b) => b.redraw()); } });
+document.fonts?.ready.then(() => boards.forEach((b) => b.redraw()));
+</script>
+</body>
+</html>
