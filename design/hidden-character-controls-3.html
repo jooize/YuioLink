@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hidden Character Controls 3</title>
+<style>
+:root {
+    --bg: #f5f5f7;
+    --card: #fff;
+    --text: #1d1d1f;
+    --text-secondary: rgba(60, 60, 67, 0.74);
+    --text-tertiary: rgba(60, 60, 67, 0.58);
+    --line: #d2d2d7;
+    --field-bg: rgba(255, 255, 255, 0.72);
+    --field-border: rgba(0, 0, 0, 0.1);
+    --danger: #d70015;
+    --on-danger: #fff;
+    --hc-gray: #6e6e73;
+    --gray-ink: #6e6e73;
+    --accent: #007aff;
+    --result-text: #0a7854;
+    --font: -apple-system, system-ui, "Segoe UI", sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Monaco, "Cascadia Code", monospace;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #000;
+        --card: #1c1c1e;
+        --text: #f5f5f7;
+        --text-secondary: rgba(235, 235, 245, 0.6);
+        --text-tertiary: rgba(235, 235, 245, 0.45);
+        --line: #3a3a3c;
+        --field-bg: rgba(255, 255, 255, 0.06);
+        --field-border: rgba(255, 255, 255, 0.12);
+        --danger: #ff5d54;
+        --on-danger: #1c0505;
+        --hc-gray: #8e8e93;
+        --gray-ink: #a1a1a6;
+        --accent: #0a84ff;
+        --result-text: #34d399;
+    }
+}
+:root[data-theme="dark"] {
+    --bg: #000;
+    --card: #1c1c1e;
+    --text: #f5f5f7;
+    --text-secondary: rgba(235, 235, 245, 0.6);
+    --text-tertiary: rgba(235, 235, 245, 0.45);
+    --line: #3a3a3c;
+    --field-bg: rgba(255, 255, 255, 0.06);
+    --field-border: rgba(255, 255, 255, 0.12);
+    --danger: #ff5d54;
+    --on-danger: #1c0505;
+    --hc-gray: #8e8e93;
+    --gray-ink: #a1a1a6;
+    --accent: #0a84ff;
+    --result-text: #34d399;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    padding: 32px 16px 80px;
+    font: 15px/1.5 var(--font);
+    color: var(--text);
+    background: var(--bg);
+}
+main { max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 28px; margin: 0 0 4px; }
+h2 { font-size: 20px; margin: 44px 0 6px; }
+h3 { font-size: 16px; margin: 0 0 2px; }
+p { margin: 6px 0; max-width: 72ch; }
+.lead { color: var(--text-secondary); font-size: 16px; }
+.small { font-size: 13px; color: var(--text-secondary); }
+.pick { color: var(--accent); font-weight: 600; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; margin: 14px 0 0; font-size: 14px; }
+.toolbar label { display: inline-flex; gap: 6px; align-items: center; }
+.toolbar > button { font: inherit; padding: 4px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; margin-top: 14px; align-items: start; }
+.opt {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    min-width: 0;
+    container-type: inline-size;
+}
+.opt > .small { margin-bottom: 12px; }
+.opt.mine { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* E1: the controls and the entry stay on screen while the text scrolls. */
+.head { background: var(--card); }
+.opt[data-opt="e1"] .head { position: sticky; top: 0; z-index: 2; padding-top: 6px; margin-top: -6px; }
+.opt[data-opt="e1"] .head.stuck { box-shadow: 0 6px 8px -8px rgba(0, 0, 0, 0.35); }
+
+/* The text box, as the Text page draws it. */
+.text-wrap { position: relative; }
+.text-body {
+    position: relative;
+    margin: 0;
+    padding: 14px;
+    border: 0.5px solid var(--field-border);
+    border-radius: 12px;
+    background: var(--field-bg);
+    font: 13px/1.5 var(--font-mono);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.text-body.capped { max-height: 55vh; overflow: hidden; }
+.text-wrap.capped::after {
+    content: "";
+    position: absolute;
+    left: 0.5px;
+    right: 0.5px;
+    bottom: 0.5px;
+    height: 84px;
+    border-radius: 0 0 12px 12px;
+    pointer-events: none;
+    background: linear-gradient(to bottom, transparent, var(--card));
+}
+.expand { display: block; margin: 6px auto 0; padding: 3px 12px; border: 0; border-radius: 8px; background: none; font: 600 13px var(--font); color: var(--accent); cursor: pointer; }
+
+.lab::after {
+    content: attr(data-label) "\200B";
+    margin: 0 1px;
+    padding: 0 3px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    font-weight: 700;
+    color: var(--on-danger);
+    background: var(--danger);
+    white-space: nowrap;
+    line-height: 0;
+}
+.lab.soft::after { color: #fff; background: var(--hc-gray); }
+.lab.open::after { color: #fff; background: var(--accent); }
+.tick { position: relative; }
+.tick::after {
+    content: "";
+    position: absolute;
+    left: -0.23em;
+    top: 0.05em;
+    width: 0.46em;
+    height: 1.25em;
+    background: var(--danger);
+    clip-path: polygon(0 0, 100% 0, calc(50% + 0.75px) 0.24em, calc(50% + 0.75px) 100%, calc(50% - 0.75px) 100%, calc(50% - 0.75px) 0.24em);
+    pointer-events: none;
+}
+.tick.soft::after { background: var(--hc-gray); }
+.tick.open::after { background: var(--accent); }
+.wedge {
+    position: absolute;
+    width: 0.46em;
+    height: 0.26em;
+    margin-left: -0.23em;
+    background: var(--hc-gray);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    pointer-events: none;
+}
+.wedge.open { background: var(--accent); }
+
+/* The controls above the box (round 2's C2). */
+.ctrl {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    align-items: start;
+    margin: 0 0 8px 8px;
+    font-size: 12.5px;
+}
+.ctrl .seg { justify-self: end; align-self: end; }
+@container (max-width: 440px) {
+    .ctrl { grid-template-columns: minmax(0, 1fr); row-gap: 6px; }
+}
+.chips { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.pair { display: inline-grid; grid-template-columns: minmax(0, max-content) auto; align-items: start; column-gap: 2px; margin: 0 -6px; max-width: calc(100% + 12px); }
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    border: 0;
+    border-radius: 6px;
+    font: inherit;
+    font-weight: 600;
+    color: var(--danger);
+    background: none;
+    cursor: pointer;
+    text-align: left;
+}
+.pair > .chip:first-child { padding-right: 2px; }
+.chip:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.chip.soft, .chip.word { color: var(--gray-ink); }
+.chip.done { color: var(--result-text); }
+.chip.static { cursor: default; }
+.chip.static:hover { background: none; }
+.chip.verb { font-weight: 400; color: var(--gray-ink); padding-left: 3px; min-width: 5.6em; }
+.chip svg { flex: none; }
+.chip[aria-expanded="true"] { text-decoration: underline; text-underline-offset: 3px; }
+.seg { display: inline-flex; padding: 2px; border-radius: 8px; background: color-mix(in srgb, var(--hc-gray) 16%, transparent); font-size: 12px; }
+.seg button { font: inherit; font-weight: 600; border: 0; border-radius: 6px; padding: 1px 9px; background: none; color: var(--gray-ink); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.18); }
+
+/* The entry, as the product draws it (app.css .pv-cast). */
+.pv-cast { text-align: left; }
+.pv-cast .entry { display: flex; align-items: flex-start; gap: 10px; padding: 7px 6px; border-radius: 8px; }
+.pv-cast .entry.shown { animation: cast-pulse 1.4s ease-out; }
+@keyframes cast-pulse { from { background: color-mix(in srgb, var(--accent) 15%, transparent); } to { background: transparent; } }
+.pv-cast .tiles { display: inline-flex; gap: 5px; flex: none; width: 65px; justify-content: flex-end; }
+.pv-cast .tile { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; font: 600 15px var(--font-mono); color: var(--text); border-radius: 7px; }
+.pv-cast .tile.sym { border: 1.5px dotted var(--text-tertiary); font-size: 8.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--text-secondary); }
+.pv-cast .entry.warn .tile.sym { border-color: var(--danger); color: var(--danger); }
+.pv-cast .tile.raw { display: inline-block; background: var(--field-bg); border: 0.5px solid var(--field-border); line-height: 29px; text-align: center; white-space: pre; }
+.pv-cast .what { font: 400 12px/1.5 var(--font); color: var(--text-secondary); min-width: 0; margin-top: calc((30px - 1lh) / 2); }
+.pv-cast .what b { color: var(--text); font-weight: 600; }
+.pv-cast .entry.warn .what b { color: var(--danger); }
+.pv-cast .what .of { color: var(--text-tertiary); }
+.pv-cast .what .forms { display: flex; flex-wrap: wrap; gap: 2px 8px; margin: 3px 0 0 -5px; }
+.pv-cast .what .form { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 2px 5px; border: 0; border-radius: 6px; font: inherit; text-align: left; background: none; cursor: copy; color: inherit; }
+.pv-cast .what .form:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.pv-cast .what .form code { font-family: var(--font-mono); font-size: 0.95em; color: var(--text); }
+.pv-cast .entry.warn .what .form code:not(.bad) { color: var(--text); }
+.pv-cast .what .form code.bad { padding: 0 3px; border-radius: 3px; font-weight: 700; font-size: 11.5px; color: var(--on-danger); background: var(--danger); }
+.pv-cast .entry.soft .what .form code.bad { color: #fff; background: var(--hc-gray); }
+.pv-cast .what .form small { font-size: 10.5px; line-height: 1.2; color: var(--text-tertiary); }
+.pv-cast .what .form.copied small { color: var(--result-text); font-weight: 600; }
+.pv-cast .what .after { display: block; margin-top: 2px; }
+.pv-cast .side { display: flex; flex-direction: column; align-items: center; margin: -4px -2px 0 auto; flex: none; }
+.pv-cast .entry-close, .pv-cast .stepper button {
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: var(--text-tertiary);
+    background: transparent;
+    cursor: pointer;
+    font-size: 15px;
+}
+.pv-cast .entry-close:hover, .pv-cast .stepper button:hover { color: var(--text-secondary); background: color-mix(in srgb, var(--text-secondary) 12%, transparent); }
+.pv-cast .stepper { display: flex; }
+
+/* E2: the entry floats at its character. */
+.float {
+    position: absolute;
+    z-index: 3;
+    width: min(400px, 100%);
+    border: 0.5px solid var(--field-border);
+    border-radius: 12px;
+    background: var(--card);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.12);
+    padding: 3px;
+}
+.float .entry.shown { animation: none; }
+
+.copy {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 9px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font: 600 15px var(--font);
+}
+.copy small { display: inline-flex; align-items: center; gap: 4px; font-weight: 400; font-size: 12px; opacity: 0.92; }
+.copy .sub { display: block; }
+
+.answers dt { font-weight: 600; margin-top: 12px; }
+.answers dd { margin: 2px 0 0; max-width: 72ch; }
+</style>
+</head>
+<body>
+<main>
+<h1>Hidden Character Controls, Round 3</h1>
+<p class="lead">Both use round 2's controls above the box, with special characters in gray. The entry is the product's own again, with its three ways to write the character, their captions, and what it does. Turn on the long text to see where the entry has to be.</p>
+
+<div class="toolbar">
+    <label><input type="checkbox" id="long"> Long text (folded at 55% of the window, as today)</label>
+    <button type="button" id="reset">Reset all</button>
+</div>
+
+<div class="grid">
+
+<section class="opt mine" data-opt="e1">
+    <h3>E1. Entry under the controls, both pinned <span class="pick">my pick</span></h3>
+    <p class="small">The entry opens between the controls and the box. While you scroll a long text, the controls and the open entry stay at the top of the window. When a click in the text opens the entry, the page scrolls by the entry's height, so the text stays under the pointer.</p>
+    <div class="head"><div class="ctrl"></div><div class="pv-cast deck"></div></div>
+    <div class="text-wrap"><pre class="text-body"></pre></div>
+    <button class="copy" type="button">Copy</button>
+</section>
+
+<section class="opt" data-opt="e2">
+    <h3>E2. Entry at the character</h3>
+    <p class="small">The entry floats just under the character it names, over the text, so nothing moves. Stepping through scrolls each character into view and moves the card along, with ‹ › to go on from there. The controls scroll away with the page.</p>
+    <div class="head"><div class="ctrl"></div></div>
+    <div class="text-wrap"><pre class="text-body"></pre></div>
+    <button class="copy" type="button">Copy</button>
+</section>
+
+</div>
+
+<h2>Notes</h2>
+<dl class="answers">
+    <dt>Copy's sublabel</dt>
+    <dd>“Without” read too much like “With”, so the two states now start with different words and icons: “Includes Hidden and Special Characters” with the red mark, and “Leaves Out Hidden and Special Characters” with the green check. After one Remove, it says what is still in: “Includes a Special Character”.</dd>
+    <dt>A folded text</dt>
+    <dd>Stepping to a character under the fold opens the fold first, in both, so the character you are reading about is always on screen.</dd>
+    <dt>Clicking a character in the text</dt>
+    <dd>Opens its entry, as on the Text page today: a label, a tick, or a joiner's wedge (within a few pixels, as the product matches them).</dd>
+</dl>
+</main>
+
+<script>
+"use strict";
+
+const ICON = {
+    alert: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.2v4.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.4" r="0.95" fill="currentColor"/></svg>',
+    info: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.2v4.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.6" r="0.95" fill="currentColor"/></svg>',
+    check: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 8.3l2 2 4-4.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    wedge: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10l-5 7z" fill="currentColor"/></svg>',
+};
+
+const H = (id, label) => ({ tier: "hard", id, label });
+const S = (id, label, ch) => ({ tier: "soft", id, label, ch });
+const SAMPLE = [
+    { parts: ["Wi-Fi: pass", H("u200b", "zero-width space"), "word"] },
+    { parts: ["Room: 10", S("u00a0", "no-break space", " "), "km away"] },
+    { parts: ["Family: \u{1f468}‍\u{1f469}‍\u{1f467}"] },
+    { parts: ["File: abc", H("u202e", "right-to-left override"), "def", H("u202c", "pop directional formatting")] },
+    { parts: ["Bell: ", H("u0007", "alert")] },
+    { parts: ["Persian: می‌خواهم"], words: true },
+    { parts: ["Abbreviation: به‍."], words: true },
+    { parts: ["Hindi: क्‍ष"], words: true },
+    { parts: ["Kannada: ರ‍್ಯ"], words: true },
+    { parts: ["Sinhala: ස්‍ය"], words: true },
+];
+const FILLER = [
+    "Notes from the planning call, kept for the team.",
+    "Nothing on this line hides anything.",
+    "Bring the projector cable and the spare adapter.",
+    "The room is booked from nine until half past eleven.",
+    "Lunch is on the third floor, next to the stairs.",
+    "Ask at the front desk if the door is locked.",
+];
+// The long text: the sample's lines spread out between ordinary ones.
+const LONG = SAMPLE.flatMap((line, n) => [line, ...Array.from({ length: 5 }, (_, k) => ({ parts: [FILLER[(n + k) % FILLER.length]] }))]);
+
+const SPELL = "It sets how the letters beside it join or combine. Persian, Hindi and many other languages write it inside words, and here it sits where that spelling puts it.";
+const ENTRIES = {
+    hard: [
+        { id: "u200b", sym: "ZWSP", raw: "​", name: "zero-width space", cp: "200B", url: "%E2%80%8B", after: "It draws nothing, so two texts that look the same can differ.", times: 1 },
+        { id: "u202e", sym: "RLO", raw: "‮", name: "right-to-left override", cp: "202E", url: "%E2%80%AE", after: "It changes the direction of the text around it, so the order you see can differ from the order stored.", times: 1 },
+        { id: "u202c", sym: "PDF", raw: "‬", name: "pop directional formatting", cp: "202C", url: "%E2%80%AC", after: "It changes the direction of the text around it, so the order you see can differ from the order stored.", times: 1 },
+        { id: "u0007", sym: "BEL", raw: "", name: "alert", cp: "0007", url: "%07", after: "It is a control code with no visible form.", times: 1 },
+    ],
+    soft: [{ id: "u00a0", sym: "NBSP", raw: " ", name: "no-break space", cp: "00A0", url: "%C2%A0", after: "It looks like a space but is a different character.", times: 1 }],
+    word: [
+        { id: "w200c", sym: "ZWNJ", raw: "‌", name: "zero-width non-joiner", cp: "200C", url: "%E2%80%8C", after: SPELL, times: 1 },
+        { id: "w200d", sym: "ZWJ", raw: "‍", name: "zero-width joiner", cp: "200D", url: "%E2%80%8D", after: SPELL, times: 4 },
+    ],
+};
+const TIER_OF = Object.fromEntries(Object.entries(ENTRIES).flatMap(([t, l]) => l.map((e) => [e.id, t])));
+const COUNT = { hard: 4, soft: 1, word: 5 };
+
+const el = (tag, cls, ...kids) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    n.append(...kids);
+    return n;
+};
+const btn = (cls, html, title, onClick) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = cls;
+    b.innerHTML = html;
+    if (title) b.title = title;
+    b.addEventListener("click", onClick);
+    return b;
+};
+const esc = (s) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const whatOf = (tier) => ({
+    hard: plural(COUNT.hard, "Hidden Character"),
+    soft: plural(COUNT.soft, "Special Character"),
+    word: `${COUNT.word} Joiners in Words`,
+}[tier]);
+const objOf = (tier) => {
+    const n = COUNT[tier];
+    const w = tier === "hard" ? "hidden" : "special";
+    return n === 1 ? `the ${w} character` : `the ${n} ${w} characters`;
+};
+
+// The text, marked; joiners in words get wedges placed by measuring.
+const draw = (pre, lines, state) => {
+    pre.replaceChildren();
+    const built = lines.map((line, n) => {
+        const nodes = [];
+        for (const p of line.parts) {
+            if (typeof p === "string") { nodes.push(document.createTextNode(p)); continue; }
+            if (state.out[p.tier]) { if (p.ch) nodes.push(document.createTextNode(" ")); continue; }
+            if (p.ch) nodes.push(document.createTextNode(p.ch));
+            const s = document.createElement("span");
+            s.className = `${state.view === "labels" ? "lab" : "tick"} ${p.tier}${state.open === p.id ? " open" : ""}`;
+            s.dataset.id = p.id;
+            if (state.view === "labels") s.dataset.label = p.label;
+            nodes.push(s);
+        }
+        if (n < lines.length - 1) nodes.push(document.createTextNode("\n"));
+        return { line, nodes };
+    });
+    for (const { nodes } of built) pre.append(...nodes);
+    const at = pre.getBoundingClientRect();
+    const fs = Number.parseFloat(getComputedStyle(pre).fontSize);
+    const wedges = [];
+    for (const { line, nodes } of built) {
+        if (!line.words) continue;
+        for (const node of nodes) {
+            if (node.nodeType !== Node.TEXT_NODE) continue;
+            for (const m of node.data.matchAll(/[‌‍]/g)) {
+                const id = m[0] === "‌" ? "w200c" : "w200d";
+                if (!state.words && state.open !== id) continue;
+                const r = document.createRange();
+                r.setStart(node, m.index);
+                r.setEnd(node, m.index + 1);
+                let rect = r.getClientRects()[0];
+                if (!rect) { r.collapse(true); rect = r.getBoundingClientRect(); }
+                const w = el("span", `wedge${state.open === id ? " open" : ""}`);
+                w.dataset.id = id;
+                w.style.left = `${rect.left + rect.width / 2 - at.left - pre.clientLeft}px`;
+                w.style.top = `${rect.top - at.top - pre.clientTop + pre.scrollTop - 0.12 * fs}px`;
+                wedges.push(w);
+            }
+        }
+    }
+    pre.append(...wedges);
+};
+
+// The mark a click landed on: a label by its box, a tick or a wedge within
+// a few pixels of where it stands.
+const markAt = (pre, x, y) => {
+    let best = null;
+    let bestD = Infinity;
+    for (const m of pre.querySelectorAll("[data-id]")) {
+        const r = m.getBoundingClientRect();
+        const lab = m.classList.contains("lab");
+        const pad = lab ? 0 : 7;
+        const top = m.classList.contains("wedge") ? r.top - 4 : r.top;
+        const bottom = m.classList.contains("wedge") ? r.top + 20 : r.bottom;
+        if (y < top - 2 || y > bottom + 2) continue;
+        const d = x < r.left ? r.left - x : x > r.right ? x - r.right : 0;
+        if (d <= pad && d < bestD) { best = m; bestD = d; }
+    }
+    return best;
+};
+
+const entryEl = (e, tier, extra) => {
+    const soft = tier !== "hard";
+    const times = e.times > 1 ? ` It appears ${e.times} times.` : "";
+    const form = (code, where, bad) => {
+        const c = el("code", bad ? "bad" : "", code);
+        const cap = el("small", "", where);
+        const b = el("button", "form", c, cap);
+        b.type = "button";
+        b.addEventListener("click", () => {
+            navigator.clipboard?.writeText(code).catch(() => {});
+            b.classList.add("copied");
+            cap.textContent = "Copied";
+            setTimeout(() => { b.classList.remove("copied"); cap.textContent = where; }, 1200);
+        });
+        return b;
+    };
+    const what = el("span", "what",
+        el("b", "", e.name), extra.of ? el("span", "of", ` · ${extra.of}`) : "",
+        el("span", "forms",
+            form(`U+${e.cp}`, "in Unicode", false),
+            form(`\\u{${e.cp.replace(/^0+(?=.)/, "")}}`, "in code", true),
+            form(e.url, "in a URL", false)),
+        el("span", "after", `${e.after}${times} The empty box is the character.`));
+    const tiles = el("span", "tiles", el("span", "tile sym", e.sym), el("span", "tile raw", e.raw));
+    const side = el("span", "side");
+    if (extra.step) {
+        const st = el("span", "stepper",
+            btn("", "‹", "Previous", extra.step.prev),
+            btn("", "›", "Next", extra.step.next));
+        side.append(st);
+    }
+    side.prepend(btn("entry-close", "×", "Close", extra.close));
+    return el("div", `entry ${soft ? "soft" : "warn"}${tier === "word" ? " word" : ""} shown`, tiles, what, side);
+};
+
+const carries = (state) => {
+    const kept = ["hard", "soft"].filter((t) => !state.out[t]);
+    const one = (t) => COUNT[t] === 1 ? `a ${t === "hard" ? "Hidden" : "Special"} Character` : `${t === "hard" ? "Hidden" : "Special"} Characters`;
+    if (kept.length === 2) return [ICON.alert, "Includes Hidden and Special Characters"];
+    if (kept.length === 1) return [ICON.alert, `Includes ${one(kept[0])}`];
+    return [ICON.check, "Leaves Out Hidden and Special Characters"];
+};
+
+const longBox = document.getElementById("long");
+const fresh = () => ({ view: "labels", out: { hard: false, soft: false }, words: false, open: null, step: { tier: null, i: -1 }, capped: true });
+const boards = [];
+
+const setup = (sec) => {
+    const opt = sec.dataset.opt;
+    const head = sec.querySelector(".head");
+    const ctrl = sec.querySelector(".ctrl");
+    const deck = sec.querySelector(".deck");
+    const wrap = sec.querySelector(".text-wrap");
+    const pre = sec.querySelector(".text-body");
+    const copy = sec.querySelector(".copy");
+    let state = fresh();
+    let expand = null;
+
+    const lines = () => longBox.checked ? LONG : SAMPLE;
+    const markOf = (id) => pre.querySelector(`[data-id="${id}"]`);
+
+    // Opening an entry: from a chip's name, the ‹ › buttons, or a click in
+    // the text (`from` is then the clicked point, kept under the pointer).
+    const open = (tier, i, from = null) => {
+        const list = ENTRIES[tier];
+        if (i < 0 || i >= list.length) { close(); return; }
+        const boxTop = wrap.getBoundingClientRect().top;
+        state.step = { tier, i };
+        state.open = list[i].id;
+        redraw();
+        let m = markOf(state.open);
+        // Under the fold: open it, so the character is on screen.
+        if (m && state.capped && pre.classList.contains("capped") && m.getBoundingClientRect().top > pre.getBoundingClientRect().bottom - 30) {
+            state.capped = false;
+            redraw();
+            m = markOf(state.open);
+        }
+        if (from) {
+            // E1's entry grew above the text: scroll by as much.
+            const moved = wrap.getBoundingClientRect().top - boxTop;
+            if (moved) scrollBy(0, moved);
+        } else if (m) {
+            const r = m.getBoundingClientRect();
+            const headH = opt === "e1" ? head.getBoundingClientRect().height : 0;
+            const floatH = opt === "e2" ? 170 : 0;
+            if (r.top < headH + 8 || r.bottom + floatH > innerHeight - 8) {
+                scrollBy(0, r.top - headH - Math.max(40, (innerHeight - headH - floatH) / 3));
+            }
+            if (opt === "e2") placeFloat();
+        }
+    };
+    const close = () => { state.step = { tier: null, i: -1 }; state.open = null; redraw(); };
+    const step = (tier) => open(tier, state.step.tier === tier ? state.step.i + 1 : 0);
+
+    const sw = () => {
+        const seg = el("span", "seg");
+        seg.setAttribute("role", "group");
+        seg.setAttribute("aria-label", "Draw marks as");
+        for (const v of ["labels", "ticks"]) {
+            const b = btn("", v === "labels" ? "Labels" : "Ticks", "", () => { state.view = v; redraw(); });
+            b.setAttribute("aria-pressed", String(state.view === v));
+            seg.append(b);
+        }
+        return seg;
+    };
+    const pair = (tier) => {
+        const p = el("span", "pair");
+        const cls = tier === "hard" ? "chip" : `chip ${tier}`;
+        if (tier === "word") {
+            const name = btn(cls, `${ICON.wedge}${esc(whatOf(tier))}`, "Show them one at a time", () => step(tier));
+            name.setAttribute("aria-expanded", String(state.step.tier === tier));
+            p.append(name, btn("chip verb", `· ${state.words ? "Hide" : "Show"}`,
+                state.words ? "Hide the marks; the joiners stay in the text" : "Show where the joiners are",
+                () => { state.words = !state.words; redraw(); }));
+            return p;
+        }
+        const out = state.out[tier];
+        const icon = out ? ICON.check : tier === "hard" ? ICON.alert : ICON.info;
+        let name;
+        if (!out) {
+            name = btn(cls, `${icon}${esc(whatOf(tier))}`, "Show them one at a time", () => step(tier));
+            name.setAttribute("aria-expanded", String(state.step.tier === tier));
+        } else name = btn(`${cls} done static`, `${icon}${esc(whatOf(tier))}`, "", () => {});
+        p.append(name, btn("chip verb", `· ${out ? "Put Back" : "Remove"}`,
+            out ? `Put ${objOf(tier)} back` : `Take ${objOf(tier)} out of the text`,
+            () => {
+                state.out[tier] = !out;
+                if (state.step.tier === tier) { close(); return; }
+                redraw();
+            }));
+        return p;
+    };
+
+    let float = null;
+    const entryNow = () => {
+        if (!state.step.tier) return null;
+        const list = ENTRIES[state.step.tier];
+        const e = list[state.step.i];
+        const extra = { close, of: list.length > 1 ? `${state.step.i + 1} of ${list.length}` : null };
+        if (opt === "e2") extra.step = { prev: () => open(state.step.tier, state.step.i - 1), next: () => open(state.step.tier, state.step.i + 1) };
+        return entryEl(e, state.step.tier, extra);
+    };
+    const placeFloat = () => {
+        if (!float) return;
+        const m = markOf(state.open);
+        const w = wrap.getBoundingClientRect();
+        if (!m) { float.style.top = "8px"; float.style.left = "0"; return; }
+        const r = m.getBoundingClientRect();
+        const fw = float.offsetWidth;
+        const left = Math.min(Math.max(r.left - w.left - 40, 0), w.width - fw);
+        float.style.left = `${left}px`;
+        float.style.top = `${r.bottom - w.top + 6}px`;
+    };
+
+    const redraw = () => {
+        const list = lines();
+        pre.classList.toggle("capped", false);
+        draw(pre, list, state);
+        // Fold only when the text is well past the cap, as text.js does.
+        const cap = innerHeight * 0.55;
+        const folds = pre.scrollHeight > cap + 90;
+        pre.classList.toggle("capped", folds && state.capped);
+        wrap.classList.toggle("capped", folds && state.capped);
+        if (folds) draw(pre, list, state);
+        expand?.remove();
+        expand = null;
+        if (folds) {
+            expand = btn("expand", state.capped ? "Show all" : "Show less", "", () => { state.capped = !state.capped; redraw(); });
+            wrap.after(expand);
+        }
+        const chips = el("div", "chips", pair("hard"), pair("soft"), pair("word"));
+        ctrl.replaceChildren(chips, sw());
+        const entry = entryNow();
+        if (opt === "e1") deck.replaceChildren(...(entry ? [entry] : []));
+        else {
+            float?.remove();
+            float = null;
+            if (entry) {
+                float = el("div", "pv-cast float", entry);
+                wrap.append(float);
+                placeFloat();
+            }
+        }
+        const [icon, text] = carries(state);
+        const sub = el("small", "");
+        sub.innerHTML = `${icon}${esc(text)}`;
+        copy.replaceChildren("Copy", el("span", "sub", sub));
+    };
+
+    pre.addEventListener("click", (ev) => {
+        if (getSelection()?.toString()) return;
+        const m = markAt(pre, ev.clientX, ev.clientY);
+        if (!m) return;
+        const tier = TIER_OF[m.dataset.id];
+        open(tier, ENTRIES[tier].findIndex((e) => e.id === m.dataset.id), { x: ev.clientX, y: ev.clientY });
+    });
+    if (opt === "e1") {
+        addEventListener("scroll", () => head.classList.toggle("stuck", head.getBoundingClientRect().top <= 0.5 && sec.getBoundingClientRect().top < 0), { passive: true });
+    }
+    boards.push({ redraw, reset: () => { state = fresh(); redraw(); } });
+    redraw();
+};
+
+document.querySelectorAll(".opt").forEach(setup);
+document.getElementById("reset").addEventListener("click", () => boards.forEach((b) => b.reset()));
+longBox.addEventListener("change", () => boards.forEach((b) => b.reset()));
+let width = innerWidth;
+addEventListener("resize", () => { if (innerWidth !== width) { width = innerWidth; boards.forEach((b) => b.redraw()); } });
+document.fonts?.ready.then(() => boards.forEach((b) => b.redraw()));
+</script>
+</body>
+</html>
