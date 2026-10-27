@@ -2638,7 +2638,7 @@ dependencies = [
 
 [[package]]
 name = "yuiolink-core"
-version = "0.15.18"
+version = "0.15.19"
 dependencies = [
  "aes-gcm",
  "base64",
@@ -2652,7 +2652,7 @@ dependencies = [
 
 [[package]]
 name = "yuiolink-server"
-version = "0.15.18"
+version = "0.15.19"
 dependencies = [
  "anyhow",
  "axum",
