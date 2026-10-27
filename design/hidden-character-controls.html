@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hidden Character Controls</title>
+<style>
+:root {
+    --bg: #f5f5f7;
+    --card: #fff;
+    --text: #1d1d1f;
+    --muted: #6e6e73;
+    --line: #d2d2d7;
+    --red: #d70015;
+    --red-wash: rgba(215, 0, 21, 0.09);
+    --gray: #8e8e93;
+    --gray-ink: #6e6e73;
+    --accent: #0071e3;
+    --ok: #1a7f37;
+    --field: #a855f7;
+    --font: -apple-system, system-ui, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #000;
+        --card: #1c1c1e;
+        --text: #f5f5f7;
+        --muted: #a1a1a6;
+        --line: #3a3a3c;
+        --red: #ff5d54;
+        --red-wash: rgba(255, 93, 84, 0.14);
+        --gray: #8e8e93;
+        --gray-ink: #a1a1a6;
+        --accent: #4da3ff;
+        --ok: #30d158;
+        --field: #bf7af0;
+    }
+}
+:root[data-theme="dark"] {
+    --bg: #000;
+    --card: #1c1c1e;
+    --text: #f5f5f7;
+    --muted: #a1a1a6;
+    --line: #3a3a3c;
+    --red: #ff5d54;
+    --red-wash: rgba(255, 93, 84, 0.14);
+    --gray: #8e8e93;
+    --gray-ink: #a1a1a6;
+    --accent: #4da3ff;
+    --ok: #30d158;
+    --field: #bf7af0;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    padding: 32px 16px 80px;
+    font: 15px/1.5 var(--font);
+    color: var(--text);
+    background: var(--bg);
+}
+main { max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 28px; margin: 0 0 4px; }
+h2 { font-size: 20px; margin: 44px 0 6px; }
+h3 { font-size: 16px; margin: 0 0 2px; }
+p { margin: 6px 0; max-width: 72ch; }
+.lead { color: var(--muted); font-size: 16px; }
+.small { font-size: 13px; color: var(--muted); }
+.pick { color: var(--accent); font-weight: 600; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin: 14px 0 0; font-size: 14px; }
+.toolbar label { display: inline-flex; gap: 6px; align-items: center; }
+.toolbar button { font: inherit; padding: 4px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-top: 14px; align-items: start; }
+.opt {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    min-width: 0;
+}
+.opt > .small { margin-bottom: 12px; }
+.opt.mine { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* The page's facts row, as the Text page has it today. */
+.facts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 8px 2px; font-size: 11px; font-weight: 600; color: var(--gray-ink); }
+.facts .warn { color: var(--red); }
+.facts span { display: inline-flex; align-items: center; gap: 4px; }
+
+/* The text box. */
+.box {
+    position: relative;
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+    font: 16px/1.6 var(--font);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    transition: none;
+}
+.field { border: 2px solid var(--field); box-shadow: 0 0 0 4px color-mix(in srgb, var(--field) 25%, transparent); border-radius: 14px; font-size: 17px; }
+
+/* A label: the character's name, reverse red, or gray for the soft kinds. */
+.lab::after {
+    content: attr(data-label) "\200B";
+    margin: 0 1px;
+    padding: 0 3px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #fff;
+    background: var(--red);
+    white-space: nowrap;
+}
+.lab.soft::after { background: var(--gray); }
+
+/* A tick: a thin bar under a wedge, taking no width. */
+.tick { position: relative; }
+.tick::after {
+    content: "";
+    position: absolute;
+    left: -0.23em;
+    top: 0.05em;
+    width: 0.46em;
+    height: 1.25em;
+    background: var(--red);
+    clip-path: polygon(0 0, 100% 0, calc(50% + 0.75px) 0.24em, calc(50% + 0.75px) 100%, calc(50% - 0.75px) 100%, calc(50% - 0.75px) 0.24em);
+    pointer-events: none;
+}
+.tick.soft::after { background: var(--gray); }
+
+/* A joiner where spelling puts it: a gray wedge alone, placed by measuring,
+   since a span inside the word would change how it draws. */
+.wedge {
+    position: absolute;
+    width: 0.46em;
+    height: 0.26em;
+    margin-left: -0.23em;
+    background: var(--gray);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    pointer-events: none;
+}
+
+/* The chips, as the product draws them. */
+.tiers { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin: 8px 0 0 8px; font-size: 12.5px; }
+.tiers.row { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px 14px; margin: 0 0 8px 2px; }
+.tierline { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; flex-wrap: wrap; }
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 -6px;
+    padding: 1px 6px;
+    border: 0;
+    border-radius: 6px;
+    font: inherit;
+    font-weight: 600;
+    color: var(--red);
+    background: none;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.chip:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.chip.soft, .chip.word { color: var(--gray-ink); }
+.chip.done { color: var(--ok); }
+.chip .mode { font-weight: 400; color: var(--gray-ink); }
+.chip svg { flex: none; }
+.chip.word.off svg { opacity: 0.45; }
+
+/* Labels / Ticks: a small segmented switch, its state always shown. */
+.seg { display: inline-flex; padding: 2px; border-radius: 8px; background: color-mix(in srgb, var(--gray) 16%, transparent); font-size: 12px; }
+.seg button { font: inherit; font-weight: 600; border: 0; border-radius: 6px; padding: 1px 9px; background: none; color: var(--gray-ink); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.18); }
+.seg-wrap { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+
+.copy {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 9px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font: 600 15px var(--font);
+}
+.copy small { display: block; font-weight: 400; font-size: 12px; opacity: 0.85; }
+
+.cmp { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+.cmp th, .cmp td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.cmp th { font-size: 12.5px; color: var(--muted); }
+.cmp code { font-size: 13px; }
+.bad { color: var(--red); }
+.good { color: var(--ok); }
+.note { margin-top: 10px; font-size: 13px; color: var(--muted); }
+.wrap-table { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+<h1>Hidden Character Controls</h1>
+<p class="lead">Three gaps from your Safari look, mocked against the /demo/text sample. Every box and chip below works: click the chips and watch whether the chip you clicked stays under the pointer.</p>
+
+<div class="toolbar">
+    <label><input type="checkbox" id="hold" checked> Hold the box's height (proposed)</label>
+    <button type="button" id="reset">Reset all</button>
+    <span class="small">Turn the hold off to feel today's jump.</span>
+</div>
+
+<h2>1. The Text page</h2>
+<p>Today one red chip does two jobs: it steps Labels → Ticks → Removed. The gray chip only removes, so the gray characters follow the red chip's drawing. With no red characters in the text, they are stuck on Labels. Joiners in words have no control at all.</p>
+
+<div class="grid">
+
+<section class="opt mine" data-opt="a">
+    <h3>A. A switch for drawing, a chip per tier for removing <span class="pick">my pick</span></h3>
+    <p class="small">Labels | Ticks covers every tier. Each chip is a verb: Remove, Put Back, Hide, Show. Controls stay under the box, beside Copy, which they change.</p>
+    <div class="facts"></div>
+    <pre class="box"></pre>
+    <div class="tiers"></div>
+    <button class="copy" type="button">Copy</button>
+</section>
+
+<section class="opt" data-opt="b">
+    <h3>B. Every tier gets the red chip's cycle</h3>
+    <p class="small">Each chip names its state and steps on a click: Labels → Ticks → Removed for red and gray, Shown → Hidden for joiners. The smallest change, but red and gray can each draw differently, and a click's result is never shown in advance.</p>
+    <div class="facts"></div>
+    <pre class="box"></pre>
+    <div class="tiers"></div>
+    <button class="copy" type="button">Copy</button>
+</section>
+
+<section class="opt" data-opt="c">
+    <h3>C. Everything above the box</h3>
+    <p class="small">The facts row becomes the controls, so nothing above them ever moves. Copy, now far away, says what it leaves out instead.</p>
+    <div class="tiers row"></div>
+    <pre class="box"></pre>
+    <button class="copy" type="button">Copy</button>
+</section>
+
+</div>
+
+<h2>2. The create form</h2>
+<p>The form draws ticks only, since the field has no room for labels. Joiners in words get a third line, so they are counted and can be hidden. A caret beside a wedge still opens its entry, as it does today.</p>
+<div class="grid">
+<section class="opt mine" data-opt="f">
+    <h3>Form with a joiners line</h3>
+    <p class="small">Remove and Put Back work per tier and keep each other's state. Today, removing the gray tier forgets the red tier's Put Back (your screenshot shows only the gray line for that reason).</p>
+    <pre class="box field"></pre>
+    <div class="tiers"></div>
+</section>
+</div>
+
+<h2>3. The tooltip</h2>
+<p>The chip shows a state (“Ticks”) while its tooltip names the next action, and the tooltip says “them” for one character. In A and C the chips name their action, so the tooltip only adds what is acted on.</p>
+<div class="wrap-table">
+<table class="cmp">
+    <tr><th>Chip</th><th>Today's tooltip</th><th>Proposed (A or C)</th></tr>
+    <tr><td>4 Hidden Characters · Ticks</td><td class="bad">Take them out of the text</td><td>Chip reads “· Remove”; tooltip “Take the 4 hidden characters out of the text”</td></tr>
+    <tr><td>1 Special Character · Remove</td><td class="bad">Take them out of the text</td><td>“Take the special character out of the text”</td></tr>
+    <tr><td>…Removed · Put Back</td><td>Put them back in the text</td><td>“Put the special character back” (count-aware)</td></tr>
+    <tr><td>5 Joiners in Words · Hide</td><td>∅</td><td>“Hide the marks; the joiners stay in the text”</td></tr>
+</table>
+</div>
+
+<h2>Notes</h2>
+<p><b>Holding the height.</b> The box keeps the tallest height it has had at the current width, and lets go when the width changes. Labels is the tallest drawing, and the page starts on it, so in practice the box never shrinks under the pointer. Today's jump comes from Labels → Ticks: labels take room, ticks take none.</p>
+<p><b>Joiners stay in the text.</b> They are part of the spelling, so the joiners chip hides their marks and never removes them, as the server's Remove already keeps them. They never get labels either: a label inside a word changes how Persian and the Indic scripts draw.</p>
+<p><b>History rows</b> follow whichever option wins, at the same small size.</p>
+</main>
+
+<script>
+"use strict";
+
+const ICON = {
+    alert: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.2v4.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.4" r="0.95" fill="currentColor"/></svg>',
+    info: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.2v4.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.6" r="0.95" fill="currentColor"/></svg>',
+    check: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 8.3l2 2 4-4.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    wedge: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10l-5 7z" fill="currentColor"/></svg>',
+};
+
+// The /demo/text sample: plain strings, and marks for the characters the
+// page marks. Joiners in words stay in the strings (they shape the word) and
+// are found by scanning lines flagged `words`.
+const H = (label) => ({ tier: "hard", label });
+const S = (label, ch) => ({ tier: "soft", label, ch });
+const LINES = [
+    { parts: ["Wi-Fi: pass", H("zero-width space"), "word"] },
+    { parts: ["Room: 10", S("no-break space", " "), "km away"] },
+    { parts: ["Family: \u{1f468}‍\u{1f469}‍\u{1f467}"] },
+    { parts: ["File: abc", H("right-to-left override"), "def", H("pop directional formatting")] },
+    { parts: ["Bell: ", H("alert")] },
+    { parts: ["Persian: می‌خواهم"], words: true },
+    { parts: ["Abbreviation: به‍."], words: true },
+    { parts: ["Hindi: क्‍ष"], words: true },
+    { parts: ["Kannada: ರ‍್ಯ"], words: true },
+    { parts: ["Sinhala: ස්‍ය"], words: true },
+];
+const COUNT = { hard: 4, soft: 1, word: 5 };
+const JOINER = /[‌‍]/g;
+
+// state: hard and soft are "labels" | "ticks" | "removed"; words is a bool.
+const draw = (box, state, hold) => {
+    const before = box.getBoundingClientRect().height;
+    box.replaceChildren();
+    const lines = LINES.map((line, n) => {
+        const nodes = [];
+        for (const p of line.parts) {
+            if (typeof p === "string") { nodes.push(document.createTextNode(p)); continue; }
+            const how = state[p.tier];
+            if (how === "removed") { if (p.ch) nodes.push(document.createTextNode(" ")); continue; }
+            if (p.ch) nodes.push(document.createTextNode(p.ch));
+            const s = document.createElement("span");
+            s.className = `${how === "labels" ? "lab" : "tick"} ${p.tier}`;
+            if (how === "labels") s.dataset.label = p.label;
+            nodes.push(s);
+        }
+        if (n < LINES.length - 1) nodes.push(document.createTextNode("\n"));
+        return { line, nodes };
+    });
+    for (const { nodes } of lines) box.append(...nodes);
+    if (state.words) {
+        const at = box.getBoundingClientRect();
+        const fs = Number.parseFloat(getComputedStyle(box).fontSize);
+        const wedges = [];
+        for (const { line, nodes } of lines) {
+            if (!line.words) continue;
+            for (const node of nodes) {
+                if (node.nodeType !== Node.TEXT_NODE) continue;
+                for (const m of node.data.matchAll(JOINER)) {
+                    const r = document.createRange();
+                    r.setStart(node, m.index);
+                    r.setEnd(node, m.index + 1);
+                    let rect = r.getClientRects()[0];
+                    if (!rect) { r.collapse(true); rect = r.getBoundingClientRect(); }
+                    const w = document.createElement("span");
+                    w.className = "wedge";
+                    w.style.left = `${rect.left + rect.width / 2 - at.left - box.clientLeft}px`;
+                    w.style.top = `${rect.top - at.top - box.clientTop - 0.12 * fs}px`;
+                    wedges.push(w);
+                }
+            }
+        }
+        box.append(...wedges);
+    }
+    // Hold: never shorter than before, at this width.
+    if (!hold.checked) { box.style.minHeight = ""; return; }
+    if (box.dataset.width !== String(box.clientWidth)) { box.style.minHeight = ""; box.dataset.width = String(box.clientWidth); }
+    else if (box.getBoundingClientRect().height < before) box.style.minHeight = `${before}px`;
+};
+
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const WHAT = { hard: "Hidden Character", soft: "Special Character", word: "Joiner in Words" };
+const whatOf = (tier) => tier === "word" ? `${COUNT.word} Joiners in Words` : plural(COUNT[tier], WHAT[tier]);
+const objOf = (tier) => {
+    const n = COUNT[tier];
+    const w = tier === "hard" ? "hidden" : "special";
+    return n === 1 ? `the ${w} character` : `the ${n} ${w} characters`;
+};
+
+const chip = ({ tier, icon, text, mode, title, done = false, off = false, onClick }) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `chip${tier === "hard" ? "" : ` ${tier}`}${done ? " done" : ""}${off ? " off" : ""}`;
+    b.innerHTML = ICON[icon];
+    b.append(text);
+    if (mode) {
+        const m = document.createElement("span");
+        m.className = "mode";
+        m.textContent = `· ${mode}`;
+        b.append(m);
+    }
+    b.title = title;
+    b.addEventListener("click", onClick);
+    return b;
+};
+
+// Remove / Put Back for red and gray, Hide / Show for joiners.
+const verbChips = (state, redraw, removedMode = "removed") => {
+    const out = [];
+    for (const tier of ["hard", "soft"]) {
+        const removed = state[tier] === "removed";
+        out.push(chip({
+            tier, done: removed,
+            icon: removed ? "check" : tier === "hard" ? "alert" : "info",
+            text: removed ? `${whatOf(tier)} Removed` : whatOf(tier),
+            mode: removed ? "Put Back" : "Remove",
+            title: removed ? `Put ${objOf(tier)} back` : `Take ${objOf(tier)} out of the text`,
+            onClick: () => { state[tier] = removed ? state.view : removedMode; redraw(); },
+        }));
+    }
+    out.push(chip({
+        tier: "word", icon: "wedge", off: !state.words,
+        text: whatOf("word"),
+        mode: state.words ? "Hide" : "Show",
+        title: state.words ? "Hide the marks; the joiners stay in the text" : "Show where the joiners are",
+        onClick: () => { state.words = !state.words; redraw(); },
+    }));
+    return out;
+};
+
+const segSwitch = (state, redraw) => {
+    const wrap = document.createElement("span");
+    wrap.className = "seg-wrap";
+    const seg = document.createElement("span");
+    seg.className = "seg";
+    seg.setAttribute("role", "group");
+    seg.setAttribute("aria-label", "Draw marks as");
+    for (const v of ["labels", "ticks"]) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = v === "labels" ? "Labels" : "Ticks";
+        b.setAttribute("aria-pressed", String(state.view === v));
+        b.addEventListener("click", () => {
+            state.view = v;
+            for (const t of ["hard", "soft"]) if (state[t] !== "removed") state[t] = v;
+            redraw();
+        });
+        seg.append(b);
+    }
+    wrap.append(seg);
+    return wrap;
+};
+
+const hold = document.getElementById("hold");
+const fresh = () => ({ view: "labels", hard: "labels", soft: "labels", words: true });
+const boards = [];
+
+const setup = (sec) => {
+    const opt = sec.dataset.opt;
+    const box = sec.querySelector(".box");
+    const tiers = sec.querySelector(".tiers");
+    const facts = sec.querySelector(".facts");
+    const copy = sec.querySelector(".copy");
+    let state = opt === "f" ? { ...fresh(), view: "ticks", hard: "ticks", soft: "ticks" } : fresh();
+    if (facts) facts.innerHTML = `<span class="warn">${ICON.alert}Hidden Characters</span><span>${ICON.info}Special Characters</span><span>Joiners in Words</span>`;
+
+    const redraw = () => {
+        draw(box, state, hold);
+        tiers.replaceChildren();
+        if (opt === "a") {
+            const [hard, soft, word] = verbChips(state, redraw);
+            const first = document.createElement("div");
+            first.className = "tierline";
+            first.append(hard, segSwitch(state, redraw));
+            tiers.append(first, soft, word);
+        } else if (opt === "c") {
+            tiers.append(...verbChips(state, redraw));
+            const sw = segSwitch(state, redraw);
+            sw.style.marginLeft = "auto";
+            tiers.append(sw);
+        } else if (opt === "f") {
+            tiers.append(...verbChips(state, redraw));
+        } else {
+            const MODES = ["labels", "ticks", "removed"];
+            const NAME = { labels: "Labels", ticks: "Ticks", removed: "Removed" };
+            for (const tier of ["hard", "soft"]) {
+                const cur = state[tier];
+                const next = MODES[(MODES.indexOf(cur) + 1) % 3];
+                tiers.append(chip({
+                    tier, done: cur === "removed",
+                    icon: cur === "removed" ? "check" : tier === "hard" ? "alert" : "info",
+                    text: cur === "removed" ? `${whatOf(tier)} Removed` : whatOf(tier),
+                    mode: cur === "removed" ? null : NAME[cur],
+                    title: `Next: ${NAME[next]}`,
+                    onClick: () => { state[tier] = next; redraw(); },
+                }));
+            }
+            tiers.append(chip({
+                tier: "word", icon: "wedge", off: !state.words,
+                text: whatOf("word"), mode: state.words ? "Shown" : "Hidden",
+                title: state.words ? "Next: Hidden" : "Next: Shown",
+                onClick: () => { state.words = !state.words; redraw(); },
+            }));
+        }
+        if (copy) {
+            const left = ["hard", "soft"].filter((t) => state[t] === "removed").reduce((n, t) => n + COUNT[t], 0);
+            copy.replaceChildren("Copy");
+            if (opt === "c" && left) {
+                const s = document.createElement("small");
+                s.textContent = `Leaves out ${plural(left, "character")}`;
+                copy.append(s);
+            }
+        }
+    };
+    boards.push({ redraw, reset: () => { state = opt === "f" ? { ...fresh(), view: "ticks", hard: "ticks", soft: "ticks" } : fresh(); box.style.minHeight = ""; redraw(); } });
+    redraw();
+};
+
+document.querySelectorAll(".opt").forEach(setup);
+document.getElementById("reset").addEventListener("click", () => boards.forEach((b) => b.reset()));
+hold.addEventListener("change", () => boards.forEach((b) => b.reset()));
+let width = innerWidth;
+addEventListener("resize", () => { if (innerWidth !== width) { width = innerWidth; boards.forEach((b) => b.redraw()); } });
+document.fonts?.ready.then(() => boards.forEach((b) => b.redraw()));
+</script>
+</body>
+</html>
