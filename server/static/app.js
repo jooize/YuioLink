@@ -2348,8 +2348,12 @@
             const what = plural(n, soft ? "Special Character" : "Hidden Character");
             if (removed) c.append(checkIcon(), `${what} Removed`, el("span", "hidden-chip-mode", "· Put Back"));
             else c.append(soft ? infoIcon() : alertIcon(), what, el("span", "hidden-chip-mode", "· Remove"));
-            c.addEventListener("click", () => {
+            c.addEventListener("click", async () => {
                 const words = soft ? "Special characters" : "Hidden characters";
+                // A table still loading would unmark a registered selector or
+                // a spelling joiner, so Remove waits for it and keeps them,
+                // as the server's Remove does.
+                if (!removed) await Promise.all([variantsLoading, joiningLoading]);
                 if (removed) {
                     const back = st.removed[tier].before;
                     st.removed[tier] = null;
@@ -2358,13 +2362,16 @@
                 } else {
                     const before = ta.value;
                     const after = withoutHidden(before, soft, isRedirect(before));
-                    replaceField(after);
-                    st.removed[tier] = { before, after };
-                    Object.assign(st, { open: [], flag: null });
-                    live.textContent = `${words} removed.`;
+                    if (after !== before) {
+                        replaceField(after);
+                        st.removed[tier] = { before, after };
+                        Object.assign(st, { open: [], flag: null });
+                        live.textContent = `${words} removed.`;
+                    }
                 }
                 render();
-                slot.querySelector(`.hidden-chip[data-tier="${tier}"]`)?.focus();
+                // The chip is gone when the table unmarked all of its tier.
+                (slot.querySelector(`.hidden-chip[data-tier="${tier}"]`) ?? ta).focus();
             });
             return c;
         };
