@@ -2175,8 +2175,48 @@ html.js .text-cast .entry:not(.in-group) {
 
 /* The joiners spelling puts in words start hidden: they are spelling, not
    a trick. One whose entry is open still shows, blue. */
-.text-body.words-hidden .hid.word:not(.open)::after {
+.text-body.words-hidden .hid.word:not(.open)::after,
+.history-well-body.words-hidden .hid.word:not(.open, .lab)::after {
     display: none;
+}
+
+/* A row's open run in Labels: blue, as on the Text page. */
+.history-well-body:not(.ticked) .hid.open:not(.word)::after {
+    color: #fff;
+    background: var(--accent);
+}
+
+/* A row's Labels | Ticks, at the size of its chips. */
+.hidden-seg {
+    display: inline-flex;
+    margin-top: 2px;
+    padding: 1.5px;
+    border-radius: 7px;
+    font-size: 11.5px;
+    background: color-mix(in srgb, var(--hc-gray) 16%, transparent);
+}
+
+.hidden-seg button {
+    padding: 0 8px;
+    border: 0;
+    border-radius: 5.5px;
+    font: inherit;
+    font-weight: 600;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    background: none;
+    cursor: pointer;
+}
+
+.hidden-seg button[aria-pressed="true"] {
+    color: var(--text);
+    background: var(--hc-solid);
+    box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.18);
+}
+
+.hidden-seg button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
 }
 
 /* The label ignores the pointer, so text.js (and app.js, in a row) finds a

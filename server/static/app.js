@@ -838,8 +838,10 @@
                 const merged = { ...win, marksAt: other.marksAt };
                 if (other.marks) merged.marks = other.marks;
                 else delete merged.marks;
-                if (other.softRemoved) merged.softRemoved = true;
-                else delete merged.softRemoved;
+                for (const k of ["hardRemoved", "softRemoved", "words"]) {
+                    if (other[k]) merged[k] = true;
+                    else delete merged[k];
+                }
                 byId.set(e.id, merged);
             } else byId.set(e.id, win);
         }
@@ -1120,6 +1122,7 @@
         }
         const mode = marksMode(it);
         if (mode !== "labels") body.classList.add("marks-ticks", "ticked");
+        if (!it.words) body.classList.add("words-hidden");
         paintDisplay(c.display, body, dropFor(it));
         groupRuns(it, body, mode);
         beside.set(body, setBeside(body));
@@ -1190,6 +1193,7 @@
                 m.dataset.label = label;
             });
             if (cps.every(isSoft)) run.forEach((m) => m.classList.add("soft"));
+            if (opened === k) run.forEach((m) => m.classList.add("open"));
             if (mode !== "labels" && opened === k) run.forEach((m) => m.classList.add("lab"));
         });
     };
@@ -1276,6 +1280,10 @@
     const markCount = (nodes, soft = false) =>
         nodes.reduce((sum, n) => sum + (isMarkNode(n) ? counted(n).filter((cp) => isSoft(cp) === soft).length
             : Array.isArray(n) ? markCount(n.slice(1), soft) : 0), 0);
+    // How many joiners spelling puts in words a tree holds.
+    const wordCount = (nodes) =>
+        nodes.reduce((sum, n) => sum + (isMarkNode(n) ? markIds(n).filter((id) => id.startsWith("w")).length
+            : Array.isArray(n) ? wordCount(n.slice(1)) : 0), 0);
     // The same, read back from the page: a mark's label is generated content,
     // never text, so only a NUL's empty mark needs its data-cp put back.
     const exactText = (root) => {
@@ -1290,74 +1298,111 @@
     };
 
     // --- hidden characters in a Text row ---
-    // A row draws its hidden characters in one of three modes, cycled by the
-    // chip in its footer: Ticks (a tick where each run sits, as in the form;
-    // the default), Labels (each run wears its name) and Removed (left out of
-    // the row, of a selection and of the row's Copy). The mode is the row's
-    // own, `it.marks` (absent for Ticks), stamped like the eye for the merge.
-    // Removed leaves the soft kinds in; they have their own gray chip, which
-    // takes them out too (`it.softRemoved`, on the same stamp).
-    const MARK_MODES = ["ticks", "labels", "removed"];
-    const marksMode = (it) => (MARK_MODES.includes(it.marks) ? it.marks : "ticks");
+    // A row draws its hidden characters as the Text page does, at row size:
+    // in Ticks (a tick where each run sits, as in the form; the default) or
+    // Labels (each run wears its name), picked by the row's switch
+    // (`it.marks`, "labels" or absent). Each tier is taken out of the row,
+    // of a selection and of the row's Copy by its own chip, and put back
+    // (`it.hardRemoved`, `it.softRemoved`). The joiners spelling puts in
+    // words show their wedges only when asked (`it.words`). All of it is the
+    // row's own, stamped like the eye for the merge (`it.marksAt`). An older
+    // copy's `marks: "removed"` reads as red taken out, drawn in Ticks.
+    const marksMode = (it) => (it.marks === "labels" ? "labels" : "ticks");
+    const hardOut = (it) => Boolean(it.hardRemoved) || it.marks === "removed";
     const dropFor = (it) => {
-        const hard = marksMode(it) === "removed";
+        const hard = hardOut(it);
         return hard || it.softRemoved ? { hard, soft: Boolean(it.softRemoved) } : null;
-    };
-    const softChip = (it, n) => {
-        const chip = document.createElement("button");
-        chip.type = "button";
-        chip.className = "hidden-chip soft";
-        chip.dataset.for = it.id;
-        chip.dataset.tier = "soft";
-        const what = plainPlural(n, "Special Character");
-        const state = document.createElement("span");
-        state.className = "hidden-chip-mode";
-        state.textContent = it.softRemoved ? "\u00b7 Put Back" : "\u00b7 Remove";
-        if (it.softRemoved) {
-            chip.dataset.mode = "removed";
-            chip.append(checkIcon(), `${what} Removed`, state);
-        } else chip.append(infoIcon(), what, state);
-        chip.title = it.softRemoved ? "Put them back in the row" : "Take them out of the row";
-        chip.addEventListener("click", () => {
-            if (it.softRemoved) delete it.softRemoved;
-            else it.softRemoved = true;
-            it.marksAt = Date.now();
-            renderHistory();
-            document.querySelector(`.hidden-chip[data-for="${it.id}"][data-tier="soft"]`)?.focus();
-        });
-        return chip;
     };
     // The entry a mark opens, under the row, this page view only: row id to
     // the mark's `data-tell` and its run's place in the row.
     const castOpen = new Map();
-    const setMarksMode = (it, mode) => {
-        if (mode === "ticks") delete it.marks;
-        else it.marks = mode;
+    // A change to how a row draws its marks: an older copy's "removed" is
+    // first read as what it means, then the change is made and stamped.
+    const changeMarks = (it, change) => {
+        if (it.marks === "removed") {
+            delete it.marks;
+            it.hardRemoved = true;
+        }
+        change();
+        for (const k of ["hardRemoved", "softRemoved", "words"]) if (!it[k]) delete it[k];
         it.marksAt = Date.now();
-        if (mode === "removed") castOpen.delete(it.id);
+        renderHistory();
     };
-    const marksChip = (it, n) => {
-        const mode = marksMode(it);
+    const refocus = (it, tier) => document.querySelector(`.history-item [data-for="${it.id}"][data-tier="${tier}"]`)?.focus();
+    // A tier's chip: red for the kinds that hide things, gray for the soft
+    // ones. Taken out, it keeps its name, green, so its verb stays put.
+    const tierChip = (it, tier, n) => {
+        const soft = tier === "soft";
+        const out = soft ? Boolean(it.softRemoved) : hardOut(it);
         const chip = document.createElement("button");
         chip.type = "button";
-        chip.className = "hidden-chip";
-        chip.dataset.mode = mode;
+        chip.className = soft ? "hidden-chip soft" : "hidden-chip";
         chip.dataset.for = it.id;
-        const what = plainPlural(n, "Hidden Character");
-        if (mode === "removed") chip.append(checkIcon(), `${what} Removed`);
-        else {
-            const state = document.createElement("span");
-            state.className = "hidden-chip-mode";
-            state.textContent = `\u00b7 ${mode === "ticks" ? "Ticks" : "Labels"}`;
-            chip.append(alertIcon(), what, state);
-        }
-        chip.title = { ticks: "Show them as labels", labels: "Take them out of the row", removed: "Show them as ticks" }[mode];
+        chip.dataset.tier = tier;
+        if (out) chip.dataset.mode = "removed";
+        const verb = document.createElement("span");
+        verb.className = "hidden-chip-mode";
+        verb.textContent = out ? "\u00b7 Put Back" : "\u00b7 Remove";
+        chip.append(out ? checkIcon() : soft ? infoIcon() : alertIcon(), plainPlural(n, soft ? "Special Character" : "Hidden Character"), verb);
+        const kind = soft ? "special" : "hidden";
+        const them = n === 1 ? `the ${kind} character` : `the ${n.toLocaleString("en-US")} ${kind} characters`;
+        chip.title = out ? `Put ${them} back` : `Take ${them} out of the row`;
         chip.addEventListener("click", () => {
-            setMarksMode(it, MARK_MODES[(MARK_MODES.indexOf(mode) + 1) % MARK_MODES.length]);
-            renderHistory();
-            document.querySelector(`.hidden-chip[data-for="${it.id}"]:not([data-tier])`)?.focus();
+            changeMarks(it, () => {
+                if (soft) it.softRemoved = !out;
+                else it.hardRemoved = !out;
+                if (!out) castOpen.delete(it.id);
+            });
+            refocus(it, tier);
         });
         return chip;
+    };
+    // The joiners spelling puts in words: never taken out, only shown.
+    const wordChip = (it, n) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "hidden-chip word";
+        chip.dataset.for = it.id;
+        chip.dataset.tier = "word";
+        const verb = document.createElement("span");
+        verb.className = "hidden-chip-mode";
+        verb.textContent = it.words ? "\u00b7 Hide" : "\u00b7 Show";
+        chip.append(wedgeIcon(), n === 1 ? "1 Joiner in a Word" : `${n.toLocaleString("en-US")} Joiners in Words`, verb);
+        chip.title = it.words ? "Hide the marks; the joiners stay in the row" : "Show where the joiners are";
+        chip.addEventListener("click", () => {
+            changeMarks(it, () => {
+                it.words = !it.words;
+                // Hidden, a joiner's entry closes with its mark.
+                if (!it.words && castOpen.get(it.id)?.tell?.startsWith("w")) castOpen.delete(it.id);
+            });
+            refocus(it, "word");
+        });
+        return chip;
+    };
+    // Labels | Ticks, for the row's red and gray marks alike.
+    const viewSwitch = (it) => {
+        const seg = document.createElement("span");
+        seg.className = "hidden-seg";
+        seg.setAttribute("role", "group");
+        seg.setAttribute("aria-label", "Draw marks as");
+        for (const [mode, words] of [["labels", "Labels"], ["ticks", "Ticks"]]) {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.textContent = words;
+            b.dataset.for = it.id;
+            b.dataset.tier = mode;
+            b.setAttribute("aria-pressed", String(marksMode(it) === mode));
+            b.addEventListener("click", () => {
+                if (marksMode(it) === mode) return;
+                changeMarks(it, () => {
+                    if (mode === "labels") it.marks = "labels";
+                    else delete it.marks;
+                });
+                refocus(it, mode);
+            });
+            seg.append(b);
+        }
+        return seg;
     };
     // What a mark means, under the row: its cast entry, the Text page's own.
     const castPanel = (it) => {
@@ -1382,10 +1427,12 @@
     // drag-selection leaves the entry alone. A click on the open mark puts
     // its entry away.
     const markAt = (body, x, y) => {
+        // A joiner whose wedge is hidden is not there to click, unless open.
+        const hidden = body.classList.contains("words-hidden");
         // A tick takes no width: matched within 6px of where it stands.
-        if (body.classList.contains("ticked")) return markNear(body, x, y);
+        if (body.classList.contains("ticked")) return markNear(body, x, y, hidden ? ".hid:not(.word), .hid.word.open" : ".hid");
         // A spelling joiner keeps its tick in Labels, so it is matched the same way.
-        const word = markNear(body, x, y, ".hid.word");
+        const word = markNear(body, x, y, hidden ? ".hid.word.open" : ".hid.word");
         if (word) return word;
         for (const m of body.querySelectorAll(".hid[data-tell]")) {
             for (const r of m.getClientRects()) {
@@ -1702,17 +1749,20 @@
                 uses.textContent = plainPlural(it.uses, "use");
                 meta.append(uses);
             }
-            // A Text row's hidden characters, counted in what it draws: the
-            // chip that cycles how they are drawn, and a gray one for the
-            // soft kinds, each on its own line.
+            // A Text row's hidden characters, counted in what it holds: a
+            // line per tier, red and gray, each taking its kind out; the
+            // joiners in words; and Labels | Ticks.
             const drawn = it.kind === "text" && it.snippet && !isCovered(it) && !isExpired(it) ? rowContents(it).display : null;
             const marks = Array.isArray(drawn) ? markCount(drawn) : 0;
             const softMarks = Array.isArray(drawn) ? markCount(drawn, true) : 0;
-            if (marks || softMarks) {
+            const joiners = Array.isArray(drawn) ? wordCount(drawn) : 0;
+            if (marks || softMarks || joiners) {
                 const tiers = document.createElement("span");
                 tiers.className = "hidden-tiers";
-                if (marks) tiers.append(marksChip(it, marks));
-                if (softMarks) tiers.append(softChip(it, softMarks));
+                if (marks) tiers.append(tierChip(it, "hard", marks));
+                if (softMarks) tiers.append(tierChip(it, "soft", softMarks));
+                if (joiners) tiers.append(wordChip(it, joiners));
+                if (marks || softMarks) tiers.append(viewSwitch(it));
                 meta.append(tiers);
             }
             const span = document.createElement("span");
