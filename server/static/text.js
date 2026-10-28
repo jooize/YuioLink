@@ -13,7 +13,7 @@
     // extra control: a box two lines over the limit should just be shown.
     const SLACK = 90;
 
-    const collapse = (wrap, pre, copyBtn) => {
+    const collapse = (wrap, pre) => {
         wrap.classList.add("capped");
         pre.classList.add("capped");
 
@@ -55,6 +55,7 @@
             btn.setAttribute("aria-expanded", String(open));
             label.textContent = open ? "Show less" : "Show all";
         });
+        return btn;
     };
 
     // The stored text, read back from the page. A hidden character's mark draws
@@ -258,22 +259,58 @@
         ["path", { d: "M5.2 8.2 7.2 10.1 10.9 6", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round", "stroke-linejoin": "round" }],
     ]);
 
-    // The text draws its hidden characters as a History row does, in a
-    // mode the red chip steps through: Labels (each run named in the line,
-    // as the server drew it, so nothing moves when this script arrives),
-    // Ticks (a tick where each run sits, beside the text) and Removed (left
-    // out of the text, and so of a selection and of Copy). The gray chip
-    // takes the soft kinds out, a no-break space becoming a plain space, and
-    // puts them back. Both hold for this page view.
+    // A ringed "!": the kinds that hide things (app.js alertIcon).
+    const alertIcon = () => svgIcon([
+        ["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
+        ["path", { d: "M8 4.6v4.2", stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" }],
+        ["circle", { cx: "8", cy: "11.2", r: ".95", fill: "currentColor" }],
+    ]);
+    const PREV = "M9.8 3.4 5.2 8l4.6 4.6";
+    const NEXT = "M6.2 3.4 10.8 8l-4.6 4.6";
+    const svgArrow = (d) => svgIcon([["path", { d, stroke: "currentColor", "stroke-width": "1.7", "stroke-linecap": "round", "stroke-linejoin": "round" }]]);
+
+    // The head above the text: a line per kind of character, each a name
+    // and a verb, and the Labels | Ticks switch; under them the entry a
+    // name or a mark opens. One state draws it all:
     //
-    // Every drawing starts again from the server's text (`src`): removing
-    // a tier can join two runs or split one, so each run is named anew,
-    // from the names the cast entries give.
-    const setupMarks = (pre) => {
+    // - `view`: how marks are drawn. Labels names each run in the line, as
+    //   the server drew it, so nothing moves when this script arrives;
+    //   Ticks puts a tick where each run sits, beside the text.
+    // - `out`: a tier taken out of the text, and so of a selection and of
+    //   Copy. Red takes out the kinds that hide things; gray takes out the
+    //   soft kinds, a no-break space becoming a plain space.
+    // - `words`: whether the joiners spelling puts in words show their
+    //   wedges. They start hidden; they are spelling, not a trick.
+    // - `open`: the entry shown, as its group (`tier`) and its place there.
+    //
+    // A name opens its group's first entry, and a second click puts it
+    // away; the arrows on the entry, and Left and Right, step through the
+    // group. A click on a mark opens its entry, and on the open one puts it
+    // away. While an entry is open the head stays at the top of the window
+    // (app.css), so a long text scrolls under it.
+    //
+    // Every drawing starts again from the server's text (`src`): taking a
+    // tier out can join two runs or split one, so each run is named anew,
+    // from the names the entries give.
+    //
+    // A mark's label ignores the pointer, because in Safari a label that
+    // takes it breaks a drag across the text. So a click is matched to a
+    // mark by where it landed, and only a plain click counts: one that ends
+    // a drag-selection leaves the entry alone.
+    const setupHead = (pre, head, fold) => {
+        const wrap = document.getElementById("text-wrap");
+        const cast = document.querySelector(".text-cast");
+        // The deck joins the head; until an entry opens it takes no room,
+        // so the move shifts nothing.
+        if (cast) {
+            head.append(cast);
+            copyForms(cast);
+        }
         const src = [...pre.childNodes].map((n) => n.cloneNode(true));
         const words = readWords(pre);
-        const soft = new Set((document.querySelector(".pv-fact.soft")?.dataset.cast ?? "").split(" ").filter(Boolean));
-        const names = new Map([...document.querySelectorAll(".pv-cast .entry[data-name]")]
+        const soft = new Set((head.querySelector('[data-tier="soft"] .name')?.dataset.cast ?? "").split(" ").filter(Boolean));
+        const entryFor = (name) => cast?.querySelector(`.entry[data-name="${name}"]`) ?? null;
+        const names = new Map([...(cast?.querySelectorAll(".entry[data-name]") ?? [])]
             .map((e) => [e.dataset.name, e.querySelector(".what b")?.textContent ?? ""]));
         // As views.rs run_label names a run.
         const runLabel = (ids) => {
@@ -285,7 +322,9 @@
             if (ids.every((id) => id === ids[0])) return `${ids.length > 1 ? `${ids.length} × ` : ""}${names.get(ids[0]) ?? ""}`;
             return `${ids.length} hidden characters of ${new Set(ids).size} kinds`;
         };
-        const st = { mode: "labels", softOut: false };
+        const st = { view: "labels", out: { hard: false, soft: false }, words: false, open: null };
+        const openId = () => (st.open ? groups.get(st.open.tier).entries[st.open.i].dataset.name : null);
+
         let placed = [];
         const place = () => {
             placeMarks(pre, placed);
@@ -304,10 +343,10 @@
                 if (isMark(n)) {
                     const ids = idsOf(n);
                     if (n.dataset.inner) {
-                        if (st.mode === "removed") instead = clusterLeft(n.textContent, ids);
+                        if (st.out.hard) instead = clusterLeft(n.textContent, ids);
                     } else if (soft.has(ids[0])) {
-                        if (st.softOut) instead = idCp(ids[0]) === 0xad ? "" : " ";
-                    } else if (st.mode === "removed") instead = "";
+                        if (st.out.soft) instead = idCp(ids[0]) === 0xad ? "" : " ";
+                    } else if (st.out.hard) instead = "";
                 }
                 at += len;
                 if (instead == null) {
@@ -326,13 +365,16 @@
                 if (prev && out[i - 1] === prev.at(-1) && !alone(n) && !alone(prev[0])) prev.push(n);
                 else runs.push([n]);
             });
+            const shown = openId();
             runs.forEach((run, k) => {
                 const ids = run.flatMap(idsOf);
+                const open = ids.includes(shown);
                 run.forEach((m, i) => {
                     m.dataset.run = String(k);
                     m.classList.toggle("first", i === 0);
                     m.classList.toggle("rest", i > 0);
                     m.classList.toggle("soft", ids.every((id) => soft.has(id)));
+                    m.classList.toggle("open", open);
                     if (i > 0) delete m.dataset.label;
                     // A cluster keeps the server's name for its marks.
                     else if (!m.dataset.inner) m.dataset.label = runLabel(ids);
@@ -342,7 +384,7 @@
             // In Ticks each mark gives way to its plain characters, and an
             // empty box over them takes its classes and data. A NUL keeps its
             // empty span, for its data-cp; a direction control an isolate.
-            const ticked = st.mode === "ticks";
+            const ticked = st.view === "ticks";
             const flat = [];
             const boxes = [];
             let pos = 0;
@@ -371,7 +413,7 @@
             const moved = (o) => o + shifts.reduce((d, [end, delta]) => d + (end <= o ? delta : 0), 0);
             for (const w of words) {
                 const box = document.createElement("span");
-                box.className = "hid word";
+                box.className = w.tell === shown ? "hid word open" : "hid word";
                 box.dataset.tell = w.tell;
                 boxes.push({ at: moved(w.at), end: moved(w.end), box });
             }
@@ -380,154 +422,313 @@
             // Adjacent text nodes become one, so nothing splits a word.
             pre.normalize();
             pre.classList.toggle("ticked", ticked);
+            pre.classList.toggle("words-hidden", !st.words);
             pre.append(...boxes.map((m) => m.box));
             placed = boxes;
             place();
         };
-        draw();
-        // Placed again whenever the text wraps anew (the window's width, the
-        // fold opening) or a font that arrives late redraws it.
-        if (typeof ResizeObserver === "function") new ResizeObserver(place).observe(pre);
-        document.fonts?.addEventListener?.("loadingdone", place);
 
-        const tiers = document.getElementById("text-tiers");
-        if (!tiers) return;
+        // The groups an entry steps through: each kind's name, with the
+        // entries its data-cast lists, in the order of the text.
+        const groups = new Map();
+        for (const pair of head.querySelectorAll(".pair[data-tier]")) {
+            const name = pair.querySelector(".name");
+            const entries = (name?.dataset.cast ?? "").split(" ").map(entryFor).filter(Boolean);
+            if (!name || !entries.length) continue;
+            groups.set(pair.dataset.tier, {
+                name,
+                verb: pair.querySelector(".verb"),
+                icon: name.querySelector("svg"),
+                n: Number.parseInt(name.textContent, 10) || 0,
+                entries,
+            });
+        }
+
         const live = document.createElement("p");
         live.className = "visually-hidden";
         live.setAttribute("aria-live", "polite");
-        tiers.after(live);
-        // Each chip keeps the server's count and icon; only its state is
-        // drawn here.
-        const wire = (chip, paint, step) => {
-            if (!chip) return;
-            const what = [...chip.childNodes].find((n) => n.nodeType === Node.TEXT_NODE)?.data ?? "";
-            const icon = chip.querySelector("svg");
-            const mode = (text) => {
-                const s = document.createElement("span");
-                s.className = "hidden-chip-mode";
-                s.textContent = `· ${text}`;
-                return s;
-            };
-            const render = () => paint(chip, { what, icon, mode });
-            chip.addEventListener("click", () => {
-                live.textContent = step();
-                render();
-                draw();
-            });
-            render();
-        };
-        const MODES = ["labels", "ticks", "removed"];
-        wire(tiers.querySelector('[data-tier="hard"]'), (chip, { what, icon, mode }) => {
-            chip.dataset.mode = st.mode;
-            if (st.mode === "removed") chip.replaceChildren(checkIcon(), `${what} Removed`);
-            else chip.replaceChildren(icon, what, mode(st.mode === "ticks" ? "Ticks" : "Labels"));
-            chip.title = { labels: "Show them as ticks", ticks: "Take them out of the text", removed: "Show them as labels" }[st.mode];
-        }, () => {
-            st.mode = MODES[(MODES.indexOf(st.mode) + 1) % MODES.length];
-            return { labels: "Hidden characters shown as labels.", ticks: "Hidden characters shown as ticks.", removed: "Hidden characters removed." }[st.mode];
-        });
-        wire(tiers.querySelector('[data-tier="soft"]'), (chip, { what, icon, mode }) => {
-            chip.dataset.mode = st.softOut ? "removed" : "kept";
-            if (st.softOut) chip.replaceChildren(checkIcon(), `${what} Removed`, mode("Put Back"));
-            else chip.replaceChildren(icon, what, mode("Remove"));
-            chip.title = st.softOut ? "Put them back in the text" : "Take them out of the text";
-        }, () => {
-            st.softOut = !st.softOut;
-            return st.softOut ? "Special characters removed." : "Special characters put back.";
-        });
-    };
+        head.after(live);
 
-    // The cast answers when asked, the same deck the preview card uses: one
-    // entry shown at a time, a click on a mark shows the entry naming its
-    // character, and each chip with a data-cast (Hidden Characters, Variant
-    // Forms) steps through its own entries (one past the last puts the deck
-    // away). Without this script the stylesheet shows the whole list instead.
-    //
-    // A registered variation sequence answers the same way: its pair is
-    // wrapped whole and opens the entry naming the form it picks.
-    //
-    // A mark's label ignores the pointer, because in Safari a label that
-    // takes it breaks a drag across the text. So a click is matched to a
-    // mark by where it landed, and only a plain click counts: one that ends
-    // a drag-selection leaves the deck alone.
-    const wireCast = (pre) => {
-        const cast = document.querySelector(".pv-cast");
-        if (!cast) return;
-        copyForms(cast);
-        const chips = [...document.querySelectorAll(".pv-fact[data-cast]")];
-        const settle = () => chips.forEach((c) => c.setAttribute("aria-expanded", "false"));
-        const entryFor = (name) => cast.querySelector(`.entry[data-name="${name}"]`);
-        const show = (entry) => {
-            cast.querySelectorAll(".entry.shown").forEach((e) => e.classList.remove("shown"));
+        // Each entry, once: its place in its group after its name, and in
+        // its corner the close button with the arrows under it.
+        for (const [tier, g] of groups) {
+            g.entries.forEach((entry, i) => {
+                const side = document.createElement("span");
+                side.className = "entry-side";
+                side.append(closeButton(() => {
+                    const had = entry.contains(document.activeElement);
+                    close();
+                    if (had) g.name.focus({ preventScroll: true });
+                }));
+                if (g.entries.length > 1) {
+                    const of = document.createElement("span");
+                    of.className = "of";
+                    of.textContent = ` · ${i + 1} of ${g.entries.length}`;
+                    entry.querySelector(".what b")?.after(of);
+                    const arrow = (d, title, j) => {
+                        const b = document.createElement("button");
+                        b.type = "button";
+                        b.title = title;
+                        b.setAttribute("aria-label", title);
+                        b.append(svgArrow(d));
+                        b.disabled = j < 0 || j >= g.entries.length;
+                        b.addEventListener("click", () => {
+                            open(tier, j);
+                            // The arrow keeps the focus, on the entry now shown.
+                            g.entries[j].querySelector(`.stepper button:nth-child(${d === PREV ? 1 : 2})`)?.focus({ preventScroll: true });
+                        });
+                        return b;
+                    };
+                    const stepper = document.createElement("span");
+                    stepper.className = "stepper";
+                    stepper.append(arrow(PREV, "Previous (Left Arrow)", i - 1), arrow(NEXT, "Next (Right Arrow)", i + 1));
+                    side.append(stepper);
+                }
+                entry.append(side);
+            });
+        }
+
+        const paintChips = () => {
+            for (const [tier, g] of groups) {
+                const out = Boolean(st.out[tier]);
+                const expanded = st.open?.tier === tier;
+                const { name, verb } = g;
+                name.classList.toggle("done", out);
+                const icon = out ? checkIcon() : g.icon;
+                const was = name.querySelector("svg");
+                if (icon && was !== icon) {
+                    if (was) was.replaceWith(icon);
+                    else name.prepend(icon);
+                }
+                // Taken out, its entries name characters no longer there.
+                if (out) {
+                    name.removeAttribute("role");
+                    name.removeAttribute("tabindex");
+                    name.removeAttribute("aria-expanded");
+                    name.removeAttribute("title");
+                } else {
+                    name.setAttribute("role", "button");
+                    name.setAttribute("tabindex", "0");
+                    name.setAttribute("aria-expanded", String(expanded));
+                    name.title = expanded ? "Close" : g.entries.length > 1 ? "Show what each one is" : g.n === 1 ? "Show what it is" : "Show what they are";
+                }
+                if (!verb) continue;
+                if (tier === "word") {
+                    verb.textContent = st.words ? "· Hide" : "· Show";
+                    verb.title = st.words ? "Hide the marks; the joiners stay in the text" : "Show where the joiners are";
+                    continue;
+                }
+                const kind = tier === "hard" ? "hidden" : "special";
+                const them = g.n === 1 ? `the ${kind} character` : `the ${g.n} ${kind} characters`;
+                verb.textContent = out ? "· Put Back" : "· Remove";
+                verb.title = out ? `Put ${them} back` : `Take ${them} out of the text`;
+            }
+            for (const b of head.querySelectorAll(".seg button")) {
+                b.setAttribute("aria-pressed", String((b.textContent === "Ticks") === (st.view === "ticks")));
+            }
+        };
+
+        // What Copy takes, under its label: the soft and hidden kinds still
+        // in the text. The joiners in words are spelling, never named.
+        const copyBtn = document.getElementById("copy-text");
+        const paintCopy = () => {
+            if (!copyBtn) return;
+            const has = (t) => groups.has(t) && !st.out[t];
+            const one = (t) => (groups.get(t).n === 1 ? `a ${t === "hard" ? "Hidden" : "Special"} Character` : `${t === "hard" ? "Hidden" : "Special"} Characters`);
+            let sub = null;
+            if (has("hard") && has("soft")) sub = [alertIcon(), "Includes Hidden and Special Characters"];
+            else if (has("hard")) sub = [alertIcon(), `Includes ${one("hard")}`];
+            else if (has("soft")) sub = [alertIcon(), `Includes ${one("soft")}`];
+            else if (groups.has("hard") || groups.has("soft")) sub = [checkIcon(), "Leaves Out Hidden and Special Characters"];
+            copyBtn.querySelector(".copy-sub")?.remove();
+            if (!sub) return;
+            const small = document.createElement("small");
+            small.className = "copy-sub";
+            small.append(...sub);
+            copyBtn.append(small);
+        };
+
+        // The pulse marks an answer just given: only an entry newly shown,
+        // never a redraw.
+        let shownId = null;
+        const paint = () => {
+            draw();
+            paintChips();
+            paintCopy();
+            const id = openId();
+            // The deck stands as tall as the open group's tallest entry, so
+            // stepping through the group never moves the text.
+            for (const [tier, g] of groups) g.entries.forEach((e) => e.classList.toggle("in-group", st.open?.tier === tier));
+            if (id === shownId) return;
+            shownId = id;
+            for (const e of cast?.querySelectorAll(".entry.shown") ?? []) e.classList.remove("shown");
+            const entry = id && entryFor(id);
             if (!entry) return;
             void entry.offsetWidth; // restart the pulse
             entry.classList.add("shown");
         };
+
+        // The mark an entry names, in the text as drawn now.
+        const markOf = (id) => [...pre.querySelectorAll(".hid, .var")].find((m) => idsOf(m).includes(id));
+        // Opening an entry: from a name, an arrow or a key, or a click in the
+        // text (`from`, the clicked point, which then stays under the pointer).
+        const open = (tier, i, from = false) => {
+            const g = groups.get(tier);
+            if (!g || i < 0 || i >= g.entries.length || st.out[tier]) {
+                close();
+                return;
+            }
+            const boxTop = wrap.getBoundingClientRect().top;
+            st.open = { tier, i };
+            paint();
+            live.textContent = g.entries[i].querySelector(".what b")?.textContent ?? "";
+            let m = markOf(openId());
+            // Under the fold: open it, so the character is on screen.
+            if (m && fold.capped() && m.getBoundingClientRect().top > pre.getBoundingClientRect().bottom - 30) {
+                fold.open();
+                m = markOf(openId());
+            }
+            if (from) {
+                // The entry grew above the text: scroll by as much, at once,
+                // so the text never slides under the pointer.
+                const moved = wrap.getBoundingClientRect().top - boxTop;
+                if (moved) window.scrollBy({ top: moved, behavior: "instant" });
+            } else if (m) {
+                // In view, below the head that stays at the top, and clear
+                // of the window's bottom edge.
+                const r = m.getBoundingClientRect();
+                const top = head.offsetHeight;
+                if (r.top < top + 8 || r.bottom > window.innerHeight - 48) {
+                    window.scrollBy(0, r.top - top - Math.max(40, (window.innerHeight - top) / 3));
+                }
+            }
+            stuck();
+        };
+        const close = () => {
+            if (!st.open) return;
+            st.open = null;
+            paint();
+            stuck();
+        };
+
+        for (const [tier, g] of groups) {
+            const toggle = () => {
+                if (st.out[tier]) return;
+                if (st.open?.tier === tier) close();
+                else open(tier, 0);
+            };
+            g.name.addEventListener("click", toggle);
+            g.name.addEventListener("keydown", (event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                toggle();
+            });
+            g.verb?.addEventListener("click", () => {
+                if (tier === "word") {
+                    st.words = !st.words;
+                    live.textContent = st.words ? "Joiners in words shown." : "Joiners in words hidden.";
+                } else {
+                    st.out[tier] = !st.out[tier];
+                    const words = tier === "hard" ? "Hidden characters" : "Special characters";
+                    live.textContent = st.out[tier] ? `${words} removed.` : `${words} put back.`;
+                    if (st.open?.tier === tier) st.open = null;
+                }
+                paint();
+                stuck();
+            });
+        }
+        for (const b of head.querySelectorAll(".seg button")) {
+            b.addEventListener("click", () => {
+                st.view = b.textContent === "Ticks" ? "ticks" : "labels";
+                live.textContent = `Marks shown as ${st.view}.`;
+                paint();
+            });
+        }
+
         // A tick, and a joiner where spelling puts it, take no room in the
-        // line, so each is matched within 6px of where it stands. The marks
-        // are looked up each time: a change of mode draws them anew.
+        // line, so each is matched within 6px of where it stands. A joiner
+        // whose wedge is hidden is not there to click, unless it is the one
+        // open. The marks are looked up each time: every change draws them
+        // anew.
         const markAt = (x, y) =>
             [...pre.querySelectorAll(".hid[data-tell]")].find((m) => {
-                const pad = m.classList.contains("word") || pre.classList.contains("ticked") ? 6 : 0;
+                const word = m.classList.contains("word");
+                if (word && !st.words && !m.classList.contains("open")) return false;
+                const pad = word || pre.classList.contains("ticked") ? 6 : 0;
                 return [...m.getClientRects()].some(
                     (r) => x >= r.left - pad && x <= r.right + pad && y >= r.top && y <= r.bottom,
                 );
             });
-        // Each entry closes with a button: a shown entry is otherwise put
-        // away only by stepping a chip past the last. From the keyboard the
-        // focus goes back to the first chip, since the button goes with its
-        // entry. A whole list or a sole entry stays open, so it has none.
-        const closable = cast.classList.contains("whole") ? [] : cast.querySelectorAll(".entry:not(.solo)");
-        for (const entry of closable) entry.append(closeButton(() => {
-            const had = document.activeElement?.closest(".entry") === entry;
-            show(null);
-            settle();
-            if (had) chips[0]?.focus({ preventScroll: true });
-        }));
-
+        const tierOf = (id) => [...groups].find(([, g]) => g.entries.some((e) => e.dataset.name === id));
         pre.addEventListener("click", (event) => {
             const sel = window.getSelection();
             if (sel && !sel.isCollapsed) return;
             // A registered pair is real text, so it takes the click itself.
             const mark = markAt(event.clientX, event.clientY) || event.target.closest(".var");
-            if (!mark) return;
-            show(entryFor(mark.dataset.tell));
-            settle();
+            const id = mark?.dataset.tell;
+            const found = id && tierOf(id);
+            if (!found) return;
+            if (id === openId()) {
+                close();
+                return;
+            }
+            const [tier, g] = found;
+            open(tier, g.entries.findIndex((e) => e.dataset.name === id), true);
         });
         pre.addEventListener("mousemove", (event) => {
             pre.classList.toggle("over-mark", Boolean(markAt(event.clientX, event.clientY)));
         });
         pre.addEventListener("mouseleave", () => pre.classList.remove("over-mark"));
 
-        for (const chip of chips) {
-            const entries = chip.dataset.cast.split(" ").map(entryFor).filter(Boolean);
-            chip.setAttribute("role", "button");
-            chip.setAttribute("tabindex", "0");
-            chip.setAttribute("aria-expanded", "false");
-            const step = () => {
-                // An entry another chip or a mark showed restarts this deck.
-                const at = entries.findIndex((e) => e.classList.contains("shown"));
-                const next = at + 1;
-                show(entries[next]);
-                settle();
-                chip.setAttribute("aria-expanded", String(next < entries.length));
-            };
-            chip.addEventListener("click", step);
-            chip.addEventListener("keydown", (event) => {
-                if (event.key !== "Enter" && event.key !== " ") return;
+        // Left and Right step the open entry through its group, Escape puts
+        // it away; never while typing, and never with a modifier.
+        document.addEventListener("keydown", (event) => {
+            if (!st.open || event.metaKey || event.ctrlKey || event.altKey) return;
+            if (event.target.closest?.("input, textarea, select, [contenteditable]")) return;
+            if (event.key === "Escape") {
+                const had = cast?.contains(document.activeElement);
+                const name = groups.get(st.open.tier).name;
+                close();
+                if (had) name.focus({ preventScroll: true });
                 event.preventDefault();
-                step();
-            });
-        }
+                return;
+            }
+            const dir = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+            if (!dir) return;
+            event.preventDefault();
+            const j = st.open.i + dir;
+            if (j >= 0 && j < groups.get(st.open.tier).entries.length) open(st.open.tier, j);
+        });
+
+        // Pinned over the text, the head casts a soft edge.
+        const stuck = () => {
+            const r = head.getBoundingClientRect();
+            head.classList.toggle("stuck", Boolean(st.open) && r.top <= 0.5 && wrap.getBoundingClientRect().top < r.bottom - 1);
+        };
+        window.addEventListener("scroll", stuck, { passive: true });
+
+        paint();
+        // Placed again whenever the text wraps anew (the window's width, the
+        // fold opening) or a font that arrives late redraws it.
+        if (typeof ResizeObserver === "function") new ResizeObserver(place).observe(pre);
+        document.fonts?.addEventListener?.("loadingdone", place);
     };
 
     document.addEventListener("DOMContentLoaded", () => {
         const pre = document.getElementById("text-body");
-        if (pre) setupMarks(pre);
-        if (pre) wireCast(pre);
         const wrap = document.getElementById("text-wrap");
+        // The fold, once there is one: opened when an entry steps to a
+        // character under it.
+        const fold = {
+            btn: null,
+            capped: () => Boolean(pre?.classList.contains("capped")),
+            open: () => { if (fold.capped()) fold.btn?.click(); },
+        };
+        const head = document.getElementById("text-head");
+        if (pre && wrap && head) setupHead(pre, head, fold);
         const copyBtn = document.getElementById("copy-text");
         if (!pre || !wrap || !copyBtn) return;
+        const copyLabel = copyBtn.querySelector(".copy-label") ?? copyBtn;
 
         // The box's own border goes green — the confirmation belongs to the thing
         // that was copied. Held as long as the button's label so the two land and
@@ -539,11 +740,11 @@
                 return; // clipboard unavailable (insecure context) or denied
             }
             pre.classList.add("copied");
-            copyBtn.textContent = "Copied";
+            copyLabel.textContent = "Copied";
             clearTimeout(copyAll.timer);
             copyAll.timer = setTimeout(() => {
                 pre.classList.remove("copied");
-                copyBtn.textContent = "Copy";
+                copyLabel.textContent = "Copy";
             }, 1500);
         };
 
@@ -582,6 +783,6 @@
         const capped = pre.clientHeight;
         const full = pre.scrollHeight;
         pre.classList.remove("capped");
-        if (full > capped + SLACK) collapse(wrap, pre, copyBtn);
+        if (full > capped + SLACK) fold.btn = collapse(wrap, pre);
     });
 })();

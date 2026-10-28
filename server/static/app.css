@@ -1902,14 +1902,279 @@ html.js .custom-field:not(.open) {
     gap: 2px;
 }
 
-/* The Text page's chips, under its box: only text.js can act on them, so
-   without it they are not shown. */
-.text-tiers {
-    margin: 8px 0 0 14px;
+/* The Text page's head, above its box: a line per kind of character (its
+   name, which steps through its entries, and a verb), the Labels | Ticks
+   switch on the box's edge, and the entry a name or a mark opens. While an
+   entry is open the head stays at the top of the window as a long text
+   scrolls under it, so the entry and the controls stay in reach; with
+   none open it scrolls away with the page. */
+.text-head {
+    container-type: inline-size;
+    margin-top: 14px;
+    text-align: left;
+}
+
+html.js .text-head:has(.entry.shown) {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+
+/* Pinned over the text it hides the lines under it (opaque: through glass
+   they read as a second text), and a soft edge says something is there.
+   In place it stays the card's own glass. */
+html.js .text-head.stuck {
+    background: var(--hc-solid);
+    box-shadow: 0 6px 8px -8px rgba(0, 0, 0, 0.35);
+}
+
+.text-ctrl {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    align-items: start;
+    margin: 0 0 0 8px;
     font-size: 12.5px;
 }
 
-html:not(.js) .text-tiers {
+/* Too narrow for both: the switch takes a row of its own, still next to
+   the box. */
+@container (max-width: 440px) {
+    .text-ctrl {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 6px;
+    }
+}
+
+.text-chips {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+}
+
+/* A kind's name and its verb. The negative margins put the words where a
+   plain line's would be; the padding is the hover's wash. */
+.text-head .pair {
+    display: inline-grid;
+    grid-template-columns: minmax(0, max-content) auto;
+    align-items: start;
+    column-gap: 2px;
+    max-width: calc(100% + 12px);
+    margin: 0 -6px;
+}
+
+.text-head .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    border: 0;
+    border-radius: 6px;
+    font: inherit;
+    font-weight: 600;
+    color: var(--danger);
+    background: none;
+    text-align: left;
+}
+
+.text-head .chip svg {
+    flex: none;
+    display: block;
+}
+
+.text-head .chip.soft,
+.text-head .chip.word,
+.text-head .chip.var,
+.text-head .chip.fact {
+    color: var(--text-secondary);
+}
+
+.text-head .chip.fact {
+    margin: 0 -6px;
+}
+
+.text-head .pair > .chip.name {
+    padding-right: 2px;
+}
+
+/* Taken out: the same name, green, with a check. */
+.text-head .chip.done {
+    color: var(--result-text);
+}
+
+/* The verb keeps one width, so Remove and Put Back stand in the same
+   place and the next click finds it. */
+.text-head .chip.verb {
+    min-width: 5.6em;
+    padding-left: 3px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+html.js .text-head .chip.name[role="button"],
+.text-head .chip.verb {
+    cursor: pointer;
+}
+
+html.js .text-head .chip.name[role="button"]:hover,
+.text-head .chip.verb:hover {
+    background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.text-head .chip[aria-expanded="true"] {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.text-head .chip:focus-visible,
+.text-head .seg button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.text-head .seg {
+    display: inline-flex;
+    justify-self: end;
+    align-self: end;
+    padding: 2px;
+    border-radius: 8px;
+    font-size: 12px;
+    background: color-mix(in srgb, var(--hc-gray) 16%, transparent);
+}
+
+@container (max-width: 440px) {
+    .text-head .seg {
+        justify-self: start;
+    }
+}
+
+.text-head .seg button {
+    padding: 1px 9px;
+    border: 0;
+    border-radius: 6px;
+    font: inherit;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: none;
+    cursor: pointer;
+}
+
+.text-head .seg button[aria-pressed="true"] {
+    color: var(--text);
+    background: var(--hc-solid);
+    box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.18);
+}
+
+/* Only the script can act on them. */
+html:not(.js) .text-head .verb,
+html:not(.js) .text-head .seg {
+    display: none;
+}
+
+/* The deck in the head takes no room until an entry opens. */
+html.js .text-cast.pv-cast {
+    margin: 0;
+}
+
+html.js .text-cast.pv-cast:has(.entry.shown) {
+    margin: 6px 0 0;
+}
+
+/* Stacked are only the open group's entries: the deck holds the tallest of
+   those, not of every group. */
+html.js .text-cast .entry:not(.in-group) {
+    display: none;
+}
+
+/* An open entry's place in its group, after its name. */
+.text-cast .what .of {
+    font-weight: 400;
+    color: var(--text-tertiary);
+}
+
+/* The close button, and under it the arrows that step through the group:
+   a corner that stays put whatever the name or the wrapping, so the arrow
+   just clicked is still under the pointer. */
+.text-cast .entry-side {
+    flex: none;
+    align-self: flex-start;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: -4px -2px 0 auto;
+}
+
+.text-cast .entry-side .entry-close {
+    margin: 0;
+}
+
+.text-cast .stepper {
+    display: flex;
+}
+
+.text-cast .stepper button {
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: var(--text-tertiary);
+    background: transparent;
+    cursor: pointer;
+}
+
+.text-cast .stepper button:hover:not(:disabled) {
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
+}
+
+.text-cast .stepper button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.text-cast .stepper button:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+/* The mark whose entry is open, in Labels: blue, as its tick is in Ticks. */
+.text-body:not(.ticked) .hid.open::after {
+    color: #fff;
+    background: var(--accent);
+}
+
+/* Copy says what it takes: whether the hidden and special characters are
+   still in the text. */
+#copy-text:has(.copy-sub) {
+    flex-direction: column;
+    gap: 1px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+}
+
+#copy-text .copy-sub {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
+#copy-text .copy-sub svg {
+    flex: none;
+}
+
+/* The joiners spelling puts in words start hidden: they are spelling, not
+   a trick. One whose entry is open still shows, blue. */
+.text-body.words-hidden .hid.word:not(.open)::after {
     display: none;
 }
 

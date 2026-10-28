@@ -2586,6 +2586,16 @@ fn info_icon() -> Markup {
     }
 }
 
+/// A wedge, the shape a joiner's mark takes: the joiners spelling puts in
+/// words.
+fn wedge_icon() -> Markup {
+    html! {
+        svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true" {
+            path d="M3.2 4.4h9.6L8 11.2z" fill="currentColor" {}
+        }
+    }
+}
+
 fn open_padlock_icon() -> Markup {
     html! {
         svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true" {
@@ -3511,23 +3521,65 @@ fn text_body(text: &str) -> Markup {
     let hidden = ids(&|e| e.kind == CastKind::Snippet && !is_soft(e.ch));
     let special = ids(&|e| e.kind == CastKind::Snippet && is_soft(e.ch));
     let spelling = ids(&|e| e.kind == CastKind::Spelling);
+    let joiners: usize = entries
+        .iter()
+        .filter(|e| e.kind == CastKind::Spelling)
+        .map(|e| e.count)
+        .sum();
     let variants = variant_ids(&entries);
     let marked = marked_text(text, r, true, Words::Listed);
     let (hard, soft) = hidden_counts(text, false);
     html! {
+        // Above the box, one line per kind: its name, which steps through
+        // its entries, and a verb (Remove, or Show for the joiners
+        // spelling puts in words); beside them, how marks are drawn. The
+        // entry a name or a mark opens joins this head (text.js moves the
+        // deck here), so a long text scrolls under both. Without the
+        // script the names are facts and the verbs and the switch are
+        // not shown; drawn here, they take their room from the start and
+        // nothing moves when the script arrives.
         @if crlf || !entries.is_empty() {
-            div.pv-facts {
-                @if !hidden.is_empty() {
-                    span.pv-fact.warn data-cast=(hidden) { (alert_icon()) "Hidden Characters" }
+            div.text-head #text-head {
+                div.text-ctrl {
+                    div.text-chips {
+                        @if hard > 0 {
+                            span.pair data-tier="hard" {
+                                span.chip.name data-cast=(hidden) {
+                                    (alert_icon()) (count_of(hard, "Hidden Character"))
+                                }
+                                button.chip.verb type="button" title=(take_out_title(hard, "hidden")) { "· Remove" }
+                            }
+                        }
+                        @if soft > 0 {
+                            span.pair data-tier="soft" {
+                                span.chip.name.soft data-cast=(special) {
+                                    (info_icon()) (count_of(soft, "Special Character"))
+                                }
+                                button.chip.verb type="button" title=(take_out_title(soft, "special")) { "· Remove" }
+                            }
+                        }
+                        @if joiners > 0 {
+                            span.pair data-tier="word" {
+                                span.chip.name.word data-cast=(spelling) {
+                                    (wedge_icon()) (joiners_in_words(joiners))
+                                }
+                                button.chip.verb type="button" title="Show where the joiners are" { "· Show" }
+                            }
+                        }
+                        @if let Some(ids) = &variants {
+                            span.pair data-tier="var" {
+                                span.chip.name.var data-cast=(ids) { "Variant Forms" }
+                            }
+                        }
+                        @if crlf { span.chip.fact { "CRLF Line Endings" } }
+                    }
+                    @if hard + soft > 0 {
+                        span.seg role="group" aria-label="Draw marks as" {
+                            button type="button" aria-pressed="true" { "Labels" }
+                            button type="button" aria-pressed="false" { "Ticks" }
+                        }
+                    }
                 }
-                @if !special.is_empty() {
-                    span.pv-fact.soft data-cast=(special) { (info_icon()) "Special Characters" }
-                }
-                @if !spelling.is_empty() {
-                    span.pv-fact.word data-cast=(spelling) { "Joiners in Words" }
-                }
-                @if let Some(ids) = &variants { (variant_fact(ids)) }
-                @if crlf { span.pv-fact { "CRLF Line Endings" } }
             }
         }
         div.text-wrap #text-wrap {
@@ -3535,39 +3587,38 @@ fn text_body(text: &str) -> Markup {
             // there for the text's own to survive.
             pre.text-body #text-body data-words=[marked.words_attr()] { "\n" (marked.html) }
         }
-        // How the text draws its marks, as in a History row: the red chip
-        // steps Labels, Ticks, Removed; the gray one removes the soft kinds
-        // and puts them back. Removed leaves them out of a selection and of
-        // Copy too. Only the script can act on them, so without it the
-        // stylesheet hides the row; drawn here, it takes its room from the
-        // start and nothing moves when the script arrives.
-        @if hard + soft > 0 {
-            div.hidden-tiers.text-tiers #text-tiers {
-                @if hard > 0 {
-                    button.hidden-chip type="button" data-tier="hard" data-mode="labels" title="Show them as ticks" {
-                        (alert_icon()) (count_of(hard, "Hidden Character"))
-                        span.hidden-chip-mode { "· Labels" }
-                    }
-                }
-                @if soft > 0 {
-                    button.hidden-chip.soft type="button" data-tier="soft" title="Take them out of the text" {
-                        (info_icon()) (count_of(soft, "Special Character"))
-                        span.hidden-chip-mode { "· Remove" }
-                    }
-                }
-            }
-        }
-        // Below the box, so the first answer grows the page under the text
-        // rather than pushing the text down under the pointer. Quiet until a
-        // mark or a chip asks (text.js); without the script, the full list.
+        // Without the script, the full list under the text. With it, a deck
+        // that text.js moves into the head, quiet until a name or a mark
+        // asks.
         @if !entries.is_empty() {
-            div.pv-cast {
+            div.pv-cast.text-cast {
                 @for e in &entries {
                     (cast_entry(e, EntryDress { soft: true, ..EntryDress::default() }))
                 }
             }
         }
-        button.btn.btn-block #copy-text type="button" hidden { "Copy" }
+        // text.js adds what it takes under the label, while the text holds
+        // hidden or special characters.
+        button.btn.btn-block #copy-text type="button" hidden { span.copy-label { "Copy" } }
+    }
+}
+
+/// The Remove button's tooltip, named by what it takes out: "Take the
+/// hidden character out of the text", "Take the 4 special characters ...".
+fn take_out_title(n: usize, kind: &str) -> String {
+    if n == 1 {
+        format!("Take the {kind} character out of the text")
+    } else {
+        format!("Take the {n} {kind} characters out of the text")
+    }
+}
+
+/// "1 Joiner in a Word", "5 Joiners in Words".
+fn joiners_in_words(n: usize) -> String {
+    if n == 1 {
+        "1 Joiner in a Word".to_string()
+    } else {
+        format!("{n} Joiners in Words")
     }
 }
 
@@ -4329,8 +4380,8 @@ pub fn demo_page() -> Markup {
         }
         h3.help-h { "On a link's page" }
         p.help-p {
-            "A link's page marks the same characters. Click a mark or the chip to see "
-            "each one, written three ways to copy. Two sample pages show it: a "
+            "A link's page marks the same characters. Click a mark, or a count above "
+            "the text, to see each one, written three ways to copy. Two sample pages show it: a "
             a href="/demo/text" { "text link" }
             " and a "
             a href="/demo/redirect" { "redirect" }
@@ -5106,7 +5157,7 @@ mod tests {
         let page = text_body("pass\u{200b}\u{200b}word 10\u{a0}km").into_string();
         assert!(page.contains(r#"data-cast="u200b">"#), "{page}");
         assert!(
-            page.contains(r#"<span class="pv-fact soft" data-cast="u00a0">"#),
+            page.contains(r#"<span class="chip name soft" data-cast="u00a0">"#),
             "{page}"
         );
         assert!(
@@ -5117,26 +5168,34 @@ mod tests {
             page.contains(r#"class="entry soft" data-name="u00a0""#),
             "{page}"
         );
-        // The chips text.js wires, with the server's counts.
-        assert!(
-            page.contains(r#"<div class="hidden-tiers text-tiers" id="text-tiers">"#),
-            "{page}"
-        );
+        // The controls text.js wires, above the box, with the server's
+        // counts and count-aware tooltips.
+        let head = page.find(r#"<div class="text-head" id="text-head">"#);
+        assert!(head.is_some() && head < page.find("<pre"), "{page}");
         assert!(page.contains("2 Hidden Characters"), "{page}");
         assert!(page.contains("1 Special Character<"), "{page}");
         assert!(
-            page.contains(r#"data-tier="hard" data-mode="labels""#),
+            page.contains(r#"title="Take the 2 hidden characters out of the text">· Remove"#),
             "{page}"
         );
-        // Nothing to draw another way: no chips.
+        assert!(
+            page.contains(r#"title="Take the special character out of the text">· Remove"#),
+            "{page}"
+        );
+        assert!(page.contains(r#"aria-label="Draw marks as""#), "{page}");
+        // Nothing to draw another way: no head.
         let plain = text_body("plain text").into_string();
-        assert!(!plain.contains("text-tiers"), "{plain}");
-        // Only spelling joiners: no chips either; they are never counted.
+        assert!(!plain.contains("text-head"), "{plain}");
+        // Only spelling joiners: a line to show them, never one to remove
+        // them, and no Labels | Ticks, since they never wear a label.
         let persian = text_body("می\u{200c}خواهم").into_string();
-        assert!(!persian.contains("text-tiers"), "{persian}");
+        assert!(persian.contains("1 Joiner in a Word"), "{persian}");
+        assert!(persian.contains("· Show"), "{persian}");
+        assert!(!persian.contains("· Remove"), "{persian}");
+        assert!(!persian.contains("Draw marks as"), "{persian}");
         // Without the script nothing can act on them.
         const APP_CSS: &str = include_str!("../static/app.css");
-        assert!(APP_CSS.contains("html:not(.js) .text-tiers {\n    display: none;\n}"));
+        assert!(APP_CSS.contains("html:not(.js) .text-head .verb,"));
     }
 
     #[test]
@@ -6040,7 +6099,7 @@ mod tests {
             ),
             "{s}"
         );
-        assert!(s.contains("Hidden Characters"), "{s}");
+        assert!(s.contains("1 Hidden Character<"), "{s}");
 
         // A lone carriage return is marked even beside a uniform convention.
         let s = snippet("a\rb\r\nc\r\n");
@@ -6058,14 +6117,17 @@ mod tests {
         let s = snippet("a\u{200b}b\u{200b}c\u{202e}d");
         // The chip steps through the entries, in order of first appearance.
         assert!(s.contains(r#"data-cast="u200b u202e""#), "{s}");
-        let cast = &s[s.find(r#"<div class="pv-cast">"#).expect("a cast")..];
+        let cast = &s[s
+            .find(r#"<div class="pv-cast text-cast">"#)
+            .expect("a cast")..];
         assert!(cast.contains(r#"data-name="u200b""#), "{s}");
         assert!(cast.contains("zero-width space"), "{s}");
         assert!(cast.contains("It appears twice."), "{s}");
         assert!(cast.contains("It draws nothing"), "{s}");
         assert!(cast.contains("right-to-left override"), "{s}");
         assert!(cast.contains("It changes the direction"), "{s}");
-        // The cast sits under the text, so asking never moves the text.
+        // Without the script the full list sits under the text (text.js
+        // moves it into the head).
         assert!(
             s.find("text-wrap").unwrap() < s.find("pv-cast").unwrap(),
             "{s}"
