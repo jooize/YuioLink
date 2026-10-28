@@ -978,7 +978,8 @@ html.js .custom-field:not(.open) {
     margin: 0;
 }
 
-.hidden-chip.soft {
+.hidden-chip.soft,
+.hidden-chip.word {
     color: var(--text-secondary);
 }
 

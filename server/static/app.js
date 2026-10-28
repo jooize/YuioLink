@@ -357,6 +357,10 @@
             ["circle", { cx: "8", cy: "8", r: "6.6", stroke: "currentColor", "stroke-width": "1.4" }],
             ["path", { ...round, d: "M5.2 8.2 7.2 10.1 10.9 6", "stroke-width": "1.6" }],
         ]);
+    // A wedge, the shape a joiner's mark takes: the joiners spelling puts in
+    // words.
+    const wedgeIcon = () =>
+        icon(12, "0 0 16 16", [["path", { fill: "currentColor", d: "M3.2 4.4h9.6L8 11.2z" }]]);
     // A small down chevron: a cut row's note opens the rest.
     const chevronIcon = () =>
         icon(12, "0 0 10 10", [["path", { ...round, d: "M2.5 3.8 5 6.3l2.5-2.5", "stroke-width": "1.5" }]]);
@@ -2234,10 +2238,12 @@
         live.setAttribute("aria-live", "polite");
         field.after(slot, live);
         // `flag` is the run the caret stands beside (its `at`), `open` the
-        // entries shown; `removed` holds the text around each tier's Remove
-        // (`{ before, after }`), so Put Back can undo it until the field
-        // changes.
-        const st = { flag: null, open: [], removed: { hard: null, soft: null }, announced: 0, down: false, typing: false, ours: false };
+        // entries shown; `removed` says which tiers are out of the text that
+        // was there before the first Remove (`orig`), so each Put Back
+        // undoes its own tier, in either order, until the field changes.
+        // `words`: whether the joiners spelling puts in words show their
+        // wedges (they start hidden; they are spelling, not a trick).
+        const st = { flag: null, open: [], removed: { orig: null, hard: false, soft: false }, words: false, announced: 0, down: false, typing: false, ours: false };
 
         const pct =(cp) => encodeURIComponent(String.fromCodePoint(cp)).toUpperCase();
         // A run's tick, its count, and its flag are placed from the first
@@ -2324,6 +2330,10 @@
                     el("span", "after", `${word && CHARS?.spelling ? CHARS.spelling : charMeaning(cp)}.${times} The empty box is the character.`)));
         };
 
+        // The marks drawn: the joiners in words only while shown, or the
+        // one whose entry is open.
+        const drawn = (marks) => (st.words ? marks : marks.filter((m) => !m.word || st.open.includes(m.id)));
+
         const replaceField = (text) => {
             ta.focus();
             ta.select();
@@ -2335,9 +2345,20 @@
             }
             st.ours = false;
         };
-        const removedNow = (tier) => st.removed[tier] != null && ta.value === st.removed[tier].after;
+        // The field as the removed tiers leave `orig`: red first, then gray,
+        // each read as the text it is applied to.
+        const without = (orig, out) => {
+            let t = orig;
+            if (out.hard) t = withoutHidden(t, false, isRedirect(t));
+            if (out.soft) t = withoutHidden(t, true, isRedirect(t));
+            return t;
+        };
+        const removedNow = (tier) => st.removed.orig != null && st.removed[tier];
+        // How many of a tier the text held before it was taken out.
+        const was = (tier) => scan(st.removed.orig).filter((m) => !m.word && m.soft === (tier === "soft")).length;
         // A tier's chip: red for the kinds that hide things, gray for the
-        // soft ones. Each removes its own kind and puts it back.
+        // soft ones. Each removes its own kind and puts it back; taken out,
+        // it keeps its name, green, so the verb stays where it was.
         const chip = (tier, n) => {
             const soft = tier === "soft";
             const removed = removedNow(tier);
@@ -2346,32 +2367,51 @@
             c.dataset.mode = removed ? "removed" : "ticks";
             c.dataset.tier = tier;
             const what = plural(n, soft ? "Special Character" : "Hidden Character");
-            if (removed) c.append(checkIcon(), `${what} Removed`, el("span", "hidden-chip-mode", "· Put Back"));
-            else c.append(soft ? infoIcon() : alertIcon(), what, el("span", "hidden-chip-mode", "· Remove"));
+            c.append(removed ? checkIcon() : soft ? infoIcon() : alertIcon(), what,
+                el("span", "hidden-chip-mode", removed ? "· Put Back" : "· Remove"));
+            const kind = soft ? "special" : "hidden";
+            const them = n === 1 ? `the ${kind} character` : `the ${n} ${kind} characters`;
+            c.title = removed ? `Put ${them} back` : `Take ${them} out of the text`;
             c.addEventListener("click", async () => {
                 const words = soft ? "Special characters" : "Hidden characters";
                 // A table still loading would unmark a registered selector or
                 // a spelling joiner, so Remove waits for it and keeps them,
                 // as the server's Remove does.
                 if (!removed) await Promise.all([variantsLoading, joiningLoading]);
-                if (removed) {
-                    const back = st.removed[tier].before;
-                    st.removed[tier] = null;
-                    replaceField(back);
-                    live.textContent = `${words} put back.`;
-                } else {
-                    const before = ta.value;
-                    const after = withoutHidden(before, soft, isRedirect(before));
-                    if (after !== before) {
-                        replaceField(after);
-                        st.removed[tier] = { before, after };
-                        Object.assign(st, { open: [], flag: null });
-                        live.textContent = `${words} removed.`;
-                    }
+                const orig = st.removed.orig ?? ta.value;
+                const out = { hard: st.removed.hard, soft: st.removed.soft, [tier]: !removed };
+                const after = without(orig, out);
+                if (after !== ta.value) {
+                    replaceField(after);
+                    if (!removed) Object.assign(st, { open: [], flag: null });
+                    live.textContent = `${words} ${removed ? "put back" : "removed"}.`;
+                }
+                // A Remove that found nothing (the tables unmarked them all)
+                // leaves nothing to put back.
+                if (after !== orig || !out[tier]) {
+                    st.removed = out.hard || out.soft ? { orig, ...out } : { orig: null, hard: false, soft: false };
                 }
                 render();
                 // The chip is gone when the table unmarked all of its tier.
                 (slot.querySelector(`.hidden-chip[data-tier="${tier}"]`) ?? ta).focus();
+            });
+            return c;
+        };
+        // The joiners spelling puts in words: never removed, only shown.
+        const wordChip = (n) => {
+            const c = el("button", "hidden-chip word");
+            c.type = "button";
+            c.dataset.tier = "word";
+            c.append(wedgeIcon(), n === 1 ? "1 Joiner in a Word" : `${n} Joiners in Words`,
+                el("span", "hidden-chip-mode", st.words ? "· Hide" : "· Show"));
+            c.title = st.words ? "Hide the marks; the joiners stay in the text" : "Show where the joiners are";
+            c.addEventListener("click", () => {
+                st.words = !st.words;
+                live.textContent = st.words ? "Joiners in words shown." : "Joiners in words hidden.";
+                // Hidden, a joiner's entry closes with its mark.
+                if (!st.words && st.open.some((id) => id.startsWith("w"))) Object.assign(st, { open: [], flag: null });
+                render();
+                slot.querySelector('.hidden-chip[data-tier="word"]')?.focus();
             });
             return c;
         };
@@ -2381,7 +2421,10 @@
             if (!VARIANTS && marks.some((m) => isSelector(m.cp))) loadVariants().then(() => { if (VARIANTS) render(); });
             if (!JOINING && marks.some((m) => isJoiner(m.cp))) loadJoining().then(() => { if (JOINING) render(); });
             const runs = runsOfMarks(marks, ta.value);
-            for (const tier of ["hard", "soft"]) if (!removedNow(tier)) st.removed[tier] = null;
+            // Any other change to the field ends what Put Back can undo.
+            if (st.removed.orig != null && ta.value !== without(st.removed.orig, st.removed)) {
+                st.removed = { orig: null, hard: false, soft: false };
+            }
             st.open = st.open.filter((id) => marks.some((m) => m.id === id));
             if (!runs.some((r) => r.at === st.flag)) st.flag = null;
             const hard = marks.filter((m) => !m.soft && !m.word).length;
@@ -2397,12 +2440,14 @@
                 entries[0].append(closeButton(() => dismiss(), ta));
                 slot.append(el("div", "history-cast pv-cast", ...entries));
             }
-            // A line per tier: its count, or how many were removed.
-            const was = (tier) => scan(st.removed[tier].before).filter((m) => !m.word && m.soft === (tier === "soft")).length;
+            // A line per tier: its count, or how many were removed; then the
+            // joiners in words, counted.
             for (const [tier, n] of [["hard", hard], ["soft", soft]]) {
                 if (removedNow(tier)) slot.append(el("div", "history-meta", chip(tier, was(tier))));
                 else if (n) slot.append(el("div", "history-meta", chip(tier, n)));
             }
+            const joiners = marks.filter((m) => m.word).length;
+            if (joiners) slot.append(el("div", "history-meta", wordChip(joiners)));
             // A hidden character in a domain: the URL standard ignores some
             // (the server drops them) and forbids the rest (the address is
             // not one, so the link is Text). One line, saying which.
@@ -2417,7 +2462,7 @@
                 slot.append(el("p", "hc-note", cautionIcon(), el("span", "",
                     `Domains ignore ${these(dom.dropped, dom.softDropped === dom.dropped)}: goes to `, el("code", "", dom.clean), ".")));
             }
-            paintOverlay(marks);
+            paintOverlay(drawn(marks));
         };
 
         // The caret decides what is open: after a click or a drag ends, and
@@ -2426,7 +2471,7 @@
         const follow = ({ closeOnly = false } = {}) => {
             const a = ta.selectionStart;
             const b = ta.selectionEnd;
-            const marks = scan(ta.value);
+            const marks = scan(ta.value).filter((m) => st.words || !m.word);
             let flagAt = null;
             let ids;
             if (a === b) {
@@ -2482,7 +2527,7 @@
             const m = markNear(overlay, event.clientX, event.clientY);
             const first = m && overlay.querySelector(`.hid.first[data-run="${m.dataset.run}"]`);
             if (!first || Number(first.dataset.run) === st.flag) { peek.hidden = true; return; }
-            const run = runsOfMarks(scan(ta.value), ta.value).find((r) => String(r.at) === first.dataset.run);
+            const run = runsOfMarks(drawn(scan(ta.value)), ta.value).find((r) => String(r.at) === first.dataset.run);
             peek.classList.toggle("soft", first.matches(".soft, .word"));
             place(peek, first, runLabel(run.marks.map((x) => x.cp)));
         });
@@ -2492,8 +2537,8 @@
             placeFlag();
             peek.hidden = true;
         });
-        if (typeof ResizeObserver === "function") new ResizeObserver(() => paintOverlay(scan(ta.value))).observe(ta);
-        afterFonts(() => paintOverlay(scan(ta.value)));
+        if (typeof ResizeObserver === "function") new ResizeObserver(() => paintOverlay(drawn(scan(ta.value)))).observe(ta);
+        afterFonts(() => paintOverlay(drawn(scan(ta.value))));
         render();
         return { render };
     };
