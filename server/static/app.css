@@ -1910,7 +1910,6 @@ html.js .custom-field:not(.open) {
    scrolls under it, so the entry and the controls stay in reach; with
    none open it scrolls away with the page. */
 .text-head {
-    container-type: inline-size;
     margin-top: 14px;
     text-align: left;
 }
@@ -1931,6 +1930,8 @@ html.js .text-head.stuck {
     box-shadow: 0 6px 8px -8px rgba(0, 0, 0, 0.35);
 }
 
+/* The switch on the right at every width, on the box's edge; a long name
+   wraps in its own column first. */
 .text-ctrl {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1938,15 +1939,6 @@ html.js .text-head.stuck {
     align-items: start;
     margin: 0 0 0 8px;
     font-size: 12.5px;
-}
-
-/* Too narrow for both: the switch takes a row of its own, still next to
-   the box. */
-@container (max-width: 440px) {
-    .text-ctrl {
-        grid-template-columns: minmax(0, 1fr);
-        row-gap: 6px;
-    }
 }
 
 .text-chips {
@@ -2047,12 +2039,6 @@ html.js .text-head .chip.name[role="button"]:hover,
     background: color-mix(in srgb, var(--hc-gray) 16%, transparent);
 }
 
-@container (max-width: 440px) {
-    .text-head .seg {
-        justify-self: start;
-    }
-}
-
 .text-head .seg button {
     padding: 1px 9px;
     border: 0;
@@ -2106,6 +2092,9 @@ html.js .text-cast .entry:not(.in-group) {
     display: flex;
     flex-direction: column;
     align-items: center;
+    /* As wide as the two arrows even without them, so the close button
+       stands in one place in every entry. */
+    min-width: 52px;
     margin: -4px -2px 0 auto;
 }
 
