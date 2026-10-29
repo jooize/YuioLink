@@ -106,7 +106,8 @@ pub fn router(state: AppState) -> Router {
         .route("/demo/redirect", get(demo_redirect))
         .route("/colophon", get(colophon))
         .route("/legal", get(legal))
-        .route("/legal/notices.txt", get(legal_notices))
+        .route("/legal/licenses", get(legal_licenses))
+        .route("/legal/licenses.txt", get(legal_licenses_txt))
         .route("/legal/{version}", get(legal_version))
         .route("/stats", get(stats))
         .nest("/api/v0", api_routes())
@@ -1389,12 +1390,27 @@ pub async fn legal_version(State(state): State<AppState>, Path(version): Path<St
     }
 }
 
-/// `GET /legal/notices.txt` — the third-party notices and license texts built
-/// into the binary (see `notices`).
-pub async fn legal_notices() -> Response {
+/// `GET /legal/licenses` — the license texts built into the binary (see
+/// `licenses`), one heading each, with a contents list.
+pub async fn legal_licenses() -> Response {
+    Html(crate::licenses::page().into_string()).into_response()
+}
+
+/// `GET /legal/licenses.txt` — the same texts as one plain file. Shown in the
+/// browser; saved, it is named for whose licenses they are.
+pub async fn legal_licenses_txt() -> Response {
     (
-        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-        crate::notices::text(),
+        [
+            (
+                header::CONTENT_TYPE,
+                "text/plain; charset=utf-8".to_string(),
+            ),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("inline; filename=\"{}\"", crate::licenses::FILE_NAME),
+            ),
+        ],
+        crate::licenses::text(),
     )
         .into_response()
 }
@@ -2598,18 +2614,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn legal_links_the_built_in_notices() {
+    async fn legal_links_the_built_in_licenses() {
         let st = test_state().await;
         let (s, _, legal) = send(&st, get("/legal")).await;
         assert_eq!(s, StatusCode::OK);
-        assert!(legal.contains("href=\"/legal/notices.txt\""), "{legal}");
-        let (s, h, body) = send(&st, get("/legal/notices.txt")).await;
+        assert!(legal.contains("href=\"/legal/licenses\""), "{legal}");
+
+        let (s, _, page) = send(&st, get("/legal/licenses")).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(page.contains("href=\"#crates\""), "contents list");
+        assert!(page.contains("id=\"crates\""), "crates heading");
+        assert!(page.contains("SIL OPEN FONT LICENSE"), "texts in full");
+
+        let (s, h, body) = send(&st, get("/legal/licenses.txt")).await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(h[header::CONTENT_TYPE], "text/plain; charset=utf-8");
-        assert_eq!(body, crate::notices::text());
-        // The static route sits beside `/legal/{version}` without taking it over.
-        let (s, _, _) = send(&st, get("/legal/notices")).await;
-        assert_eq!(s, StatusCode::NOT_FOUND);
+        assert_eq!(
+            h[header::CONTENT_DISPOSITION],
+            "inline; filename=\"yuiolink-server-licenses.txt\""
+        );
+        assert_eq!(body, crate::licenses::text());
     }
 
     #[tokio::test]

@@ -418,7 +418,7 @@ fn page(base_url: &str, idx: usize) -> Markup {
     let terms = VERSIONS[idx].1;
     let body = html! {
         (home_chip("/", "Back to YuioLink"))
-        h2.help-title { "Legal" }
+        h2.help-title.legal-title { "Legal" }
         p.help-lead {
             "Who provides this service, what it keeps while a link lives, and "
             "the terms you use it under, in plain words, with the legal terms "
@@ -486,11 +486,11 @@ fn page(base_url: &str, idx: usize) -> Markup {
             " of what the terms said, independent of this site."
         }
 
-        h3.help-h #notices { "Third-party notices" }
+        h3.help-h #licenses { "Licenses" }
         p.help-p {
-            "YuioLink includes fonts, word lists and data made by others, under "
-            "their own licenses. Their notices and full license texts are at "
-            a href="/legal/notices.txt" { "/legal/notices.txt" }
+            "YuioLink includes fonts, data and Rust crates made by others, each "
+            "under its own license. The full texts are on the "
+            a href="/legal/licenses" { "licenses page" }
             "."
         }
 

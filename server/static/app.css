@@ -5393,6 +5393,27 @@ svg.legal-chain {
     fill: var(--accent-text);
 }
 
+/* /legal and its pages read as documents, so their window is wider than the
+   app's: a 79-column license text fits at the code size without wrapping. */
+.app-window:has(.legal-title) {
+    width: min(100%, 680px);
+}
+
+/* /legal/licenses contents list. */
+.licenses-toc ol {
+    margin: 12px 0 0;
+    padding-left: 22px;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+/* A license text keeps its own line breaks; a phone too narrow for them wraps
+   the long lines instead of scrolling sideways through a few hundred KB. */
+pre.license-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 .help-types {
     margin: 0;
     padding: 0;
