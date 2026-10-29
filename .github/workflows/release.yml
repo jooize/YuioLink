@@ -60,6 +60,16 @@ jobs:
       - name: Checksum
         run: sha256sum yuiolink-server-linux-amd64 | tee yuiolink-server-linux-amd64.sha256
 
+      # The license texts the fonts and NOTICE ask copies to carry are built
+      # into the binary; publish them beside it too, from the binary itself, so
+      # the asset and the built-in text cannot drift apart. It runs in the image
+      # it was built in, whose glibc may be newer than the runner's.
+      - name: Write the third-party notices
+        run: |
+          docker run --rm --platform linux/amd64 -v "$PWD:/w:ro" "$RUST_IMAGE" \
+            /w/yuiolink-server-linux-amd64 --notices > yuiolink-server-notices.txt
+          grep -q 'SIL OPEN FONT LICENSE' yuiolink-server-notices.txt
+
       - name: Record the toolchain
         run: |
           {
@@ -72,6 +82,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes \
-            yuiolink-server-linux-amd64 yuiolink-server-linux-amd64.sha256 build-info.txt \
+            yuiolink-server-linux-amd64 yuiolink-server-linux-amd64.sha256 yuiolink-server-notices.txt build-info.txt \
           || gh release upload "$GITHUB_REF_NAME" \
-            yuiolink-server-linux-amd64 yuiolink-server-linux-amd64.sha256 build-info.txt --clobber
+            yuiolink-server-linux-amd64 yuiolink-server-linux-amd64.sha256 yuiolink-server-notices.txt build-info.txt --clobber
