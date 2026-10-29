@@ -42,8 +42,8 @@
     /* ===================================================================
        CANDIDATES for app.css -- section 1, alignment
        =================================================================== */
-    /* A: centre if it fits, left when it wraps. fit-content shrinks the
-       block to the text when one line is enough and the auto margins centre
+    /* A: center if it fits, left when it wraps. fit-content shrinks the
+       block to the text when one line is enough and the auto margins center
        it; longer text takes the full width and left-aligns. No JS, no length
        threshold, no wrap detection -- the layout engine itself decides. */
     .pv-url.v-fit { width: fit-content; max-width: 100%; box-sizing: border-box;
@@ -145,9 +145,9 @@
 
 <div class="mock-row">
   <div class="win">
-    <span class="cap">today — centred, breaks anywhere</span>
+    <span class="cap">today — centered, breaks anywhere</span>
     <div class="app-window win strip">
-      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">example-shop.co.uk</span><span class="pn">/</span><span class="ps">products</span><span class="pn">/</span><span class="ps">kitchen</span><span class="pn">/</span><span class="ps">espresso-machines</span><span class="pn">/</span><span class="ps">lever-operated</span><span class="pn">?</span><span class="qk">colour</span><span class="pn">=</span><span class="qv">stainless<span class="dsp"> </span>steel</span><span class="pn">&amp;</span><span class="qk">campaign</span><span class="pn">=</span><span class="qv">spring_newsletter_2026</span><span class="pn">&amp;</span><span class="qk">utm_source</span><span class="pn">=</span><span class="qv">weekly<span class="dsp"> </span>digest</span><span class="pn">&amp;</span><span class="qk">ref</span><span class="pn">=</span><span class="qv">a<span class="pe">%26</span>b</span></code>
+      <code class="pv-url"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">example-shop.co.uk</span><span class="pn">/</span><span class="ps">products</span><span class="pn">/</span><span class="ps">kitchen</span><span class="pn">/</span><span class="ps">espresso-machines</span><span class="pn">/</span><span class="ps">lever-operated</span><span class="pn">?</span><span class="qk">color</span><span class="pn">=</span><span class="qv">stainless<span class="dsp"> </span>steel</span><span class="pn">&amp;</span><span class="qk">campaign</span><span class="pn">=</span><span class="qv">spring_newsletter_2026</span><span class="pn">&amp;</span><span class="qk">utm_source</span><span class="pn">=</span><span class="qv">weekly<span class="dsp"> </span>digest</span><span class="pn">&amp;</span><span class="qk">ref</span><span class="pn">=</span><span class="qv">a<span class="pe">%26</span>b</span></code>
     </div>
     <p class="note"><b>The problem.</b> Four ragged edges. Every line starts somewhere
       new, so the eye re-finds its place four times, and a break in the middle of
@@ -155,16 +155,16 @@
   </div>
 
   <div class="win">
-    <span class="cap">A — left when it wraps, centred when it fits</span>
+    <span class="cap">A — left when it wraps, centered when it fits</span>
     <div class="app-window win strip">
-      <code class="pv-url v-fit"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">example-shop.co.uk</span><span class="pn">/</span><span class="ps">products</span><span class="pn">/</span><span class="ps">kitchen</span><span class="pn">/</span><span class="ps">espresso-machines</span><span class="pn">/</span><span class="ps">lever-operated</span><span class="pn">?</span><span class="qk">colour</span><span class="pn">=</span><span class="qv">stainless<span class="dsp"> </span>steel</span><span class="pn">&amp;</span><span class="qk">campaign</span><span class="pn">=</span><span class="qv">spring_newsletter_2026</span><span class="pn">&amp;</span><span class="qk">utm_source</span><span class="pn">=</span><span class="qv">weekly<span class="dsp"> </span>digest</span><span class="pn">&amp;</span><span class="qk">ref</span><span class="pn">=</span><span class="qv">a<span class="pe">%26</span>b</span></code>
+      <code class="pv-url v-fit"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">example-shop.co.uk</span><span class="pn">/</span><span class="ps">products</span><span class="pn">/</span><span class="ps">kitchen</span><span class="pn">/</span><span class="ps">espresso-machines</span><span class="pn">/</span><span class="ps">lever-operated</span><span class="pn">?</span><span class="qk">color</span><span class="pn">=</span><span class="qv">stainless<span class="dsp"> </span>steel</span><span class="pn">&amp;</span><span class="qk">campaign</span><span class="pn">=</span><span class="qv">spring_newsletter_2026</span><span class="pn">&amp;</span><span class="qk">utm_source</span><span class="pn">=</span><span class="qv">weekly<span class="dsp"> </span>digest</span><span class="pn">&amp;</span><span class="qk">ref</span><span class="pn">=</span><span class="qv">a<span class="pe">%26</span>b</span></code>
     </div>
     <div class="app-window win strip">
       <code class="pv-url v-fit"><span class="sch">https</span><span class="pn">://</span><span class="reg">example.com</span><span class="pn">/</span><span class="ps">docs</span></code>
     </div>
     <p class="note"><b>One CSS rule, no JS, no threshold.</b> <code>width: fit-content</code>
       + auto margins: text that fits one line shrinks the box to itself and the box is
-      centred — the short URL below is under the <em>same</em> rule and hasn't moved.
+      centered — the short URL below is under the <em>same</em> rule and hasn't moved.
       Text that wraps takes the full width and left-aligns. The layout engine is the
       wrap detector.</p>
   </div>
@@ -172,7 +172,7 @@
   <div class="win">
     <span class="cap">B — A + hanging indent on continuation lines</span>
     <div class="app-window win strip">
-      <code class="pv-url v-fit v-hang"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">example-shop.co.uk</span><span class="pn">/</span><span class="ps">products</span><span class="pn">/</span><span class="ps">kitchen</span><span class="pn">/</span><span class="ps">espresso-machines</span><span class="pn">/</span><span class="ps">lever-operated</span><span class="pn">?</span><span class="qk">colour</span><span class="pn">=</span><span class="qv">stainless<span class="dsp"> </span>steel</span><span class="pn">&amp;</span><span class="qk">campaign</span><span class="pn">=</span><span class="qv">spring_newsletter_2026</span><span class="pn">&amp;</span><span class="qk">utm_source</span><span class="pn">=</span><span class="qv">weekly<span class="dsp"> </span>digest</span><span class="pn">&amp;</span><span class="qk">ref</span><span class="pn">=</span><span class="qv">a<span class="pe">%26</span>b</span></code>
+      <code class="pv-url v-fit v-hang"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">example-shop.co.uk</span><span class="pn">/</span><span class="ps">products</span><span class="pn">/</span><span class="ps">kitchen</span><span class="pn">/</span><span class="ps">espresso-machines</span><span class="pn">/</span><span class="ps">lever-operated</span><span class="pn">?</span><span class="qk">color</span><span class="pn">=</span><span class="qv">stainless<span class="dsp"> </span>steel</span><span class="pn">&amp;</span><span class="qk">campaign</span><span class="pn">=</span><span class="qv">spring_newsletter_2026</span><span class="pn">&amp;</span><span class="qk">utm_source</span><span class="pn">=</span><span class="qv">weekly<span class="dsp"> </span>digest</span><span class="pn">&amp;</span><span class="qk">ref</span><span class="pn">=</span><span class="qv">a<span class="pe">%26</span>b</span></code>
     </div>
     <p class="note"><b>The indent is the "no space here" signal.</b> A tucked-in line is
       how every code editor says "this is still the previous line" — a continuation, not
@@ -184,7 +184,7 @@
   <div class="win">
     <span class="cap">C — A + B + breaks prefer the structure</span>
     <div class="app-window win strip">
-      <code class="pv-url v-fit v-hang v-struct"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">example-shop.co.uk</span><span class="pn">/</span><wbr><span class="ps">products</span><span class="pn">/</span><wbr><span class="ps">kitchen</span><span class="pn">/</span><wbr><span class="ps">espresso-machines</span><span class="pn">/</span><wbr><span class="ps">lever-operated</span><span class="pn">?</span><wbr><span class="qk">colour</span><span class="pn">=</span><wbr><span class="qv">stainless<span class="dsp"> </span>steel</span><span class="pn">&amp;</span><wbr><span class="qk">campaign</span><span class="pn">=</span><wbr><span class="qv">spring_newsletter_2026</span><span class="pn">&amp;</span><wbr><span class="qk">utm_source</span><span class="pn">=</span><wbr><span class="qv">weekly<span class="dsp"> </span>digest</span><span class="pn">&amp;</span><wbr><span class="qk">ref</span><span class="pn">=</span><wbr><span class="qv">a<span class="pe">%26</span>b</span></code>
+      <code class="pv-url v-fit v-hang v-struct"><span class="sch">https</span><span class="pn">://</span><span class="sub">www.</span><span class="reg">example-shop.co.uk</span><span class="pn">/</span><wbr><span class="ps">products</span><span class="pn">/</span><wbr><span class="ps">kitchen</span><span class="pn">/</span><wbr><span class="ps">espresso-machines</span><span class="pn">/</span><wbr><span class="ps">lever-operated</span><span class="pn">?</span><wbr><span class="qk">color</span><span class="pn">=</span><wbr><span class="qv">stainless<span class="dsp"> </span>steel</span><span class="pn">&amp;</span><wbr><span class="qk">campaign</span><span class="pn">=</span><wbr><span class="qv">spring_newsletter_2026</span><span class="pn">&amp;</span><wbr><span class="qk">utm_source</span><span class="pn">=</span><wbr><span class="qv">weekly<span class="dsp"> </span>digest</span><span class="pn">&amp;</span><wbr><span class="qk">ref</span><span class="pn">=</span><wbr><span class="qv">a<span class="pe">%26</span>b</span></code>
     </div>
     <p class="note"><b>Lines end where the URL has joints.</b> A <code>&lt;wbr&gt;</code>
       after each delimiter lets lines end on <code>/</code> <code>?</code> <code>&amp;</code>
@@ -200,7 +200,7 @@
       <b>Recommendation: C</b> (which contains A and B). All three are pure CSS plus
       invisible <code>&lt;wbr&gt;</code> tags — no JS, so the no-JS page gets the same
       layout. Resize this window and the breaks re-place themselves; the short URL
-      never leaves centre.
+      never leaves center.
     </div>
   </div>
 </div>
@@ -255,7 +255,7 @@
           Hidden Characters</span>
       </div>
     </div>
-    <p class="note"><b>Live — click the dotted space, the red escape, or the grey
+    <p class="note"><b>Live — click the dotted space, the red escape, or the gray
       <code>%26</code>.</b> The explanation is one cast entry from note 28, floated at
       the finger; nothing exists until asked, and Esc or a click elsewhere dismisses it.
       The invisible characters are thin targets, so the clickable area is padded a few
@@ -332,7 +332,7 @@
         <li>One answer at a time; asking another swaps it.</li>
         <li>Production: the server wraps each marked run in a real
           <code>&lt;button&gt;</code> (focusable, <code>aria-expanded</code>) with a
-          <code>title</code> as the no-JS crumb; the behaviour lives in preview.js keyed
+          <code>title</code> as the no-JS crumb; the behavior lives in preview.js keyed
           on <code>html.js</code>.</li>
         <li>The always-visible cast list is dead; note 28's entry dress survives as the
           answer's body.</li>

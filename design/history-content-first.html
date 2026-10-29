@@ -52,7 +52,7 @@ figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
 .A .left { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 11.5px; color: var(--text-secondary); }
 .A .fallback .l1 { font-family: var(--font-mono); font-size: 14px; }
 
-/* B: kind tile at the left, two lines beside it, actions centred at right */
+/* B: kind tile at the left, two lines beside it, actions centered at right */
 .B .history-item { flex-direction: row; align-items: center; gap: 12px; padding: 10px 14px; }
 .B .tile { flex: none; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; font-weight: 700; font-size: 15px; }
 .B .tile.text { color: var(--text-kind); background: color-mix(in srgb, var(--text-kind) 13%, transparent); }
@@ -207,9 +207,9 @@ build.E = build.A;
 
 const X = {
     A: ["Content headline", "The contents on top at full strength. Below them, one quiet line: the short link, kind and time, then the actions. Two lines per row instead of three."],
-    B: ["Kind tile", "A tinted tile says Text or Redirect at a glance, so the kind word goes. Contents over the short link and time, actions centred on the right."],
-    C: ["Quoted well", "The contents sit in a soft inset with a kind-coloured edge, like a quoted message. Text may run to two lines. Taller, but the most legible."],
-    D: ["Name capsule", "As A, with the short link in a grey capsule, so it reads as a tag on the contents rather than a second headline."],
+    B: ["Kind tile", "A tinted tile says Text or Redirect at a glance, so the kind word goes. Contents over the short link and time, actions centered on the right."],
+    C: ["Quoted well", "The contents sit in a soft inset with a kind-colored edge, like a quoted message. Text may run to two lines. Taller, but the most legible."],
+    D: ["Name capsule", "As A, with the short link in a gray capsule, so it reads as a tag on the contents rather than a second headline."],
     E: ["A, with one eye for all", "Layout A, plus an eye in the History head that covers every row at once (screen sharing, someone looking over your shoulder). Row eyes still work one by one."],
 };
 for (const [k, [t, d]] of Object.entries(X)) {

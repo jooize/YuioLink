@@ -52,10 +52,10 @@
                 background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.25); transition: transform .2s; }
   .hig.on .sw::before { transform: translateX(12px); }
 
-  /* B. current HIG — neutral grey */
-  .hig.grey { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
-  .hig.grey .sw { background: color-mix(in srgb, var(--text) 22%, transparent); }
-  .hig.grey.on .sw { background: var(--switch-on); }
+  /* B. current HIG — neutral gray */
+  .hig.gray { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
+  .hig.gray .sw { background: color-mix(in srgb, var(--text) 22%, transparent); }
+  .hig.gray.on .sw { background: var(--switch-on); }
 
   /* C. purple background, green switch */
   .hig.purple { color: #fff; background: var(--purple); }
@@ -68,7 +68,7 @@
   .hig.purpleWhite.on .sw { background: #fff; }
   .hig.purpleWhite.on .sw::before { background: var(--purple); box-shadow: none; }
 
-  /* E. purple-when-on: grey base, switch + a faint purple wash when on */
+  /* E. purple-when-on: gray base, switch + a faint purple wash when on */
   .hig.purpleOn { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); transition: background .2s; }
   .hig.purpleOn .sw { background: color-mix(in srgb, var(--text) 22%, transparent); }
   .hig.purpleOn.on { color: #fff; background: var(--purple); }
@@ -87,12 +87,12 @@
   <div class="row"><span class="cap">on</span>
     <span class="pill"><span class="status">History · 3 Links ›</span><button class="old on">Local History On</button></span></div>
 
-  <h2>B — Current HIG switch (neutral grey)</h2>
+  <h2>B — Current HIG switch (neutral gray)</h2>
   <p class="note">Label names what it controls; the switch shows state. What's live now.</p>
   <div class="row"><span class="cap">off</span>
-    <span class="pill"><span class="status">No Links Yet</span><button class="hig grey"><span>Local History</span><span class="sw"></span></button></span></div>
+    <span class="pill"><span class="status">No Links Yet</span><button class="hig gray"><span>Local History</span><span class="sw"></span></button></span></div>
   <div class="row"><span class="cap">on</span>
-    <span class="pill"><span class="status">History · 3 Links ›</span><button class="hig grey on"><span>Local History</span><span class="sw"></span></button></span></div>
+    <span class="pill"><span class="status">History · 3 Links ›</span><button class="hig gray on"><span>Local History</span><span class="sw"></span></button></span></div>
 
   <h2>C — HIG switch on the OLD PURPLE, green switch</h2>
   <p class="note">Keeps the purple you miss; switch turns green when on.</p>
@@ -108,8 +108,8 @@
   <div class="row"><span class="cap">on</span>
     <span class="pill"><span class="status">History · 3 Links ›</span><button class="hig purpleWhite on"><span>Local History</span><span class="sw"></span></button></span></div>
 
-  <h2>E — Grey when off, turns purple when on</h2>
-  <p class="note">Quiet until enabled, then the whole control goes purple (state via colour + switch).</p>
+  <h2>E — Gray when off, turns purple when on</h2>
+  <p class="note">Quiet until enabled, then the whole control goes purple (state via color + switch).</p>
   <div class="row"><span class="cap">off</span>
     <span class="pill"><span class="status">No Links Yet</span><button class="hig purpleOn"><span>Local History</span><span class="sw"></span></button></span></div>
   <div class="row"><span class="cap">on</span>

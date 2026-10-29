@@ -71,7 +71,7 @@
     /* Digit rhythm from margins, never characters — the text node is untouched. */
     .pv-value .grp + .grp { margin-left: .4em; }
     /* An extension or an explicit port rides the headline, subordinate in size
-       and colour: part of the address, not a parameter of it. */
+       and color: part of the address, not a parameter of it. */
     .pv-value .ext { margin-left: .55em; font-size: .66em; font-weight: 500;
       color: var(--text-secondary); letter-spacing: 0; }
     .pv-value .port { font-size: .78em; font-weight: 500; color: var(--text-tertiary); }
@@ -87,7 +87,7 @@
     .pv-fact.warn { color: var(--danger); }
     .pv-fact .flag { font-size: 13px; line-height: 1; }
 
-    /* --- parameter table (tags retired — notes carry the judgement) ------ */
+    /* --- parameter table (tags retired — notes carry the judgment) ------ */
     .pv-params { width: 100%; margin-top: 14px; border-collapse: collapse;
       font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; }
     .pv-params td { padding: 7px 0; vertical-align: top;
@@ -99,12 +99,12 @@
     .pv-params .v .dl { color: var(--text-tertiary); }
     .pv-params .v .reg { font-weight: 700; }
 
-    /* --- the exact stored string, in the site's own syntax colours -------
+    /* --- the exact stored string, in the site's own syntax colors -------
        Same palette as .pv-url, one size down: scheme and delimiters recede,
        keys sit up as signposts, percent-escapes dim to encoding noise.
        The one thing it never borrows is the accent wash — that appears once
        per page, on the headline's registrable domain. Hazard marks (space
-       tint, decoded-invisible escapes) keep their danger colour. */
+       tint, decoded-invisible escapes) keep their danger color. */
     .pv-exact { display: block; margin-top: 14px; padding-top: 11px;
       border-top: .5px solid var(--card-border); font-family: var(--font-mono);
       font-size: 11.5px; line-height: 1.65; word-break: break-all; text-align: left;
@@ -166,13 +166,13 @@
     <li><b>Flags are emoji now</b> — 🇳🇴 costs no characters of copy and is the one place an
       emoji earns its keep. On platforms without flag glyphs it degrades to the letters
       <code>NO</code>; the country name beside it carries the content either way.</li>
-    <li><b>The extension joins the number.</b> <code>;ext=4021</code> is part of dialling, not a
+    <li><b>The extension joins the number.</b> <code>;ext=4021</code> is part of dialing, not a
       payload parameter — so it rides the headline as <code>ext.&nbsp;4021</code>, which is
       libphonenumber's own rendering. The <code>tel:</code> table is gone entirely.</li>
     <li><b>The row tags are retired.</b> <code>identifies</code> / <code>name only</code> /
       <code>sent as you</code> shouted in uppercase what the note under the table already says
       in a sentence. The notes stay; the tags go.</li>
-    <li><b>"Exactly as stored" gets the site's own syntax colours</b> — the <code>.pv-url</code>
+    <li><b>"Exactly as stored" gets the site's own syntax colors</b> — the <code>.pv-url</code>
       palette one size down, and a sentence-case italic label instead of the uppercase one.
       It never collapses, at any length: it is the copy target and the proof.</li>
     <li><b>The lid is gone from the common case</b> — argued in full below. Where a chip burned
@@ -218,7 +218,7 @@
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
-    <p class="note"><b>No table left at all.</b> The extension is dialling information, so it
+    <p class="note"><b>No table left at all.</b> The extension is dialing information, so it
       belongs to the number — <code>ext.&nbsp;4021</code> is how libphonenumber itself formats
       it, so the headline is a standard rendering, not an invention. The exact line underneath
       keeps it honest (<code>;ext=4021</code> verbatim). And because Premium Rate burned red,
@@ -302,8 +302,8 @@
       <p class="pv-meta">Expires in 6 days</p>
     </div>
     <p class="note">With the tags gone the rows are quieter and the note — the sentence that
-      earned its keep — is the only voice of judgement on the card. The exact line is the same
-      ~200 characters as before, but in the site's syntax colours: keys bold, delimiters and
+      earned its keep — is the only voice of judgment on the card. The exact line is the same
+      ~200 characters as before, but in the site's syntax colors: keys bold, delimiters and
       percent-escapes receded to <b>encoding noise</b>. It reads as structure now instead of
       as a wall, which is most of what made it feel too tall.</p>
   </div>
@@ -359,7 +359,7 @@
   spent by Reveal, not by this anchor), and its two lines already say what it is and what it
   does. A second gate on top of that is not caution — it is friction that trains reflexive
   double-clicking, which is worse than no gate. And the drained clone had a deeper problem than
-  its label: <b>a greyed-out button reads as a disabled button</b>, i.e. "broken", not "armed".
+  its label: <b>a grayed-out button reads as a disabled button</b>, i.e. "broken", not "armed".
   <br><br>
   Where something <em>is</em> wrong — Premium Rate, Hidden Characters, Padded With Spaces — a
   pause is honest, so a guard stays. But shaped as what it is: a plain dashed disclosure line
@@ -390,7 +390,7 @@
     <li><b>host</b> → the headline: subdomain dim, registrable domain bold on the accent wash,
       exactly as today. IDN mixed-script keeps its existing red panel.</li>
     <li><b>port</b> → rides the headline, dim, like a phone extension rides its number. The
-      <code>url</code> crate never serialises default ports, so if one is visible it is
+      <code>url</code> crate never serializes default ports, so if one is visible it is
       non-standard by definition — the dim <code>:8443</code> is itself the signal.</li>
     <li><b>path</b> → first table row, percent-decoded for reading.</li>
     <li><b>query</b> → one row per pair, repeated keys repeated, order preserved — the magnet
@@ -490,7 +490,7 @@
       this card versus today's <code>.pv-host</code> + <code>.pv-url</code> page, and the
       difference is small; the gains are one renderer for every scheme, one copy target
       everywhere ("Exactly as stored" inherits <code>pv-url</code>'s ⌘C-and-checkmark), long
-      paths that wrap in a row instead of snaking through a centred line, and http(s) finally
+      paths that wrap in a row instead of snaking through a centered line, and http(s) finally
       getting hazard chips like everyone else. I would unify.</p>
   </div>
 </div>
@@ -506,8 +506,8 @@
     <li><b>Spotify can sharpen its subtitle from its own URI.</b>
       <code>spotify:track:…</code> / <code>album</code> / <code>playlist</code> /
       <code>artist</code> is right there in the second segment: "A track in Spotify's
-      catalogue" is a published fact, not a prediction, and beats the generic "Something in
-      Spotify's catalogue" whenever the segment is recognised.</li>
+      catalog" is a published fact, not a prediction, and beats the generic "Something in
+      Spotify's catalog" whenever the segment is recognized.</li>
     <li><b>Same trick for chat schemes.</b> <code>xmpp:</code> with <code>?join</code> is a
       room, not a person; <code>matrix:</code> paths start <code>u/</code> (user),
       <code>r/</code> (room), <code>roomid/</code>. The subtitle can say which without

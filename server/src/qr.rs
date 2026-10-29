@@ -30,7 +30,7 @@ const ROUND: f32 = 0.5;
 /// Radius of the fillet in an inside corner.
 const FILLET: f32 = 0.35;
 
-/// How far a cell reaches into a dark neighbour. Shapes that merely touch leave
+/// How far a cell reaches into a dark neighbor. Shapes that merely touch leave
 /// a hairline where anti-aliasing blends both edges; overlapping by a sliver
 /// closes it.
 const BLEED: f32 = 0.02;
@@ -76,7 +76,7 @@ pub fn svg(url: &str) -> Option<String> {
                     dark(x, y - 1),
                     dark(x, y + 1),
                 );
-                // A corner rounds only where neither neighbour beside it is dark.
+                // A corner rounds only where neither neighbor beside it is dark.
                 let rad = |a: bool, c: bool| if a || c { 0.0 } else { ROUND };
                 let (tl, tr, br, bl) = (rad(l, u), rad(r, u), rad(r, b), rad(l, b));
                 let e = |n: bool| if n { BLEED } else { 0.0 };
@@ -94,7 +94,7 @@ pub fn svg(url: &str) -> Option<String> {
             } else if !in_finder(x, y) {
                 // A light cell with dark on both sides of a corner, and at the
                 // diagonal, sits in an inside corner: fill it with a fillet that
-                // reaches a sliver into both neighbours.
+                // reaches a sliver into both neighbors.
                 let (f, e) = (FILLET, BLEED);
                 let (x1, y1) = (x0 + 1.0, y0 + 1.0);
                 if dark(x - 1, y) && dark(x, y - 1) && dark(x - 1, y - 1) {
@@ -153,7 +153,7 @@ pub fn svg(url: &str) -> Option<String> {
         }
     }
 
-    // Each finder: a ring (6 wide, one module thick) around a 3x3 centre, both
+    // Each finder: a ring (6 wide, one module thick) around a 3x3 center, both
     // with soft corners.
     let mut eyes = String::new();
     for (ex, ey) in [(0, 0), (w - 7, 0), (0, w - 7)] {

@@ -5,7 +5,7 @@
 //! immediately and the response 303-redirects to `GET /:name/revealed`, carrying
 //! the token in a short-lived, path-scoped `yl_reveal` cookie. That GET must be
 //! safe to refresh and back-button, so it cannot consume again; the token is what
-//! authorises the re-render. It carries the link name and an expiry, signed with
+//! authorizes the re-render. It carries the link name and an expiry, signed with
 //! the server secret, so it can be verified with no stored state.
 //!
 //! Format: `base64url(name|exp) "." base64url(HMAC_SHA256(secret, "name|exp"))`,
@@ -33,7 +33,7 @@ pub fn mint(secret: &[u8], name: &str, exp_unix: i64) -> String {
 }
 
 /// Verify a token against `secret` at time `now_unix`. Returns the link name it
-/// authorises when the signature is valid and the token has not expired;
+/// authorizes when the signature is valid and the token has not expired;
 /// otherwise `None` (malformed, tampered, or expired). Signature comparison is
 /// constant-time (via `Mac::verify_slice`).
 pub fn verify(secret: &[u8], token: &str, now_unix: i64) -> Option<String> {

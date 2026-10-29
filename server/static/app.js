@@ -267,7 +267,7 @@
         return (looksLikeUrl(t) && !addressProblem(t)) || looksLikeDomain(t) ? "redirect" : "text";
     };
     const kindLabel = (k) => (k === "redirect" ? "Redirect" : "Text");
-    // The kind as a colour-coded word (Redirect blue, Text yellow), shared by the
+    // The kind as a color-coded word (Redirect blue, Text yellow), shared by the
     // history rows and the result meta.
     const kindWord = (k) => {
         const el = document.createElement("span");
@@ -420,7 +420,7 @@
     };
 
     // Split a shoutkey name at its case boundaries ("runnyDUSK" -> "runny","DUSK")
-    // and render each word in an alternating colour, so a multi-word name reads as
+    // and render each word in an alternating color, so a multi-word name reads as
     // separate words. Returns a fragment of <span class="nw nw-0|nw-1"> words.
     const NAME_WORDS = /[a-z0-9]+(?:-[a-z0-9]+)*|[A-Z0-9]+(?:-[A-Z0-9]+)*/g;
     const nameSpans = (name) => {
@@ -508,7 +508,7 @@
         const ms = d.getTime() - Date.now();
         // "expired" keys off the real deadline (not the floored seconds) so the label never
         // flips before the link is actually gone — the last partial second still reads
-        // "1 second", matching the greying/Delete-disable which also use the true deadline.
+        // "1 second", matching the graying/Delete-disable which also use the true deadline.
         if (ms <= 0) return { text: "expired", compact: "expired", level: "now", unit: "" };
         const s = Math.floor(ms / 1000);
         const created = Number(createdMs);
@@ -560,14 +560,14 @@
             const copyBtn = panel.querySelector(".result-copy");
             if (copyBtn) {
                 // An anchor has no `disabled`: drop the href (no target to copy)
-                // and grey it via the class instead.
+                // and gray it via the class instead.
                 copyBtn.classList.toggle("disabled", dead);
                 if (dead) copyBtn.removeAttribute("href");
             }
         }
     };
     // Build "<Kind> · <green time left><uses>" into `metaEl` (no innerHTML): the kind
-    // as a coloured word, then the green countdown, then any use limit.
+    // as a colored word, then the green countdown, then any use limit.
     const buildMeta = (metaEl, kind, expiresIso, uses) => {
         metaEl.replaceChildren();
         metaEl.append(kindWord(kind), " · ");
@@ -598,7 +598,7 @@
         // Reflect any link that just expired: dim its row and reveal "Clear Expired".
         // Re-render whenever the live expired count diverges from what is shown dimmed —
         // not just the first time (the old `.hidden` guard fired once, so links expiring
-        // after the button appeared showed "expired" text but never got greyed).
+        // after the button appeared showed "expired" text but never got grayed).
         const expiredNow = memHistory.filter(isExpired).length;
         const expiredShown = document.querySelectorAll(".history-item.expired").length;
         if (expiredNow !== expiredShown) renderHistory();
@@ -625,7 +625,7 @@
         }
         // Re-arm only while a live countdown still needs updating; once everything is
         // expired (or there are none) the timer stops — zero wakeups until something
-        // changes. Floor 50ms honours the sub-second final tick (only the last partial
+        // changes. Floor 50ms honors the sub-second final tick (only the last partial
         // second ever asks for under a second, so it is not a busy-wait).
         if (delay !== Infinity) tickTimer = setTimeout(scheduleTick, Math.max(50, Math.min(delay, 60000)));
     };
@@ -1643,7 +1643,7 @@
         const toggle = document.getElementById("storage-toggle");
         if (toggle) {
             // HIG switch: the label names what it controls ("Local History"); the switch
-            // shows on/off by colour + knob position, not by words. role/aria for a11y.
+            // shows on/off by color + knob position, not by words. role/aria for a11y.
             if (!toggle.querySelector(".storage-switch")) {
                 const label = document.createElement("span");
                 label.className = "storage-toggle-label";
@@ -2946,7 +2946,7 @@
             }
         });
 
-        // Focusing the field un-greys it and places the caret at the end.
+        // Focusing the field un-grays it and places the caret at the end.
         content.addEventListener("focus", () => {
             content.classList.remove("submitted");
             const n = content.value.length;
@@ -3043,7 +3043,7 @@
                 addHistory(entry); // stamps entry.id, which the result's Delete needs
                 renderHistory();
                 setupResultActions(entry);
-                // The input greys (still clickable); the result is in sync with it.
+                // The input grays (still clickable); the result is in sync with it.
                 resultSourceValue = raw;
                 content.classList.add("submitted");
                 panel.classList.remove("stale");

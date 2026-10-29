@@ -102,7 +102,7 @@
     .p-c1 .r-frag { color: var(--h-frag); }
     /* subdomain differentiation, the two candidates */
     .p-c1.sub-hue .r-sub { color: color-mix(in srgb, var(--accent) 55%, var(--text-tertiary)); }
-    .p-c1.sub-grey .r-sub { color: var(--text-secondary); }
+    .p-c1.sub-gray .r-sub { color: var(--text-secondary); }
     /* the ;sid path parameter, the two candidates */
     .p-c1.pp-key .r-pp-key { color: var(--h-key); font-weight: 700; }
     .p-c1.pp-key .r-pp-val { color: var(--text); }
@@ -156,7 +156,7 @@
   (a key=value riding a path segment): whether it dresses as key-stuff or path-stuff is
   a toggle below. Not on the board because they already have non-negotiable ink:
   <b>userinfo</b> (danger red — it is a warning, not anatomy), <b>port</b> (its own
-  colour, ships today), <b>scheme</b> (tertiary), the <b>capsule</b> interior (tertiary
+  color, ships today), <b>scheme</b> (tertiary), the <b>capsule</b> interior (tertiary
   delims, bold-never-washed domain). Non-web cards (mailto, tel, magnet…) keep their
   own headline language — C1 is for the URL grammar, which they do not have.
 </div>
@@ -175,7 +175,7 @@
       <legend>Subdomain, in C1</legend>
       <label><input type="radio" name="sub" value="hue" checked> Same hue, quieter<span class="rec">rec</span></label>
       <div class="why">www. belongs to the host, so it keeps the host's blue — at half strength. reddit.com still lands hardest.</div>
-      <label><input type="radio" name="sub" value="grey"> Plain grey</label>
+      <label><input type="radio" name="sub" value="gray"> Plain gray</label>
       <div class="why">Differentiation by absence: only the registrable domain gets any blue at all.</div>
     </fieldset>
 
@@ -190,7 +190,7 @@
     <fieldset id="f-edit">
       <legend>Removing parameters</legend>
       <label><input type="radio" name="edit" value="hero" checked> Click them in the hero<span class="rec">try it →</span></label>
-      <div class="why">Your idea. Strike-through where the thing is. Costs: small touch targets, and the hero gains a click behaviour it never had.</div>
+      <div class="why">Your idea. Strike-through where the thing is. Costs: small touch targets, and the hero gains a click behavior it never had.</div>
       <label><input type="radio" name="edit" value="table"> Checkbox table in the fold (today)</label>
       <div class="why">Native checkboxes: keyboard, screen reader, fat fingers all free. Costs: the whole table repeats the hero.</div>
     </fieldset>
@@ -330,7 +330,7 @@
     document.getElementById("summary").textContent =
 `bare-means-real round 3 picks:
   palette:   ${state.palette}
-  subdomain: ${state.sub === "hue" ? "same hue, quieter" : "plain grey"}
+  subdomain: ${state.sub === "hue" ? "same hue, quieter" : "plain gray"}
   ;params:   ${state.pp === "key" ? "key-stuff (violet)" : "path-stuff (green)"}
   editing:   ${state.edit === "hero" ? "click in hero" : "table in fold"}
   fold:      ${state.fold}

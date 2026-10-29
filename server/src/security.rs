@@ -94,7 +94,7 @@ pub async fn headers(req: Request, next: Next) -> Response {
         HeaderValue::from_str(&csp).expect("the policy is ASCII"),
     );
     // Belt to the policy's braces: `frame-ancestors` is the modern half of this,
-    // but the old header costs one line and covers whatever does not honour it.
+    // but the old header costs one line and covers whatever does not honor it.
     h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
     h.insert(
         header::X_CONTENT_TYPE_OPTIONS,

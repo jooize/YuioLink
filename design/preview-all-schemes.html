@@ -74,7 +74,7 @@
       background: color-mix(in srgb, var(--accent) 13%, transparent); }
     .pv-value .dl { color: var(--text-tertiary); font-weight: 400; }
     /* round-20 shading, restored per round-25 review: local part regular
-       weight at full colour — bold stays the domain's mark */
+       weight at full color — bold stays the domain's mark */
     .pv-value .lp { color: var(--text); font-weight: 400; }
     /* phone dress A (round 27): the routing recedes — country code regular
        secondary, separators tertiary, national digits keep the bold */
@@ -109,7 +109,7 @@
     .pv-fact svg { flex: none; color: var(--danger); }
 
     /* slices: every row a verbatim cut of the stored string, one cell,
-       native checkbox — grey via accent-color, disabled = not yours to change */
+       native checkbox — gray via accent-color, disabled = not yours to change */
     .pv-slices { margin-top: 14px; font-family: var(--font-mono);
       font-size: 12.5px; line-height: 1.5; }
     .pv-slice { display: flex; align-items: baseline; gap: 9px;
@@ -206,23 +206,23 @@
     /* The ladder under the domain, re-ranked 2026-08-15 at the user's call,
        overriding round 4's value emphasis: on a real URL the path says what
        opens and the query is usually tracking noise, so full-strength query
-       VALUES over secondary path SEGMENTS read backwards. Path takes colour,
+       VALUES over secondary path SEGMENTS read backwards. Path takes color,
        never weight -- bold still means the registrable domain, site-wide.
        Cannot-be-a-base schemes (magnet, mailto, ...) keep their old dress:
        their parameters are not noise beside a destination, they are it. */
     /* The raw line's register, applied everywhere (settled 2026-08-15): flat
-       full-colour text in which the bold KEYS carry the structure, with dimming
+       full-color text in which the bold KEYS carry the structure, with dimming
        spent only on the scheme and the percent-escapes. A brief experiment
        demoted the tails' values to lift the path above them; reverted, because
        bold keys do that job without draining the line. */
     .pv-url .ps { color: var(--text); }
     .pv-url .qv { color: var(--text); }
     /* An explicit port decides which server actually answers, so it is the one
-       token with a colour of its own: amber at the "you leave" buttons' hue --
+       token with a color of its own: amber at the "you leave" buttons' hue --
        attention, not alarm -- contrast-checked in both themes. */
     .pv-url .port, .pv-line .port,
     .pv-slice .txt .port, .rawline .port { color: var(--c-port); }
-    /* A tail's key is a signpost: bold at the secondary colour, the way the
+    /* A tail's key is a signpost: bold at the secondary color, the way the
        slices and both raw lines have always drawn it. Not a new rule -- the URL
        line was the one surface that had never applied it. */
     .pv-url .qk { color: var(--text-secondary); font-weight: 700; }
@@ -238,7 +238,7 @@
       font: 400 13px/1.5 var(--font); font-style: italic;
       color: var(--text-secondary); }
 
-    /* one-time badge, in the type's own colour */
+    /* one-time badge, in the type's own color */
     .pv-badge.once {
       color: var(--c-once);
       background: color-mix(in srgb, var(--c-once) 10%, transparent);
@@ -275,7 +275,7 @@
       editing at "not rows, not optional". You asked for something smarter, and the slice
       costume turns out to already contain it: with two or more recipients, each address
       becomes a verbatim slice — <code>sales@example.com</code>, then
-      <code>,support@example.com</code> wearing its true comma — with the same grey native
+      <code>,support@example.com</code> wearing its true comma — with the same gray native
       checkbox as every removable row. The old reason recipients could not be rows was the
       empty key column, and costume C abolished columns. Two special rules keep it honest:
       <b>no floor at all — the Draft rule</b>: RFC 6068 allows a to-less, cc-only, even
@@ -470,7 +470,7 @@
     </div>
     <p class="note"><b>"Not Encrypted", not "Not Secure"</b> — precise, and it does not claim
       we judged the site. Red on the scheme characters and the open padlock; the words carry
-      the warning for colourblind readers and monochrome prints. This is the one red verdict
+      the warning for colorblind readers and monochrome prints. This is the one red verdict
       the card can prove from the string alone — and why no green ever appears on
       <code>https</code>: encryption is the norm, its absence is the signal. The chip is a
       warning, so it fires the open-padlock icon bare. <b>No fold at all here</b> — a bare
@@ -480,7 +480,7 @@
   </div>
 
   <div class="win">
-    <span class="cap">https · one-time — the other button colour</span>
+    <span class="cap">https · one-time — the other button color</span>
     <div class="app-window win">
       <div class="pv-head">
         <span class="kicker">YuioLink <span class="kind kind-redirect">Redirect</span></span>
@@ -564,7 +564,7 @@
       consistently.</b> The old "core like a host" exception is gone: an address is
       content, not routing, and RFC 6068 is happy without one. Untick it and the button
       turns into "Draft a Message" over a legal <code>mailto:?subject=…</code>.
-      The local part reads at full colour but regular weight — bold stays the
+      The local part reads at full color but regular weight — bold stays the
       domain's mark (on freemail the local part <i>is</i>
       the identity); the wash stays on the domain. Two space stories on one card: the
       subject's dotted space was stored as <code>%20</code>; the body's bare space is a real
@@ -660,7 +660,7 @@
             <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
           Premium Rate</span>
       </div>
-      <span class="pv-note">The extension, 4021, is dialled after the call connects.</span>
+      <span class="pv-note">The extension, 4021, is dialed after the call connects.</span>
       <code class="rawline"><span class="lbl">Exactly as stored
         <button class="copybtn" data-copy="stored" data-card="tel">Copy</button></span><span class="str" id="stored-tel-str"><span class="sch">tel:</span>+47-820-12-345<span class="dl">;</span><span class="k">ext</span><span class="dl">=</span>4021</span></code>
       <div class="pv-split pv-open">
@@ -677,7 +677,7 @@
       real <code>tel:</code> hazard, and nothing else in the stack can see it. The flag
       rides the region chip (your one emoji exception; letter pairs where flags don't
       render). Headline always formatted — the creator's hyphens live only in the exact
-      line. No slices: <code>;ext=</code> is part of dialling, not a removable extra, and
+      line. No slices: <code>;ext=</code> is part of dialing, not a removable extra, and
       no lid — the chip warns, the button acts.</p>
   </div>
 
@@ -805,7 +805,7 @@
       <div class="pv-split pv-open">
         <a class="btn btn--go btn-2 btn-link go" href="#" style="margin-top:0">
           <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">spotify:</span></span>
-          <span class="what">A track in Spotify's catalogue</span></a>
+          <span class="what">A track in Spotify's catalog</span></a>
         <button class="btn splitcopy" data-static="spotify:track:6rqhFgbbKwnb9MLmUQDhG6" aria-label="Copy the link">Copy</button>
       </div>
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
@@ -817,7 +817,7 @@
       <code>spotify:track:6rqh…</code> unbroken. Character-identical means the exact line
       has nothing to prove and is gone; nothing keyed means no slices. "A track" is read
       off the URI's own type segment — a published fact — falling back to "Something in
-      Spotify's catalogue" when the segment is unrecognised.</p>
+      Spotify's catalog" when the segment is unrecognized.</p>
   </div>
 </div>
 
@@ -923,7 +923,7 @@
     </div>
     <p class="note"><code>irc:</code> and <code>ircs:</code> share one card; the trailing
       <code>s</code> is TLS and the subtitle stays the same — transport is not something we
-      editorialise here (the "Not Encrypted" signal is reserved for the web tier, where the
+      editorialize here (the "Not Encrypted" signal is reserved for the web tier, where the
       browser's own UI continues the story after the click). The channel rides as a path
       segment; the network's domain takes the wash. One run, stored-identical, no exact
       line.</p>
@@ -1126,7 +1126,7 @@
     return { raw: raw, html: html };
   }
 
-  /* per-card follow-the-edits behaviour beyond the raw line */
+  /* per-card follow-the-edits behavior beyond the raw line */
   /* the Draft rule: no floor at all. RFC 6068 allows a to-less, cc-only,
      even address-less mailto — a bare compose opens. So every address is
      removable, and with none left the button offers a draft. */

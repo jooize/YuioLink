@@ -493,7 +493,7 @@ function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/
 function renderURL(){
   var n=buildName(), key=buildKey();
   var nameHtml = "";
-  // colour alternating-case uppercase runs
+  // color alternating-case uppercase runs
   nameHtml = esc(n.base).replace(/([A-Z]+)/g,'<span class="up">$1</span>');
   var h = '<span class="dom">yuio.link/</span><span class="nm">'+nameHtml+'</span>';
   if(n.marker) h += '<span class="mk">'+esc(n.marker)+'</span>';

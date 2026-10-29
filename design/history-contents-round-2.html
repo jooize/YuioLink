@@ -133,12 +133,12 @@ for (const [k, [t, d]] of Object.entries(P)) {
     document.getElementById("eyes").append(h("figure", "", h("figcaption", "", h("b", "", k + " · " + t), d), ul));
 }
 const RS = {
-    R1: ["Today", "Text arrow and one space, faint grey."],
+    R1: ["Today", "Text arrow and one space, faint gray."],
     R2: ["More room", "Same arrow, 6px of air, one step darker."],
     R3: ["Blue arrow", "Larger, semibold, in the Redirect blue."],
     R4: ["Drawn arrow, blue", "An SVG arrow drawn like the row's icons, in Redirect blue."],
     R5: ["Hook arrow", "A return arrow, as in “this leads to”, in blue."],
-    R6: ["Drawn arrow, grey", "The SVG arrow in the secondary grey."],
+    R6: ["Drawn arrow, gray", "The SVG arrow in the secondary gray."],
 };
 for (const [k, [t, d]] of Object.entries(RS)) {
     const ul = h("ul", "history-list " + k,

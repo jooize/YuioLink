@@ -41,7 +41,7 @@
       border-color: color-mix(in srgb, #ff9f0a 40%, transparent); color: #8a5a00; }
     @media (prefers-color-scheme: dark) { .tag.go { color: #ffc266; } }
 
-    /* Swatches for the colour argument. */
+    /* Swatches for the color argument. */
     .swatches { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; padding: 0 16px; }
     .sw { width: 330px; }
     .sw .chip { height: 62px; border-radius: var(--radius-control); display: flex;
@@ -82,7 +82,7 @@
        =================================================================== */
 
     /* An anchor styled as a button needs the button's own reset: <a> brings its
-       own colour, underline and inline layout that .btn does not override. */
+       own color, underline and inline layout that .btn does not override. */
     .btn-link { text-decoration: none; }
     .btn--go.btn-link { color: #241a05; }
 
@@ -108,18 +108,18 @@
 
 <div class="wrap">
   <p class="mock-h" style="margin-top:8px">YuioLink · design note</p>
-  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Preview buttons: colour, element, cost</h1>
+  <h1 style="font: 600 30px/1.2 var(--font); letter-spacing: -.02em; margin: 0 0 10px;">Preview buttons: color, element, cost</h1>
   <p class="mock-note" style="padding-left:0; padding-right:0">
     Four buttons appear on link pages. They differ along three axes that are currently
-    carried by <strong>one</strong> signal (colour). This note separates the axes and proposes
+    carried by <strong>one</strong> signal (color). This note separates the axes and proposes
     which ones deserve their own visible treatment.
   </p>
 </div>
 
 <!-- ================================================================== -->
-<p class="mock-h">1 · The colour rule, stated</p>
+<p class="mock-h">1 · The color rule, stated</p>
 <p class="mock-note">
-  Colour answers exactly one question: <strong>where do I end up?</strong> Nothing else is
+  Color answers exactly one question: <strong>where do I end up?</strong> Nothing else is
   encoded in it — not the kind of link, not the cost, not the risk.
 </p>
 
@@ -148,7 +148,7 @@
 <!-- ================================================================== -->
 <p class="mock-h">2 · The four situations</p>
 <p class="mock-note">
-  What differs between them is not only colour: it is <strong>what the control is</strong>
+  What differs between them is not only color: it is <strong>what the control is</strong>
   (a link you can copy, or a form that changes server state) and <strong>what pressing it
   costs</strong>. Today both of those are invisible.
 </p>
@@ -156,7 +156,7 @@
 <div class="mock-t">
   <table>
     <thead>
-      <tr><th>Page</th><th>Label</th><th>Colour</th><th>Element</th><th>Costs</th><th>Copyable URL</th></tr>
+      <tr><th>Page</th><th>Label</th><th>Color</th><th>Element</th><th>Costs</th><th>Copyable URL</th></tr>
     </thead>
     <tbody>
       <tr>
@@ -197,7 +197,7 @@
 
 <p class="mock-note" style="margin-top:16px">
   The table collapses to a clean rule: <strong>amber is always an anchor and always free;
-  blue is always a form and always costs a use.</strong> Colour already correlates perfectly
+  blue is always a form and always costs a use.</strong> Color already correlates perfectly
   with both — so the question is whether the other two axes need their own marks, or whether
   restating them is noise.
 </p>
@@ -268,7 +268,7 @@
     <button class="btn btn-block pv-btn">Reveal Destination</button>
     <button class="btn btn-block pv-btn">Reveal Text</button>
 
-    <p class="verdict"><b>Adds:</b> the one axis colour can't carry — "this is a link, you can
+    <p class="verdict"><b>Adds:</b> the one axis color can't carry — "this is a link, you can
       take it with you". <b>Costs:</b> nothing; ↗ is the most conventional glyph on the web.
       <b>Silent on:</b> the cost of Reveal, which the badge below already names.</p>
   </div>
@@ -330,14 +330,14 @@
 <p class="mock-note" style="margin-top:26px">
   <strong>Recommendation: A, or B if the cost line survives dropping the badge.</strong>
   The ↗ is the honest addition — it marks a genuine capability change (this control is now
-  copyable and openable in a new tab) rather than restating what colour already says. The
+  copyable and openable in a new tab) rather than restating what color already says. The
   cost line in B is a real improvement to the limited-link decision, but it duplicates the
   badge; adopting it means deleting <code>.pv-badge</code>, and that badge is also what tells
   a visitor the link is one-time <em>before</em> they read any button.
 </p>
 
 <p class="mock-note">
-  <strong>Not proposed:</strong> a third colour, an icon on the Reveal buttons (an eye reads
+  <strong>Not proposed:</strong> a third color, an icon on the Reveal buttons (an eye reads
   as "peek", which is wrong — the view is spent whether or not you look), and any treatment
   that makes Continue less prominent than Reveal. Continue is the expected outcome of
   visiting a link; the interstitial already taxes it with a click.

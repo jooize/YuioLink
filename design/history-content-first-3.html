@@ -83,7 +83,7 @@ figcaption b { color: var(--text); font-size: 15px; margin-right: 6px; }
 <div class="row" id="covers"></div>
 
 <h2>Once</h2>
-<p class="lead">In the One-Time purple, the colour the type picker and the preview page's "Opens Once" badge already use for single use.</p>
+<p class="lead">In the One-Time purple, the color the type picker and the preview page's "Opens Once" badge already use for single use.</p>
 <div class="row" id="once"></div>
 </main>
 <script>
@@ -197,10 +197,10 @@ for (const [k, t, d, o] of [
     ["H1", "Characters", " How much, in characters.", { size: "S1" }],
     ["H2", "Lines for Text", " Text says lines, a redirect says characters.", { size: "S2" }],
     ["H3", "Both", " Lines and characters when there is more than one line.", { size: "S3" }],
-    ["H4", "Both, tinted by type", " The hatch and the word in the type colour: Secret green, One-Time purple.", { size: "S3", tint: true }],
+    ["H4", "Both, tinted by type", " The hatch and the word in the type color: Secret green, One-Time purple.", { size: "S3", tint: true }],
 ])
     document.getElementById("covers").append(fig(k + " · " + t, d, list(412, { ...o, once: "O1" }, covRows, false)));
-for (const [k, t, d] of [["O1", "Purple capsule", " Like the preview page's badge, without the border."], ["O2", "Grey capsule", " Quiet; the word does the work."], ["O3", "Purple outline", " The preview page's badge, as it is."], ["O4", "Flame and Once", " A filled flame, redrawn."]])
+for (const [k, t, d] of [["O1", "Purple capsule", " Like the preview page's badge, without the border."], ["O2", "Gray capsule", " Quiet; the word does the work."], ["O3", "Purple outline", " The preview page's badge, as it is."], ["O4", "Flame and Once", " A filled flame, redrawn."]])
     document.getElementById("once").append(fig(k + " · " + t, d, list(412, { ...base, once: k }, [ROWS[4], { ...ROWS[0], once: true, name: ["plaza", "HUMID"], snippet: "Your code is 318 204", lines: 1, chars: 20 }], false)));
 </script>
 </body>

@@ -883,7 +883,7 @@ pub async fn qr_image(State(state): State<AppState>, Path(name): Path<String>) -
 ///
 /// Split out from [`card_image`] so the one disclosure decision it makes --
 /// whether the destination is named at all -- can be checked without
-/// rasterising anything.
+/// rasterizing anything.
 struct CardText {
     kicker: &'static str,
     hero: String,
@@ -1357,7 +1357,7 @@ pub async fn demo_redirect(State(state): State<AppState>) -> Response {
     Html(views::demo_redirect_page(base_host).into_string()).into_response()
 }
 
-/// `GET /colophon` — the licence and the third-party attributions. Fully static:
+/// `GET /colophon` — the license and the third-party attributions. Fully static:
 /// nothing on it depends on the instance, unlike `/help` and its `curl` examples.
 pub async fn colophon() -> Response {
     Html(views::colophon_page().into_string()).into_response()
@@ -2345,7 +2345,7 @@ mod tests {
         // The card is still offered -- it just has nothing to disclose.
         assert!(body.contains("card.png"));
 
-        // The image carries no destination either. It is rasterised text, so
+        // The image carries no destination either. It is rasterized text, so
         // the check is on the words that go into it.
         let resp = router(st.clone())
             .oneshot(get(&format!("/{}/card.png", l.name)))
@@ -2614,7 +2614,7 @@ mod tests {
                 "colophon should credit {credit}: {body}"
             );
         }
-        // The footer's licence link is the only route to this page.
+        // The footer's license link is the only route to this page.
         let (s, _, home) = send(&st, get("/")).await;
         assert_eq!(s, StatusCode::OK);
         assert!(home.contains("href=\"/colophon\""), "{home}");

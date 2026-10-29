@@ -141,14 +141,14 @@ h1 { font-size: 22px; margin: 0 0 6px; }
 .hc-flag.peek.soft { color: var(--text-secondary); box-shadow: inset 0 0 0 1px var(--text-tertiary), 0 1px 4px rgba(0, 0, 0, 0.18); }
 
 /* The common kinds from pasted text (no-break spaces, soft hyphens): a
-   grey tick, and in "toggle" none until shown. */
+   gray tick, and in "toggle" none until shown. */
 .ticked .hid.soft { --tick: var(--text-tertiary); }
 .ticked .hid.soft.open { --tick: var(--accent); }
 .ticked.soft-hidden .hid.soft::after, .ticked.soft-hidden .hid.soft::before { display: none; }
 .hc-soft { font-size: 13px; color: var(--text-secondary); }
 button.hc-soft { font: inherit; font-size: 13px; border: 0; background: none; padding: 0; cursor: pointer; color: var(--text-secondary); }
 button.hc-soft:hover { color: var(--text); }
-/* An open soft run: its flag, its History label and its entry in grey. */
+/* An open soft run: its flag, its History label and its entry in gray. */
 .hc-flag.soft:not(.peek) { background: var(--hc-gray); color: #fff; }
 .ticked .hid.soft.lab::after { background: var(--hc-gray); color: #fff; }
 .pv-cast .entry.soft .what code.bad { background: var(--hc-gray); color: #fff; font-size: 11.5px; }
@@ -297,7 +297,7 @@ const idsAtCaret = (text, a, b) => {
 };
 const SPACE_LIKE = (cp) => cp === 0xa0 || (cp >= 0x2000 && cp <= 0x200a) || cp === 0x202f || cp === 0x205f || cp === 0x3000;
 // The kinds pasted text often holds for a reason: spaces that don't break,
-// and soft hyphens. With tiers they get a grey tick and stay on Remove.
+// and soft hyphens. With tiers they get a gray tick and stay on Remove.
 const SOFT = (cp) => SPACE_LIKE(cp) || cp === 0xad;
 const withoutHidden = (text, keepSoft = false) => scan(text).parts.map((p) => p.kind !== "hid" ? p.text
   : keepSoft && SOFT(p.cp) ? p.text : SPACE_LIKE(p.cp) ? " " : (p.cp === 0x2028 || p.cp === 0x2029) ? "\n" : "").join("");
@@ -572,7 +572,7 @@ const historyWell = (text, { labels = false, open = null, stored = null, run = "
 // run "count" | "comb" | "fan"; layout (the entry's); labelsCopy (round 3's
 // labeled copy under the field); domainNote; say (what a label says); debug
 // (a line naming where the caret is, for checking a browser); tiers "same"
-// | "soft" (grey ticks for SOFT kinds) | "toggle" (none until shown).
+// | "soft" (gray ticks for SOFT kinds) | "toggle" (none until shown).
 const DEFAULTS = { caret: "own", hover: "peek", run: "count", layout: "three", labelsCopy: false, domainNote: true, say: "name", debug: false, tiers: "same" };
 function setupForm(frame, cfgIn = {}) {
   const cfg = { ...DEFAULTS, ...cfgIn };
@@ -914,7 +914,7 @@ const DECISIONS = [
     ] },
   { key: "chip", title: "The form's chip: Remove, then Put Back", decided: "You loved it. No Labels step in the form: the field can't make room for labels, and a labeled copy draws the text twice." },
   { key: "caret", title: "When the caret stands on a tick",
-    context: "The caret and the tick are drawn at the same place, so the caret hides the bar. Safari also draws its caret a character off when a hidden character sits beside it: before “.” in “attached.”, and before “a” in a joined “a‍m”, though it stands after them. The grey line under each field says where the caret really is. Click right after “attached.” in each.",
+    context: "The caret and the tick are drawn at the same place, so the caret hides the bar. Safari also draws its caret a character off when a hidden character sits beside it: before “.” in “attached.”, and before “a” in a joined “a‍m”, though it stands after them. The gray line under each field says where the caret really is. Click right after “attached.” in each.",
     options: [
       { value: "own", title: "The page draws the caret under the wedge", pick: true,
         why: "New. Beside a run, Safari's caret is hidden and the page draws one at the run's real place, under its wedge. Away from runs, the field's own caret is back.",
@@ -1000,7 +1000,7 @@ const DECISIONS = [
         mock: (box) => noJsResult(frameOf(box), MULTI, false) },
     ] },
   { key: "domain", title: "A hidden character in a domain",
-    context: "Corrected: the server never stores a different domain. Its parser drops some hidden characters from a domain (a zero-width space, a soft hyphen) and refuses the rest (a joiner, a direction mark), and a refused address becomes a text link. Top: a joiner, refused. Bottom: a zero-width space, dropped. The grey line says where the caret is.",
+    context: "Corrected: the server never stores a different domain. Its parser drops some hidden characters from a domain (a zero-width space, a soft hyphen) and refuses the rest (a joiner, a direction mark), and a refused address becomes a text link. Top: a joiner, refused. Bottom: a zero-width space, dropped. The gray line says where the caret is.",
     options: [
       { value: "note", title: "The form says what happens to the domain", pick: true,
         why: "You learn why it is a text link, or where the link really goes, before you share it.",
@@ -1026,7 +1026,7 @@ const DECISIONS = [
   { key: "soft", title: "No-break spaces and soft hyphens",
     context: "Pasted text often holds these for a reason. In the sample, “Room 4” and “10 am” hold no-break spaces and “the­badge” a soft hyphen; “attached.” is followed by zero-width spaces. Remove keeps the soft kinds in both new options.",
     options: [
-      { value: "soft", title: "A grey tick, and a quiet count", pick: true,
+      { value: "soft", title: "A gray tick, and a quiet count", pick: true,
         why: "New. They stay visible, without the red. The red chip counts only the kinds that hide things.",
         mock: both(formMock({ tiers: "soft" }, MULTI), histMock({ tiers: "soft" }, MULTI)) },
       { value: "toggle", title: "Hidden until you show them",

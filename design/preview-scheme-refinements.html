@@ -68,8 +68,8 @@
       text-align: center; }
 
     /* --- insecure http --------------------------------------------------
-       Colour is never the only carrier: the chip states it in words, so the
-       warning survives a colourblind reader and a monochrome print. */
+       Color is never the only carrier: the chip states it in words, so the
+       warning survives a colorblind reader and a monochrome print. */
     .pv-url .sch.insecure { color: var(--danger); font-weight: 700; }
     .pv-insecure { display: inline-flex; align-items: center; gap: 5px; margin-top: 9px;
       padding: 3px 9px; border-radius: 999px; font: 600 11px/1.45 var(--font);
@@ -98,7 +98,7 @@
       font-weight: 700; opacity: .9; }
 
     /* --- refusal alert, with the symbol locked to the heading's line -----
-       The symbol box is given the heading's exact line box and centres its
+       The symbol box is given the heading's exact line box and centers its
        glyph inside it, so the two share an optical baseline at any text size
        — margin nudges drift the moment the type scales. */
     .pv-refuse-alert { display: grid; grid-template-columns: auto 1fr; gap: 11px;
@@ -124,7 +124,7 @@
 
 <div class="fixnote">
   <b>A correction to round 4.</b> I wrote that a <code>tel:</code> link is "one accidental tap
-  from being dialled". That overstates it: iOS Safari interposes a confirmation sheet, and
+  from being dialed". That overstates it: iOS Safari interposes a confirmation sheet, and
   Android generally opens the dialer pre-filled rather than placing the call. The premium-rate
   risk is real, but a browser confirmation usually stands between the tap and the charge — so
   the cover is a second seatbelt, not the only one. That changes how hard the cover has to
@@ -165,7 +165,7 @@
     </div>
     <p class="note">The heading gets an explicit <code>line-height: 19px</code> and the symbol
       box is given that same height with <code>place-items: center</code>. They now share an
-      optical centre at any size, with no magic numbers to re-tune.</p>
+      optical center at any size, with no magic numbers to re-tune.</p>
   </div>
 </div>
 
@@ -173,13 +173,13 @@
 <p class="mock-h">2 · Marking insecure http</p>
 <p class="mock-note">
   Worth doing — this is the one place YuioLink knows something the visitor's browser will only
-  tell them <em>after</em> they've arrived. The constraint: colour must never be the only
-  carrier, or the warning vanishes for a colourblind reader.
+  tell them <em>after</em> they've arrived. The constraint: color must never be the only
+  carrier, or the warning vanishes for a colorblind reader.
 </p>
 
 <div class="mock-row">
   <div class="card">
-    <span class="rank nope">Colour only</span>
+    <span class="rank nope">Color only</span>
     <h3>Red scheme, nothing else</h3>
     <code class="pv-url" style="display:block;text-align:center">
       <span class="sch insecure">http://</span><span class="reg">example.com</span><span class="seg">/page</span>
@@ -205,7 +205,7 @@
       </span>
     </div>
     <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:18px">Continue to example.com</a>
-    <p class="note">The colour draws the eye, the words carry the meaning, the open padlock
+    <p class="note">The color draws the eye, the words carry the meaning, the open padlock
       carries it a third way. <b>"Not Encrypted" over "Not Secure"</b>: it is the precise
       claim, and it doesn't imply we have judged the site itself — which we haven't, and say
       so two lines below.</p>
@@ -226,8 +226,8 @@
       </span>
     </div>
     <a class="btn btn--go btn-block btn-link" href="#" style="margin-top:18px">Continue to example.com</a>
-    <p class="note">Keeps the URL rendering untouched — one fewer colour in a line that is
-      already doing part-by-part colouring. <b>Against:</b> the chip floats free of the thing
+    <p class="note">Keeps the URL rendering untouched — one fewer color in a line that is
+      already doing part-by-part coloring. <b>Against:</b> the chip floats free of the thing
       it describes; tying red to the four characters that are the problem is the clearer
       teach.</p>
   </div>
@@ -308,7 +308,7 @@
   Because blue on this site means <strong>you stay on YuioLink</strong>, and a
   <code>mailto:</code> does not — it hands your address book an addressee. But your instinct
   that these are not all equally alarming is right, and there is a better lever for it than
-  colour.
+  color.
 </p>
 
 <div class="mock-row">
@@ -326,7 +326,7 @@
     <a class="btn btn-block btn-link" href="#" style="margin-top:20px">Write to hello@example.com</a>
     <p class="note">It looks calm, and that is the problem: it is the same blue as
       <b>Reveal Destination</b>, which is the site's promise that pressing keeps you here.
-      Once one blue button launches an external app, the visitor can no longer read colour to
+      Once one blue button launches an external app, the visitor can no longer read color to
       know whether they are about to leave — and that inference is the only thing the palette
       was buying.</p>
   </div>
@@ -350,7 +350,7 @@
       <br><br>
       The lid stays on <code>tel:</code>, <code>magnet:</code>, <code>ftp:</code> and
       <code>spotify:</code> — the ones where the app starts <i>doing</i> something on arrival:
-      placing a call, joining a swarm, fetching, playing. <b>Colour keeps saying where you go;
+      placing a call, joining a swarm, fetching, playing. <b>Color keeps saying where you go;
       the cover now says whether it commits.</b> Two signals, two questions, neither
       overloaded.</p>
   </div>
@@ -358,7 +358,7 @@
 
 <p class="mock-note" style="margin-top:6px">
   This also settles the round-4 worry honestly. With the correction at the top — browsers
-  usually confirm before dialling — a lid on every non-web scheme was friction charged to six
+  usually confirm before dialing — a lid on every non-web scheme was friction charged to six
   harmless ones to slow down four. Covering only what commits keeps the protection where the
   risk is.
 </p>

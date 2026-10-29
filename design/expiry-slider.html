@@ -129,7 +129,7 @@
     .segmented input { position: absolute; opacity: 0; width: 0; height: 0; }
     .segmented input:checked + label { background: var(--card-highlight); box-shadow: 0 1px 2px rgba(0,0,0,0.18); }
 
-    /* --- Clear button colour alts --- */
+    /* --- Clear button color alts --- */
     .clear-row {
         display: flex; align-items: center; justify-content: space-between;
         padding: 10px 4px; border-bottom: 0.5px solid var(--separator);
@@ -140,7 +140,7 @@
     .clear-row .btns { display: flex; gap: 14px; }
     .clear-row button { font-family: inherit; font-size: 12.5px; background: none; border: 0; padding: 0; cursor: pointer; }
     .clear-row button:hover { text-decoration: underline; }
-    .c-grey { color: var(--text-secondary); }
+    .c-gray { color: var(--text-secondary); }
     .c-red { color: var(--danger); }
     .c-amber { color: var(--warn); }
     .c-green { color: var(--result); }
@@ -151,7 +151,7 @@
         border: 0.5px solid color-mix(in srgb, var(--danger) 24%, transparent) !important;
         border-radius: 999px; padding: 4px 11px !important;
     }
-    .pill-grey {
+    .pill-gray {
         color: var(--text-secondary);
         background: color-mix(in srgb, var(--text) 8%, transparent);
         border: 0.5px solid var(--separator) !important;
@@ -208,15 +208,15 @@
     <div class="ticks" id="tk-d"></div>
 </section>
 
-<!-- Clear colours -->
+<!-- Clear colors -->
 <section class="card">
-    <h2>Clear… colours</h2>
-    <p>The folded state shows a lone grey "Clear…"; these are options for the pair it reveals. Hover each.</p>
+    <h2>Clear… colors</h2>
+    <p>The folded state shows a lone gray "Clear…"; these are options for the pair it reveals. Hover each.</p>
     <div class="clear-row"><span class="name">1 · current (green / red)</span><span class="btns"><button class="c-green">Clear Expired</button><button class="c-red">Clear All</button></span></div>
-    <div class="clear-row"><span class="name">2 · severity only (grey / red)</span><span class="btns"><button class="c-grey">Clear Expired</button><button class="c-red">Clear All</button></span></div>
+    <div class="clear-row"><span class="name">2 · severity only (gray / red)</span><span class="btns"><button class="c-gray">Clear Expired</button><button class="c-red">Clear All</button></span></div>
     <div class="clear-row"><span class="name">3 · caution ladder (amber / red)</span><span class="btns"><button class="c-amber">Clear Expired</button><button class="c-red">Clear All</button></span></div>
     <div class="clear-row"><span class="name">4 · both destructive (red / red)</span><span class="btns"><button class="c-red">Clear Expired</button><button class="c-red">Clear All</button></span></div>
-    <div class="clear-row"><span class="name">5 · confirm-style pills</span><span class="btns"><button class="pill-grey">Clear Expired</button><button class="pill-red">Clear All</button></span></div>
+    <div class="clear-row"><span class="name">5 · confirm-style pills</span><span class="btns"><button class="pill-gray">Clear Expired</button><button class="pill-red">Clear All</button></span></div>
 </section>
 
 <script>

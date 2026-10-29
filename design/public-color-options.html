@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>YuioLink — Public type color options</title>
 <!--
-  Candidate colours for --c-public, each rendered in the real picker, light and
+  Candidate colors for --c-public, each rendered in the real picker, light and
   dark side by side. It links the REAL stylesheet (../server/static/app.css) so
   the surrounding chrome is always the shipped design. Open directly in a
   browser (file://). Not served by the app -- a design reference only.
@@ -98,7 +98,7 @@
 .v-gold   .pane { --c-public: #8f5a00; }  .v-gold   .pane.dark { --c-public: #ffc93c; }
 .v-orange .pane { --c-public: #b34700; }  .v-orange .pane.dark { --c-public: #ff9f0a; }
 .v-rose   .pane { --c-public: #c11574; }  .v-rose   .pane.dark { --c-public: #ff6fb5; }
-.v-grey   .pane { --c-public: #55565c; }  .v-grey   .pane.dark { --c-public: #b0b3bb; }
+.v-gray   .pane { --c-public: #55565c; }  .v-gray   .pane.dark { --c-public: #b0b3bb; }
 
 /* Split: text carries the deep gold (4.5:1 for small text), while the dot and
    the body border keep the real amber -- those are graphical objects, where AA
@@ -270,7 +270,7 @@ body.mock {
 
 <div class="doc">
     <h1>Public type color — options</h1>
-    <p>Six candidates for <code>--c-public</code>, each in the shipped picker with Public selected and the disclosure open, light and dark. Everything the token tints moves with it: the dot before "Public", the bold lead of the summary line, the <code>details-body</code> left border and its 8% wash, and the "Browse the wordlist →" link. The grey "Not secret!" tail and the blue "Security" toggle never follow the type color — that is the point of comparison, since Public's blue currently collides with that toggle.</p>
+    <p>Six candidates for <code>--c-public</code>, each in the shipped picker with Public selected and the disclosure open, light and dark. Everything the token tints moves with it: the dot before "Public", the bold lead of the summary line, the <code>details-body</code> left border and its 8% wash, and the "Browse the wordlist →" link. The gray "Not secret!" tail and the blue "Security" toggle never follow the type color — that is the point of comparison, since Public's blue currently collides with that toggle.</p>
     <p>The text this color carries is 12px bold, so AA wants 4.5:1 against the glass. Contrast figures are in the table at the bottom.</p>
 </div>
 
@@ -587,7 +587,7 @@ body.mock {
 <!-- ============================ 5. Rose ============================ -->
 <section class="variant v-rose">
     <h2><span class="sw" style="background:#c11574"></span>5 &middot; Rose — leave the warm family entirely <span class="vals">#c11574 / #ff6fb5</span></h2>
-    <p>Not a caution colour in any culture, comfortably AA in both themes, and it picks up the pink already in the background glow (<code>--glow-2</code>). Three types then read blue-free: rose, green, purple — a clean key where nothing competes with the accent. The risk is tone: it is the most playful option here.</p>
+    <p>Not a caution color in any culture, comfortably AA in both themes, and it picks up the pink already in the background glow (<code>--glow-2</code>). Three types then read blue-free: rose, green, purple — a clean key where nothing competes with the accent. The risk is tone: it is the most playful option here.</p>
     <div class="panes">
         <div class="pane">
             <div class="pane-label">Light</div>
@@ -647,9 +647,9 @@ body.mock {
 </section>
 
 <!-- ============================ 6. Graphite ============================ -->
-<section class="variant v-grey">
+<section class="variant v-gray">
     <h2><span class="sw" style="background:#55565c"></span>6 &middot; Graphite — Public as the plain one <span class="vals">#55565c / #b0b3bb</span></h2>
-    <p>The argument: Public is the absence of protection, so give it the absence of colour and let green and purple be the two that mean something. Highest contrast of the six, and no hue collides with anything. It is also, deliberately, the least exciting thing to open on.</p>
+    <p>The argument: Public is the absence of protection, so give it the absence of color and let green and purple be the two that mean something. Highest contrast of the six, and no hue collides with anything. It is also, deliberately, the least exciting thing to open on.</p>
     <div class="panes">
         <div class="pane">
             <div class="pane-label">Light</div>
@@ -792,7 +792,7 @@ body.mock {
     </table>
 
     <h2>Where the color actually lands</h2>
-    <p>Worth keeping in mind while choosing: the type color is an 8px dot, a 2px left border, an 8% wash, and one bold 12px line. It is a key, not the page's first impression — the glass window, the blue and pink glow behind it, and the purple-bordered input are what a visitor sees first, and none of them move with this token. A colour that is "boring" at 8px is mostly invisible; a colour that is loud at 8px is a badge.</p>
+    <p>Worth keeping in mind while choosing: the type color is an 8px dot, a 2px left border, an 8% wash, and one bold 12px line. It is a key, not the page's first impression — the glass window, the blue and pink glow behind it, and the purple-bordered input are what a visitor sees first, and none of them move with this token. A color that is "boring" at 8px is mostly invisible; a color that is loud at 8px is a badge.</p>
 </div>
 
 <script>

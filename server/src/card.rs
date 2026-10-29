@@ -1,6 +1,6 @@
 //! Server-side share-card (og:image) rendering.
 //!
-//! Builds an SVG card from a template and rasterises it to PNG with resvg — pure
+//! Builds an SVG card from a template and rasterizes it to PNG with resvg — pure
 //! Rust, no system libraries (it builds `default-features = false, features =
 //! ["text"]`, so the SVG-embedded-raster decoders and system-font loading are
 //! dropped). The fonts are embedded so the card renders identically with no
@@ -19,8 +19,8 @@
 //! it to every chat server the link passed through without spending anything —
 //! which is precisely the disclosure the blind card exists to prevent.
 //!
-//! The wordmark carries the only brand colour — "Link" in the accent blue, with no
-//! separate mark beside it — so the card holds one accent, not three. The greys are
+//! The wordmark carries the only brand color — "Link" in the accent blue, with no
+//! separate mark beside it — so the card holds one accent, not three. The grays are
 //! `#55555c` (~6.5:1) rather than the lighter `#6e6e73`: a share card is usually
 //! seen scaled down to a couple of hundred pixels, where the secondary lines are
 //! the first thing to dissolve.
@@ -143,7 +143,7 @@ pub struct Card<'a> {
     pub foot: &'a str,
 }
 
-/// Render a card to PNG bytes. `None` only if rasterisation fails (it should not
+/// Render a card to PNG bytes. `None` only if rasterization fails (it should not
 /// for our fixed-size template).
 pub fn render_png(card: &Card) -> Option<Vec<u8>> {
     let fonts = fonts();
@@ -590,7 +590,7 @@ mod tests {
         assert!(!svg.contains("8594"), "{svg}");
         // A sentence reads in the UI face, not the address face.
         assert!(!svg.contains(MONO), "{svg}");
-        // And it still rasterises.
+        // And it still rasterizes.
         assert!(render_png(&card).is_some());
     }
 

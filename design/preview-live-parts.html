@@ -153,7 +153,7 @@
   <br><br>
   <b>About "call me": that bare space was the point, not a bug.</b> The card stored
   <code>&amp;body=call me</code> with a <em>literal</em> space — mailto bodies are one of
-  the few places the canonicaliser lets a raw space survive (probe-verified back in round
+  the few places the canonicalizer lets a raw space survive (probe-verified back in round
   14's hazard work). The exact line reproduces stored bytes, so it shows a real space;
   the dotted underline appears only where display and storage differ. Dotted =
   was <code>%20</code>; bare = really a space. The subject demonstrated one, the body the
@@ -162,7 +162,7 @@
 
 <div class="fixnote">
   <b>The clipboard cannot be styled — but it can be spoken to.</b> Native selection
-  serialises rendered <em>line boxes</em>: every hard line break becomes <code>\n</code>,
+  serializes rendered <em>line boxes</em>: every hard line break becomes <code>\n</code>,
   every table cell boundary a <code>\t</code>. No CSS keeps the plate-over-list-over-rows
   formatting and yields a clean single string; that is a browser rule, not a layout bug.
   The single-cell slices already remove the tabs; the newlines need the same small tool

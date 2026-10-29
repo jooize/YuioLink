@@ -26,11 +26,11 @@
     --text-kind: #00838f;
     /* Vibrant purple — the standout border on the create input. */
     --purple: #af52de;
-    /* The alternate name-word colour, paired with the accent: a deep navy so a
+    /* The alternate name-word color, paired with the accent: a deep navy so a
        multi-word name reads as blue/navy/blue/navy — two blues, no purple. */
     --word-alt: #003e8f;
 
-    /* Per-type colour key for the link-type picker: Public blue (open),
+    /* Per-type color key for the link-type picker: Public blue (open),
        Private green (secure), One-Time purple (single-use). */
     --c-public: #0a6cd6;
     --c-private: #1a8f3c;
@@ -251,7 +251,7 @@ form {
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--purple) 26%, transparent);
 }
 
-/* Greyed after a successful submit; focusing or editing the field restores it. */
+/* Grayed after a successful submit; focusing or editing the field restores it. */
 .form-control.submitted {
     opacity: 0.55;
 }
@@ -264,9 +264,9 @@ textarea.form-control {
     min-height: 46px;
     max-height: 40vh;
     line-height: 1.45;
-    /* Vertically centre the text when the field is taller than its content (a
+    /* Vertically center the text when the field is taller than its content (a
        single line at min-height). Some engines, notably Windows Edge, otherwise
-       top-align it; supported engines centre, the rest are unaffected. */
+       top-align it; supported engines center, the rest are unaffected. */
     align-content: center;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -316,7 +316,7 @@ textarea.form-control {
     flex: 1;
     min-width: 0;
     /* Flex-centered both ways: when one label wraps to two lines on a narrow
-       screen, the single-line neighbours stay vertically centred beside it. */
+       screen, the single-line neighbors stay vertically centered beside it. */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -360,7 +360,7 @@ textarea.form-control {
 /* --- Expires After: readout + stepped slider (JS un-hides these) --- */
 
 /* The live readout — also the tap target that opens the exact field. It sits
-   on the legend's line: "Expires after" stays left, the duration is centred,
+   on the legend's line: "Expires after" stays left, the duration is centered,
    and the concrete deadline is pinned to the right edge (monospace, so its
    width never changes as the day or time ticks over). */
 .ttl-readout {
@@ -486,7 +486,7 @@ textarea.form-control {
 
 
 /* Landmark labels under the slider, positioned at their stops (half-thumb
-   inset so each label centres under the thumb at that stop). Each is a
+   inset so each label centers under the thumb at that stop). Each is a
    clickable shortcut with a notch mark tying it to the track above. */
 .ttl-ticks {
     position: relative;
@@ -571,7 +571,7 @@ textarea.form-control {
     color: var(--text-secondary);
 }
 
-/* Per-type colour key: a small dot on each type label (persistent, so the key
+/* Per-type color key: a small dot on each type label (persistent, so the key
    reads even for the unselected types). */
 .dot {
     display: inline-flex;
@@ -640,8 +640,8 @@ textarea.form-control {
 .summary-txt {
     flex: 1 1 auto;
     min-width: 0;
-    /* The whole summary line runs bold: the type-tinted lead and the grey
-       .summary-sub tail separate by colour, not weight. */
+    /* The whole summary line runs bold: the type-tinted lead and the gray
+       .summary-sub tail separate by color, not weight. */
     font-weight: 700;
 }
 
@@ -708,7 +708,7 @@ textarea.form-control {
     margin-bottom: 0;
 }
 
-/* The grey-bold tail on each summary line ("Not private!", "47-bit namespace.") —
+/* The gray-bold tail on each summary line ("Not private!", "47-bit namespace.") —
    quiet next to the type-tinted lead, but weighted so it still registers. */
 .summary-sub {
     color: var(--text-secondary);
@@ -718,7 +718,7 @@ textarea.form-control {
 /* Keep each of the three type labels on a single line. */
 .type-picker .seg-label { white-space: nowrap; }
 
-/* Whole-form error under the action — on-page, never an alert. Danger colour since
+/* Whole-form error under the action — on-page, never an alert. Danger color since
    it means the link was not created. */
 .form-error {
     margin: 12px auto 0;
@@ -790,7 +790,7 @@ textarea.form-control {
     border-radius: var(--radius-control) 0 0 var(--radius-control);
 }
 
-/* "Clear" sits where Copy was — caution colour, since it discards the input. */
+/* "Clear" sits where Copy was — caution color, since it discards the input. */
 .split-clear {
     flex: none;
     padding: 0 18px;
@@ -827,8 +827,8 @@ textarea.form-control {
     opacity: 0.5;
 }
 
-/* The created-link result drops the green box: the URL is the hero (coloured),
-   centred, with its meta and a Copy pill beneath and an optional note last. The
+/* The created-link result drops the green box: the URL is the hero (colored),
+   centered, with its meta and a Copy pill beneath and an optional note last. The
    preview page keeps the plain .result box above. */
 #link-panel {
     margin: 24px 0 4px;
@@ -843,7 +843,7 @@ textarea.form-control {
 
 
 /* The link name as the giant hero (direction R4): the memorable word, big and in
-   the accent colour, centred and selectable. */
+   the accent color, centered and selectable. */
 .result-word {
     display: block;
     font-family: var(--font-mono);
@@ -860,8 +860,8 @@ textarea.form-control {
 
 /* The full URL beneath the hero word: small but legible — dim scheme, standout
    host — rendered in parts by app.js. Wraps so the whole link stays visible and
-   copyable. Full text colour: this IS the created link, and on the no-JS result
-   page it renders as plain text with no spans, so the base colour must carry it. */
+   copyable. Full text color: this IS the created link, and on the no-JS result
+   page it renders as plain text with no spans, so the base color must carry it. */
 .result-url {
     display: block;
     margin-top: 0;
@@ -875,7 +875,7 @@ textarea.form-control {
 
 /* Copy confirmation: a green check trails the URL on copy (the Copy button or ⌘C),
    showing the whole link was copied; clears with the button's "Copied" after 1.5s.
-   Opacity-toggled (space reserved) so the centred line never reflows. */
+   Opacity-toggled (space reserved) so the centered line never reflows. */
 .result-url::after {
     content: "\2713";
     margin-left: 0.4em;
@@ -907,7 +907,7 @@ textarea.form-control {
 }
 
 /* The giant hero above already carries the name, so the sub-URL stays quiet: every
-   name word is the same secondary grey as the scheme — no bold, no per-word tone —
+   name word is the same secondary gray as the scheme — no bold, no per-word tone —
    so nothing here competes with the hero. Only the domain lifts a step (see
    .u-host) to gently mark "yuio.link". */
 .result-url .u-name {
@@ -917,9 +917,9 @@ textarea.form-control {
 .result-url .nw-0,
 .result-url .nw-1 { color: inherit; }
 
-/* Shoutkey name words, alternating colour so a multi-word name reads as separate
+/* Shoutkey name words, alternating color so a multi-word name reads as separate
    words (the result hero, the URL name, history rows, and the interstitial). The
-   explicit per-word colour overrides whatever the surrounding context paints. */
+   explicit per-word color overrides whatever the surrounding context paints. */
 .nw-0 { color: var(--accent); }
 .nw-1 { color: var(--word-alt); }
 
@@ -935,7 +935,7 @@ textarea.form-control {
     user-select: text;
 }
 
-/* Foot beneath the hero URL: the meta line, then the Copy pill, centred. */
+/* Foot beneath the hero URL: the meta line, then the Copy pill, centered. */
 .result-foot {
     display: flex;
     flex-direction: column;
@@ -959,7 +959,7 @@ textarea.form-control {
 }
 
 /* Time left reads green (alive) by default, then warns as the deadline nears.
-   Mixed a step toward the text colour so it sits quieter than the switch green. */
+   Mixed a step toward the text color so it sits quieter than the switch green. */
 .countdown {
     color: color-mix(in srgb, var(--switch-on) 82%, var(--text));
     font-weight: 600;
@@ -1092,7 +1092,7 @@ textarea.form-control {
     font-family: var(--font);
 }
 
-/* Full destination URL, coloured by part (registrable domain highlighted). */
+/* Full destination URL, colored by part (registrable domain highlighted). */
 .pv-url {
     display: block;
     text-align: center;
@@ -1267,7 +1267,7 @@ textarea.form-control {
 
 /* Split storage pill near the top, always shown. Two butted segments clipped to a
    pill: left = status (links to the list), right = local-persistence toggle in its
-   own colour, for a clean colour cut between them. */
+   own color, for a clean color cut between them. */
 .storage-pill {
     display: flex;
     width: fit-content;
@@ -1296,7 +1296,7 @@ textarea.form-control {
 }
 
 /* HIG-style switch on the old purple (mockup C): a "Local History" label and a toggle
-   that shows state by colour + knob position (green/right = on), not by words. */
+   that shows state by color + knob position (green/right = on), not by words. */
 .storage-toggle {
     display: flex;
     align-items: center;
@@ -1460,7 +1460,7 @@ textarea.form-control {
     opacity: 0.5;
 }
 
-/* A dead row is done, not urgent — mute its countdown to grey. Otherwise the red
+/* A dead row is done, not urgent — mute its countdown to gray. Otherwise the red
    "expired" warning keeps shouting from a row that is only waiting to be cleared. */
 .history-item.expired .countdown {
     color: var(--text-secondary);
@@ -1482,7 +1482,7 @@ textarea.form-control {
     text-decoration: underline;
 }
 
-/* The kind as a coloured word (mockup H3 / Rb): Redirect in accent blue, Text in
+/* The kind as a colored word (mockup H3 / Rb): Redirect in accent blue, Text in
    golden yellow — no chip, sitting before the green time on the meta line. */
 .kind-word {
     flex: none;
@@ -1514,7 +1514,7 @@ textarea.form-control {
     gap: 12px;
 }
 
-/* Line 1: the tri-colour URL plus a trailing green copy-check, on one row. */
+/* Line 1: the tri-color URL plus a trailing green copy-check, on one row. */
 .history-l1 {
     display: flex;
     align-items: center;
@@ -1522,7 +1522,7 @@ textarea.form-control {
     min-width: 0;
 }
 
-/* The full-width tri-colour URL — dim scheme, standout host, the name highlighted
+/* The full-width tri-color URL — dim scheme, standout host, the name highlighted
    by word. flex: 1 so it takes the whole line (the actions moved to line 2); it
    still ellipsizes when a redirect URL is too long for the row. */
 .history-url {
@@ -1565,18 +1565,18 @@ textarea.form-control {
 
 .history-url .u-host,
 .history-url .u-sep {
-    /* A strong grey — clearly above the faint scheme, clearly below the black name —
+    /* A strong gray — clearly above the faint scheme, clearly below the black name —
        so scheme < domain < name reads as three distinct steps. */
     color: color-mix(in srgb, var(--text) 80%, transparent);
 }
 
 /* The name is the point of the row, so it runs bold at full strength to outshine the
-   host. It stays greyscale (never accent/purple — that's the result hero's job); the
+   host. It stays grayscale (never accent/purple — that's the result hero's job); the
    alternating case alone separates the words — uniform weight reads cleaner than a
    mixed-weight split. */
 .history-url .u-name { color: var(--text); font-weight: 600; }
 .history-url .nw-0 { color: var(--text); }
-/* In the dense list the alternation stays monochrome: text/grey/text/grey. */
+/* In the dense list the alternation stays monochrome: text/gray/text/gray. */
 .history-url .nw-1 { color: var(--text-secondary); }
 
 /* Line 2: kind pill + expiry, in the UI font (mockup A). */
@@ -1931,7 +1931,7 @@ main > footer {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
-/* A solid panel (like the history confirm), centred by the dialog UA styles. */
+/* A solid panel (like the history confirm), centered by the dialog UA styles. */
 .kbd-dialog {
     width: min(92vw, 400px);
     padding: 24px 26px;
@@ -2223,7 +2223,7 @@ body.mock {
 <div class="doc">
     <h1>Public type color — blue</h1>
     <p>The shipped picker as of v0.7.1, rendered with <code>server/static/app.css</code> inlined verbatim. Both themes are shown side by side, and all three types are expanded so the color family is comparable. The old Public amber was <code>#c9820f</code> / <code>#ffd400</code>.</p>
-    <p>Everything tinted by <code>--c-public</code>: the dot before "Public", the lead of the summary line, the <code>details-body</code> left border and its 8% background wash, and the "Browse the wordlist →" link. The grey bold "Not private!" tail is <code>--text-secondary</code> and does not follow the type color; the "Security" toggle stays <code>--accent</code> by design.</p>
+    <p>Everything tinted by <code>--c-public</code>: the dot before "Public", the lead of the summary line, the <code>details-body</code> left border and its 8% background wash, and the "Browse the wordlist →" link. The gray bold "Not private!" tail is <code>--text-secondary</code> and does not follow the type color; the "Security" toggle stays <code>--accent</code> by design.</p>
 </div>
 
 <div class="panes">

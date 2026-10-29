@@ -42,7 +42,7 @@
     });
 
     /**
-     * One preview page's worth of behaviour. Every piece is optional: a card
+     * One preview page's worth of behavior. Every piece is optional: a card
      * with no editable parts still gets its Copy controls, and a card with no
      * destination at all (a blind one-time link) gets nothing and says nothing.
      */
@@ -226,9 +226,9 @@
          * Fixed parts — the host, the port, the path, a magnet's `xt` — get a
          * checked, disabled box rather than no box at all: same geometry, and
          * the browser's own disabled look says "not yours to change" better
-         * than an absence would. The boxes are re-inked grey with
+         * than an absence would. The boxes are re-inked gray with
          * `accent-color` rather than replaced, so focus, keyboard, and screen
-         * reader behaviour are the platform's.
+         * reader behavior are the platform's.
          */
         buildRows() {
             this.slices.querySelectorAll(".pv-slice").forEach((row) => {

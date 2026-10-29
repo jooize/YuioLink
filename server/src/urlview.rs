@@ -1,6 +1,6 @@
 //! Decompose a stored redirect URI for trustworthy display on the interstitial.
 //!
-//! Three jobs: split the URL into parts the view can colour (scheme /
+//! Three jobs: split the URL into parts the view can color (scheme /
 //! delimiters / subdomain / **registrable domain** / path / query); judge
 //! whether the host is a deceptive internationalized lookalike; and — the parts
 //! model at the bottom of this file — cut the stored string into an ordered list
@@ -125,7 +125,7 @@ pub enum Role {
     Userinfo,
     /// The host. Never a row — it is the headline.
     Host,
-    /// An explicit `:8443`. The `url` crate never serialises a default port, so
+    /// An explicit `:8443`. The `url` crate never serializes a default port, so
     /// a visible one is always non-standard.
     Port,
     /// A run of path segments with no parameters of their own.
@@ -144,7 +144,7 @@ pub enum Role {
     Opaque,
 }
 
-/// One run of a value, ready to be coloured. The card never substitutes a glyph
+/// One run of a value, ready to be colored. The card never substitutes a glyph
 /// for a character: an escape that stays escaped is *shown* escaped, so what is
 /// on screen and what ⌘C yields agree.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -162,7 +162,7 @@ pub enum Piece {
     /// structure: `&`, `=`, `#`, `%`. Drawn dim, as encoding noise.
     Escape(String),
     /// An escape decoding to something invisible or direction-changing. Left
-    /// escaped and drawn in danger colour, always with its chip.
+    /// escaped and drawn in danger color, always with its chip.
     BadEscape(String),
     /// A structural delimiter inside a value — the `://` and `/` of an address
     /// carried in a query parameter.
@@ -170,7 +170,7 @@ pub enum Piece {
     /// A registrable domain inside a value. Bold, never washed: the accent wash
     /// is spent once per page, on the headline.
     Domain(String),
-    /// The local part of an address. Full colour, regular weight — bold is the
+    /// The local part of an address. Full color, regular weight — bold is the
     /// domain's mark site-wide.
     Local(String),
     /// A registered variation sequence: a base character and the selector
@@ -246,7 +246,7 @@ impl Slice {
     }
 
     /// True when reading this value put different characters on screen from the
-    /// ones in storage. Colour is not a difference — a bold domain and a dim
+    /// ones in storage. Color is not a difference — a bold domain and a dim
     /// delimiter still spell the stored string — so this is a plain comparison
     /// of what is shown against what is kept. It is what gates the record on
     /// an http(s) card: everyday links stay one quiet line.
@@ -393,8 +393,8 @@ pub fn tier_of(scheme: &str) -> Tier {
 /// Cut a stored URI into its parts.
 ///
 /// Every branch works on the stored characters directly rather than on a
-/// re-serialised `url::Url`, because the invariant is about *these* characters:
-/// a round trip through a parser is exactly the place a stray normalisation
+/// re-serialized `url::Url`, because the invariant is about *these* characters:
+/// a round trip through a parser is exactly the place a stray normalization
 /// would slip in and make the card's "Exactly as stored" line a lie.
 pub fn parse_uri(stored: &str) -> UriView {
     let scheme = stored
@@ -416,7 +416,7 @@ pub fn parse_uri(stored: &str) -> UriView {
 }
 
 /// `scheme://[userinfo@]host[:port][/path][;params][?query][#fragment]`, and
-/// `irc:` too — it was never standardised, but every draft gives it this shape.
+/// `irc:` too — it was never standardized, but every draft gives it this shape.
 fn hierarchical(stored: &str, scheme: &str) -> UriView {
     let prefix = format!("{scheme}://");
     let rest = stored.get(prefix.len()..).unwrap_or("");
@@ -721,7 +721,7 @@ fn tel(stored: &str, scheme: &str) -> UriView {
             equals,
             display: decode_for_reading(value),
             value: value.to_string(),
-            // `;ext=` is part of dialling the number, not an extra riding along.
+            // `;ext=` is part of dialing the number, not an extra riding along.
             removable: false,
         });
     }
@@ -904,7 +904,7 @@ fn host_display(host: Option<&HostView>, stored: &str) -> Vec<Piece> {
 }
 
 /// An address or a bare number, read for what it is. On freemail the local part
-/// *is* the identity, so it takes full colour — but regular weight, because
+/// *is* the identity, so it takes full color — but regular weight, because
 /// bold means one thing site-wide.
 fn address_pieces(value: &str) -> Vec<Piece> {
     match value.rfind('@') {
@@ -1778,7 +1778,7 @@ mod tests {
         assert_eq!(to, vec!["+46701234567", "+4782012345"]);
         assert_eq!(v.param("body").unwrap().value, "JOIN%20LIST");
         // RFC 3966 has no list form, so a tel: number is one opaque body with
-        // its dialling parameters, and none of it is a removable row.
+        // its dialing parameters, and none of it is a removable row.
         let t = parse_uri(SPECIMENS[9]);
         assert_eq!(t.recipients().count(), 0);
         assert_eq!(t.slices[0].value, "+47-820-12-345");

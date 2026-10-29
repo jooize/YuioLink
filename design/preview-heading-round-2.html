@@ -121,22 +121,22 @@ body {
     /* box-shadow, never border-width: a thicker border would reflow the text inside */
     transition: border-color 0.55s ease, box-shadow 0.55s ease, background 0.55s ease;
 }
-/* C1 — border colour only */
+/* C1 — border color only */
 .copy-border.lit { border-color: var(--switch-on); transition-duration: 0.1s; }
-/* C2 — border colour, doubled by an inset ring so it reads at 0.5px on any display */
+/* C2 — border color, doubled by an inset ring so it reads at 0.5px on any display */
 .copy-ring.lit {
     border-color: var(--switch-on);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--switch-on) 55%, transparent);
     transition-duration: 0.1s;
 }
-/* C3 — border colour plus an outer halo */
+/* C3 — border color plus an outer halo */
 .copy-halo.lit {
     border-color: var(--switch-on);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--switch-on) 22%, transparent),
                 0 0 18px 1px color-mix(in srgb, var(--switch-on) 22%, transparent);
     transition-duration: 0.1s;
 }
-/* C4 — border colour, held twice as long, no other change */
+/* C4 — border color, held twice as long, no other change */
 .copy-slow.lit { border-color: var(--switch-on); transition-duration: 0.1s; }
 .copy-pill {
     display: block; width: 100%; margin-top: 14px; padding: 12px 18px; font-family: inherit; font-size: 15px;
@@ -195,7 +195,7 @@ body {
 
 <div class="page-head">
     <h1>Round 2 — A4 heading, sheet anchoring, copied-border</h1>
-    <p><strong>A</strong> settles the A4 details (kicker weight, colour, colon, host line).
+    <p><strong>A</strong> settles the A4 details (kicker weight, color, colon, host line).
     <strong>B</strong> answers &ldquo;can everything go to the bottom?&rdquo; — including what happens when the page is long.
     <strong>C</strong> is the right box this time: the <code>&lt;pre&gt;</code> holding the text content, border only. Click any Copy button.</p>
 </div>
@@ -206,14 +206,14 @@ body {
 <div class="section-title">A · A4 — QUIET KICKER, LOUD NAME</div>
 <p class="section-note">Structurally the whole block is one <code>h1</code>: a small <code>span</code> line
 (&ldquo;YuioLink Redirect&rdquo;) then the name. Screen readers announce it as one heading, which is what it is.
-The variants below differ only in how the kicker is weighted and whether the name stays greyscale.</p>
+The variants below differ only in how the kicker is weighted and whether the name stays grayscale.</p>
 
 <div class="grid">
 
     <div class="frame">
         <div class="frame-label">
-            <span class="key">A4a</span><span class="name">Secondary kicker, greyscale name</span>
-            <span class="desc">Kicker in secondary grey with only the kind word coloured; name in text/grey word alternation.</span>
+            <span class="key">A4a</span><span class="name">Secondary kicker, grayscale name</span>
+            <span class="desc">Kicker in secondary gray with only the kind word colored; name in text/gray word alternation.</span>
             <span class="verdict good">The name is unambiguously the hero and the kind still registers. My pick.</span>
         </div>
         <div class="window">
@@ -233,9 +233,9 @@ The variants below differ only in how the kicker is weighted and whether the nam
 
     <div class="frame">
         <div class="frame-label">
-            <span class="key">A4b</span><span class="name">Whole kicker in the kind colour</span>
+            <span class="key">A4b</span><span class="name">Whole kicker in the kind color</span>
             <span class="desc">&ldquo;YuioLink Text&rdquo; entirely orange, so the kind reads as a label on the page rather than a word in a sentence.</span>
-            <span class="verdict">Louder kind signal; the brand name picks up a colour it doesn't own elsewhere.</span>
+            <span class="verdict">Louder kind signal; the brand name picks up a color it doesn't own elsewhere.</span>
         </div>
         <div class="window">
             <span class="back-chip" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 13 13" fill="none"><path d="M10.5 10.5 2.5 2.5M9 2.5H2.5V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
@@ -256,7 +256,7 @@ The variants below differ only in how the kicker is weighted and whether the nam
     <div class="frame">
         <div class="frame-label">
             <span class="key">A4c</span><span class="name">Blue/navy name</span>
-            <span class="desc">Keeps the name's usual accent/navy alternation from the result hero instead of going greyscale.</span>
+            <span class="desc">Keeps the name's usual accent/navy alternation from the result hero instead of going grayscale.</span>
             <span class="verdict bad">On a Redirect the blue name and the blue kind word chime; the kicker stops being a separate layer.</span>
         </div>
         <div class="window">
@@ -298,8 +298,8 @@ The variants below differ only in how the kicker is weighted and whether the nam
 <!-- ======================================================================
      B. anchoring
      ====================================================================== -->
-<div class="section-title">B · CENTRED VS. EVERYTHING AT THE BOTTOM</div>
-<p class="section-note">Both are one property on the sheet body: <code>margin-block: auto</code> centres,
+<div class="section-title">B · CENTERED VS. EVERYTHING AT THE BOTTOM</div>
+<p class="section-note">Both are one property on the sheet body: <code>margin-block: auto</code> centers,
 <code>margin-block-start: auto</code> pushes the whole block down. Both collapse to today's top-anchored layout
 automatically once the content is taller than the screen — the second row shows exactly that, with the same two
 rules on a long revealed-text page. Desktop is untouched either way (the rule lives in the
@@ -332,7 +332,7 @@ rules on a long revealed-text page. Desktop is untouched either way (the rule li
     </div>
 
     <div class="phone-col">
-        <div class="frame-label"><span class="key">B2</span><span class="name">Centred</span>
+        <div class="frame-label"><span class="key">B2</span><span class="name">Centered</span>
             <span class="desc"><code>margin-block: auto</code>.</span></div>
         <div class="phone reach">
             <div class="sheet center">
@@ -407,7 +407,7 @@ rules on a long revealed-text page. Desktop is untouched either way (the rule li
 <div class="phones">
 
     <div class="phone-col">
-        <div class="frame-label"><span class="key">B2·long</span><span class="name">Centred, content overflows</span>
+        <div class="frame-label"><span class="key">B2·long</span><span class="name">Centered, content overflows</span>
             <span class="desc">Auto margins go to zero when there is no free space — identical to today, and nothing is clipped off the top.</span></div>
         <div class="phone">
             <div class="sheet center">
@@ -486,13 +486,13 @@ attached to something.</p>
      ====================================================================== -->
 <div class="section-title">C · THE COPIED BOX BORDER</div>
 <p class="section-note">The <code>&lt;pre class="text-body"&gt;</code> already has a 0.5px border, so there is a shape
-to work with — no new plate needed. All four change border colour only; none changes border <em>width</em>, which would
+to work with — no new plate needed. All four change border color only; none changes border <em>width</em>, which would
 reflow the text inside. Click Copy on each.</p>
 
 <div class="grid">
 
     <div class="frame">
-        <div class="frame-label"><span class="key">C1</span><span class="name">Border colour, 1.2s</span>
+        <div class="frame-label"><span class="key">C1</span><span class="name">Border color, 1.2s</span>
             <span class="desc">The hairline turns green, then fades back over half a second.</span>
             <span class="verdict good">Exactly what you asked for. Faint on a low-DPI external display, where 0.5px renders as one thin pixel.</span></div>
         <div class="window">

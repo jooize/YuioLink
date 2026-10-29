@@ -7,14 +7,14 @@
 <!--
   Options for the og:image share card rendered by server/src/card.rs. Three
   separate decisions, one section each: the mark beside the wordmark, the
-  legibility of the grey text, and the wording of the foot line. Open directly
+  legibility of the gray text, and the wording of the foot line. Open directly
   in a browser (file://). Not served by the app -- a design reference only.
 
   The cards are the same SVG the server builds, generated here by JS from one
-  template so the variants differ only where labelled. One deviation: the server
+  template so the variants differ only where labeled. One deviation: the server
   embeds DejaVu Sans and DejaVu Sans Mono, which a browser probably does not
   have, so the stacks below fall back to the platform sans/mono. Proportions
-  shift a little; alignment and colour are faithful.
+  shift a little; alignment and color are faithful.
 -->
 <style>
 :root {
@@ -174,13 +174,13 @@ code {
 
 <div class="doc">
     <h1>Share card — mark, legibility, foot copy</h1>
-    <p>The card <code>server/src/card.rs</code> rasterises for <code>og:image</code>, at 1200×630. Three decisions are separated below so each can be judged on its own: what sits beside the wordmark, how dark and how large the grey text runs, and what the foot line says. Everything not under discussion in a section is held at its shipped value.</p>
+    <p>The card <code>server/src/card.rs</code> rasterizes for <code>og:image</code>, at 1200×630. Three decisions are separated below so each can be judged on its own: what sits beside the wordmark, how dark and how large the gray text runs, and what the foot line says. Everything not under discussion in a section is held at its shipped value.</p>
 </div>
 
 <!-- ==================== 1. The mark ==================== -->
 <div class="doc">
     <h2>1 · The mark</h2>
-    <p>The blue square is 30×30 at <code>y=92</code> while the wordmark's cap height spans roughly <code>y=88</code> to <code>y=117</code> — so the square sits about 5px low and hangs below the baseline. Option A just fixes that. B and C drop the shape: one keeps a colour accent inside the wordmark, the other goes fully monochrome and lets the arrow be the only blue on the card.</p>
+    <p>The blue square is 30×30 at <code>y=92</code> while the wordmark's cap height spans roughly <code>y=88</code> to <code>y=117</code> — so the square sits about 5px low and hangs below the baseline. Option A just fixes that. B and C drop the shape: one keeps a color accent inside the wordmark, the other goes fully monochrome and lets the arrow be the only blue on the card.</p>
 </div>
 
 <div class="grid" id="marks"></div>
@@ -193,7 +193,7 @@ code {
 
 <!-- ==================== 2. Legibility ==================== -->
 <div class="doc">
-    <h2>2 · Legibility of the grey text</h2>
+    <h2>2 · Legibility of the gray text</h2>
     <p>The kicker and foot are <code>#6e6e73</code> on the near-white card — about 4.6:1, AA at those sizes but the first thing to disappear when the card is scaled down. Darkening to <code>#55555c</code> (≈6.5:1) and nudging both up two points costs nothing else on the card. Shown here on option C.</p>
 </div>
 
@@ -217,7 +217,7 @@ code {
     <div>
         <label for="own-foot">Foot line</label>
         <input type="text" id="own-foot" value="expires Jun 29, 2026 · never points here again">
-        <p class="hint">Rendered on option C with the darkened greys. The foot has room for roughly 46 characters at 33px before it reaches the right padding; the card does not wrap, so a longer line runs off the edge.</p>
+        <p class="hint">Rendered on option C with the darkened grays. The foot has room for roughly 46 characters at 33px before it reaches the right padding; the card does not wrap, so a longer line runs off the edge.</p>
         <label for="own-domain" style="margin-top:14px">Destination domain</label>
         <input type="text" id="own-domain" value="example.com">
     </div>
@@ -237,7 +237,7 @@ code {
 
 <script>
 // ---- One template, driven entirely by options, so variants differ only where
-// labelled. Mirrors build_svg() in server/src/card.rs.
+// labeled. Mirrors build_svg() in server/src/card.rs.
 var SANS = "-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif";
 var MONO = "ui-monospace, 'SF Mono', Menlo, Monaco, monospace";
 var WIDTH = 1200, PAD = 96;
@@ -254,7 +254,7 @@ function esc(s) {
 
 function card(o) {
     var id = o.id;
-    var grey = o.grey || "#6e6e73";
+    var gray = o.gray || "#6e6e73";
     var kickerSize = o.kickerSize || 33;
     var footSize = o.footSize || 31;
     var domain = o.domain || "example.com";
@@ -294,9 +294,9 @@ function card(o) {
 '<rect width="1200" height="630" fill="url(#glow-' + id + ')"/>' +
 mark +
 '<text x="' + wordX + '" y="117" font-family="' + SANS + '" font-weight="bold" font-size="' + wordSize + '" fill="#1d1d1f">' + word + '</text>' +
-'<text x="96" y="338" font-family="' + SANS + '" font-size="' + kickerSize + '" fill="' + grey + '">' + esc(kicker) + ' <tspan fill="#007aff">&#8594;</tspan></text>' +
+'<text x="96" y="338" font-family="' + SANS + '" font-size="' + kickerSize + '" fill="' + gray + '">' + esc(kicker) + ' <tspan fill="#007aff">&#8594;</tspan></text>' +
 '<text x="94" y="432" font-family="' + MONO + '" font-weight="bold" font-size="' + destSize(domain) + '" fill="#1d1d1f">' + esc(domain) + '</text>' +
-'<text x="96" y="566" font-family="' + SANS + '" font-size="' + footSize + '" fill="' + grey + '">' + esc(foot) + '</text>';
+'<text x="96" y="566" font-family="' + SANS + '" font-size="' + footSize + '" fill="' + gray + '">' + esc(foot) + '</text>';
 }
 
 function svg(o, cls) {
@@ -307,11 +307,11 @@ function svg(o, cls) {
 var MARKS = [
     {
         id: "m0", mark: "square", title: "Shipped",
-        note: "The square sits ~5px below the wordmark's optical centre and drops past the baseline."
+        note: "The square sits ~5px below the wordmark's optical center and drops past the baseline."
     },
     {
         id: "m1", mark: "square-aligned", title: "A · Square, aligned",
-        note: "y 92 → 87 so the square centres on the cap height, and the gap tightens from 14px to 12px. Nothing else changes."
+        note: "y 92 → 87 so the square centers on the cap height, and the gap tightens from 14px to 12px. Nothing else changes."
     },
     {
         id: "m2", mark: "none", twoTone: true, title: "B · No square, two-tone wordmark",
@@ -335,11 +335,11 @@ document.getElementById("mark-thumbs").innerHTML = MARKS.map(function (m) {
 // ---- 2. Legibility ----
 var LEGIBILITY = [
     {
-        id: "g0", mark: "none", title: "Shipped greys",
+        id: "g0", mark: "none", title: "Shipped grays",
         note: "#6e6e73, kicker 33px, foot 31px."
     },
     {
-        id: "g1", mark: "none", grey: "#55555c", kickerSize: 35, footSize: 33,
+        id: "g1", mark: "none", gray: "#55555c", kickerSize: 35, footSize: 33,
         title: "Darkened",
         note: "#55555c, kicker 35px, foot 33px."
     }
@@ -389,7 +389,7 @@ var FEET = [
 ];
 
 document.getElementById("feet").innerHTML = FEET.map(function (f) {
-    var o = Object.assign({ mark: "none", grey: "#55555c", kickerSize: 35, footSize: 33 }, f);
+    var o = Object.assign({ mark: "none", gray: "#55555c", kickerSize: 35, footSize: 33 }, f);
     return '<div class="foot-opt">' + svg(o) +
         "<div><h3>" + f.title + (f.tag || "") + "</h3>" +
         '<p class="say">' + f.say + "</p>" +
@@ -404,7 +404,7 @@ document.getElementById("feet").innerHTML = FEET.map(function (f) {
 
     function paint() {
         target.innerHTML = card({
-            id: "own", mark: "none", grey: "#55555c", kickerSize: 35, footSize: 33,
+            id: "own", mark: "none", gray: "#55555c", kickerSize: 35, footSize: 33,
             foot: footEl.value, domain: domainEl.value
         });
     }

@@ -148,7 +148,7 @@ fn document_shell(
             body {
                 main.app-window {
                     // One wrapper around everything the page shows, so the phone
-                    // sheet can centre its content with a single auto margin.
+                    // sheet can center its content with a single auto margin.
                     div.sheet-body.centered[centered] {
                         @if masthead {
                             header {
@@ -182,7 +182,7 @@ fn document_short(title: &str, body: Markup, scripts: Markup) -> Markup {
 }
 
 /// A page about one link. It carries its own heading (`link_heading`) instead of
-/// the wordmark, and centres on a phone.
+/// the wordmark, and centers on a phone.
 fn document_link(title: &str, head_extra: Markup, body: Markup, scripts: Markup) -> Markup {
     document_shell(title, head_extra, false, true, body, scripts)
 }
@@ -219,7 +219,7 @@ fn name_words(name: &str) -> Vec<&str> {
     words
 }
 
-/// Render a shoutkey name with each word in an alternating colour, so a multi-word
+/// Render a shoutkey name with each word in an alternating color, so a multi-word
 /// name reads as separate words (`braveOTTER`), grouped into two halves (`.nwg`).
 /// Mirrors the client's `nameSpans`.
 ///
@@ -247,7 +247,7 @@ fn highlight_name(name: &str) -> Markup {
 /// blues, on one line. Mirrors app.js's `heroName`.
 ///
 /// Lowercase because the capitals are only there to mark word boundaries in the
-/// URL, where nothing else can; here the colour and the gap do that, and names
+/// URL, where nothing else can; here the color and the gap do that, and names
 /// are case-insensitive, so the hero reads as words rather than a code. The URL
 /// under it keeps its capitals, since that is the text that gets pasted.
 fn hero_name(name: &str) -> Markup {
@@ -336,7 +336,7 @@ pub(crate) fn home_chip(href: &str, label: &str) -> Markup {
 /// The "this link leaves YuioLink" mark: a box with an arrow leaving its top-right
 /// corner, the convention every OS and browser already uses for it. An inline SVG
 /// rather than U+2197 or U+29C9, so it has one shape everywhere and takes the link's
-/// own colour; `aria-hidden` because the destination is already in the link text.
+/// own color; `aria-hidden` because the destination is already in the link text.
 pub(crate) fn external_mark() -> Markup {
     html! {
         svg.ext-mark width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true" {
@@ -554,7 +554,7 @@ fn result_output(
                         }
                         span.label { "Copy" }
                     }
-                    // The secondary pair, in the glyphs and colours the history rows
+                    // The secondary pair, in the glyphs and colors the history rows
                     // already use. Preview opens this link's own interstitial, so the
                     // creator sees exactly what a recipient will see.
                     div.result-actions {
@@ -630,8 +630,8 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
         }
 
         // Split storage pill (top): left shows the status (and links to the list),
-        // right is the local-persistence toggle in its own colour. app.js fills both.
-        // Both start hidden: they are blank coloured pills until app.js fills
+        // right is the local-persistence toggle in its own color. app.js fills both.
+        // Both start hidden: they are blank colored pills until app.js fills
         // them (renderHistory un-hides), so the no-JS page never shows them empty.
         div.storage-pill {
             a.storage-status #storage-status href="#history" hidden {}
@@ -791,7 +791,7 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
                     span.history-title { "Local History" }
                 }
                 // The localStorage opt-in, right beside the heading: a bare HIG
-                // switch (state by colour + knob position; app.js drives it).
+                // switch (state by color + knob position; app.js drives it).
                 button.history-persist #history-persist type="button" hidden
                     title="Save history on this device" {}
                 div.history-head-actions {
@@ -827,8 +827,8 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             " · "
             a href="/legal" { "Legal" }
             // The credit links neither name: the source link on the next line is
-            // where someone who wants to look goes. Only jooize takes a colour —
-            // "AI" is a category, not a name, so a second identifying colour
+            // where someone who wants to look goes. Only jooize takes a color —
+            // "AI" is a category, not a name, so a second identifying color
             // would be decoration, and it sits back in tertiary instead.
             span.footer-line {
                 "Created by " span.by-jooize { "jooize" } " + " span.by-ai { "AI" }
@@ -836,9 +836,9 @@ pub fn index_page(max_ttl_secs: i64) -> Markup {
             // The terms first, then where to go and read them. The arrow says the
             // link leaves the site, which every other link in this footer does not.
             span.footer-line {
-                // The licence links inward, to the colophon, which also carries
+                // The license links inward, to the colophon, which also carries
                 // the attributions it does not cover; the source links outward.
-                // The label names the licence rather than the page: "Colophon" is
+                // The label names the license rather than the page: "Colophon" is
                 // the nicer word for the URL but tells a visitor nothing.
                 a href="/colophon" { "MIT/Apache-2.0" }
                 ", "
@@ -1210,14 +1210,14 @@ fn interstitial_head(i: &Interstitial, one_time: bool) -> Markup {
 /// generic wordmark and the old `yuio.link/<name>` source line — the name was the
 /// only thing that line added, and it says it far better as the hero.
 ///
-/// The kind word takes the colour it already has in the history list (Redirect
-/// accent blue, Text orange) and is the only colour on the kicker; the name stays
-/// greyscale, its alternating case doing the work of separating the words. The
+/// The kind word takes the color it already has in the history list (Redirect
+/// accent blue, Text orange) and is the only color on the kicker; the name stays
+/// grayscale, its alternating case doing the work of separating the words. The
 /// whole block is one `<h1>`: it is one heading, and it reads as one.
 ///
 /// The back chip is a sibling, not part of the heading — assistive tech should not
 /// hear "Go to YuioLink" inside the page title — but it lives in this block so that
-/// it travels with the content when the phone sheet centres it.
+/// it travels with the content when the phone sheet centers it.
 fn link_heading(kind: Kind, name: &str, host: &str, back: Markup) -> Markup {
     html! {
         div.pv-head {
@@ -1613,8 +1613,8 @@ fn slice_rows(uri: &UriView, rows: &[&urlview::Slice]) -> Markup {
 /// The extra class a slice's value carries, if any.
 ///
 /// Only the port has one. An explicit port is unusual, and it decides which
-/// server actually answers, so it gets a colour of its own rather than another
-/// shade of the same grey — see `--c-port` in app.css.
+/// server actually answers, so it gets a color of its own rather than another
+/// shade of the same gray — see `--c-port` in app.css.
 fn value_class(slice: &urlview::Slice) -> &'static str {
     if slice.role == Role::Port {
         "val port"
@@ -2660,7 +2660,7 @@ fn notes(uri: &UriView) -> Markup {
         "tel" => {
             if let Some(ext) = uri.slices.iter().find(|s| s.key.as_deref() == Some("ext")) {
                 out.push(html! {
-                    "The extension, " (ext.value) ", is dialled after the call connects."
+                    "The extension, " (ext.value) ", is dialed after the call connects."
                 });
             }
         }
@@ -2774,13 +2774,13 @@ fn action(uri: &UriView, numbers: &[phone::Number]) -> Action {
         "magnet" => generic("A file identified by its hash"),
         "ftp" | "ftps" => generic("An address on a file server"),
         "spotify" => generic(match uri.type_segment.as_deref() {
-            Some("track") => "A track in Spotify's catalogue",
-            Some("album") => "An album in Spotify's catalogue",
-            Some("artist") => "An artist in Spotify's catalogue",
-            Some("playlist") => "A playlist in Spotify's catalogue",
-            Some("show") => "A show in Spotify's catalogue",
-            Some("episode") => "An episode in Spotify's catalogue",
-            _ => "Something in Spotify's catalogue",
+            Some("track") => "A track in Spotify's catalog",
+            Some("album") => "An album in Spotify's catalog",
+            Some("artist") => "An artist in Spotify's catalog",
+            Some("playlist") => "A playlist in Spotify's catalog",
+            Some("show") => "A show in Spotify's catalog",
+            Some("episode") => "An episode in Spotify's catalog",
+            _ => "Something in Spotify's catalog",
         }),
         "xmpp" => generic(if uri.param("join").is_some() {
             "A chat room on XMPP"
@@ -2867,7 +2867,7 @@ fn continue_label(uri: &UriView) -> String {
 enum PieceStyle {
     /// The URL line: delimiters accent, escapes dim, the host washed once.
     Url,
-    /// A headline: the local part at full colour, the domain bold and washed.
+    /// A headline: the local part at full color, the domain bold and washed.
     Headline,
     /// A slice row: the same, one size down and never washed.
     Slice,
@@ -3143,7 +3143,7 @@ fn unescape_html(s: &str) -> String {
         .replace("&amp;", "&")
 }
 
-/// The full destination URL, coloured by part. Built from the same slices the
+/// The full destination URL, colored by part. Built from the same slices the
 /// model lists, so userinfo and an explicit port can no longer go missing — the
 /// old renderer had no branch for either, which quietly dropped `alice@` and
 /// `:8443` from the line and from its copy.
@@ -3253,7 +3253,7 @@ fn path_run(path: &str) -> Markup {
 
 /// A path's display pieces, split at its `/` separators with every piece's
 /// dress intact — flattening to text here used to strip a dotted space or a
-/// red escape in the path of its marking (and its colour in the hero).
+/// red escape in the path of its marking (and its color in the hero).
 fn split_path_segments(display: &[Piece]) -> Vec<Vec<Piece>> {
     let mut segments: Vec<Vec<Piece>> = vec![Vec::new()];
     for piece in display {
@@ -3280,7 +3280,7 @@ fn split_path_segments(display: &[Piece]) -> Vec<Vec<Piece>> {
     segments
 }
 
-/// A path inside a slice row: same idea, the row's own delimiter colour.
+/// A path inside a slice row: same idea, the row's own delimiter color.
 fn path_slices_markup(display: &[Piece]) -> Markup {
     let segments = split_path_segments(display);
     html! {
@@ -4443,8 +4443,8 @@ pub fn demo_redirect_page(base_host: &str) -> Markup {
     )
 }
 
-/// `GET /colophon` — what YuioLink is made of: the licence it is offered under,
-/// and the third-party work it carries that the licence does not cover.
+/// `GET /colophon` — what YuioLink is made of: the license it is offered under,
+/// and the third-party work it carries that the license does not cover.
 ///
 /// A page rather than a section of `/help` because the two answer different
 /// questions, and because CC-BY-3.0 §4(c) asks that the credit appear "in a
@@ -4462,7 +4462,7 @@ pub fn colophon_page() -> Markup {
             "carries that those terms do not cover."
         }
 
-        h3.help-h #license { "Licence" }
+        h3.help-h #license { "License" }
         p.help-p {
             "YuioLink is dual-licensed "
             a.ext href="https://github.com/jooize/YuioLink/blob/main/LICENSE-MIT" {
@@ -4554,7 +4554,7 @@ pub fn colophon_page() -> Markup {
     document_full(
         "YuioLink — Colophon",
         html! {
-            meta name="description" content="What YuioLink is made of: the MIT/Apache-2.0 licence it is offered under, the EFF and BIP-0039 wordlists its link names come from, the DejaVu and Noto fonts its share cards are drawn with, and the Unicode data and Rust crates it is built on.";
+            meta name="description" content="What YuioLink is made of: the MIT/Apache-2.0 license it is offered under, the EFF and BIP-0039 wordlists its link names come from, the DejaVu and Noto fonts its share cards are drawn with, and the Unicode data and Rust crates it is built on.";
         },
         body,
         html! {},
@@ -5576,7 +5576,7 @@ mod tests {
 
     /// Design note 29's other half: the hero prefers to break at the URL's
     /// joints, so a wrapped line ends on a character that visibly cannot end
-    /// a URL — and the stylesheet centres a one-line URL while left-aligning
+    /// a URL — and the stylesheet centers a one-line URL while left-aligning
     /// a wrapped one, with the layout engine as the wrap detector.
     #[test]
     fn the_hero_wraps_at_the_structure_and_falls_ragged_left() {
@@ -5651,7 +5651,7 @@ mod tests {
         // "Message", not "Text" -- Text is one of this site's link kinds.
         assert!(card("sms:+4799123456").contains("Message +47 99 12 34 56"));
         assert!(card("sms:+4799123456,+4791123456").contains("Message 2 numbers"));
-        assert!(card("spotify:album:x").contains("An album in Spotify's catalogue"));
+        assert!(card("spotify:album:x").contains("An album in Spotify's catalog"));
         assert!(card("matrix:u/ada:example.org").contains("A user on Matrix"));
         assert!(card("xmpp:a@b.example").contains("An XMPP chat address"));
         assert!(card("xmpp:a@b.example?join").contains("A chat room on XMPP"));
@@ -5669,7 +5669,7 @@ mod tests {
 
     #[test]
     fn phone_facts_ride_their_own_number_once_there_is_more_than_one() {
-        // One number: the chips pool in a centred row.
+        // One number: the chips pool in a centered row.
         let one = card("sms:+4782012345");
         assert!(one.contains(r#"<div class="pv-facts">"#), "{one}");
         assert!(one.contains("Premium Rate"));
@@ -5894,18 +5894,18 @@ mod tests {
     /// The register the URL wears, settled 2026-08-15 after the user saw two
     /// candidates side by side.
     ///
-    /// It is the raw line's look, applied everywhere: flat full-colour text in
+    /// It is the raw line's look, applied everywhere: flat full-color text in
     /// which the BOLD KEYS carry the structure, with dimming spent only on
     /// characters that are genuinely inert. A brief experiment demoted the
     /// tails' VALUES to secondary to lift the path above them; that is reverted,
     /// because bold keys do the same job without draining the line.
     ///
-    /// Colour lives in app.css; what this pins is that each token gets the class
+    /// Color lives in app.css; what this pins is that each token gets the class
     /// that carries it, and that the classes stay separable.
     #[test]
     fn every_token_on_the_url_line_gets_its_own_class() {
         let c = card("https://www.threads.com/@milestogo13/post/Db3LGarHIem?xmt=AQG0&slof=1");
-        // The domain keeps bold AND full colour AND the wash AND the size -- the
+        // The domain keeps bold AND full color AND the wash AND the size -- the
         // only token wearing all four, which is what keeps its rank unambiguous.
         assert!(c.contains(r#"<span class="reg">threads.com</span>"#), "{c}");
         for segment in ["@milestogo13", "post", "Db3LGarHIem"] {
@@ -5945,7 +5945,7 @@ mod tests {
     /// dimming, not more" is a decision a later tidy-up could quietly undo one
     /// declaration at a time.
     #[test]
-    fn the_url_register_keeps_its_colours() {
+    fn the_url_register_keeps_its_colors() {
         const APP_CSS: &str = include_str!("../static/app.css");
         assert!(
             APP_CSS.contains(".pv-url .qv {\n    color: var(--text);\n}"),
@@ -6019,8 +6019,8 @@ mod tests {
     }
 
     /// An explicit port is unusual and it decides which server actually answers,
-    /// so it is the one token that gets a colour of its own rather than another
-    /// shade of grey. It must reach every surface, and it must not drag along
+    /// so it is the one token that gets a color of its own rather than another
+    /// shade of gray. It must reach every surface, and it must not drag along
     /// the keyless fragment it used to share `.seg` with.
     #[test]
     fn the_port_is_marked_on_every_surface() {
@@ -6070,7 +6070,7 @@ mod tests {
         assert!(card("magnet:?xt=urn:btih:abc&dn=x.iso").contains("Only <code>xt</code>"));
         assert!(card("mailto:a@b.example?body=hi").contains("goes out as you"));
         assert!(card("sms:+4799123456?body=hi").contains("goes out from your number"));
-        assert!(card("tel:+4782012345;ext=4021").contains("dialled after the call connects"));
+        assert!(card("tel:+4782012345;ext=4021").contains("dialed after the call connects"));
         // Nothing to explain, nothing said.
         assert!(!card("tel:+4782012345").contains("pv-note"));
         assert!(!card("https://example.com/a").contains("pv-note"));

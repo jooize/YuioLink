@@ -90,11 +90,11 @@
 
     /* --- the exact stored string, now in the pv-url palette proper -------
        Round 15 kept it monochrome-shy; this round mirrors the https line's
-       actual colours one size down: scheme dim, DELIMITERS IN ACCENT (that is
+       actual colors one size down: scheme dim, DELIMITERS IN ACCENT (that is
        what .pv-url .pn does and what makes it read as syntax), keys secondary,
-       values full text colour, percent-escapes dimmed to encoding noise.
+       values full text color, percent-escapes dimmed to encoding noise.
        Registrable domains are bold but never washed — the wash appears once
-       per page, on the headline. Hazard marks keep their danger colour. */
+       per page, on the headline. Hazard marks keep their danger color. */
     .pv-exact { display: block; margin-top: 14px; padding-top: 11px;
       border-top: .5px solid var(--card-border); font-family: var(--font-mono);
       font-size: 11.5px; line-height: 1.65; word-break: break-all; text-align: left;
@@ -160,7 +160,7 @@
       regardless of how the creator typed it. Nobody suffers a creator's odd hyphens, and
       "Exactly as stored" carries the truth. The no-spaces guard is retired; padding still
       gets its chip and its tint in the exact line.</li>
-    <li><b>Scheme plate colour stays as is</b> — plain text colour, size as its emphasis.</li>
+    <li><b>Scheme plate color stays as is</b> — plain text color, size as its emphasis.</li>
     <li><b>The exact line takes the https line's real palette</b> — round 15 was too timid
       about it; see section 3.</li>
     <li><b>https keeps its page.</b> No table by default — instead an optional "Show the
@@ -214,7 +214,7 @@
             <circle cx="8" cy="11.2" r=".95" fill="currentColor"/></svg>
           Premium Rate</span>
       </div>
-      <span class="pv-note">The extension, 4021, is dialled after the call connects.</span>
+      <span class="pv-note">The extension, 4021, is dialed after the call connects.</span>
       <code class="pv-exact"><span class="lbl">Exactly as stored</span><span class="sch">tel:</span>+47-820-12-345<span class="dl">;</span><span class="k">ext</span><span class="dl">=</span>4021</code>
       <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
         <span class="lead">Call +47 820 12 345</span><span class="what">A phone number</span></a>
@@ -303,7 +303,7 @@
     <p class="note"><b>You were right to push on this.</b> The https emphasis logic — dim the
       parts, spotlight the domain — is backwards for mail: on <code>gmail.com</code> the
       domain says almost nothing and <code>ella.storli</code> says everything. So the local
-      part now carries full weight and colour; the wash stays on the domain, because "which
+      part now carries full weight and color; the wash stays on the domain, because "which
       service receives this" is still the once-per-page fact. Nothing is dim on either side
       of the <code>@</code> anymore.</p>
   </div>
@@ -342,19 +342,19 @@
       <code>to</code> pair unfolds into rows like magnet's repeated <code>tr</code>, and a
       <code>bcc</code> would get a row too, with the note gaining "…<code>bcc</code>
       addresses are hidden from the others." The button counts instead of picking a
-      favourite.</p>
+      favorite.</p>
   </div>
 </div>
 
 <!-- ================================================================== -->
-<p class="mock-h">3 · Exactly as stored, in its true colours</p>
+<p class="mock-h">3 · Exactly as stored, in its true colors</p>
 
 <div class="fixnote">
-  <b>Why it looked uncoloured: round 15 only used greys.</b> The https line's palette —
+  <b>Why it looked uncolored: round 15 only used grays.</b> The https line's palette —
   the one that reads as syntax — gets its life from <code>.pv-url .pn</code>, which paints
-  the <em>delimiters</em> in the accent colour. Round 15 gave the exact line dim delimiters,
-  bold-grey keys, grey values: structure without hue. This round mirrors the real recipe one
-  size down: <b>delimiters accent, keys secondary, values full text colour</b>, scheme and
+  the <em>delimiters</em> in the accent color. Round 15 gave the exact line dim delimiters,
+  bold-gray keys, gray values: structure without hue. This round mirrors the real recipe one
+  size down: <b>delimiters accent, keys secondary, values full text color</b>, scheme and
   percent-escapes receded, domains bold. Every card on this page wears it. The one deliberate
   difference from the https line remains: no wash in the exact line, ever — the wash appears
   once per page, on the headline.
@@ -364,7 +364,7 @@
 <p class="mock-h">4 · https stays itself — the parts are an offer</p>
 
 <div class="fixnote">
-  <b>Decision: the https page does not change.</b> The coloured URL line has earned its keep
+  <b>Decision: the https page does not change.</b> The colored URL line has earned its keep
   and stays the one register for web links. What it gains is an offer, not a rearrangement: a
   quiet <b>"Show the parts"</b> fold beneath it, which unfolds the same table every other
   format gets — and folds back. No JS, chips never hide inside it, and the closed state is
@@ -497,13 +497,13 @@
       <code class="pv-exact"><span class="lbl">Exactly as stored</span><span class="sch">spotify:</span><span class="k">track</span><span class="dl">:</span>6rqhFgbbKwnb9MLmUQDhG6</code>
       <a class="btn btn--go btn-2 btn-block btn-link pv-open" href="#">
         <span class="lead">Open Link <span style="opacity:.45">·</span> <span class="sch-tag">spotify:</span></span>
-        <span class="what">A track in Spotify's catalogue</span></a>
+        <span class="what">A track in Spotify's catalog</span></a>
       <span class="pv-hedge">What opens it, if anything, is up to your device.</span>
       <p class="pv-meta">Expires in 6 days</p>
     </div>
     <p class="note">"A track" is read off the URI's second segment — a published fact, not a
-      prediction — and falls back to "Something in Spotify's catalogue" when the segment is
-      unrecognised. Same trick, same fallback rule, for <code>xmpp:</code>
+      prediction — and falls back to "Something in Spotify's catalog" when the segment is
+      unrecognized. Same trick, same fallback rule, for <code>xmpp:</code>
       (<code>?join</code> → "A chat room on XMPP", else "An XMPP chat address") and
       <code>matrix:</code> (<code>u/</code> a user, <code>r/</code> / <code>roomid/</code> a
       room, <code>e/</code> an event — legacy <code>user/</code>, <code>room/</code>,
@@ -539,7 +539,7 @@
       key, RFC 5122's way of saying "this is a multi-user room"), and an empty cell states it
       without inventing one. The subtitle does the interpreting; the table stays literal.
       The local part gets the same full-strength treatment as mail: <code>lobby</code> is the
-      room's name, the part a person actually recognises.</p>
+      room's name, the part a person actually recognizes.</p>
   </div>
 </div>
 

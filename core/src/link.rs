@@ -148,7 +148,7 @@ fn pick_index(count: usize) -> usize {
 /// know why.
 ///
 /// Casing does not protect a route: lookups are case-insensitive, so a two-word
-/// draw spelling `wordLIST` is the `/wordlist.txt` segment's neighbour `wordlist`.
+/// draw spelling `wordLIST` is the `/wordlist.txt` segment's neighbor `wordlist`.
 /// [`generate_name`] therefore tests the whole assembled name, not just the
 /// one-word tier. Only short routes are reachable that way — every word is at
 /// least three letters, so nothing under six characters can come from two words

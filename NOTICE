@@ -44,7 +44,7 @@ carries both.
   Upstream: https://github.com/google/libphonenumber
   License:  Apache License 2.0 (both)
 
-Apache-2.0 is one of the two licences YuioLink itself is offered under, so
+Apache-2.0 is one of the two licenses YuioLink itself is offered under, so
 taking the Apache side of the dual grant covers the combined work. YuioLink's
 own code stays dual MIT/Apache-2.0.
 
