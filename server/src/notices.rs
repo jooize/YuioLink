@@ -1,7 +1,8 @@
-//! Third-party notices: NOTICE and every license text it names, built into the
-//! binary so they travel with every copy of it. The fonts' licenses (OFL 1.1,
-//! Bitstream Vera) and Apache-2.0 section 4(d) all ask for this, and a release
-//! asset is a bare binary. Served at `/legal/notices.txt`, printed by
+//! Third-party notices: NOTICE and every license text it names (the fonts',
+//! the Unicode data's and every linked crate's), built into the binary so they
+//! travel with every copy of it. The fonts' licenses (OFL 1.1, Bitstream Vera),
+//! the crates' MIT and BSD terms and Apache-2.0 section 4(d) all ask for this,
+//! and a release asset is a bare binary. Served at `/legal/notices.txt`, printed by
 //! `yuiolink-server --notices`, and attached to each release by release.yml
 //! from that same output.
 
@@ -21,6 +22,10 @@ const PARTS: &[(&str, &str)] = &[
     (
         "server/assets/fonts/noto/LICENSE.txt",
         include_str!("../assets/fonts/noto/LICENSE.txt"),
+    ),
+    (
+        "server/assets/crates/LICENSE.txt",
+        include_str!("../assets/crates/LICENSE.txt"),
     ),
     (
         "server/assets/unicode/LICENSE.txt",
@@ -82,6 +87,8 @@ mod tests {
             "Apache License",
             "Permission is hereby granted",
             "UNICODE LICENSE V3",
+            "Rust crates linked into yuiolink-server",
+            "Copyright (c) 2014 Chris Wong",
         ] {
             assert!(t.contains(needle), "notices lack {needle:?}");
         }

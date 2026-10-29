@@ -49,6 +49,18 @@ taking the Apache side of the dual grant covers the combined work. YuioLink's
 own code stays dual MIT/Apache-2.0.
 
 
+Rust crates
+-----------
+
+The server binary links about 230 Rust crates from crates.io. Each crate's
+license, with the text it ships, is in server/assets/crates/LICENSE.txt,
+written from Cargo.lock by tools/crate-licenses/build.bash (cargo-about).
+A crate that offers a choice of licenses is used under MIT when MIT is one
+of them.
+
+  Full terms: server/assets/crates/LICENSE.txt
+
+
 DejaVu fonts
 ------------
 
