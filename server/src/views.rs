@@ -4474,6 +4474,8 @@ pub fn colophon_page() -> Markup {
             }
             ", at your option — take whichever suits you. The source is on "
             a.ext href="https://github.com/jooize/YuioLink" { "GitHub" (external_mark()) }
+            ". The full license texts of YuioLink and of everything below are at "
+            a href="/license" { "/license" }
             "."
         }
 
@@ -4519,8 +4521,32 @@ pub fn colophon_page() -> Markup {
             " — descended from Bitstream Vera (© 2003 Bitstream, Inc.) and Arev "
             "(© 2006 Tavmjong Bah), with the DejaVu changes in the public domain. They are "
             "embedded in the binary, so a card renders the same with no fonts installed on "
-            "the server at all. The pages themselves ask for whatever your system calls its "
-            "interface font, and are not sent any."
+            "the server at all. A domain in a script DejaVu lacks (Han, Arabic, Devanagari, "
+            "Thai and many more) or an emoji is drawn with the "
+            a.ext href="https://notofonts.github.io/" { "Noto fonts" (external_mark()) }
+            " (© The Noto Project Authors, Google, and Adobe for the CJK set), under the "
+            "SIL Open Font License. The pages themselves ask for whatever your system calls "
+            "its interface font, and are not sent any."
+        }
+
+        h3.help-h #characters { "The characters" }
+        p.help-p {
+            "Hidden characters are told apart from registered variation sequences, such as "
+            "an emoji's style or a registered kanji glyph, with data from the "
+            a.ext href="https://www.unicode.org/ucd/" { "Unicode Character Database" (external_mark()) }
+            " and the "
+            a.ext href="https://www.unicode.org/ivd/" {
+                "Ideographic Variation Database" (external_mark())
+            }
+            ", © Unicode, Inc., under the Unicode License v3."
+        }
+
+        h3.help-h #code { "The code" }
+        p.help-p {
+            "The server is built on about 230 open-source Rust crates, nearly all under "
+            "MIT or Apache-2.0. Each one, with its license, is listed at "
+            a href="/license#crates" { "/license" }
+            "."
         }
 
         footer { a href="/" { "Back to YuioLink" } }
@@ -4528,7 +4554,7 @@ pub fn colophon_page() -> Markup {
     document_full(
         "YuioLink — Colophon",
         html! {
-            meta name="description" content="What YuioLink is made of: the MIT/Apache-2.0 licence it is offered under, the EFF and BIP-0039 wordlists its link names come from, and the DejaVu fonts its share cards are drawn with.";
+            meta name="description" content="What YuioLink is made of: the MIT/Apache-2.0 licence it is offered under, the EFF and BIP-0039 wordlists its link names come from, the DejaVu and Noto fonts its share cards are drawn with, and the Unicode data and Rust crates it is built on.";
         },
         body,
         html! {},

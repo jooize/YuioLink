@@ -2601,7 +2601,14 @@ mod tests {
         assert_eq!(s, StatusCode::OK);
         // CC-BY asks for the author, and the fonts carry their own terms — both
         // have to survive an edit to this page.
-        for credit in ["Electronic Frontier Foundation", "CC-BY-3.0-US", "DejaVu"] {
+        for credit in [
+            "Electronic Frontier Foundation",
+            "CC-BY-3.0-US",
+            "DejaVu",
+            "Noto",
+            "Unicode License v3",
+            "href=\"/license\"",
+        ] {
             assert!(
                 body.contains(credit),
                 "colophon should credit {credit}: {body}"
