@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Write server/assets/crates/LICENSE.txt: the license text of every crate linked
-# into the release binary, from Cargo.lock, by the cargo-about the flake pins.
-# It reads only the crate sources cargo has already fetched, so the same lock
-# gives the same bytes. Run it after any change to Cargo.lock.
+# into the release binary, from Cargo.lock, by cargo-about. It reads only the
+# crate sources cargo has already fetched, so the same lock and the same
+# cargo-about give the same bytes. The flake's dev shell pins the cargo-about
+# CI checks with. Run it after any change to Cargo.lock.
 #
 # usage: nix develop --command tools/crate-licenses/build.bash [--check]
 #
@@ -13,7 +14,7 @@ IFS=$'\n\t'
 shopt -s nullglob
 
 usage() {
-    sed -n '7,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '8,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 check=0
@@ -28,18 +29,18 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd -- "${here}/../.." && pwd)"
 out="${repo}/server/assets/crates/LICENSE.txt"
 
-if ! command -v cargo >/dev/null 2>&1; then
-    echo "cargo is not on PATH; run this inside nix develop" >&2
-    exit 1
-fi
-
-about="$(nix build --inputs-from "${repo}" --no-link --print-out-paths nixpkgs#cargo-about)/bin/cargo-about"
+for tool in cargo cargo-about; do
+    if ! command -v "${tool}" >/dev/null 2>&1; then
+        echo "${tool} is not on PATH; run this inside nix develop" >&2
+        exit 1
+    fi
+done
 
 work="$(mktemp -d)"
 trap 'rm -rf -- "${work}"' EXIT
 
 # --frozen: no network. Crate sources must already be fetched (cargo fetch).
-"${about}" generate --frozen \
+cargo-about generate --frozen \
     -c "${repo}/about.toml" \
     -m "${repo}/server/Cargo.toml" \
     -o "${work}/generated.txt" \

@@ -56,6 +56,10 @@
             rustToolchain
             pkgs.pkg-config
             pkgs.sqlite
+            # Third-party license texts (tools/crate-licenses) and the
+            # dependency policy in deny.toml; CI runs both from this shell.
+            pkgs.cargo-about
+            pkgs.cargo-deny
           ];
         };
       }
