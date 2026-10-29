@@ -5,7 +5,7 @@ Every crate in the release binary (x86_64-unknown-linux-gnu), with the license
 it is used under and that license's text as the crate ships it. Written by
 tools/crate-licenses/build.bash from Cargo.lock; do not edit by hand.
 
-MIT License: 200
+MIT License: 199
 Unicode License v3: 19
 BSD 3-Clause "New" or "Revised" License: 4
 Apache License 2.0: 3
@@ -3126,7 +3126,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 -------------------------------------------------------------------------------
 MIT License, used by:
   tokio-stream 0.1.18  https://github.com/tokio-rs/tokio
-  tokio 1.52.3  https://github.com/tokio-rs/tokio
+  tokio 1.53.3  https://github.com/tokio-rs/tokio
 
 MIT License
 
@@ -3332,9 +3332,8 @@ MIT License, used by:
   adler2 2.0.1  https://github.com/oyvindln/adler2
   anyhow 1.0.103  https://github.com/dtolnay/anyhow
   atomic-waker 1.1.2  https://github.com/smol-rs/atomic-waker
-  concurrent-queue 2.5.0  https://github.com/smol-rs/concurrent-queue
   displaydoc 0.2.6  https://github.com/yaahc/displaydoc
-  event-listener 5.4.1  https://github.com/smol-rs/event-listener
+  event-listener 5.4.2  https://github.com/smol-rs/event-listener
   itoa 1.0.18  https://github.com/dtolnay/itoa
   minimal-lexical 0.2.1  https://github.com/Alexhuszagh/minimal-lexical
   once_cell 1.21.4  https://github.com/matklad/once_cell
