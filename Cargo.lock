@@ -2676,6 +2676,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "ttf-parser",
  "unicode-security",
  "unicode-segmentation",
  "url",

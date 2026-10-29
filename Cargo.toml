@@ -55,6 +55,10 @@ sha2 = "0.10"
 # only -- drops the SVG-embedded-raster decoders (gif/webp/jpeg) and system-font
 # loading, since the card is an SVG we generate with bundled fonts.
 resvg = { version = "0.44", default-features = false, features = ["text"] }
+# The fonts resvg draws with, read directly to ask which characters a face
+# has, so the card picks a face per script and never draws a missing glyph.
+# Already in the lock through resvg.
+ttf-parser = { version = "0.24", default-features = false }
 
 # QR code beside the created link. The bare encoder only (no `image` or `svg`
 # features): the server draws the module grid as one SVG path itself.
