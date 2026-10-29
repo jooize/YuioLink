@@ -67,7 +67,7 @@ jobs:
       - name: Write the license texts
         run: |
           docker run --rm --platform linux/amd64 -v "$PWD:/w:ro" "$RUST_IMAGE" \
-            /w/yuiolink-server-linux-amd64 --licenses > yuiolink-server-licenses.txt
+            /w/yuiolink-server-linux-amd64 --license > yuiolink-server-licenses.txt
           grep -q 'SIL OPEN FONT LICENSE' yuiolink-server-licenses.txt
 
       - name: Record the toolchain

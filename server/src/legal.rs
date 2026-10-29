@@ -489,8 +489,8 @@ fn page(base_url: &str, idx: usize) -> Markup {
         h3.help-h #licenses { "Licenses" }
         p.help-p {
             "YuioLink includes fonts, data and Rust crates made by others, each "
-            "under its own license. The full texts are on the "
-            a href="/legal/licenses" { "licenses page" }
+            "under its own license. The full texts are at "
+            a href="/license" { "/license" }
             "."
         }
 

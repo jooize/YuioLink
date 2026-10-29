@@ -91,7 +91,7 @@ derives from the [EFF wordlists](https://www.eff.org/deeplinks/2016/07/new-wordl
 (CC-BY-3.0-US) and the BIP-0039 English wordlist, and the share-card renderer
 embeds the DejaVu and Noto fonts (OFL-1.1 for Noto). See [NOTICE](NOTICE), which redistributions must
 carry. The server binary carries NOTICE and every license it names:
-`yuiolink-server --licenses` prints them, `/legal/licenses` shows them, and each
+`yuiolink-server --license` prints them, `/license` shows them, and each
 release attaches them as `yuiolink-server-licenses.txt`.
 
 YuioLink is created by [jooize](https://github.com/jooize) with AI.

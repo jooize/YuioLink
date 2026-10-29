@@ -29,7 +29,7 @@ use web::AppState;
 
 const USAGE: &str = "\
 usage: yuiolink-server             serve; settings come from YUIOLINK_* variables
-       yuiolink-server --licenses  print the license texts of everything it includes
+       yuiolink-server --license   print the license texts of everything it includes
        yuiolink-server --help      print this
 ";
 
@@ -40,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
     let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
     match args.as_slice() {
         [] => {}
-        [flag] if flag == "--licenses" || flag == "--license" => {
+        [flag] if flag == "--license" || flag == "--licenses" => {
             // A reader that stops early (`| head`) is not an error.
             return match std::io::stdout().write_all(licenses::text().as_bytes()) {
                 Err(e) if e.kind() != std::io::ErrorKind::BrokenPipe => Err(e.into()),

@@ -2,9 +2,8 @@
 //! the Unicode data's and every linked crate's), built into the binary so they
 //! travel with every copy of it. The fonts' licenses (OFL 1.1, Bitstream Vera),
 //! the crates' MIT and BSD terms and Apache-2.0 section 4(d) all ask for this,
-//! and a release asset is a bare binary. Shown at `/legal/licenses`, served as
-//! one plain text at `/legal/licenses.txt`, printed by
-//! `yuiolink-server --licenses`, and attached to each release by release.yml
+//! and a release asset is a bare binary. Shown at `/license`, served as one
+//! plain text at `/license.txt`, printed by `yuiolink-server --license`, and attached to each release by release.yml
 //! from that same output.
 
 use crate::views::{document_full, home_chip};
@@ -12,7 +11,7 @@ use maud::{Markup, html};
 use std::sync::OnceLock;
 
 /// One license text: where it lives in the repository (the path NOTICE names),
-/// its anchor on `/legal/licenses`, the heading shown there, and the text.
+/// its anchor on `/license`, the heading shown there, and the text.
 struct Part {
     path: &'static str,
     id: &'static str,
@@ -88,17 +87,17 @@ pub fn text() -> &'static str {
     })
 }
 
-/// `/legal/licenses`: the same parts as [`text`], each under its own heading,
+/// `/license`: the same parts as [`text`], each under its own heading,
 /// with a contents list first, since the whole runs to a few hundred KB.
 pub fn page() -> Markup {
     let body = html! {
-        (home_chip("/legal", "Back to Legal"))
+        (home_chip("/", "Back to YuioLink"))
         h2.help-title.legal-title { "Licenses" }
         p.help-lead {
             "YuioLink includes fonts, data and Rust crates made by others. Each "
             "is used under its own license, and the full texts follow. The same "
             "texts as one plain file: "
-            a href="/legal/licenses.txt" { "/legal/licenses.txt" }
+            a href="/license.txt" { "/license.txt" }
             "."
         }
         nav.licenses-toc aria-label="Contents" {
@@ -112,7 +111,7 @@ pub fn page() -> Markup {
             h3.help-h id=(part.id) { (part.title) }
             pre.help-code.license-text { (part.text.trim_end()) }
         }
-        footer { a href="/legal" { "Back to Legal" } }
+        footer { a href="/" { "Back to YuioLink" } }
     };
     document_full(
         "YuioLink — Licenses",

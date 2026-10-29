@@ -106,8 +106,8 @@ pub fn router(state: AppState) -> Router {
         .route("/demo/redirect", get(demo_redirect))
         .route("/colophon", get(colophon))
         .route("/legal", get(legal))
-        .route("/legal/licenses", get(legal_licenses))
-        .route("/legal/licenses.txt", get(legal_licenses_txt))
+        .route("/license", get(license))
+        .route("/license.txt", get(license_txt))
         .route("/legal/{version}", get(legal_version))
         .route("/stats", get(stats))
         .nest("/api/v0", api_routes())
@@ -1390,15 +1390,15 @@ pub async fn legal_version(State(state): State<AppState>, Path(version): Path<St
     }
 }
 
-/// `GET /legal/licenses` — the license texts built into the binary (see
+/// `GET /license` — the license texts built into the binary (see
 /// `licenses`), one heading each, with a contents list.
-pub async fn legal_licenses() -> Response {
+pub async fn license() -> Response {
     Html(crate::licenses::page().into_string()).into_response()
 }
 
-/// `GET /legal/licenses.txt` — the same texts as one plain file. Shown in the
+/// `GET /license.txt` — the same texts as one plain file. Shown in the
 /// browser; saved, it is named for whose licenses they are.
-pub async fn legal_licenses_txt() -> Response {
+pub async fn license_txt() -> Response {
     (
         [
             (
@@ -2614,19 +2614,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn legal_links_the_built_in_licenses() {
+    async fn legal_links_the_license_page() {
         let st = test_state().await;
         let (s, _, legal) = send(&st, get("/legal")).await;
         assert_eq!(s, StatusCode::OK);
-        assert!(legal.contains("href=\"/legal/licenses\""), "{legal}");
+        assert!(legal.contains("href=\"/license\""), "{legal}");
 
-        let (s, _, page) = send(&st, get("/legal/licenses")).await;
+        let (s, _, page) = send(&st, get("/license")).await;
         assert_eq!(s, StatusCode::OK);
         assert!(page.contains("href=\"#crates\""), "contents list");
         assert!(page.contains("id=\"crates\""), "crates heading");
         assert!(page.contains("SIL OPEN FONT LICENSE"), "texts in full");
 
-        let (s, h, body) = send(&st, get("/legal/licenses.txt")).await;
+        let (s, h, body) = send(&st, get("/license.txt")).await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(h[header::CONTENT_TYPE], "text/plain; charset=utf-8");
         assert_eq!(
