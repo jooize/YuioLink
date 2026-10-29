@@ -39,3 +39,19 @@ jobs:
 
       - name: Test
         run: cargo test --workspace --locked
+
+  # server/assets/crates/LICENSE.txt must match Cargo.lock: the binary serves it
+  # as the crates' license texts. Nix runs the cargo-about the flake pins, so
+  # this check and a local run produce the same bytes.
+  crate-licenses:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+
+      - name: Fetch the locked crates
+        run: nix develop --command cargo fetch --locked
+
+      - name: Refuse a stale crate license file
+        run: nix develop --command tools/crate-licenses/build.bash --check
