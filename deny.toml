@@ -7,6 +7,9 @@ targets = ["x86_64-unknown-linux-gnu"]
 exclude-dev = true
 
 [advisories]
+# A yanked version fails too: spin 0.9.8 was yanked for a memory-safety fix
+# that never got an advisory.
+yanked = "deny"
 # Each entry names why the crate stays and what would retire it. An ignore
 # that no longer matches anything is reported, so stale entries surface.
 ignore = [
