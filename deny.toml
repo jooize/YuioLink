@@ -1,0 +1,40 @@
+# cargo-deny policy for the crates linked into the release binary. CI runs
+# `cargo deny check` from the flake's dev shell; a new advisory, a license
+# outside the list, or a crate from anywhere but crates.io fails the build.
+
+[graph]
+targets = ["x86_64-unknown-linux-gnu"]
+exclude-dev = true
+
+[advisories]
+# Each entry names why the crate stays and what would retire it. An ignore
+# that no longer matches anything is reported, so stale entries surface.
+ignore = [
+    { id = "RUSTSEC-2026-0206", reason = "rustybuzz is unmaintained; resvg 0.44 shapes share-card text with it. Retire when resvg moves to harfrust." },
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser is unmaintained; resvg 0.44 and card.rs read fonts with it. Retire with the same resvg move (skrifa)." },
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error is unmaintained; maud_macros 0.26 uses it at compile time only." },
+]
+
+[licenses]
+# The same list as about.toml, which writes the license texts.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+confidence-threshold = 0.93
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
