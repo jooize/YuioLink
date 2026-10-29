@@ -29,7 +29,10 @@ use std::sync::OnceLock;
 /// is a safe path segment — and its permanent address (`/legal/<id>`). The
 /// LAST entry is the current terms; every entry is frozen by the pinned-hash
 /// test — see the module doc.
-pub const VERSIONS: &[TermsEntry] = &[("2026-09-24T184300Z", terms_2026_09_24)];
+pub const VERSIONS: &[TermsEntry] = &[
+    ("2026-09-24T184300Z", terms_2026_09_24),
+    ("2026-10-29T224500Z", terms_2026_10_29),
+];
 
 /// One entry of [`VERSIONS`]: the id and the function that renders that text.
 pub type TermsEntry = (&'static str, fn() -> Markup);
@@ -120,6 +123,167 @@ fn terms_2026_09_24() -> Markup {
             ", never written to disk. Like essentially every service "
             "on the web, the server also keeps short-lived technical logs of "
             "requests for operations and abuse defence; they are routinely "
+            "discarded and are not used to build profiles of anyone. In legal "
+            "terms, both rest on the operator's legitimate interest in keeping "
+            "the service working and unabused (GDPR, Article 6(1)(f))."
+        }
+
+        h3.help-h #rights { "Your rights" }
+        p.help-p {
+            "European data protection law applies to this service: the GDPR "
+            "(Regulation (EU) 2016/679), supplemented in Sweden by the Data "
+            "Protection Act (2018:218). This page is the information those "
+            "rules call for, in plain words. Most of the GDPR's rights are "
+            "honored here by not collecting things: a link's record identifies "
+            "no one, and where a service cannot tell which records are whose, "
+            "the rights to access, correct, or export them do not attach "
+            "(Article 11). There is nothing to look a person up by. What a "
+            "creator can always do is delete their own link, with the deletion "
+            "secret issued at creation."
+        }
+        p.help-p {
+            "If you believe this service mishandles personal data, you can "
+            "complain to a data protection authority (GDPR, Article 77). The "
+            "operator's is Sweden's Integritetsskyddsmyndigheten (IMY), and "
+            "the authority of the country where you live works too."
+        }
+
+        h3.help-h #use { "Acceptable use" }
+        p.help-p {
+            "Do not use YuioLink to point at, or to carry, anything unlawful, "
+            "and do not use it for spam or harassment. That covers, among "
+            "other things, malware, phishing, content that infringes copyright "
+            "or trademark, private information published without consent, and "
+            "material that exploits or harms children. The operator may "
+            "withdraw any link and refuse service at any time, without notice, "
+            "at the operator's sole discretion."
+        }
+
+        h3.help-h #abuse { "Reporting abuse" }
+        p.help-p {
+            "To report a link, send its name (the word part of the address) "
+            "along with what you found and a way to reach you, to "
+            span.ph { "abuse contact — to be published" }
+            ". Reports are read by a person. A link that violates these terms "
+            "is withdrawn, and because every link expires within seven days, "
+            "even an unreported one is short-lived. Reports are handled "
+            "notice-and-action style, the shape the EU Digital Services Act "
+            "(Regulation (EU) 2022/2065) gives such procedures, whether or "
+            "not that act strictly binds a personal, non-commercial service."
+        }
+
+        h3.help-h #warranty { "No warranty" }
+        p.help-p {
+            "The service is provided \u{201c}as is\u{201d} and \u{201c}as "
+            "available\u{201d}, without warranty of any kind, express or "
+            "implied, including the implied warranties of merchantability, "
+            "fitness for a particular purpose, and non-infringement. Links "
+            "expire, and the service itself may change, pause, or end at any "
+            "time. Do not let a YuioLink be "
+            strong { "the only copy" }
+            " of anything you care about."
+        }
+
+        h3.help-h #liability { "Liability" }
+        p.help-p {
+            "To the fullest extent permitted by law, the operator is not liable "
+            "for any indirect, incidental, special, or consequential damages "
+            "arising from using, or being unable to use, this service, nor "
+            "for the content of third-party destinations that links point to. "
+            "Nothing in these terms limits liability that cannot lawfully be "
+            "limited."
+        }
+
+        h3.help-h #law { "Governing law" }
+        p.help-p {
+            "These terms are governed by Swedish law. Where you use this "
+            "service as a consumer, mandatory protections of the country "
+            "where you live stand regardless of this clause."
+        }
+
+        h3.help-h #changes { "Changes" }
+        p.help-p {
+            "These terms may change as the service does. A change takes effect "
+            "when it is published, as a new dated version of this page. Every "
+            "version, this one and each one before it, keeps its own "
+            "permanent address on this site, listed at the end of the page. "
+            "Because every link expires within seven days, no link ever "
+            "outlives the terms it was created under by more than a week."
+        }
+    }
+}
+
+/// The terms as they took effect 2026-10-29: the first version with American
+/// spelling ("abuse defense"), nothing else changed. What [`terms_2026_09_24`]
+/// says about its claims and citations holds for this text too.
+fn terms_2026_10_29() -> Markup {
+    html! {
+        h3.help-h #operator { "Who provides this" }
+        p.help-p {
+            "YuioLink is a personal, non-commercial project operated by jooize "
+            "(\u{201c}the operator\u{201d}). It is offered free of charge, "
+            "without accounts and without advertising, and it is operated from "
+            "Sweden. For the little personal data the service touches, the "
+            "operator is the data controller (GDPR, Article 4(7)). A "
+            "publishable contact address will appear here: "
+            span.ph { "operator contact — to be published" }
+            "."
+        }
+
+        h3.help-h #service { "The service" }
+        p.help-p {
+            "YuioLink turns a web address or a piece of text into a short link. "
+            strong { "Every link expires" }
+            ": the longest lifetime is "
+            strong { "seven days" }
+            ", and when a link's time is up it stops working for everyone. "
+            "There are no permanent links, by design. Creating a link means "
+            "accepting these terms; if you do not accept them, do not create "
+            "links here."
+        }
+
+        h3.help-h #stored { "What is stored" }
+        p.help-p {
+            "A link is one record: its name, what it points to (the destination "
+            "address, or the text), when it was created, when it expires, an "
+            "optional use limit and a count of uses, a deletion secret, and "
+            "whether its creator has deleted it. That is the whole record. "
+            "There are "
+            strong { "no accounts" }
+            ", and nothing in the record identifies who created or opened a "
+            "link."
+        }
+        p.help-p {
+            "The history panel on the front page lives in your own browser's "
+            "storage and is "
+            strong { "never sent to the server" }
+            ". It is kept beyond the visit only after you switch it on; that "
+            "switch is the consent EU rules ask for before a site stores "
+            "things in your browser (in Sweden, the Electronic Communications "
+            "Act (2022:482), Chapter 9, Section 28). There are no cookies and "
+            "no other stored state. The public "
+            a href="/stats" { "statistics" }
+            " are daily tallies: counts of events per day, with nothing in "
+            "them that can be traced to a person or a link."
+        }
+
+        h3.help-h #retention { "How long it is kept" }
+        p.help-p {
+            "A link's record is deleted shortly after the link expires, at most "
+            "seven days after it was created. Deleting a link yourself stops it "
+            "resolving immediately; the record then remains only so the name "
+            "cannot be claimed by someone else, is no longer readable by "
+            "visitors, and is removed on the same expiry schedule."
+        }
+
+        h3.help-h #network { "Network data" }
+        p.help-p {
+            "To keep link creation from being abused, the server briefly holds "
+            "the network address a creation request came from, "
+            strong { "in working memory only" }
+            ", never written to disk. Like essentially every service "
+            "on the web, the server also keeps short-lived technical logs of "
+            "requests for operations and abuse defense; they are routinely "
             "discarded and are not used to build profiles of anyone. In legal "
             "terms, both rest on the operator's legitimate interest in keeping "
             "the service working and unabused (GDPR, Article 6(1)(f))."
@@ -522,10 +686,16 @@ mod tests {
     /// Re-pinning an entry is only ever legitimate before that entry has been
     /// published on yuio.link — after that, receipts in the wild hold the old
     /// fingerprint, and history is append-only.
-    const PINNED: &[(&str, &str)] = &[(
-        "2026-09-24T184300Z",
-        "d2ae7bea711e5d61d5acb552e34f81275d20faa3ac00b60143c46814bf284dc0",
-    )];
+    const PINNED: &[(&str, &str)] = &[
+        (
+            "2026-09-24T184300Z",
+            "d2ae7bea711e5d61d5acb552e34f81275d20faa3ac00b60143c46814bf284dc0",
+        ),
+        (
+            "2026-10-29T224500Z",
+            "c54885062aaffb5355b8fb59d0b888662414a9d789b2d0e8b9518b2d74ffa9f9",
+        ),
+    ];
 
     #[test]
     fn every_version_fingerprint_is_pinned_and_unchanged() {
