@@ -63,6 +63,24 @@ server binary so share-card images render with no system fonts installed.
   Source:     https://dejavu-fonts.github.io/
 
 
+Noto fonts
+----------
+
+server/assets/fonts/noto/ holds Noto fonts, embedded in the server binary so a
+share card draws a domain in any script DejaVu lacks (Han, Arabic, Devanagari,
+Thai and others). tools/card-fonts/build.bash makes them from the Noto packages
+in the pinned nixpkgs: static Regular instances with hinting removed. The CJK
+collection is copied unchanged.
+
+  Noto: (c) 2022 The Noto Project Authors
+  Noto Emoji: (c) 2013, 2022 Google Inc.
+  Noto Sans CJK: (c) 2014-2021 Adobe, with Reserved Font Name 'Source'
+
+  License:    SIL Open Font License 1.1
+  Full terms: server/assets/fonts/noto/LICENSE.txt
+  Source:     https://notofonts.github.io/
+
+
 Unicode variation sequence data
 -------------------------------
 

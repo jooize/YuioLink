@@ -89,7 +89,7 @@ inclusion shall be dual-licensed as above, with no additional terms.
 Bundled third-party material keeps its own terms — the link-name wordlist
 derives from the [EFF wordlists](https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases)
 (CC-BY-3.0-US) and the BIP-0039 English wordlist, and the share-card renderer
-embeds the DejaVu fonts. See [NOTICE](NOTICE), which redistributions must
+embeds the DejaVu and Noto fonts (OFL-1.1 for Noto). See [NOTICE](NOTICE), which redistributions must
 carry.
 
 YuioLink is created by [jooize](https://github.com/jooize) with AI.
