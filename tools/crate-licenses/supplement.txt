@@ -1,0 +1,24 @@
+-------------------------------------------------------------------------------
+Copyright holders for crates whose package has no license file
+-------------------------------------------------------------------------------
+
+The crates below are listed above under the MIT text that reads "Copyright (c)
+<year> <copyright holders>": their published package has no license file of
+its own, so the generic text stands in. Each is used under the MIT license,
+which its Cargo.toml offers. Their copyright holders, and where that is stated:
+
+Crate: maud 0.26.0
+Crate: maud_macros 0.26.0
+  Copyright (c) 2014 Chris Wong
+  LICENSE-MIT in https://github.com/lambda-fairy/maud at commit
+  6e50e675b6dc9c641e421476e0cc816a8324a353, which both crates were packaged from.
+
+Crate: siphasher 1.0.3
+  Copyright 2012-2016 The Rust Project Developers.
+  Copyright 2016-2026 Frank Denis.
+  COPYING in the package.
+
+Crate: oncemutex 0.1.1
+  Jonathan Reem, the author its Cargo.toml names. Neither the package nor
+  https://github.com/reem/rust-once-mutex has a license file or a copyright
+  notice.

@@ -1,0 +1,36 @@
+# cargo-about settings for tools/crate-licenses/build.bash, which writes the
+# license texts of every crate linked into the release binary.
+targets = ["x86_64-unknown-linux-gnu"]
+ignore-dev-dependencies = true
+ignore-build-dependencies = true
+private = { ignore = true }
+# Order is preference: a crate offered under several licenses is listed under
+# the first one here it allows. MIT first, since each crate's MIT text carries
+# its own copyright line and asks for no NOTICE file.
+accepted = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "ISC",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+
+# libm's license file holds both licenses with a preamble cargo-about cannot
+# classify; take its MIT part. The checksum covers that part (cargo-about
+# hashes after cutting), so a changed file drops the clarification and the
+# crate falls back to the generic MIT text, which build.bash refuses.
+[libm.clarify]
+license = "MIT"
+[[libm.clarify.files]]
+path = "LICENSE.txt"
+license = "MIT"
+checksum = "9e2041d9dd3fda7a7d215385844a9d398f05b68a038b93d5a28fe4fffc3957f0"
+end = "SOFTWARE.\n"
+

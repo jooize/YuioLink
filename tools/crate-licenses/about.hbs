@@ -1,0 +1,21 @@
+Rust crates linked into yuiolink-server
+=======================================
+
+Every crate in the release binary (x86_64-unknown-linux-gnu), with the license
+it is used under and that license's text as the crate ships it. Written by
+tools/crate-licenses/build.bash from Cargo.lock; do not edit by hand.
+
+{{#each overview}}
+{{{name}}}: {{count}}
+{{/each}}
+
+{{#each licenses}}
+-------------------------------------------------------------------------------
+{{{name}}}, used by:
+{{#each used_by}}
+  {{crate.name}} {{crate.version}}  {{crate.repository}}
+{{/each}}
+
+{{{text}}}
+
+{{/each}}
