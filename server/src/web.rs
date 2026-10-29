@@ -3105,6 +3105,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_card_names_an_idn_in_its_own_letters() {
+        // Stored as punycode, as the create path canonicalizes it.
+        let st = test_state().await;
+        let l = db::insert_link(
+            &st.pool,
+            redirect("https://xn--fsqu00a.xn--fiqs8s/", None),
+            &db::EMPTY_OCCUPANCY,
+        )
+        .await
+        .unwrap();
+        let row = db::get_link_live(&st.pool, &l.name).await.unwrap().unwrap();
+        assert_eq!(card_content(&row).hero, "例子.中国");
+        let resp = router(st.clone())
+            .oneshot(get(&format!("/{}/card.png", l.name)))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
     async fn card_png_renders_and_spends_no_use() {
         let st = test_state().await;
         let l = db::insert_link(
