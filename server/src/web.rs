@@ -106,6 +106,7 @@ pub fn router(state: AppState) -> Router {
         .route("/demo/redirect", get(demo_redirect))
         .route("/colophon", get(colophon))
         .route("/legal", get(legal))
+        .route("/legal/notices.txt", get(legal_notices))
         .route("/legal/{version}", get(legal_version))
         .route("/stats", get(stats))
         .nest("/api/v0", api_routes())
@@ -1388,6 +1389,16 @@ pub async fn legal_version(State(state): State<AppState>, Path(version): Path<St
     }
 }
 
+/// `GET /legal/notices.txt` — the third-party notices and license texts built
+/// into the binary (see `notices`).
+pub async fn legal_notices() -> Response {
+    (
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        crate::notices::text(),
+    )
+        .into_response()
+}
+
 /// `GET /stats` — the public, aggregate-only counters. Reads three cheap queries
 /// and renders them; a failure on any one degrades to zeroes rather than a 500,
 /// since a broken counter is never worth an error page.
@@ -2584,6 +2595,21 @@ mod tests {
         let (s, _, home) = send(&st, get("/")).await;
         assert_eq!(s, StatusCode::OK);
         assert!(home.contains("href=\"/colophon\""), "{home}");
+    }
+
+    #[tokio::test]
+    async fn legal_links_the_built_in_notices() {
+        let st = test_state().await;
+        let (s, _, legal) = send(&st, get("/legal")).await;
+        assert_eq!(s, StatusCode::OK);
+        assert!(legal.contains("href=\"/legal/notices.txt\""), "{legal}");
+        let (s, h, body) = send(&st, get("/legal/notices.txt")).await;
+        assert_eq!(s, StatusCode::OK);
+        assert_eq!(h[header::CONTENT_TYPE], "text/plain; charset=utf-8");
+        assert_eq!(body, crate::notices::text());
+        // The static route sits beside `/legal/{version}` without taking it over.
+        let (s, _, _) = send(&st, get("/legal/notices")).await;
+        assert_eq!(s, StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]

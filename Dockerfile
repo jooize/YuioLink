@@ -18,6 +18,8 @@ RUN mkdir -p core/src server/src \
     && rm -rf core/src server/src
 COPY core ./core
 COPY server ./server
+# Built into the binary by server/src/notices.rs.
+COPY NOTICE LICENSE-MIT LICENSE-APACHE ./
 RUN cargo build --release --locked -p yuiolink-server
 
 FROM debian:trixie-slim

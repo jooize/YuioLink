@@ -5,6 +5,7 @@ mod emoji;
 mod error;
 mod joining;
 mod legal;
+mod notices;
 mod phone;
 mod qr;
 mod ratelimit;
@@ -15,6 +16,7 @@ mod variation;
 mod views;
 mod web;
 
+use std::io::Write;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
@@ -25,8 +27,33 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use web::AppState;
 
+const USAGE: &str = "\
+usage: yuiolink-server             serve; settings come from YUIOLINK_* variables
+       yuiolink-server --notices   print third-party notices and license texts
+       yuiolink-server --help      print this
+";
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Settings come from YUIOLINK_* variables (see config.rs); the command line
+    // has two options, so anything else on it is refused rather than ignored.
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    match args.as_slice() {
+        [] => {}
+        [flag] if flag == "--notices" => {
+            std::io::stdout().write_all(notices::text().as_bytes())?;
+            return Ok(());
+        }
+        [flag] if flag == "--help" || flag == "-h" => {
+            print!("{USAGE}");
+            return Ok(());
+        }
+        _ => {
+            eprint!("{USAGE}");
+            std::process::exit(2);
+        }
+    }
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()

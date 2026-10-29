@@ -486,6 +486,14 @@ fn page(base_url: &str, idx: usize) -> Markup {
             " of what the terms said, independent of this site."
         }
 
+        h3.help-h #notices { "Third-party notices" }
+        p.help-p {
+            "YuioLink includes fonts, word lists and data made by others, under "
+            "their own licenses. Their notices and full license texts are at "
+            a href="/legal/notices.txt" { "/legal/notices.txt" }
+            "."
+        }
+
         footer { a href="/" { "Back to YuioLink" } }
     };
     document_full(
