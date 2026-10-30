@@ -20,11 +20,17 @@ COPY core ./core
 COPY server ./server
 # Built into the binary by server/src/licenses.rs.
 COPY NOTICE LICENSE-MIT LICENSE-APACHE ./
-RUN cargo build --release --locked -p yuiolink-server
+# The target directory is a build cache, not a layer, so a local rebuild after
+# a source change recompiles only what changed. A cache starts empty on a
+# fresh builder (CI, releases), where this is an ordinary full build. The
+# binary is copied out because the cache is not part of the image.
+RUN --mount=type=cache,id=yuiolink-target,target=/src/target,sharing=locked \
+    cargo build --release --locked -p yuiolink-server \
+    && cp target/release/yuiolink-server /usr/local/bin/yuiolink-server
 
 FROM debian:trixie-slim
 RUN useradd --create-home --uid 10001 app && mkdir -p /data && chown app:app /data
-COPY --from=build /src/target/release/yuiolink-server /usr/local/bin/yuiolink-server
+COPY --from=build /usr/local/bin/yuiolink-server /usr/local/bin/yuiolink-server
 USER app
 WORKDIR /data
 # Bind on all interfaces so the fronting Caddy container can reach it; keep the

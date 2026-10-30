@@ -1,24 +1,17 @@
-# Keep the build context small and reproducible: no build output, VCS, scratch,
-# or local databases. Source + manifests only.
-target
-.agents-cargo
-.direnv
-repo-archive
-legacy-server-backup
-deploy
-design
-docs
-tools
-node_modules
-.git
-.tmp
-.trash
-.claude
-.claude-memory
-.claude-lane
-.claude-plans
-.claude-transcripts
-.envrc
-*.db
-*.db-wal
-*.db-shm
+# The build context is exactly what the Dockerfile copies: everything is
+# excluded, then the inputs are named. A new top-level file or folder (local
+# state, scratch, session logs) stays out of the context without an entry
+# here. Add a line when the Dockerfile starts copying something new.
+*
+!Cargo.toml
+!Cargo.lock
+!core
+!server
+!NOTICE
+!LICENSE-MIT
+!LICENSE-APACHE
+# Inside the named folders: build output and local databases.
+**/target
+**/*.db
+**/*.db-wal
+**/*.db-shm
