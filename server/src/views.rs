@@ -3328,8 +3328,8 @@ fn idn_panel(w: &IdnWarning) -> Markup {
 /// are unticked, and keep the button honest about what it would open.
 ///
 /// Every slice ships as `(class, text)` runs rather than as markup. The site's
-/// CSP carries `require-trusted-types-for 'script'` with no policy allowed, so
-/// an `innerHTML` assignment would throw outright — the script has to build
+/// CSP carries `require-trusted-types-for 'script'` and the site creates no
+/// policy, so an `innerHTML` assignment would throw outright — the script has to build
 /// elements and set `textContent`. That is the stricter arrangement anyway: no
 /// HTML crosses this boundary at all, in either direction.
 fn card_model(uri: &UriView) -> String {
@@ -5808,7 +5808,7 @@ mod tests {
 
     /// The other half of the same rule, from the script's side.
     ///
-    /// The CSP carries `require-trusted-types-for 'script'` with no policy, so
+    /// The CSP carries `require-trusted-types-for 'script'` and we create no policy, so
     /// an innerHTML assignment throws. The half-edited build() gave itself away
     /// here too: it was still concatenating `'<span class="dl">'`.
     #[test]
@@ -5849,8 +5849,8 @@ mod tests {
 
     #[test]
     fn no_markup_crosses_into_the_parts_model() {
-        // The site's CSP carries `require-trusted-types-for 'script'` with no
-        // policy allowed, so preview.js cannot assign innerHTML at all. The
+        // The site's CSP carries `require-trusted-types-for 'script'` and the
+        // site creates no policy, so preview.js cannot assign innerHTML at all. The
         // model therefore ships (class, text) runs; a stray tag in here would
         // be a string the script could only render as literal text -- or, if
         // someone "fixed" that with innerHTML, a page that throws in Chrome.

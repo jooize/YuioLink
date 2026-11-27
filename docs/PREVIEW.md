@@ -214,7 +214,7 @@ subtitle when `?join` goes — and all of it is still read off the URI's
 structure.
 
 **No HTML crosses the boundary.** The site's CSP carries
-`require-trusted-types-for 'script'` with no policy allowed, so an `innerHTML`
+`require-trusted-types-for 'script'` and the site creates no policy, so an `innerHTML`
 assignment throws outright in browsers that enforce Trusted Types. The parts
 model on `.pv-slices[data-card]` therefore ships `(class, text)` runs, and
 `preview.js` builds elements and sets `textContent`.

@@ -25,7 +25,7 @@
 // is what the Copy buttons do; selecting text does exactly what it looks like.
 //
 // And no HTML is ever assembled as a string here. The site's CSP carries
-// `require-trusted-types-for 'script'` with no policy allowed, so an innerHTML
+// `require-trusted-types-for 'script'` and the site creates no policy, so an innerHTML
 // assignment throws; the server hands over `(class, text)` runs and this file
 // builds elements and sets textContent.
 (() => {

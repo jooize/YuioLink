@@ -15,9 +15,18 @@
 //!
 //! `require-trusted-types-for 'script'` closes the DOM-XSS sinks the policy
 //! cannot see: with it, `innerHTML` and friends reject plain strings outright.
-//! `trusted-types 'none'` then forbids minting a policy to get around that. The
-//! client builds every node it needs (`createElement`, `createElementNS` for the
-//! inline icons), so it never wanted either.
+//! The client builds every node it needs (`createElement`, `createElementNS`
+//! for the inline icons), so it never wanted them.
+//!
+//! There is deliberately no `trusted-types` directive. `trusted-types 'none'`
+//! (or any list of policy names) would forbid creating a policy, and Apple's
+//! LinkPresentation, which builds the rich link Messages shows, runs its own
+//! extractor script in the page and that script creates one. Under the
+//! restriction it throws on any page with a description, and Messages shows a
+//! bare link: every link preview in iMessage was lost that way from August to
+//! November 2026. What the directive added was a refusal for code already
+//! running here, and the only such code is ours, which creates no policy; the
+//! test below holds it to that, so the sinks stay closed without it.
 
 use std::sync::Arc;
 
@@ -69,8 +78,7 @@ fn csp(nonce: &str) -> String {
          base-uri 'none'; \
          frame-ancestors 'none'; \
          object-src 'none'; \
-         require-trusted-types-for 'script'; \
-         trusted-types 'none'"
+         require-trusted-types-for 'script'"
     )
 }
 
@@ -134,4 +142,95 @@ pub async fn headers(req: Request, next: Next) -> Response {
         h.insert(CORP, HeaderValue::from_static("same-origin"));
     }
     res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::csp;
+
+    /// Every script the site serves. A new file under static/ that is not
+    /// listed here would escape the sink check below, so the list is checked
+    /// against the directory too.
+    const SCRIPTS: [(&str, &str); 3] = [
+        ("app.js", include_str!("../static/app.js")),
+        ("preview.js", include_str!("../static/preview.js")),
+        ("text.js", include_str!("../static/text.js")),
+    ];
+
+    /// `source` with its comments removed, so a comment that names a sink (to
+    /// explain why it is not used) does not trip the check.
+    fn code_only(source: &str) -> String {
+        let mut out = String::with_capacity(source.len());
+        let mut rest = source;
+        loop {
+            let block = rest.find("/*");
+            let line = rest.find("//");
+            match (block, line) {
+                (Some(b), l) if l.is_none_or(|l| b < l) => {
+                    out.push_str(&rest[..b]);
+                    rest = rest[b..].find("*/").map_or("", |e| &rest[b + e + 2..]);
+                }
+                (_, Some(l)) => {
+                    out.push_str(&rest[..l]);
+                    rest = rest[l..].find('\n').map_or("", |e| &rest[l + e..]);
+                }
+                _ => {
+                    out.push_str(rest);
+                    return out;
+                }
+            }
+        }
+    }
+
+    /// The browser closes the sinks; this keeps the guarantee the policy no
+    /// longer states for itself (see the module comment): no script of ours
+    /// creates a Trusted Types policy, and none writes markup into the page.
+    #[test]
+    fn no_script_creates_a_policy_or_writes_markup() {
+        for (name, source) in SCRIPTS {
+            let code = code_only(source);
+            for forbidden in [
+                "createPolicy",
+                "innerHTML",
+                "outerHTML",
+                "insertAdjacentHTML",
+                "document.write",
+                "srcdoc",
+                "DOMParser",
+                "createContextualFragment",
+            ] {
+                assert!(
+                    !code.contains(forbidden),
+                    "{name} contains `{forbidden}`; the site creates no Trusted Types \
+                     policy, so it would throw (and a policy would reopen the sink)"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_served_script_is_checked() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/static");
+        let mut on_disk: Vec<String> = std::fs::read_dir(dir)
+            .expect("static/ is readable")
+            .map(|e| e.expect("static/ entry").file_name().into_string().unwrap())
+            .filter(|n| n.ends_with(".js"))
+            .collect();
+        on_disk.sort();
+        let listed: Vec<&str> = SCRIPTS.iter().map(|(n, _)| *n).collect();
+        assert_eq!(on_disk, listed, "static/*.js and SCRIPTS disagree");
+    }
+
+    /// Sinks stay closed, and policy creation stays open: a `trusted-types`
+    /// directive breaks iMessage link previews (see the module comment).
+    #[test]
+    fn trusted_types_are_required_but_policy_names_are_not_restricted() {
+        let policy = csp("n");
+        assert!(policy.contains("require-trusted-types-for 'script'"), "{policy}");
+        let directives: Vec<&str> = policy.split(';').map(str::trim).collect();
+        assert!(
+            !directives.iter().any(|d| d.starts_with("trusted-types")),
+            "{policy}"
+        );
+    }
 }
