@@ -31,3 +31,14 @@ license = "MIT"
 checksum = "9e2041d9dd3fda7a7d215385844a9d398f05b68a038b93d5a28fe4fffc3957f0"
 end = "SOFTWARE.\n"
 
+# regex-cache's src/lib.rs opens with the full MIT text, so cargo-about (0.9.2
+# and later keep every detected file) would list that source file, code
+# included, beside the root LICENSE, which holds the same holder and text.
+# Name the root file alone. A changed file drops the clarification, as above.
+[regex-cache.clarify]
+license = "MIT"
+[[regex-cache.clarify.files]]
+path = "LICENSE"
+license = "MIT"
+checksum = "f39ae1fe92d40fc4acdb1296d068028ec7882cdd946db399a048890d5373a603"
+

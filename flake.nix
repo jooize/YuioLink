@@ -25,6 +25,25 @@
           rustc = rustToolchain;
         };
 
+        # cargo-about 0.9.2 fixed upstream issue #309: 0.9.0 kept one license
+        # file per license, chosen in directory-listing order, so the crate
+        # license file differed between macOS and Linux and could credit a
+        # crate with a bundled file's text. nixpkgs still ships 0.9.0 (checked
+        # 2026-11-27); drop this override once it ships 0.9.2 or later.
+        cargo-about = pkgs.cargo-about.overrideAttrs (finalAttrs: _old: {
+          version = "0.9.3";
+          src = pkgs.fetchFromGitHub {
+            owner = "EmbarkStudios";
+            repo = "cargo-about";
+            tag = finalAttrs.version;
+            hash = "sha256-Jlr4TYNZkzYo5V77n0YYrx1e8m17ELN/1+ZcR/Bl0K4=";
+          };
+          cargoDeps = pkgs.rustPlatform.fetchCargoVendor {
+            inherit (finalAttrs) pname version src;
+            hash = "sha256-kNGfQQumgvtDPhiQcqc9K2ohhEsTzuySeisHcNcmig8=";
+          };
+        });
+
         # Keep transcripts / scratch dirs out of the build source so editing
         # them does not bust the Nix build cache.
         src = pkgs.lib.cleanSourceWith {
@@ -58,7 +77,7 @@
             pkgs.sqlite
             # Third-party license texts (tools/crate-licenses) and the
             # dependency policy in deny.toml; CI runs both from this shell.
-            pkgs.cargo-about
+            cargo-about
             pkgs.cargo-deny
           ];
         };
