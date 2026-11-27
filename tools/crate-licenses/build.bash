@@ -72,6 +72,8 @@ fi
 if ((check)); then
     if ! cmp -s -- "${work}/LICENSE.txt" "${out}"; then
         echo "${out#"${repo}/"} is stale; run tools/crate-licenses/build.bash" >&2
+        echo "difference (committed, then generated):" >&2
+        diff -u --label committed --label generated -- "${out}" "${work}/LICENSE.txt" >&2 || true
         exit 1
     fi
     exit 0
