@@ -226,7 +226,10 @@ mod tests {
     #[test]
     fn trusted_types_are_required_but_policy_names_are_not_restricted() {
         let policy = csp("n");
-        assert!(policy.contains("require-trusted-types-for 'script'"), "{policy}");
+        assert!(
+            policy.contains("require-trusted-types-for 'script'"),
+            "{policy}"
+        );
         let directives: Vec<&str> = policy.split(';').map(str::trim).collect();
         assert!(
             !directives.iter().any(|d| d.starts_with("trusted-types")),
